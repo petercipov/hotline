@@ -86,7 +86,9 @@ func (h *Histogram) SizeInBytes() int {
 	return (sizeOfBucket * sizeOfKey) + (sizeOfBucket * sizeOfBuckets)
 }
 
-var growthDivisor = math.Log(1.15)
+const growthFactor = 1.15
+
+var growthDivisor = math.Log(growthFactor)
 
 type bucketIndex int
 
@@ -95,7 +97,7 @@ func exponentiallyDistributedKey(latency float64) bucketIndex {
 }
 
 func (h *bucketIndex) to() float64 {
-	return math.Pow(1.15, float64(*h+1))
+	return math.Pow(growthFactor, float64(*h+1))
 }
 
 func (h *bucketIndex) from() float64 {
@@ -103,5 +105,5 @@ func (h *bucketIndex) from() float64 {
 		return 0
 	}
 
-	return math.Pow(1.15, float64(*h))
+	return math.Pow(growthFactor, float64(*h))
 }
