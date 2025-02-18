@@ -7,16 +7,55 @@ import (
 	"unsafe"
 )
 
-type Histogram struct {
-	counters map[bucketIndex]int64
-	layout   *exponentialBucketLayout
+type bucketIndex int
+type bucketCounter struct {
+	key            bucketIndex
+	counter        int64
+	splitThreshold *float64
+	splitCounter   int64
 }
 
-func NewHistogram() *Histogram {
-	return &Histogram{
-		counters: make(map[bucketIndex]int64),
-		layout:   newExponentialLayout(),
+func (b *bucketCounter) Inc(latency float64) {
+	if b.splitThreshold != nil && latency <= *b.splitThreshold {
+		b.splitCounter++
+	} else {
+		b.counter++
 	}
+}
+
+func (b *bucketCounter) Sum() int64 {
+	return b.counter + b.splitCounter
+}
+
+func (b *bucketCounter) Split(toDistribute int64, maxTo float64) float64 {
+	if toDistribute >= b.splitCounter {
+		return maxTo
+	}
+	return *b.splitThreshold
+}
+
+type Histogram struct {
+	buckets map[bucketIndex]bucketCounter
+	layout  *exponentialBucketLayout
+}
+
+func NewHistogram(splitThreshold *float64) *Histogram {
+	h := &Histogram{
+		buckets: make(map[bucketIndex]bucketCounter),
+		layout:  newExponentialLayout(),
+	}
+
+	if splitThreshold != nil {
+		key := h.layout.key(*splitThreshold)
+		h.buckets[key] = bucketCounter{
+			key:            key,
+			counter:        0,
+			splitThreshold: splitThreshold,
+			splitCounter:   0,
+		}
+	}
+
+	return h
 }
 
 type Bucket struct {
@@ -25,61 +64,64 @@ type Bucket struct {
 }
 
 func (h *Histogram) ComputeP50() Bucket {
-	count := h.counterSum()
+	count := h.allCountersSum()
 	if count <= 2 {
 		return Bucket{}
 	}
 
-	entriesThreshold := int64(math.Ceil(float64(count) * 0.5))
-	index := h.findBucketGeThreshold(entriesThreshold)
+	pThreshold := int64(math.Ceil(float64(count) * 0.5))
+	index, toDistribute := h.findBucketGeThreshold(pThreshold)
 
+	bucket := h.buckets[index]
+	to := bucket.Split(toDistribute, h.layout.to(index))
 	return Bucket{
 		From: h.layout.from(index),
-		To:   h.layout.to(index),
+		To:   to,
 	}
 }
 
-func (h *Histogram) findBucketGeThreshold(threshold int64) bucketIndex {
-	sortedKeys := slices.SortedFunc(maps.Keys(h.counters), func(index bucketIndex, index2 bucketIndex) int {
+func (h *Histogram) findBucketGeThreshold(threshold int64) (bucketIndex, int64) {
+	sortedKeys := slices.SortedFunc(maps.Keys(h.buckets), func(index bucketIndex, index2 bucketIndex) int {
 		return int(index) - int(index2)
 	})
 	entries := int64(0)
-
 	if len(sortedKeys) == 1 {
-		return sortedKeys[0]
+		return sortedKeys[0], 0
 	}
 
 	for _, sortedKey := range sortedKeys {
-		entries += h.counters[sortedKey]
-		if entries >= threshold {
-			return sortedKey
+		bucket := h.buckets[sortedKey]
+		bucketSum := bucket.Sum()
+		if entries+bucketSum >= threshold {
+			return sortedKey, threshold - entries
+		} else {
+			entries += bucketSum
 		}
 	}
-	return sortedKeys[len(sortedKeys)-1]
+	return sortedKeys[len(sortedKeys)-1], 0
 }
 
 func (h *Histogram) Add(latency float64) {
 	key := h.layout.key(latency)
-	counter, found := h.counters[key]
+	bucket, found := h.buckets[key]
 	if !found {
-		h.counters[key] = 1
-	} else {
-		h.counters[key] = counter + 1
+		bucket = bucketCounter{key: key}
 	}
+	bucket.Inc(latency)
+	h.buckets[key] = bucket
 }
 
-func (h *Histogram) counterSum() int64 {
+func (h *Histogram) allCountersSum() int64 {
 	sum := int64(0)
-
-	for _, counter := range h.counters {
-		sum += counter
+	for _, bucket := range h.buckets {
+		sum += bucket.Sum()
 	}
 	return sum
 }
 
 func (h *Histogram) SizeInBytes() int {
-	b := int64(0)
-	sizeOfBuckets := len(h.counters)
+	b := bucketCounter{}
+	sizeOfBuckets := len(h.buckets)
 	sizeOfBucket := int(unsafe.Sizeof(&b))
 
 	k := bucketIndex(0)
@@ -87,8 +129,6 @@ func (h *Histogram) SizeInBytes() int {
 
 	return (sizeOfBucket * sizeOfKey) + (sizeOfBucket * sizeOfBuckets)
 }
-
-type bucketIndex int
 
 type exponentialBucketLayout struct {
 	growthFactor  float64
