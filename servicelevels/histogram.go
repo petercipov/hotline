@@ -9,11 +9,13 @@ import (
 
 type Histogram struct {
 	counters map[bucketIndex]int64
+	layout   *exponentialBucketLayout
 }
 
 func NewHistogram() *Histogram {
 	return &Histogram{
 		counters: make(map[bucketIndex]int64),
+		layout:   newExponentialLayout(),
 	}
 }
 
@@ -32,8 +34,8 @@ func (h *Histogram) ComputeP50() Bucket {
 	index := h.findBucketGeThreshold(entriesThreshold)
 
 	return Bucket{
-		From: index.from(),
-		To:   index.to(),
+		From: h.layout.from(index),
+		To:   h.layout.to(index),
 	}
 }
 
@@ -57,7 +59,7 @@ func (h *Histogram) findBucketGeThreshold(threshold int64) bucketIndex {
 }
 
 func (h *Histogram) Add(latency float64) {
-	key := exponentiallyDistributedKey(latency)
+	key := h.layout.key(latency)
 	counter, found := h.counters[key]
 	if !found {
 		h.counters[key] = 1
@@ -86,24 +88,31 @@ func (h *Histogram) SizeInBytes() int {
 	return (sizeOfBucket * sizeOfKey) + (sizeOfBucket * sizeOfBuckets)
 }
 
-const growthFactor = 1.15
-
-var growthDivisor = math.Log(growthFactor)
-
 type bucketIndex int
 
-func exponentiallyDistributedKey(latency float64) bucketIndex {
-	return bucketIndex(math.Floor(math.Log(latency) / growthDivisor))
+type exponentialBucketLayout struct {
+	growthFactor  float64
+	growthDivisor float64
 }
 
-func (h *bucketIndex) to() float64 {
-	return math.Pow(growthFactor, float64(*h+1))
+func newExponentialLayout() *exponentialBucketLayout {
+	return &exponentialBucketLayout{
+		growthFactor:  1.15,
+		growthDivisor: math.Log(1.15),
+	}
 }
 
-func (h *bucketIndex) from() float64 {
-	if *h == 0 {
+func (l *exponentialBucketLayout) key(latency float64) bucketIndex {
+	return bucketIndex(math.Floor(math.Log(latency) / l.growthDivisor))
+}
+
+func (l *exponentialBucketLayout) from(index bucketIndex) float64 {
+	if index == 0 {
 		return 0
 	}
+	return math.Pow(l.growthFactor, float64(index))
+}
 
-	return math.Pow(growthFactor, float64(*h))
+func (l *exponentialBucketLayout) to(index bucketIndex) float64 {
+	return math.Pow(l.growthFactor, float64(index+1))
 }
