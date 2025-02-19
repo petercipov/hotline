@@ -80,6 +80,23 @@ var _ = Describe("Histogram", func() {
 
 		})
 	})
+
+	Context("P99", func() {
+		It("computes 0 for an empty histogram", func() {
+			s.forEmptyHistogram()
+			bucket := s.computeP99()
+			Expect(bucket.From).Should(BeNumerically("==", 0))
+			Expect(bucket.To).Should(BeNumerically("==", 0))
+		})
+
+		It("computes bucket for a 3 latencies", func() {
+			s.forEmptyHistogram()
+			s.fillLatencies(17, 11, 22)
+			bucket := s.computeP99()
+			Expect(bucket.From).Should(BeNumerically("<=", 21.7))
+			Expect(bucket.To).Should(BeNumerically(">=", 24.8))
+		})
+	})
 })
 
 type sut struct {
@@ -91,7 +108,7 @@ func (s *sut) forEmptyHistogram() {
 }
 
 func (s *sut) computeP50() servicelevels.Bucket {
-	return s.h.ComputeP50()
+	return s.h.ComputePercentile(0.5)
 }
 
 func (s *sut) fillLatencies(latencies ...float64) {
@@ -120,4 +137,8 @@ func (s *sut) repeatIncreasingLatencies(count int, repeat int) []float64 {
 
 func (s *sut) forEmptyHistogramWithSplit(splitLatency ...float64) {
 	s.h = servicelevels.NewHistogram(splitLatency)
+}
+
+func (s *sut) computeP99() servicelevels.Bucket {
+	return s.h.ComputePercentile(0.99)
 }

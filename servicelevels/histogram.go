@@ -86,17 +86,17 @@ type Bucket struct {
 	To   float64
 }
 
-func (h *Histogram) ComputeP50() Bucket {
+func (h *Histogram) ComputePercentile(percentile float64) Bucket {
 	count := h.allCountersSum()
 	if count <= 2 {
 		return Bucket{}
 	}
 
-	pThreshold := int64(math.Ceil(float64(count) * 0.5))
-	index, toDistribute := h.findBucketGeThreshold(pThreshold)
+	pThreshold := int64(math.Ceil(float64(count) * percentile))
+	index, toDistributeInsideBucket := h.findBucketGeThreshold(pThreshold)
 
 	bucket := h.buckets[index]
-	to := bucket.Split(toDistribute)
+	to := bucket.Split(toDistributeInsideBucket)
 	return Bucket{
 		From: h.layout.from(index),
 		To:   to,
