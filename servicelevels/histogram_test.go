@@ -65,6 +65,20 @@ var _ = Describe("Histogram", func() {
 			Expect(bucket.To).ShouldNot(BeNumerically("==", 1000))
 			Expect(bucket.To).Should(BeNumerically("<=", 1084))
 		})
+
+		It("computes median more precise if split buckets by exact thresholds", func() {
+			s.forEmptyHistogramWithSplit(2000, 1000)
+			s.fillLatencies(500, 1000, 1000, 1000, 1000, 1900)
+			bucket := s.computeP50()
+			Expect(bucket.From).Should(BeNumerically(">=", 942))
+			Expect(bucket.To).Should(BeNumerically("==", 1000))
+
+			s.repeatLatencies(10, 2000, 2000, 2000, 2000)
+			bucket = s.computeP50()
+			Expect(bucket.From).Should(BeNumerically(">=", 1895))
+			Expect(bucket.To).Should(BeNumerically("==", 2000))
+
+		})
 	})
 })
 
@@ -86,6 +100,12 @@ func (s *sut) fillLatencies(latencies ...float64) {
 	}
 }
 
+func (s *sut) repeatLatencies(repeat int, latencies ...float64) {
+	for i := 0; i < repeat; i++ {
+		s.fillLatencies(latencies...)
+	}
+}
+
 func (s *sut) repeatIncreasingLatencies(count int, repeat int) []float64 {
 	var latencies []float64
 	for latency := 1; latency <= count; latency++ {
@@ -95,10 +115,9 @@ func (s *sut) repeatIncreasingLatencies(count int, repeat int) []float64 {
 	for i := 0; i < repeat; i++ {
 		s.fillLatencies(latencies...)
 	}
-
 	return latencies
 }
 
-func (s *sut) forEmptyHistogramWithSplit(splitLatency float64) {
-	s.h = servicelevels.NewHistogram(&splitLatency)
+func (s *sut) forEmptyHistogramWithSplit(splitLatency ...float64) {
+	s.h = servicelevels.NewHistogram(splitLatency)
 }
