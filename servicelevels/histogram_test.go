@@ -9,7 +9,7 @@ import (
 
 var _ = Describe("Histogram", func() {
 
-	s := sut{}
+	s := suthistogram{}
 
 	Context("P50", func() {
 		It("computes 0 for an empty histogram", func() {
@@ -99,31 +99,31 @@ var _ = Describe("Histogram", func() {
 	})
 })
 
-type sut struct {
+type suthistogram struct {
 	h *servicelevels.Histogram
 }
 
-func (s *sut) forEmptyHistogram() {
+func (s *suthistogram) forEmptyHistogram() {
 	s.h = servicelevels.NewHistogram(nil)
 }
 
-func (s *sut) computeP50() servicelevels.Bucket {
+func (s *suthistogram) computeP50() servicelevels.Bucket {
 	return s.h.ComputePercentile(0.5)
 }
 
-func (s *sut) fillLatencies(latencies ...float64) {
+func (s *suthistogram) fillLatencies(latencies ...float64) {
 	for _, latency := range latencies {
 		s.h.Add(latency)
 	}
 }
 
-func (s *sut) repeatLatencies(repeat int, latencies ...float64) {
+func (s *suthistogram) repeatLatencies(repeat int, latencies ...float64) {
 	for i := 0; i < repeat; i++ {
 		s.fillLatencies(latencies...)
 	}
 }
 
-func (s *sut) repeatIncreasingLatencies(count int, repeat int) []float64 {
+func (s *suthistogram) repeatIncreasingLatencies(count int, repeat int) []float64 {
 	var latencies []float64
 	for latency := 1; latency <= count; latency++ {
 		latencies = append(latencies, float64(latency))
@@ -135,11 +135,11 @@ func (s *sut) repeatIncreasingLatencies(count int, repeat int) []float64 {
 	return latencies
 }
 
-func (s *sut) forEmptyHistogramWithSplit(splitLatency ...float64) {
+func (s *suthistogram) forEmptyHistogramWithSplit(splitLatency ...float64) {
 	s.h = servicelevels.NewHistogram(splitLatency)
 }
 
-func (s *sut) computeP99() servicelevels.Bucket {
+func (s *suthistogram) computeP99() servicelevels.Bucket {
 	return s.h.ComputePercentile(0.99)
 }
 
