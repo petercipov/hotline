@@ -13,7 +13,7 @@ type SlidingWindow struct {
 	windows     []Window
 }
 
-func (w *SlidingWindow) GetWindow(now time.Time) interface{} {
+func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 	if w.windows == nil {
 		return nil
 	}
@@ -24,7 +24,7 @@ func (w *SlidingWindow) GetWindow(now time.Time) interface{} {
 
 	if (now.After(graceStart) || now.Equal(graceStart)) &&
 		(now.Before(graceEnd) || now.Equal(graceEnd)) {
-		return window
+		return &window
 	}
 	return nil
 }
