@@ -20,25 +20,25 @@ var _ = Describe("SlidingWindow", func() {
 		})
 	})
 
-	Context("window with single value", func() {
+	Context("window with single value, time is trimmed to grace period down", func() {
 		It("returns NO active window if current time not in grace period", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:04:04Z")
-			window := s.getActiveWindow("2025-02-22T12:04:05Z")
+			window := s.getActiveWindow("2025-02-22T12:04:00Z")
 			Expect(window).To(BeNil())
 		})
 
 		It("returns active window if current time falls into grace period", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:03:05Z")
-			window := s.getActiveWindow("2025-02-22T12:04:05Z")
+			window := s.getActiveWindow("2025-02-22T12:04:00Z")
 			Expect(window).NotTo(BeNil())
 		})
 
 		It("returns active window containing inserted value", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:03:05Z")
-			window := s.getActiveWindow("2025-02-22T12:04:05Z")
+			window := s.getActiveWindow("2025-02-22T12:04:00Z")
 			Expect(window).NotTo(BeNil())
 			Expect(s.windowContains(window, 1234)).To(BeTrue())
 		})

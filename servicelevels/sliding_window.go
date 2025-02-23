@@ -45,10 +45,14 @@ func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 
 func (w *SlidingWindow) AddValue(now time.Time, value float64) {
 	if w.windows == nil {
+
+		startTime := now.Truncate(w.GracePeriod)
+		endTime := startTime.Add(w.Size)
+		
 		w.windows = []Window{
 			{
-				StartTime:   now,
-				EndTime:     now.Add(w.Size),
+				StartTime:   startTime,
+				EndTime:     endTime,
 				Accumulator: w.createAcc(),
 			},
 		}
