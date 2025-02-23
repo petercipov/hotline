@@ -24,7 +24,7 @@ var _ = Describe("SlidingWindow", func() {
 		It("returns NO active window if current time not in grace period", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:04:04Z")
-			window := s.getActiveWindow("2025-02-22T12:04:00Z")
+			window := s.getActiveWindow("2025-02-22T13:04:04Z")
 			Expect(window).To(BeNil())
 		})
 
@@ -43,6 +43,19 @@ var _ = Describe("SlidingWindow", func() {
 			Expect(s.windowContains(window, 1234)).To(BeTrue())
 		})
 
+	})
+
+	Context("window with multiple values", func() {
+		It("hops to next window if first value if out of window size", func() {
+			s.forEmptySlidingWindow()
+			s.addValue(1234, "2025-02-22T12:04:04Z")
+			s.addValue(2345, "2025-02-22T12:04:55Z")
+
+			window := s.getActiveWindow("2025-02-22T12:05:05Z")
+			Expect(window).NotTo(BeNil())
+			Expect(s.windowContains(window, 1234)).NotTo(BeTrue())
+			Expect(s.windowContains(window, 2345)).To(BeTrue())
+		})
 	})
 })
 

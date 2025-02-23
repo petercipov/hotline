@@ -8,6 +8,19 @@ type Window struct {
 	Accumulator Accumulator
 }
 
+func (w *Window) IsActive(now time.Time) bool {
+	return (now.After(w.StartTime) || now.Equal(w.StartTime)) &&
+		(now.Before(w.EndTime) || now.Equal(w.EndTime))
+}
+
+func (w *Window) IsActiveInGracePeriod(now time.Time, gracePeriod time.Duration) bool {
+	graceEnd := w.EndTime
+	graceStart := w.EndTime.Add(-gracePeriod)
+
+	return (now.After(graceStart) || now.Equal(graceStart)) &&
+		(now.Before(graceEnd) || now.Equal(graceEnd))
+}
+
 type Accumulator interface {
 	Add(value float64)
 }
@@ -32,30 +45,49 @@ func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 		return nil
 	}
 
-	window := w.windows[0]
-	graceEnd := window.EndTime
-	graceStart := window.EndTime.Add(-w.GracePeriod)
-
-	if (now.After(graceStart) || now.Equal(graceStart)) &&
-		(now.Before(graceEnd) || now.Equal(graceEnd)) {
-		return &window
+	w.pruneInactiveWindows(now)
+	for _, window := range w.windows {
+		if window.IsActiveInGracePeriod(now, w.GracePeriod) {
+			return &window
+		}
 	}
 	return nil
 }
 
-func (w *SlidingWindow) AddValue(now time.Time, value float64) {
-	if w.windows == nil {
+func (w *SlidingWindow) pruneInactiveWindows(now time.Time) {
+	var activeWindows []Window
+	for _, window := range w.windows {
+		if window.IsActive(now) {
+			activeWindows = append(activeWindows, window)
+		}
+	}
+	w.windows = activeWindows
+}
 
-		startTime := now.Truncate(w.GracePeriod)
+func (w *SlidingWindow) AddValue(now time.Time, value float64) {
+	w.pruneInactiveWindows(now)
+
+	for offset := time.Duration(0); offset <= w.Size; offset += w.GracePeriod {
+		startTime := now.Truncate(w.GracePeriod).Add(-offset)
 		endTime := startTime.Add(w.Size)
-		
-		w.windows = []Window{
-			{
+
+		found := false
+		for _, window := range w.windows {
+			if window.StartTime.Equal(startTime) {
+				found = true
+			}
+		}
+
+		if !found {
+			w.windows = append(w.windows, Window{
 				StartTime:   startTime,
 				EndTime:     endTime,
 				Accumulator: w.createAcc(),
-			},
+			})
 		}
 	}
-	w.windows[0].Accumulator.Add(value)
+
+	for i := range w.windows {
+		w.windows[i].Accumulator.Add(value)
+	}
 }
