@@ -13,6 +13,13 @@ type SlidingWindow struct {
 	windows     []Window
 }
 
+func NewSlidingWindow(size time.Duration, gracePeriod time.Duration) *SlidingWindow {
+	return &SlidingWindow{
+		Size:        size,
+		GracePeriod: gracePeriod,
+	}
+}
+
 func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 	if w.windows == nil {
 		return nil
@@ -29,7 +36,7 @@ func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 	return nil
 }
 
-func (w *SlidingWindow) AddValue(now time.Time, _ float64) {
+func (w *SlidingWindow) AddValue(now time.Time, _ interface{}) {
 	if w.windows == nil {
 		w.windows = []Window{
 			{

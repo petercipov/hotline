@@ -41,10 +41,10 @@ type sutslidingwindow struct {
 }
 
 func (s *sutslidingwindow) forEmptySlidingWindow() {
-	s.slidingWindow = &servicelevels.SlidingWindow{
-		Size:        time.Minute,
-		GracePeriod: 10 * time.Second,
-	}
+	s.slidingWindow = servicelevels.NewSlidingWindow(
+		1*time.Minute,
+		10*time.Second,
+	)
 }
 
 func (s *sutslidingwindow) activeWindow(nowString string) interface{} {
