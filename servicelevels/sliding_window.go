@@ -3,20 +3,27 @@ package servicelevels
 import "time"
 
 type Window struct {
-	StartTime time.Time
-	EndTime   time.Time
+	StartTime   time.Time
+	EndTime     time.Time
+	Accumulator Accumulator
+}
+
+type Accumulator interface {
+	Add(value float64)
 }
 
 type SlidingWindow struct {
 	Size        time.Duration
 	GracePeriod time.Duration
 	windows     []Window
+	createAcc   func() Accumulator
 }
 
-func NewSlidingWindow(size time.Duration, gracePeriod time.Duration) *SlidingWindow {
+func NewSlidingWindow(createAcc func() Accumulator, size time.Duration, gracePeriod time.Duration) *SlidingWindow {
 	return &SlidingWindow{
 		Size:        size,
 		GracePeriod: gracePeriod,
+		createAcc:   createAcc,
 	}
 }
 
@@ -36,13 +43,15 @@ func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 	return nil
 }
 
-func (w *SlidingWindow) AddValue(now time.Time, _ interface{}) {
+func (w *SlidingWindow) AddValue(now time.Time, value float64) {
 	if w.windows == nil {
 		w.windows = []Window{
 			{
-				StartTime: now,
-				EndTime:   now.Add(w.Size),
+				StartTime:   now,
+				EndTime:     now.Add(w.Size),
+				Accumulator: w.createAcc(),
 			},
 		}
 	}
+	w.windows[0].Accumulator.Add(value)
 }
