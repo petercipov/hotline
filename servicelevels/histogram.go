@@ -8,18 +8,22 @@ import (
 )
 
 type bucketIndex int
+
+type splitCounter struct {
+	latency float64
+	counter int64
+}
 type bucketCounter struct {
-	key            bucketIndex
-	keyTo          float64
-	counter        int64
-	splitLatencies []float64
-	splitCounters  []int64
+	key     bucketIndex
+	keyTo   float64
+	counter int64
+	splits  []splitCounter
 }
 
 func (b *bucketCounter) Inc(latency float64) {
-	for i, threshold := range b.splitLatencies {
-		if latency <= threshold {
-			b.splitCounters[i]++
+	for i, split := range b.splits {
+		if latency <= split.latency {
+			b.splits[i].counter++
 			return
 		}
 	}
@@ -28,32 +32,34 @@ func (b *bucketCounter) Inc(latency float64) {
 
 func (b *bucketCounter) Sum() int64 {
 	sum := b.counter
-	for _, splitCounter := range b.splitCounters {
-		sum += splitCounter
+	for _, split := range b.splits {
+		sum += split.counter
 	}
 	return sum
 }
 
 func (b *bucketCounter) Split(toDistribute int64) float64 {
 	added := int64(0)
-	for i, splitCounter := range b.splitCounters {
-		added += splitCounter
+	for _, split := range b.splits {
+		added += split.counter
 		if added >= toDistribute {
-			return b.splitLatencies[i]
+			return split.latency
 		}
 	}
 	return b.keyTo
 }
 
 type Histogram struct {
-	buckets map[bucketIndex]bucketCounter
-	layout  *exponentialBucketLayout
+	buckets     map[bucketIndex]bucketCounter
+	layout      *exponentialBucketLayout
+	splitLength int
 }
 
 func NewHistogram(splitLatencies []float64) *Histogram {
 	h := &Histogram{
-		buckets: make(map[bucketIndex]bucketCounter),
-		layout:  newExponentialLayout(),
+		buckets:     make(map[bucketIndex]bucketCounter),
+		layout:      newExponentialLayout(),
+		splitLength: len(splitLatencies),
 	}
 
 	slices.Sort(splitLatencies)
@@ -70,12 +76,19 @@ func NewHistogram(splitLatencies []float64) *Histogram {
 	}
 
 	for key, latenciesForKey := range latenciesByKey {
+		var splits []splitCounter
+		for _, latencyForKey := range latenciesForKey {
+			splits = append(splits, splitCounter{
+				latency: latencyForKey,
+				counter: 0,
+			})
+		}
+
 		h.buckets[key] = bucketCounter{
-			key:            key,
-			keyTo:          h.layout.to(key),
-			counter:        0,
-			splitLatencies: latenciesForKey,
-			splitCounters:  make([]int64, len(latenciesForKey)),
+			key:     key,
+			keyTo:   h.layout.to(key),
+			counter: 0,
+			splits:  splits,
 		}
 	}
 	return h
@@ -146,6 +159,9 @@ func (h *Histogram) allCountersSum() int64 {
 }
 
 func (h *Histogram) SizeInBytes() int {
+	c := splitCounter{}
+	sizeOfSplit := int(unsafe.Sizeof(&c))
+
 	b := bucketCounter{}
 	sizeOfBuckets := len(h.buckets)
 	sizeOfBucket := int(unsafe.Sizeof(&b))
@@ -153,7 +169,9 @@ func (h *Histogram) SizeInBytes() int {
 	k := bucketIndex(0)
 	sizeOfKey := int(unsafe.Sizeof(&k))
 
-	return (sizeOfBucket * sizeOfKey) + (sizeOfBucket * sizeOfBuckets)
+	return (sizeOfBucket * sizeOfKey) +
+		(sizeOfBucket * sizeOfBuckets) +
+		(h.splitLength * sizeOfSplit)
 }
 
 type exponentialBucketLayout struct {
