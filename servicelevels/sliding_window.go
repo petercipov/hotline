@@ -25,6 +25,10 @@ func (w *Window) IsActiveGracePeriod(now time.Time, gracePeriod time.Duration) b
 		(now.Before(graceEnd) || now.Equal(graceEnd))
 }
 
+func (w *Window) IsObsolete(now time.Time) bool {
+	return !(w.IsActive(now) || w.IsInFuture(now))
+}
+
 type Accumulator interface {
 	Add(value float64)
 }
@@ -49,7 +53,7 @@ func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 	if len(w.windows) == 0 {
 		return nil
 	}
-	w.pruneInactiveWindows(now)
+	w.pruneObsoleteWindows(now)
 	for _, window := range w.windows {
 		if window.IsActiveGracePeriod(now, w.GracePeriod) {
 			return window
@@ -58,16 +62,16 @@ func (w *SlidingWindow) GetActiveWindow(now time.Time) *Window {
 	return nil
 }
 
-func (w *SlidingWindow) pruneInactiveWindows(now time.Time) {
+func (w *SlidingWindow) pruneObsoleteWindows(now time.Time) {
 	for key, window := range w.windows {
-		if !(window.IsActive(now) || window.IsInFuture(now)) {
+		if window.IsObsolete(now) {
 			delete(w.windows, key)
 		}
 	}
 }
 
 func (w *SlidingWindow) AddValue(now time.Time, value float64) {
-	w.pruneInactiveWindows(now)
+	w.pruneObsoleteWindows(now)
 
 	for offset := time.Duration(0); offset <= w.Size; offset += w.GracePeriod {
 		startTime := now.Truncate(w.GracePeriod).Add(offset)
