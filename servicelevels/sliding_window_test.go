@@ -65,6 +65,30 @@ var _ = Describe("SlidingWindow", func() {
 				nil,
 			}))
 		})
+
+		It("should generate multiple windows in past and future for 2 data points, window size away, from each other", func() {
+			s.forEmptySlidingWindow()
+			s.addValue(1234, "2025-02-22T12:03:05Z")
+			s.addValue(1234, "2025-02-22T12:04:05Z")
+			scrolledWindows := s.scrollByGracePeriod("2025-02-22T12:04:05Z", 13)
+			startTimes := scrolledWindows.StartTimes()
+
+			Expect(startTimes).To(Equal([]*time.Time{
+				parseTimePtr("2025-02-22T12:03:10Z"),
+				parseTimePtr("2025-02-22T12:03:20Z"),
+				parseTimePtr("2025-02-22T12:03:30Z"),
+				parseTimePtr("2025-02-22T12:03:40Z"),
+				parseTimePtr("2025-02-22T12:03:50Z"),
+				parseTimePtr("2025-02-22T12:04:00Z"),
+				parseTimePtr("2025-02-22T12:04:10Z"),
+				parseTimePtr("2025-02-22T12:04:20Z"),
+				parseTimePtr("2025-02-22T12:04:30Z"),
+				parseTimePtr("2025-02-22T12:04:40Z"),
+				parseTimePtr("2025-02-22T12:04:50Z"),
+				parseTimePtr("2025-02-22T12:05:00Z"),
+				nil,
+			}))
+		})
 	})
 
 	Context("window with multiple values", func() {

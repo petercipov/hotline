@@ -9,20 +9,28 @@ type Window struct {
 }
 
 func (w *Window) IsActive(now time.Time) bool {
-	return (now.After(w.StartTime) || now.Equal(w.StartTime)) &&
-		(now.Before(w.EndTime) || now.Equal(w.EndTime))
+	nowSec := now.Unix()
+	startSec := w.StartTime.Unix()
+	endSec := w.EndTime.Unix()
+
+	return nowSec >= startSec && nowSec < endSec
 }
 
 func (w *Window) IsInFuture(now time.Time) bool {
-	return now.Before(w.StartTime)
+	nowSec := now.Unix()
+	startSec := w.StartTime.Unix()
+	return nowSec < startSec
 }
 
 func (w *Window) IsActiveGracePeriod(now time.Time, gracePeriod time.Duration) bool {
 	graceEnd := w.EndTime
 	graceStart := w.EndTime.Add(-gracePeriod)
 
-	return (now.After(graceStart) || now.Equal(graceStart)) &&
-		(now.Before(graceEnd) || now.Equal(graceEnd))
+	nowSec := now.Unix()
+	graceStartSec := graceStart.Unix()
+	graceEndSec := graceEnd.Unix()
+
+	return nowSec >= graceStartSec && nowSec < graceEndSec
 }
 
 func (w *Window) IsObsolete(now time.Time) bool {
@@ -36,7 +44,7 @@ type Accumulator interface {
 type SlidingWindow struct {
 	Size        time.Duration
 	GracePeriod time.Duration
-	windows     map[time.Time]*Window
+	windows     map[int64]*Window
 	createAcc   func() Accumulator
 }
 
@@ -45,7 +53,7 @@ func NewSlidingWindow(createAcc func() Accumulator, size time.Duration, gracePer
 		Size:        size,
 		GracePeriod: gracePeriod,
 		createAcc:   createAcc,
-		windows:     make(map[time.Time]*Window),
+		windows:     make(map[int64]*Window),
 	}
 }
 
@@ -77,9 +85,10 @@ func (w *SlidingWindow) AddValue(now time.Time, value float64) {
 		startTime := now.Truncate(w.GracePeriod).Add(offset)
 		endTime := startTime.Add(w.Size)
 
-		_, found := w.windows[startTime]
+		key := startTime.Unix()
+		_, found := w.windows[key]
 		if !found {
-			w.windows[startTime] = &Window{
+			w.windows[key] = &Window{
 				StartTime:   startTime,
 				EndTime:     endTime,
 				Accumulator: w.createAcc(),
