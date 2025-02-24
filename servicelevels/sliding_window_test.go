@@ -43,15 +43,48 @@ var _ = Describe("SlidingWindow", func() {
 			Expect(s.windowContains(window, 1234)).To(BeTrue())
 		})
 
+		It("should generate multiple windows to future from single data, scrolled by grace period", func() {
+			s.forEmptySlidingWindow()
+			s.addValue(1234, "2025-02-22T12:03:05Z")
+
+			scrolledWindows := s.scrollByGracePeriod("2025-02-22T12:03:05Z", 13)
+			startTimes := scrolledWindows.StartTimes()
+			Expect(startTimes).To(Equal([]*time.Time{
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				parseTimePtr("2025-02-22T12:03:00Z"),
+				parseTimePtr("2025-02-22T12:03:10Z"),
+				parseTimePtr("2025-02-22T12:03:20Z"),
+				parseTimePtr("2025-02-22T12:03:30Z"),
+				parseTimePtr("2025-02-22T12:03:40Z"),
+				parseTimePtr("2025-02-22T12:03:50Z"),
+				parseTimePtr("2025-02-22T12:04:00Z"),
+				nil,
+			}))
+		})
 	})
 
 	Context("window with multiple values", func() {
-		It("hops to next window if first value if out of window size", func() {
+		It("hops to next window if first value if not out of first window boundaries", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:04:04Z")
 			s.addValue(2345, "2025-02-22T12:04:55Z")
 
 			window := s.getActiveWindow("2025-02-22T12:05:05Z")
+			Expect(window).NotTo(BeNil())
+			Expect(s.windowContains(window, 1234)).To(BeTrue())
+			Expect(s.windowContains(window, 2345)).To(BeTrue())
+		})
+
+		It("hops to next window if first value if out of first window boundaries", func() {
+			s.forEmptySlidingWindow()
+			s.addValue(1234, "2025-02-22T12:04:04Z")
+			s.addValue(2345, "2025-02-22T12:05:10Z")
+
+			window := s.getActiveWindow("2025-02-22T12:06:10Z")
 			Expect(window).NotTo(BeNil())
 			Expect(s.windowContains(window, 1234)).NotTo(BeTrue())
 			Expect(s.windowContains(window, 2345)).To(BeTrue())
@@ -71,21 +104,60 @@ func (s *sutslidingwindow) forEmptySlidingWindow() {
 	)
 }
 
-func (s *sutslidingwindow) getActiveWindow(nowString string) *servicelevels.Window {
+func parseTimePtr(nowString string) *time.Time {
+	now := parseTime(nowString)
+	return &now
+}
+
+func parseTime(nowString string) time.Time {
 	now, parseErr := time.Parse(time.RFC3339, nowString)
 	Expect(parseErr).NotTo(HaveOccurred())
+	return now
+}
+
+func (s *sutslidingwindow) getActiveWindow(nowString string) *servicelevels.Window {
+	now := parseTime(nowString)
 	return s.slidingWindow.GetActiveWindow(now)
 }
 
 func (s *sutslidingwindow) addValue(latency float64, nowString string) {
-	now, parseErr := time.Parse(time.RFC3339, nowString)
-	Expect(parseErr).NotTo(HaveOccurred())
+	now := parseTime(nowString)
 	s.slidingWindow.AddValue(now, latency)
 }
 
 func (s *sutslidingwindow) windowContains(window *servicelevels.Window, value float64) bool {
 	acc := window.Accumulator.(*arrAccumulator)
 	return slices.Contains(acc.values, value)
+}
+
+func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolledWindows {
+	now := parseTime(nowStr)
+	var windows []*servicelevels.Window
+	for i := 0; i < count; i++ {
+		tNow := now.Add(s.slidingWindow.GracePeriod * time.Duration(i))
+		window := s.slidingWindow.GetActiveWindow(tNow)
+		windows = append(windows, window)
+	}
+	return windows
+}
+
+type scrolledWindows []*servicelevels.Window
+
+func (s *scrolledWindows) StartTimes() []*time.Time {
+	if s == nil {
+		return nil
+	}
+
+	var startTimes []*time.Time
+	for _, window := range *s {
+		if window == nil {
+			startTimes = append(startTimes, nil)
+		} else {
+			startTimes = append(startTimes, &window.StartTime)
+		}
+	}
+
+	return startTimes
 }
 
 type arrAccumulator struct {
