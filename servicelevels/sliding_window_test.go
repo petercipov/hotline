@@ -1,6 +1,7 @@
 package servicelevels_test
 
 import (
+	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"hotline/servicelevels"
@@ -23,45 +24,39 @@ var _ = Describe("SlidingWindow", func() {
 	Context("window with single value, time is trimmed to grace period down", func() {
 		It("returns NO active window if current time not in grace period", func() {
 			s.forEmptySlidingWindow()
-			s.addValue(1234, "2025-02-22T12:04:04Z")
-			window := s.getActiveWindow("2025-02-22T13:04:04Z")
+			s.addValue(1234, "2025-02-22T12:03:05Z")
+			window := s.getActiveWindow("2025-02-22T12:04:00Z")
 			Expect(window).To(BeNil())
 		})
 
 		It("returns active window if current time falls into grace period", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:03:05Z")
-			window := s.getActiveWindow("2025-02-22T12:04:00Z")
+			window := s.getActiveWindow("2025-02-22T12:03:59Z")
 			Expect(window).NotTo(BeNil())
 		})
 
 		It("returns active window containing inserted value", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:03:05Z")
-			window := s.getActiveWindow("2025-02-22T12:04:00Z")
+			window := s.getActiveWindow("2025-02-22T12:03:59Z")
 			Expect(window).NotTo(BeNil())
 			Expect(s.windowContains(window, 1234)).To(BeTrue())
 		})
 
-		It("should generate multiple windows to future from single data, scrolled by grace period", func() {
+		It("should generate multiple windows to past from single data, scrolled by grace period", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:03:05Z")
 
-			scrolledWindows := s.scrollByGracePeriod("2025-02-22T12:03:05Z", 13)
+			scrolledWindows := s.scrollByGracePeriod("2025-02-22T12:03:05Z", 7)
 			startTimes := scrolledWindows.StartTimes()
 			Expect(startTimes).To(Equal([]*time.Time{
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
+				parseTimePtr("2025-02-22T12:02:10Z"),
+				parseTimePtr("2025-02-22T12:02:20Z"),
+				parseTimePtr("2025-02-22T12:02:30Z"),
+				parseTimePtr("2025-02-22T12:02:40Z"),
+				parseTimePtr("2025-02-22T12:02:50Z"),
 				parseTimePtr("2025-02-22T12:03:00Z"),
-				parseTimePtr("2025-02-22T12:03:10Z"),
-				parseTimePtr("2025-02-22T12:03:20Z"),
-				parseTimePtr("2025-02-22T12:03:30Z"),
-				parseTimePtr("2025-02-22T12:03:40Z"),
-				parseTimePtr("2025-02-22T12:03:50Z"),
-				parseTimePtr("2025-02-22T12:04:00Z"),
 				nil,
 			}))
 		})
@@ -70,7 +65,7 @@ var _ = Describe("SlidingWindow", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:03:05Z")
 			s.addValue(1234, "2025-02-22T12:04:05Z")
-			scrolledWindows := s.scrollByGracePeriod("2025-02-22T12:04:05Z", 13)
+			scrolledWindows := s.scrollByGracePeriod("2025-02-22T12:04:05Z", 7)
 			startTimes := scrolledWindows.StartTimes()
 
 			Expect(startTimes).To(Equal([]*time.Time{
@@ -80,35 +75,29 @@ var _ = Describe("SlidingWindow", func() {
 				parseTimePtr("2025-02-22T12:03:40Z"),
 				parseTimePtr("2025-02-22T12:03:50Z"),
 				parseTimePtr("2025-02-22T12:04:00Z"),
-				parseTimePtr("2025-02-22T12:04:10Z"),
-				parseTimePtr("2025-02-22T12:04:20Z"),
-				parseTimePtr("2025-02-22T12:04:30Z"),
-				parseTimePtr("2025-02-22T12:04:40Z"),
-				parseTimePtr("2025-02-22T12:04:50Z"),
-				parseTimePtr("2025-02-22T12:05:00Z"),
 				nil,
 			}))
 		})
 	})
 
 	Context("window with multiple values", func() {
-		It("hops to next window if first value if not out of first window boundaries", func() {
+		It("values are shared if windows overlap", func() {
 			s.forEmptySlidingWindow()
-			s.addValue(1234, "2025-02-22T12:04:04Z")
-			s.addValue(2345, "2025-02-22T12:04:55Z")
+			s.addValue(1234, "2025-02-22T12:04:05Z")
+			s.addValue(2345, "2025-02-22T12:04:15Z")
 
-			window := s.getActiveWindow("2025-02-22T12:05:05Z")
+			window := s.getActiveWindow("2025-02-22T12:04:50Z")
 			Expect(window).NotTo(BeNil())
 			Expect(s.windowContains(window, 1234)).To(BeTrue())
 			Expect(s.windowContains(window, 2345)).To(BeTrue())
 		})
 
-		It("hops to next window if first value if out of first window boundaries", func() {
+		It("hops to next window if first value if out of  window boundaries", func() {
 			s.forEmptySlidingWindow()
 			s.addValue(1234, "2025-02-22T12:04:04Z")
 			s.addValue(2345, "2025-02-22T12:05:10Z")
 
-			window := s.getActiveWindow("2025-02-22T12:06:10Z")
+			window := s.getActiveWindow("2025-02-22T12:06:05Z")
 			Expect(window).NotTo(BeNil())
 			Expect(s.windowContains(window, 1234)).NotTo(BeTrue())
 			Expect(s.windowContains(window, 2345)).To(BeTrue())
@@ -151,6 +140,7 @@ func (s *sutslidingwindow) addValue(latency float64, nowString string) {
 
 func (s *sutslidingwindow) windowContains(window *servicelevels.Window, value float64) bool {
 	acc := window.Accumulator.(*arrAccumulator)
+	fmt.Printf("%+v", acc.values)
 	return slices.Contains(acc.values, value)
 }
 
