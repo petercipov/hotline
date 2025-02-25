@@ -1,7 +1,6 @@
 package servicelevels_test
 
 import (
-	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"hotline/servicelevels"
@@ -140,7 +139,6 @@ func (s *sutslidingwindow) addValue(latency float64, nowString string) {
 
 func (s *sutslidingwindow) windowContains(window *servicelevels.Window, value float64) bool {
 	acc := window.Accumulator.(*arrAccumulator)
-	fmt.Printf("%+v", acc.values)
 	return slices.Contains(acc.values, value)
 }
 
