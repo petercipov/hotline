@@ -3,12 +3,12 @@ package servicelevels
 import "time"
 
 type LatencySLO struct {
-	window      *SlidingWindow
+	window      *SlidingWindow[float64]
 	percentiles []float64
 }
 
 func NewLatencySLO(percentiles []float64, windowDuration time.Duration, splitLatencies []float64) *LatencySLO {
-	window := NewSlidingWindow(func() Accumulator {
+	window := NewSlidingWindow(func() Accumulator[float64] {
 		return NewLatencyHistogram(splitLatencies)
 	}, windowDuration, 10*time.Second)
 	return &LatencySLO{
