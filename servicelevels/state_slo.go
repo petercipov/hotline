@@ -29,10 +29,6 @@ func NewStateSLO(expectedStates []string, windowDuration time.Duration) *StateSL
 	}
 }
 
-func (s *StateSLO) ListStates() []string {
-	return s.states
-}
-
 func (s *StateSLO) AddState(now time.Time, state string) {
 	_, found := s.statesMap[state]
 	if !found {
@@ -41,18 +37,22 @@ func (s *StateSLO) AddState(now time.Time, state string) {
 	s.window.AddValue(now, state)
 }
 
-func (s *StateSLO) GetMetrics(now time.Time) []float64 {
+func (s *StateSLO) Check(now time.Time) []SLOCheck {
 	activeWindow := s.window.GetActiveWindow(now)
 	if activeWindow == nil {
-		return make([]float64, len(s.states))
+		return nil
 	}
 
 	histogram := activeWindow.Accumulator.(*TagHistogram)
-	metrics := make([]float64, len(s.states))
-	for i, state := range s.states {
+	metrics := make([]SLOCheck, len(s.states))
+	metrics = metrics[:0]
+	for _, state := range s.states {
 		metric := histogram.ComputePercentile(state)
 		if metric != nil {
-			metrics[i] = *metric
+			metrics = append(metrics, SLOCheck{
+				MetricName:  state,
+				MetricValue: *metric,
+			})
 		}
 	}
 	return metrics

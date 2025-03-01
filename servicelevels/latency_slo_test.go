@@ -14,7 +14,7 @@ var _ = Describe("Latency SLO", func() {
 		It("should return return no current metric", func() {
 			sut.forEmptySLO()
 			metric := sut.getMetric()
-			Expect(metric).To(BeNumerically("==", 0))
+			Expect(metric.MetricValue).To(BeNumerically("==", 0))
 		})
 	})
 
@@ -23,21 +23,22 @@ var _ = Describe("Latency SLO", func() {
 			sut.forEmptySLO()
 			sut.WithValues(100, 200, 300, 400)
 			metric := sut.getMetric()
-			Expect(metric).To(BeNumerically(">", 0))
+			Expect(metric.MetricValue).To(BeNumerically(">", 0))
 		})
 
 		It("should return p50 metric", func() {
 			sut.forEmptySLO()
 			sut.WithValues(100, 200, 300, 400, 500)
 			metric := sut.getMetric()
-			Expect(metric).Should(BeInInterval(308, 309))
+			Expect(metric.MetricValue).Should(BeInInterval(308, 309))
 		})
 
 		It("should compute metric in 1 minute p50 window SLO", func() {
 			sut.forSLO([]float64{0.5}, 1*time.Minute)
 			sut.WithValues(100, 200, 300, 400, 500)
 			metric := sut.getMetric()
-			Expect(metric).Should(BeInInterval(308, 309))
+			Expect(metric.MetricName).Should(Equal("p50"))
+			Expect(metric.MetricValue).Should(BeInInterval(308, 309))
 		})
 	})
 
@@ -46,7 +47,7 @@ var _ = Describe("Latency SLO", func() {
 			sut.forSLO([]float64{0.99}, 1*time.Minute, 5000)
 			sut.WithRandomValues(100000, 5000)
 			metric := sut.getMetric()
-			Expect(metric).Should(BeNumerically("<=", 5000))
+			Expect(metric.MetricValue).Should(BeNumerically("<=", 5000))
 		})
 
 		It("compute p50, p70, p90, p99, p999 latency metric of 1 min window, has to be <= 5s", func() {
@@ -56,11 +57,11 @@ var _ = Describe("Latency SLO", func() {
 				2530, 3530, 4530, 4960, 5000)
 			sut.WithRandomValues(100000, 5000)
 			metrics := sut.getMetrics()
-			Expect(metrics[0]).Should(BeNumerically("==", 2530))
-			Expect(metrics[1]).Should(BeNumerically("==", 3530))
-			Expect(metrics[2]).Should(BeNumerically("==", 4530))
-			Expect(metrics[3]).Should(BeNumerically("==", 4960))
-			Expect(metrics[4]).Should(BeNumerically("==", 5000))
+			Expect(metrics[0].MetricValue).Should(BeNumerically("==", 2530))
+			Expect(metrics[1].MetricValue).Should(BeNumerically("==", 3530))
+			Expect(metrics[2].MetricValue).Should(BeNumerically("==", 4530))
+			Expect(metrics[3].MetricValue).Should(BeNumerically("==", 4960))
+			Expect(metrics[4].MetricValue).Should(BeNumerically("==", 5000))
 		})
 	})
 })
@@ -73,13 +74,13 @@ func (s *latencySLOSUT) forEmptySLO() {
 	s.forSLO([]float64{0.5}, 1*time.Minute)
 }
 
-func (s *latencySLOSUT) getMetric() float64 {
+func (s *latencySLOSUT) getMetric() servicelevels.SLOCheck {
 	return s.getMetrics()[0]
 }
 
-func (s *latencySLOSUT) getMetrics() []float64 {
+func (s *latencySLOSUT) getMetrics() []servicelevels.SLOCheck {
 	now := parseTime("2025-02-22T12:04:55Z")
-	return s.slo.GetMetrics(now)
+	return s.slo.Check(now)
 }
 
 func (s *latencySLOSUT) WithValues(latencies ...float64) {

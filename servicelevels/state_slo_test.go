@@ -23,9 +23,8 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("success")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
-			Expect(metrics).To(Equal(map[string]float64{
-				"success": 100,
-			}))
+			Expect(metrics[0].MetricName).To(Equal("success"))
+			Expect(metrics[0].MetricValue).To(BeNumerically("==", 100))
 		})
 
 		It("should return metric for multiple entry", func() {
@@ -36,10 +35,10 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("failure")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics).To(Equal(map[string]float64{
-				"success": 75,
-				"failure": 25,
-			}))
+			Expect(metrics[0].MetricName).To(Equal("success"))
+			Expect(metrics[0].MetricValue).To(BeNumerically("==", 75))
+			Expect(metrics[1].MetricName).To(Equal("failure"))
+			Expect(metrics[1].MetricValue).To(BeNumerically("==", 25))
 		})
 	})
 
@@ -52,10 +51,10 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("abcd")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics).To(Equal(map[string]float64{
-				"success": 75,
-				"unknown": 25,
-			}))
+			Expect(metrics[0].MetricName).To(Equal("success"))
+			Expect(metrics[0].MetricValue).To(BeNumerically("==", 75))
+			Expect(metrics[1].MetricName).To(Equal("unknown"))
+			Expect(metrics[1].MetricValue).To(BeNumerically("==", 25))
 		})
 
 		It("should deduplicate unknown metric for unknown state", func() {
@@ -66,13 +65,12 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("abcd")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics).To(Equal(map[string]float64{
-				"success": 75,
-				"unknown": 25,
-			}))
+			Expect(metrics[0].MetricName).To(Equal("unknown"))
+			Expect(metrics[0].MetricValue).To(BeNumerically("==", 25))
+			Expect(metrics[1].MetricName).To(Equal("success"))
+			Expect(metrics[1].MetricValue).To(BeNumerically("==", 75))
 		})
 	})
-
 })
 
 type stateslosut struct {
@@ -83,17 +81,9 @@ func (s *stateslosut) forEmptySLO() {
 	s.forSLO()
 }
 
-func (s *stateslosut) getMetrics() map[string]float64 {
+func (s *stateslosut) getMetrics() []servicelevels.SLOCheck {
 	now := parseTime("2025-02-22T12:04:55Z")
-	states := s.slo.ListStates()
-	metrics := s.slo.GetMetrics(now)
-	result := map[string]float64{}
-	for i, state := range states {
-		if metrics[i] != 0 {
-			result[state] = metrics[i]
-		}
-	}
-	return result
+	return s.slo.Check(now)
 }
 
 func (s *stateslosut) forSLO(states ...string) {
