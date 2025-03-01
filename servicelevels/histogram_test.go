@@ -79,6 +79,14 @@ var _ = Describe("Histogram", func() {
 			Expect(bucket.To).Should(BeNumerically("==", 2000))
 
 		})
+
+		It("moves small latencies into zero bucket", func() {
+			s.forEmptyHistogramWithSplit()
+			s.fillLatencies(0.0001, 0.00001, 0.000001, 0.0000001)
+			bucket := s.computeP50()
+			Expect(bucket.From).Should(BeNumerically("==", 0))
+			Expect(bucket.To).Should(BeNumerically("==", 1))
+		})
 	})
 
 	Context("P99", func() {

@@ -175,18 +175,23 @@ func (h *Histogram) SizeInBytes() int {
 }
 
 type exponentialBucketLayout struct {
-	growthFactor  float64
-	growthDivisor float64
+	growthFactor        float64
+	growthDivisor       float64
+	zeroBucketThreshold float64
 }
 
 func newExponentialLayout() *exponentialBucketLayout {
 	return &exponentialBucketLayout{
-		growthFactor:  1.15,
-		growthDivisor: math.Log(1.15),
+		growthFactor:        1.15,
+		growthDivisor:       math.Log(1.15),
+		zeroBucketThreshold: 1.0,
 	}
 }
 
 func (l *exponentialBucketLayout) key(latency float64) bucketIndex {
+	if latency < l.zeroBucketThreshold {
+		return bucketIndex(0)
+	}
 	return bucketIndex(math.Floor(math.Log(latency) / l.growthDivisor))
 }
 
@@ -194,9 +199,15 @@ func (l *exponentialBucketLayout) from(index bucketIndex) float64 {
 	if index == 0 {
 		return 0
 	}
+	if index == 1 {
+		return 1
+	}
 	return math.Pow(l.growthFactor, float64(index))
 }
 
 func (l *exponentialBucketLayout) to(index bucketIndex) float64 {
+	if index == 0 {
+		return 1
+	}
 	return math.Pow(l.growthFactor, float64(index+1))
 }
