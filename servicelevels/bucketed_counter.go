@@ -43,7 +43,7 @@ func (c *bucketedCounters) SizeInBytes() int {
 		(sizeOfBucket * sizeOfBuckets)
 }
 
-func (c *bucketedCounters) allCountersSum() int64 {
+func (c *bucketedCounters) Sum() int64 {
 	sum := int64(0)
 	for _, bucket := range c.buckets {
 		sum += bucket.Sum()
@@ -51,7 +51,7 @@ func (c *bucketedCounters) allCountersSum() int64 {
 	return sum
 }
 
-func (c *bucketedCounters) createSplit(key bucketIndex, splits []float64) {
+func (c *bucketedCounters) CreateSplit(key bucketIndex, splits []float64) {
 	splitCounters := make([]splitCounter, len(splits))
 	for i, latencyForKey := range splits {
 		splitCounters[i] = splitCounter{
@@ -66,11 +66,11 @@ func (c *bucketedCounters) createSplit(key bucketIndex, splits []float64) {
 	}
 }
 
-func (c *bucketedCounters) getCounter(index bucketIndex) *bucketCounter {
+func (c *bucketedCounters) GetCounter(index bucketIndex) *bucketCounter {
 	return c.buckets[index]
 }
 
-func (c *bucketedCounters) getSortedIndexes() []bucketIndex {
+func (c *bucketedCounters) GetSortedIndexes() []bucketIndex {
 	return slices.SortedFunc(maps.Keys(c.buckets), func(index bucketIndex, index2 bucketIndex) int {
 		return int(index) - int(index2)
 	})
