@@ -12,24 +12,23 @@ var _ = Describe("Tags Histogram", func() {
 
 	It("returns nothing when empty", func() {
 		s.forEmptyHistogram()
-		percentiles := s.getPercentiles()
+		percentiles := s.getPercentile("unknown")
 		Expect(percentiles).To(BeNil())
 	})
 
 	It("returns nothing when empty and unknown tag is added", func() {
 		s.forEmptyHistogram()
 		s.Add("success")
-		percentiles := s.getPercentiles()
+		percentiles := s.getPercentile("success")
 		Expect(percentiles).To(BeNil())
 	})
 
 	It("returns percentile for defined tags if adding defined tags", func() {
 		s.forHistogram("success")
 		s.Add("success")
-		percentiles := s.getPercentiles()
+		percentiles := s.getPercentile("success")
 		Expect(percentiles).ToNot(BeNil())
-		Expect(percentiles).To(HaveLen(1))
-		Expect(percentiles[0]).To(BeNumerically("==", 100))
+		Expect(*percentiles).To(BeNumerically("==", 100))
 	})
 
 	It("returns percentile for defined tags if adding multiple tags", func() {
@@ -38,11 +37,9 @@ var _ = Describe("Tags Histogram", func() {
 		s.Add("success")
 		s.Add("success")
 		s.Add("failure")
-		percentiles := s.getPercentiles()
-		Expect(percentiles).ToNot(BeNil())
-		Expect(percentiles).To(HaveLen(2))
-		Expect(percentiles[0]).To(BeNumerically("==", 75))
-		Expect(percentiles[1]).To(BeNumerically("==", 25))
+
+		Expect(*s.getPercentile("success")).To(BeNumerically("==", 75))
+		Expect(*s.getPercentile("failure")).To(BeNumerically("==", 25))
 	})
 })
 
@@ -54,8 +51,8 @@ func (s *suttagshistogram) forEmptyHistogram() {
 	s.forHistogram()
 }
 
-func (s *suttagshistogram) getPercentiles() []float64 {
-	return s.histogram.GetPercentiles()
+func (s *suttagshistogram) getPercentile(tag string) *float64 {
+	return s.histogram.ComputePercentile(tag)
 }
 
 func (s *suttagshistogram) forHistogram(tags ...string) {

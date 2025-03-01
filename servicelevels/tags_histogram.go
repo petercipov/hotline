@@ -20,22 +20,19 @@ func (h *TagHistogram) Add(tag string) {
 	h.buckets.Add(*key, 1)
 }
 
-func (h *TagHistogram) GetPercentiles() []float64 {
-
-	total := float64(h.buckets.Sum())
-	sortedIndexes := h.layout.indexedByTagOrder
-	if len(sortedIndexes) == 0 {
+func (h *TagHistogram) ComputePercentile(tag string) *float64 {
+	key := h.layout.key(tag)
+	if key == nil {
 		return nil
 	}
-	percentiles := make([]float64, len(sortedIndexes))
-
-	for i, key := range sortedIndexes {
-		sum := h.buckets.GetCounter(key).Sum()
-		percentile := float64(sum) / total * 100.0
-		percentiles[i] = percentile
+	total := float64(h.buckets.Sum())
+	counter := h.buckets.GetCounter(*key)
+	if counter == nil {
+		return nil
 	}
-
-	return percentiles
+	sum := counter.Sum()
+	percentile := float64(sum) / total * 100.0
+	return &percentile
 }
 
 type tagsLayout struct {
