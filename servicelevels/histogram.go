@@ -94,8 +94,7 @@ func (h *Histogram) Add(latency float64) {
 }
 
 func (h *Histogram) SizeInBytes() int {
-	c := splitCounter{}
-	sizeOfSplit := int(unsafe.Sizeof(&c))
+	sizeOfSplit := int(unsafe.Sizeof(&splitCounter{}))
 	h.buckets.SizeInBytes()
 	return h.buckets.SizeInBytes() +
 		(h.splitLength * sizeOfSplit)

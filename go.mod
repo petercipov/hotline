@@ -2,8 +2,6 @@ module hotline
 
 go 1.24
 
-tool github.com/onsi/ginkgo/v2/ginkgo
-
 require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2

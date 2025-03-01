@@ -33,9 +33,8 @@ func (c *bucketedCounters) Add(key bucketIndex, latency float64) {
 }
 
 func (c *bucketedCounters) SizeInBytes() int {
-	b := bucketCounter{}
 	sizeOfBuckets := len(c.buckets)
-	sizeOfBucket := int(unsafe.Sizeof(&b))
+	sizeOfBucket := int(unsafe.Sizeof(&bucketCounter{}))
 
 	k := bucketIndex(0)
 	sizeOfKey := int(unsafe.Sizeof(&k))
