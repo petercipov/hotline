@@ -6,3 +6,4 @@ deps:
 
 lint:
 	golangci-lint run
+	govulncheck ./...
