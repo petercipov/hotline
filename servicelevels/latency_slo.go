@@ -23,7 +23,7 @@ func (s *LatencySLO) GetMetrics(now time.Time) []float64 {
 		return make([]float64, len(s.percentiles))
 	}
 
-	histogram := activeWindow.Accumulator.(*Histogram)
+	histogram := activeWindow.Accumulator.(*LatencyHistogram)
 	metrics := make([]float64, len(s.percentiles))
 	for i, percentile := range s.percentiles {
 		metric := histogram.ComputePercentile(percentile).To

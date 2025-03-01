@@ -6,14 +6,14 @@ import (
 	"unsafe"
 )
 
-type Histogram struct {
+type LatencyHistogram struct {
 	buckets     *bucketedCounters
 	layout      *exponentialBucketLayout
 	splitLength int
 }
 
-func NewHistogram(splitLatencies []float64) *Histogram {
-	h := &Histogram{
+func NewHistogram(splitLatencies []float64) *LatencyHistogram {
+	h := &LatencyHistogram{
 		buckets:     newBucketedCounters(),
 		layout:      newExponentialLayout(),
 		splitLength: len(splitLatencies),
@@ -42,7 +42,7 @@ type Bucket struct {
 	To   float64
 }
 
-func (h *Histogram) ComputePercentile(percentile float64) Bucket {
+func (h *LatencyHistogram) ComputePercentile(percentile float64) Bucket {
 	count := h.buckets.Sum()
 	if count <= 2 {
 		return Bucket{}
@@ -65,7 +65,7 @@ func (h *Histogram) ComputePercentile(percentile float64) Bucket {
 	}
 }
 
-func (h *Histogram) findFirstBucketOverThreshold(threshold int64) (bucketIndex, int64) {
+func (h *LatencyHistogram) findFirstBucketOverThreshold(threshold int64) (bucketIndex, int64) {
 	entries := int64(0)
 	sortedKeys := h.buckets.GetSortedIndexes()
 	firstBucketIndexOverThreshold := sortedKeys[len(sortedKeys)-1]
@@ -88,12 +88,12 @@ func (h *Histogram) findFirstBucketOverThreshold(threshold int64) (bucketIndex, 
 	return firstBucketIndexOverThreshold, toDistributeInsideBucket
 }
 
-func (h *Histogram) Add(latency float64) {
+func (h *LatencyHistogram) Add(latency float64) {
 	key := h.layout.key(latency)
 	h.buckets.Add(key, latency)
 }
 
-func (h *Histogram) SizeInBytes() int {
+func (h *LatencyHistogram) SizeInBytes() int {
 	sizeOfSplit := int(unsafe.Sizeof(&splitCounter{}))
 	h.buckets.SizeInBytes()
 	return h.buckets.SizeInBytes() +
