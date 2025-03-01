@@ -49,7 +49,7 @@ func (h *Histogram) ComputePercentile(percentile float64) Bucket {
 	}
 
 	pThreshold := int64(math.Ceil(float64(count) * percentile))
-	index, toDistributeInsideBucket := h.findBucketGeThreshold(pThreshold)
+	index, toDistributeInsideBucket := h.findFirstBucketOverThreshold(pThreshold)
 
 	bucket := h.buckets.getCounter(index)
 	split := bucket.Split(toDistributeInsideBucket)
@@ -65,23 +65,27 @@ func (h *Histogram) ComputePercentile(percentile float64) Bucket {
 	}
 }
 
-func (h *Histogram) findBucketGeThreshold(threshold int64) (bucketIndex, int64) {
-	sortedKeys := h.buckets.getSortedIndexes()
+func (h *Histogram) findFirstBucketOverThreshold(threshold int64) (bucketIndex, int64) {
 	entries := int64(0)
+	sortedKeys := h.buckets.getSortedIndexes()
+	firstBucketIndexOverThreshold := sortedKeys[len(sortedKeys)-1]
+	toDistributeInsideBucket := int64(0)
 	if len(sortedKeys) == 1 {
-		return sortedKeys[0], 0
+		return firstBucketIndexOverThreshold, toDistributeInsideBucket
 	}
 
 	for _, sortedKey := range sortedKeys {
 		bucket := h.buckets.getCounter(sortedKey)
 		bucketSum := bucket.Sum()
 		if entries+bucketSum >= threshold {
-			return sortedKey, threshold - entries
+			firstBucketIndexOverThreshold = sortedKey
+			toDistributeInsideBucket = threshold - entries
+			break
 		} else {
 			entries += bucketSum
 		}
 	}
-	return sortedKeys[len(sortedKeys)-1], 0
+	return firstBucketIndexOverThreshold, toDistributeInsideBucket
 }
 
 func (h *Histogram) Add(latency float64) {
@@ -122,9 +126,6 @@ func (l *exponentialBucketLayout) key(latency float64) bucketIndex {
 func (l *exponentialBucketLayout) bucketFrom(index bucketIndex) float64 {
 	if index == 0 {
 		return 0
-	}
-	if index == 1 {
-		return 1
 	}
 	return math.Pow(l.growthFactor, float64(index))
 }
