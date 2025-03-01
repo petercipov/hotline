@@ -12,7 +12,7 @@ type LatencyHistogram struct {
 	splitLength int
 }
 
-func NewHistogram(splitLatencies []float64) *LatencyHistogram {
+func NewLatencyHistogram(splitLatencies []float64) *LatencyHistogram {
 	h := &LatencyHistogram{
 		buckets:     newBucketedCounters(),
 		layout:      newExponentialLayout(),

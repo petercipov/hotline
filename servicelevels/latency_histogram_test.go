@@ -112,7 +112,7 @@ type sutlatencyhistogram struct {
 }
 
 func (s *sutlatencyhistogram) forEmptyHistogram() {
-	s.h = servicelevels.NewHistogram(nil)
+	s.h = servicelevels.NewLatencyHistogram(nil)
 }
 
 func (s *sutlatencyhistogram) computeP50() servicelevels.Bucket {
@@ -144,7 +144,7 @@ func (s *sutlatencyhistogram) repeatIncreasingLatencies(count int, repeat int) [
 }
 
 func (s *sutlatencyhistogram) forEmptyHistogramWithSplit(splitLatency ...float64) {
-	s.h = servicelevels.NewHistogram(splitLatency)
+	s.h = servicelevels.NewLatencyHistogram(splitLatency)
 }
 
 func (s *sutlatencyhistogram) computeP99() servicelevels.Bucket {
