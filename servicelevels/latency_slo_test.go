@@ -4,6 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"hotline/servicelevels"
+	"math/rand"
 	"time"
 )
 
@@ -40,6 +41,15 @@ var _ = Describe("Latency SLO", func() {
 		})
 	})
 
+	Context("For latencies distributed exponentially", func() {
+		It("compute p99 latency metric of 1 min window", func() {
+			sut.forSLO(0.99, 1*time.Minute, 5)
+			sut.WithRandomValues(1000, 5)
+			metric := sut.getMetric()
+			Expect(metric).Should(BeNumerically("<=", 5))
+		})
+	})
+
 })
 
 type latencySLOSUT struct {
@@ -62,6 +72,14 @@ func (s *latencySLOSUT) WithValues(latencies ...float64) {
 	}
 }
 
-func (s *latencySLOSUT) forSLO(percentile float64, duration time.Duration) {
-	s.slo = servicelevels.NewLatencySLO(percentile, duration)
+func (s *latencySLOSUT) forSLO(percentile float64, duration time.Duration, splits ...float64) {
+	s.slo = servicelevels.NewLatencySLO(percentile, duration, splits)
+}
+
+func (s *latencySLOSUT) WithRandomValues(count int, max float64) {
+	now := parseTime("2025-02-22T12:04:05Z")
+	for range count {
+		value := rand.Float64() * max
+		s.slo.AddLatency(now, value)
+	}
 }

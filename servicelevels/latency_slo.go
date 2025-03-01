@@ -7,9 +7,9 @@ type LatencySLO struct {
 	percentile float64
 }
 
-func NewLatencySLO(percentile float64, windowDuration time.Duration) *LatencySLO {
+func NewLatencySLO(percentile float64, windowDuration time.Duration, splitLatencies []float64) *LatencySLO {
 	window := NewSlidingWindow(func() Accumulator {
-		return NewHistogram(nil)
+		return NewHistogram(splitLatencies)
 	}, windowDuration, 10*time.Second)
 	return &LatencySLO{
 		percentile: percentile,
