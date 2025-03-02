@@ -1,6 +1,7 @@
 package servicelevels_test
 
 import (
+	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"hotline/servicelevels"
@@ -91,7 +92,15 @@ func (s *latencySLOSUT) WithValues(latencies ...float64) {
 }
 
 func (s *latencySLOSUT) forSLO(percentiles []float64, duration time.Duration, splits ...float64) {
-	s.slo = servicelevels.NewLatencySLO(percentiles, duration, splits)
+	var definition []servicelevels.PercentileDefinition
+	for _, percentile := range percentiles {
+		definition = append(definition, servicelevels.PercentileDefinition{
+			Percentile: percentile,
+			Name:       fmt.Sprintf("p%g", percentile*100),
+			Threshold:  99.99,
+		})
+	}
+	s.slo = servicelevels.NewLatencySLO(definition, duration, splits)
 }
 
 func (s *latencySLOSUT) WithRandomValues(count int, max float64) {

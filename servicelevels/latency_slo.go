@@ -1,30 +1,28 @@
 package servicelevels
 
 import (
-	"fmt"
 	"time"
 )
 
 type LatencySLO struct {
-	window          *SlidingWindow[float64]
-	percentiles     []float64
-	percentileNames []string
+	window      *SlidingWindow[float64]
+	percentiles []PercentileDefinition
 }
 
-func NewLatencySLO(percentiles []float64, windowDuration time.Duration, splitLatencies []float64) *LatencySLO {
+type PercentileDefinition struct {
+	Percentile float64
+	Threshold  float64
+	Name       string
+}
+
+func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Duration, splitLatencies []float64) *LatencySLO {
 	window := NewSlidingWindow(func() Accumulator[float64] {
 		return NewLatencyHistogram(splitLatencies)
 	}, windowDuration, 10*time.Second)
 
-	percentileNames := make([]string, len(percentiles))
-	for i, p := range percentiles {
-		percentileNames[i] = fmt.Sprintf("p%g", p*100)
-	}
-
 	return &LatencySLO{
-		percentiles:     percentiles,
-		percentileNames: percentileNames,
-		window:          window,
+		percentiles: percentiles,
+		window:      window,
 	}
 }
 
@@ -36,11 +34,11 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 
 	histogram := activeWindow.Accumulator.(*LatencyHistogram)
 	metrics := make([]SLOCheck, len(s.percentiles))
-	for i, percentile := range s.percentiles {
-		metric := histogram.ComputePercentile(percentile).To
+	for i, definition := range s.percentiles {
+		metric := histogram.ComputePercentile(definition.Percentile).To
 		metrics[i] = SLOCheck{
 			Metric: Metric{
-				Name:  s.percentileNames[i],
+				Name:  definition.Name,
 				Value: metric,
 			},
 		}
