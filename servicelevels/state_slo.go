@@ -101,7 +101,7 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, f
 	if unexpectedMetric != nil {
 		breach = &SLOBreach{
 			Threshold:      roundTo(100.0-s.breachThreshold, 5),
-			Operation:      OperationLE,
+			Operation:      OperationL,
 			WindowDuration: s.window.Size,
 		}
 		value = *unexpectedMetric
@@ -129,7 +129,7 @@ func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, flo
 	if !sloHolds {
 		breach = &SLOBreach{
 			Threshold:      roundTo(s.breachThreshold, 5),
-			Operation:      OperationGTE,
+			Operation:      OperationGE,
 			WindowDuration: s.window.Size,
 		}
 	}

@@ -112,7 +112,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breach: &servicelevels.SLOBreach{
 					Threshold:      99.99,
-					Operation:      servicelevels.OperationGTE,
+					Operation:      servicelevels.OperationGE,
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
@@ -123,7 +123,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breach: &servicelevels.SLOBreach{
 					Threshold:      0.01,
-					Operation:      servicelevels.OperationLE,
+					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
@@ -145,7 +145,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breach: &servicelevels.SLOBreach{
 					Threshold:      0.01,
-					Operation:      servicelevels.OperationLE,
+					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
@@ -174,7 +174,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breach: &servicelevels.SLOBreach{
 					Threshold:      99.99,
-					Operation:      servicelevels.OperationGTE,
+					Operation:      servicelevels.OperationGE,
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
@@ -185,7 +185,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breach: &servicelevels.SLOBreach{
 					Threshold:      0.01,
-					Operation:      servicelevels.OperationLE,
+					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
@@ -212,7 +212,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breach: &servicelevels.SLOBreach{
 					Threshold:      99.99,
-					Operation:      servicelevels.OperationGTE,
+					Operation:      servicelevels.OperationGE,
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
@@ -223,7 +223,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breach: &servicelevels.SLOBreach{
 					Threshold:      0.01,
-					Operation:      servicelevels.OperationLE,
+					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
 			}))

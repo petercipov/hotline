@@ -65,6 +65,24 @@ var _ = Describe("Latency SLO", func() {
 			Expect(metrics[4].Metric.Value).Should(BeNumerically("==", 5000))
 		})
 	})
+
+	Context("For latencies over threshold 5s", func() {
+		It("compute p99 with slo breach", func() {
+			sut.forSLO(
+				[]float64{0.99},
+				1*time.Minute,
+				2530, 3530, 4530, 4960, 5000)
+			sut.WithRandomValues(1000, 10000)
+			metrics := sut.getMetrics()
+			Expect(metrics[0].Metric.Value).Should(BeNumerically(">=", 10000))
+			Expect(metrics[0].Breach).NotTo(BeNil())
+			Expect(*metrics[0].Breach).To(Equal(servicelevels.SLOBreach{
+				Threshold:      5000,
+				Operation:      servicelevels.OperationL,
+				WindowDuration: 1 * time.Minute,
+			}))
+		})
+	})
 })
 
 type latencySLOSUT struct {
@@ -97,7 +115,7 @@ func (s *latencySLOSUT) forSLO(percentiles []float64, duration time.Duration, sp
 		definition = append(definition, servicelevels.PercentileDefinition{
 			Percentile: percentile,
 			Name:       fmt.Sprintf("p%g", percentile*100),
-			Threshold:  99.99,
+			Threshold:  5000,
 		})
 	}
 	s.slo = servicelevels.NewLatencySLO(definition, duration, splits)
