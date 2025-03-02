@@ -39,8 +39,10 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 	for i, percentile := range s.percentiles {
 		metric := histogram.ComputePercentile(percentile).To
 		metrics[i] = SLOCheck{
-			MetricValue: metric,
-			MetricName:  s.percentileNames[i],
+			Metric: Metric{
+				Name:  s.percentileNames[i],
+				Value: metric,
+			},
 		}
 	}
 	return metrics

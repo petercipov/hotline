@@ -14,7 +14,7 @@ var _ = Describe("Latency SLO", func() {
 		It("should return return no current metric", func() {
 			sut.forEmptySLO()
 			metric := sut.getMetric()
-			Expect(metric.MetricValue).To(BeNumerically("==", 0))
+			Expect(metric.Metric.Value).To(BeNumerically("==", 0))
 		})
 	})
 
@@ -23,22 +23,22 @@ var _ = Describe("Latency SLO", func() {
 			sut.forEmptySLO()
 			sut.WithValues(100, 200, 300, 400)
 			metric := sut.getMetric()
-			Expect(metric.MetricValue).To(BeNumerically(">", 0))
+			Expect(metric.Metric.Value).To(BeNumerically(">", 0))
 		})
 
 		It("should return p50 metric", func() {
 			sut.forEmptySLO()
 			sut.WithValues(100, 200, 300, 400, 500)
 			metric := sut.getMetric()
-			Expect(metric.MetricValue).Should(BeInInterval(308, 309))
+			Expect(metric.Metric.Value).Should(BeInInterval(308, 309))
 		})
 
 		It("should compute metric in 1 minute p50 window SLO", func() {
 			sut.forSLO([]float64{0.5}, 1*time.Minute)
 			sut.WithValues(100, 200, 300, 400, 500)
 			metric := sut.getMetric()
-			Expect(metric.MetricName).Should(Equal("p50"))
-			Expect(metric.MetricValue).Should(BeInInterval(308, 309))
+			Expect(metric.Metric.Name).Should(Equal("p50"))
+			Expect(metric.Metric.Value).Should(BeInInterval(308, 309))
 		})
 	})
 
@@ -47,7 +47,7 @@ var _ = Describe("Latency SLO", func() {
 			sut.forSLO([]float64{0.99}, 1*time.Minute, 5000)
 			sut.WithRandomValues(100000, 5000)
 			metric := sut.getMetric()
-			Expect(metric.MetricValue).Should(BeNumerically("<=", 5000))
+			Expect(metric.Metric.Value).Should(BeNumerically("<=", 5000))
 		})
 
 		It("compute p50, p70, p90, p99, p999 latency metric of 1 min window, has to be <= 5s", func() {
@@ -57,11 +57,11 @@ var _ = Describe("Latency SLO", func() {
 				2530, 3530, 4530, 4960, 5000)
 			sut.WithRandomValues(100000, 5000)
 			metrics := sut.getMetrics()
-			Expect(metrics[0].MetricValue).Should(BeNumerically("==", 2530))
-			Expect(metrics[1].MetricValue).Should(BeNumerically("==", 3530))
-			Expect(metrics[2].MetricValue).Should(BeNumerically("==", 4530))
-			Expect(metrics[3].MetricValue).Should(BeNumerically("==", 4960))
-			Expect(metrics[4].MetricValue).Should(BeNumerically("==", 5000))
+			Expect(metrics[0].Metric.Value).Should(BeNumerically("==", 2530))
+			Expect(metrics[1].Metric.Value).Should(BeNumerically("==", 3530))
+			Expect(metrics[2].Metric.Value).Should(BeNumerically("==", 4530))
+			Expect(metrics[3].Metric.Value).Should(BeNumerically("==", 4960))
+			Expect(metrics[4].Metric.Value).Should(BeNumerically("==", 5000))
 		})
 	})
 })
