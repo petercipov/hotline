@@ -111,7 +111,8 @@ var _ = Describe("State SLO", func() {
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
-					Threshold:      99.99,
+					ThresholdValue: 99.99,
+					ThresholdUnit:  "%",
 					Operation:      servicelevels.OperationGE,
 					WindowDuration: 1 * time.Hour,
 				},
@@ -122,7 +123,8 @@ var _ = Describe("State SLO", func() {
 					Value: 25,
 				},
 				Breach: &servicelevels.SLOBreach{
-					Threshold:      0.01,
+					ThresholdValue: 0.01,
+					ThresholdUnit:  "%",
 					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
@@ -144,7 +146,8 @@ var _ = Describe("State SLO", func() {
 					Value: 100,
 				},
 				Breach: &servicelevels.SLOBreach{
-					Threshold:      0.01,
+					ThresholdValue: 0.01,
+					ThresholdUnit:  "%",
 					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
@@ -173,7 +176,8 @@ var _ = Describe("State SLO", func() {
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
-					Threshold:      99.99,
+					ThresholdValue: 99.99,
+					ThresholdUnit:  "%",
 					Operation:      servicelevels.OperationGE,
 					WindowDuration: 1 * time.Hour,
 				},
@@ -184,7 +188,8 @@ var _ = Describe("State SLO", func() {
 					Value: 25,
 				},
 				Breach: &servicelevels.SLOBreach{
-					Threshold:      0.01,
+					ThresholdValue: 0.01,
+					ThresholdUnit:  "%",
 					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
@@ -211,7 +216,8 @@ var _ = Describe("State SLO", func() {
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
-					Threshold:      99.99,
+					ThresholdValue: 99.99,
+					ThresholdUnit:  "%",
 					Operation:      servicelevels.OperationGE,
 					WindowDuration: 1 * time.Hour,
 				},
@@ -222,7 +228,8 @@ var _ = Describe("State SLO", func() {
 					Value: 25,
 				},
 				Breach: &servicelevels.SLOBreach{
-					Threshold:      0.01,
+					ThresholdValue: 0.01,
+					ThresholdUnit:  "%",
 					Operation:      servicelevels.OperationL,
 					WindowDuration: 1 * time.Hour,
 				},
@@ -245,7 +252,10 @@ func (s *stateslosut) getMetrics() []servicelevels.SLOCheck {
 }
 
 func (s *stateslosut) forSLO(expectedStates ...string) {
-	s.slo = servicelevels.NewStateSLO(expectedStates, 99.99, 1*time.Hour)
+	p, failure := servicelevels.ParsePercent(99.99)
+	Expect(failure).To(BeFalse())
+
+	s.slo = servicelevels.NewStateSLO(expectedStates, p, 1*time.Hour)
 }
 
 func (s *stateslosut) AddState(state string) {

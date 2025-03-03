@@ -16,7 +16,7 @@ type StateSLO struct {
 const unexpectedStateName = "unexpected"
 const expectedStateName = "expected"
 
-func NewStateSLO(expectedStates []string, breachThreshold float64, windowDuration time.Duration) *StateSLO {
+func NewStateSLO(expectedStates []string, breachThreshold Percent, windowDuration time.Duration) *StateSLO {
 	expectedStates = uniqueSlice(filterOutUnknownTag(expectedStates))
 
 	statesMap := make(map[string]int, len(expectedStates))
@@ -33,7 +33,7 @@ func NewStateSLO(expectedStates []string, breachThreshold float64, windowDuratio
 		window:            window,
 		expectedStates:    expectedStates,
 		expectedStatesMap: statesMap,
-		breachThreshold:   breachThreshold,
+		breachThreshold:   roundTo(float64(breachThreshold), 5),
 	}
 }
 
@@ -100,7 +100,8 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, f
 	var value float64 = 0
 	if unexpectedMetric != nil {
 		breach = &SLOBreach{
-			Threshold:      roundTo(100.0-s.breachThreshold, 5),
+			ThresholdValue: roundTo(100.0-s.breachThreshold, 5),
+			ThresholdUnit:  "%",
 			Operation:      OperationL,
 			WindowDuration: s.window.Size,
 		}
@@ -128,7 +129,8 @@ func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, flo
 	sloHolds := expectedSum >= s.breachThreshold
 	if !sloHolds {
 		breach = &SLOBreach{
-			Threshold:      roundTo(s.breachThreshold, 5),
+			ThresholdValue: s.breachThreshold,
+			ThresholdUnit:  "%",
 			Operation:      OperationGE,
 			WindowDuration: s.window.Size,
 		}

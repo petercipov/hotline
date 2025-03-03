@@ -19,7 +19,8 @@ var OperationGE Operation = ">="
 var OperationL Operation = "<"
 
 type SLOBreach struct {
-	Threshold      float64
+	ThresholdValue float64
+	ThresholdUnit  string
 	Operation      Operation
 	WindowDuration time.Duration
 }

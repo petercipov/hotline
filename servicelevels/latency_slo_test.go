@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Latency SLO", func() {
+var _ = Describe("LatencyMs SLO", func() {
 	sut := latencySLOSUT{}
 	Context("no input data", func() {
 		It("should return return no current metric", func() {
@@ -36,7 +36,7 @@ var _ = Describe("Latency SLO", func() {
 
 		It("should compute metric in 1 minute p50 window SLO", func() {
 			sut.forSLO([]servicelevels.PercentileDefinition{
-				{Percentile: 0.5, Threshold: 5000}}, 1*time.Minute)
+				{Percentile: servicelevels.P50, Threshold: 5000}}, 1*time.Minute)
 			sut.WithValues(100, 200, 300, 400, 500)
 			metric := sut.getMetric()
 			Expect(metric.Metric.Name).Should(Equal("p50"))
@@ -47,7 +47,7 @@ var _ = Describe("Latency SLO", func() {
 	Context("For random latencies", func() {
 		It("compute p99 latency metric of 1 min window, has to be <= 5s", func() {
 			sut.forSLO([]servicelevels.PercentileDefinition{
-				{Percentile: 0.99, Threshold: 5000}}, 1*time.Minute)
+				{Percentile: servicelevels.P99, Threshold: 5000}}, 1*time.Minute)
 			sut.WithRandomValues(100000, 5000)
 			metric := sut.getMetric()
 			Expect(metric.Metric.Value).Should(BeNumerically("<=", 5000))
@@ -56,11 +56,11 @@ var _ = Describe("Latency SLO", func() {
 		It("compute p50, p70, p90, p99, p999 latency metric of 1 min window, has to be <= 5s", func() {
 			sut.forSLO(
 				[]servicelevels.PercentileDefinition{
-					{Percentile: 0.5, Threshold: 2530},
-					{Percentile: 0.7, Threshold: 3530},
-					{Percentile: 0.9, Threshold: 4530},
-					{Percentile: 0.99, Threshold: 4960},
-					{Percentile: 0.999, Threshold: 5000}},
+					{Percentile: servicelevels.P50, Threshold: 2530},
+					{Percentile: servicelevels.P70, Threshold: 3530},
+					{Percentile: servicelevels.P90, Threshold: 4530},
+					{Percentile: servicelevels.P99, Threshold: 4960},
+					{Percentile: servicelevels.P999, Threshold: 5000}},
 				1*time.Minute)
 			sut.WithRandomValues(100000, 5000)
 			metrics := sut.getMetrics()
@@ -75,14 +75,16 @@ var _ = Describe("Latency SLO", func() {
 	Context("For latencies over threshold 5s", func() {
 		It("compute p99 with slo breach", func() {
 			sut.forSLO(
-				[]servicelevels.PercentileDefinition{{Percentile: 0.99, Threshold: 5000}},
+				[]servicelevels.PercentileDefinition{
+					{Percentile: servicelevels.P99, Threshold: 5000}},
 				1*time.Minute)
 			sut.WithRandomValues(1000, 10000)
 			metrics := sut.getMetrics()
 			Expect(metrics[0].Metric.Value).Should(BeNumerically(">=", 10000))
 			Expect(metrics[0].Breach).NotTo(BeNil())
 			Expect(*metrics[0].Breach).To(Equal(servicelevels.SLOBreach{
-				Threshold:      5000,
+				ThresholdValue: 5000,
+				ThresholdUnit:  "ms",
 				Operation:      servicelevels.OperationL,
 				WindowDuration: 1 * time.Minute,
 			}))
@@ -96,7 +98,7 @@ type latencySLOSUT struct {
 
 func (s *latencySLOSUT) forEmptySLO() {
 	s.forSLO([]servicelevels.PercentileDefinition{
-		{Percentile: 0.5, Threshold: 5000}},
+		{Percentile: servicelevels.P50, Threshold: 5000}},
 		1*time.Minute)
 }
 
@@ -109,7 +111,7 @@ func (s *latencySLOSUT) getMetrics() []servicelevels.SLOCheck {
 	return s.slo.Check(now)
 }
 
-func (s *latencySLOSUT) WithValues(latencies ...float64) {
+func (s *latencySLOSUT) WithValues(latencies ...servicelevels.LatencyMs) {
 	now := parseTime("2025-02-22T12:04:05Z")
 	for _, latency := range latencies {
 		s.slo.AddLatency(now, latency)
@@ -129,6 +131,6 @@ func (s *latencySLOSUT) WithRandomValues(count int, max float64) {
 	r := rand.New(rand.NewSource(10000))
 	for range count {
 		value := r.Float64() * max
-		s.slo.AddLatency(now, value)
+		s.slo.AddLatency(now, servicelevels.LatencyMs(value))
 	}
 }

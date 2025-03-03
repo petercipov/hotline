@@ -10,15 +10,15 @@ type LatencySLO struct {
 }
 
 type PercentileDefinition struct {
-	Percentile float64
-	Threshold  float64
+	Percentile Percentile
+	Threshold  LatencyMs
 	Name       string
 }
 
 func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Duration) *LatencySLO {
 	var splitLatencies []float64
 	for i := range percentiles {
-		splitLatencies = append(splitLatencies, percentiles[i].Threshold)
+		splitLatencies = append(splitLatencies, float64(percentiles[i].Threshold))
 	}
 	window := NewSlidingWindow(func() Accumulator[float64] {
 		return NewLatencyHistogram(splitLatencies)
@@ -39,12 +39,13 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 	histogram := activeWindow.Accumulator.(*LatencyHistogram)
 	metrics := make([]SLOCheck, len(s.percentiles))
 	for i, definition := range s.percentiles {
-		metric := histogram.ComputePercentile(definition.Percentile).To
+		metric := histogram.ComputePercentile(definition.Percentile.Normalized()).To
 
 		var breach *SLOBreach
-		if !(metric < definition.Threshold) {
+		if !(metric < float64(definition.Threshold)) {
 			breach = &SLOBreach{
-				Threshold:      definition.Threshold,
+				ThresholdValue: float64(definition.Threshold),
+				ThresholdUnit:  "ms",
 				Operation:      OperationL,
 				WindowDuration: s.window.Size,
 			}
@@ -60,6 +61,6 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 	return metrics
 }
 
-func (s *LatencySLO) AddLatency(now time.Time, latency float64) {
-	s.window.AddValue(now, latency)
+func (s *LatencySLO) AddLatency(now time.Time, latency LatencyMs) {
+	s.window.AddValue(now, float64(latency))
 }

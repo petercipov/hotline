@@ -7,7 +7,7 @@ import (
 	"hotline/servicelevels"
 )
 
-var _ = Describe("Latency Histogram", func() {
+var _ = Describe("LatencyMs Histogram", func() {
 
 	s := sutlatencyhistogram{}
 
