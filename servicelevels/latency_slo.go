@@ -15,7 +15,11 @@ type PercentileDefinition struct {
 	Name       string
 }
 
-func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Duration, splitLatencies []float64) *LatencySLO {
+func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Duration) *LatencySLO {
+	var splitLatencies []float64
+	for i := range percentiles {
+		splitLatencies = append(splitLatencies, percentiles[i].Threshold)
+	}
 	window := NewSlidingWindow(func() Accumulator[float64] {
 		return NewLatencyHistogram(splitLatencies)
 	}, windowDuration, 10*time.Second)

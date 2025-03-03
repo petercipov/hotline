@@ -1,5 +1,5 @@
 test:
-	go test -cover ./servicelevels
+	go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 
 deps:
 	go mod download
