@@ -33,7 +33,7 @@ func NewStateSLO(expectedStates []string, breachThreshold Percent, windowDuratio
 		window:            window,
 		expectedStates:    expectedStates,
 		expectedStatesMap: statesMap,
-		breachThreshold:   roundTo(float64(breachThreshold), 5),
+		breachThreshold:   roundTo(breachThreshold.Value(), 5),
 	}
 }
 

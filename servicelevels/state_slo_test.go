@@ -253,7 +253,7 @@ func (s *stateslosut) getMetrics() []servicelevels.SLOCheck {
 
 func (s *stateslosut) forSLO(expectedStates ...string) {
 	p, failure := servicelevels.ParsePercent(99.99)
-	Expect(failure).To(BeFalse())
+	Expect(failure).To(BeNil())
 
 	s.slo = servicelevels.NewStateSLO(expectedStates, p, 1*time.Hour)
 }
