@@ -122,6 +122,12 @@ var _ = Describe("State SLO", func() {
 					Name:  "unexpected",
 					Value: 25,
 				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "unexpected",
+						Value: 25,
+					},
+				},
 				Breach: &servicelevels.SLOBreach{
 					ThresholdValue: 0.01,
 					ThresholdUnit:  "%",
@@ -144,6 +150,12 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 100,
+				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "unexpected",
+						Value: 100,
+					},
 				},
 				Breach: &servicelevels.SLOBreach{
 					ThresholdValue: 0.01,
@@ -187,6 +199,12 @@ var _ = Describe("State SLO", func() {
 					Name:  "unexpected",
 					Value: 25,
 				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "unexpected",
+						Value: 25,
+					},
+				},
 				Breach: &servicelevels.SLOBreach{
 					ThresholdValue: 0.01,
 					ThresholdUnit:  "%",
@@ -227,6 +245,109 @@ var _ = Describe("State SLO", func() {
 					Name:  "unexpected",
 					Value: 25,
 				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "unexpected",
+						Value: 25,
+					},
+				},
+				Breach: &servicelevels.SLOBreach{
+					ThresholdValue: 0.01,
+					ThresholdUnit:  "%",
+					Operation:      servicelevels.OperationL,
+					WindowDuration: 1 * time.Hour,
+				},
+			}))
+		})
+
+		It("should trace unexpected state if defined and show in breakdown", func() {
+			sut.forSLOTRackingUnexpected([]string{"state1", "state2"}, []string{"timeout"})
+			sut.AddState("state1")
+			sut.AddState("state1")
+			sut.AddState("state1")
+			sut.AddState("timeout")
+			metrics := sut.getMetrics()
+			Expect(metrics).To(HaveLen(2))
+			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Metric: servicelevels.Metric{
+					Name:  "expected",
+					Value: 75,
+				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "state1",
+						Value: 75,
+					},
+				},
+				Breach: &servicelevels.SLOBreach{
+					ThresholdValue: 99.99,
+					ThresholdUnit:  "%",
+					Operation:      servicelevels.OperationGE,
+					WindowDuration: 1 * time.Hour,
+				},
+			}))
+			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+				Metric: servicelevels.Metric{
+					Name:  "unexpected",
+					Value: 25,
+				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "timeout",
+						Value: 25,
+					},
+				},
+				Breach: &servicelevels.SLOBreach{
+					ThresholdValue: 0.01,
+					ThresholdUnit:  "%",
+					Operation:      servicelevels.OperationL,
+					WindowDuration: 1 * time.Hour,
+				},
+			}))
+		})
+
+		It("should trace unexpected breakdown when added unknown", func() {
+			sut.forSLOTRackingUnexpected([]string{"state1", "state2"}, []string{"timeout"})
+			sut.AddState("state1")
+			sut.AddState("state1")
+			sut.AddState("state1")
+			sut.AddState("timeout")
+			sut.AddState("unknnown_unknown")
+			metrics := sut.getMetrics()
+			Expect(metrics).To(HaveLen(2))
+			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Metric: servicelevels.Metric{
+					Name:  "expected",
+					Value: 60,
+				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "state1",
+						Value: 60,
+					},
+				},
+				Breach: &servicelevels.SLOBreach{
+					ThresholdValue: 99.99,
+					ThresholdUnit:  "%",
+					Operation:      servicelevels.OperationGE,
+					WindowDuration: 1 * time.Hour,
+				},
+			}))
+			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+				Metric: servicelevels.Metric{
+					Name:  "unexpected",
+					Value: 40,
+				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:  "timeout",
+						Value: 20,
+					},
+					{
+						Name:  "unexpected",
+						Value: 20,
+					},
+				},
 				Breach: &servicelevels.SLOBreach{
 					ThresholdValue: 0.01,
 					ThresholdUnit:  "%",
@@ -252,10 +373,14 @@ func (s *stateslosut) getMetrics() []servicelevels.SLOCheck {
 }
 
 func (s *stateslosut) forSLO(expectedStates ...string) {
+	s.forSLOTRackingUnexpected(expectedStates, nil)
+}
+
+func (s *stateslosut) forSLOTRackingUnexpected(expectedStates []string, unexpectedStates []string) {
 	p, failure := servicelevels.ParsePercent(99.99)
 	Expect(failure).To(BeNil())
 
-	s.slo = servicelevels.NewStateSLO(expectedStates, p, 1*time.Hour)
+	s.slo = servicelevels.NewStateSLO(expectedStates, unexpectedStates, p, 1*time.Hour)
 }
 
 func (s *stateslosut) AddState(state string) {

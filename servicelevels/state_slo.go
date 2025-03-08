@@ -7,33 +7,52 @@ import (
 )
 
 type StateSLO struct {
-	window            *SlidingWindow[string]
-	expectedStates    []string
-	expectedStatesMap map[string]int
-	breachThreshold   float64
+	window                    *SlidingWindow[string]
+	expectedStates            []string
+	expectedStatesMap         map[string]int
+	unexpectedStates          []string
+	unexpectedStatesMap       map[string]int
+	breachThreshold           float64
+	unexpectedBreachThreshold float64
 }
 
 const unexpectedStateName = "unexpected"
 const expectedStateName = "expected"
 
-func NewStateSLO(expectedStates []string, breachThreshold Percent, windowDuration time.Duration) *StateSLO {
+func NewStateSLO(
+	expectedStates []string,
+	unexpectedStates []string,
+	breachThreshold Percent,
+	windowDuration time.Duration) *StateSLO {
 	expectedStates = uniqueSlice(filterOutUnknownTag(expectedStates))
+	unexpectedStates = uniqueSlice(filterOutUnknownTag(unexpectedStates))
+	unexpectedStates = append(unexpectedStates, unexpectedStateName)
 
 	statesMap := make(map[string]int, len(expectedStates))
 	for i, state := range expectedStates {
 		statesMap[state] = i
 	}
+	unexpectedStatesMap := make(map[string]int, len(unexpectedStates))
+	for i, state := range unexpectedStates {
+		unexpectedStatesMap[state] = i
+	}
 
 	tags := append([]string{}, expectedStates...)
-	tags = append(tags, unexpectedStateName)
+	tags = append(tags, unexpectedStates...)
 	window := NewSlidingWindow(func() Accumulator[string] {
 		return NewTagsHistogram(tags)
 	}, windowDuration, 1*time.Minute)
+
+	expectedBreachThreshold := roundTo(breachThreshold.Value(), 5)
+	unexpectedBreachThreshold := roundTo(100.0-expectedBreachThreshold, 5)
 	return &StateSLO{
-		window:            window,
-		expectedStates:    expectedStates,
-		expectedStatesMap: statesMap,
-		breachThreshold:   roundTo(breachThreshold.Value(), 5),
+		window:                    window,
+		expectedStates:            expectedStates,
+		expectedStatesMap:         statesMap,
+		unexpectedStates:          unexpectedStates,
+		unexpectedStatesMap:       unexpectedStatesMap,
+		breachThreshold:           expectedBreachThreshold,
+		unexpectedBreachThreshold: unexpectedBreachThreshold,
 	}
 }
 
@@ -51,7 +70,10 @@ func filterOutUnknownTag(states []string) []string {
 func (s *StateSLO) AddState(now time.Time, state string) {
 	_, found := s.expectedStatesMap[state]
 	if !found {
-		state = unexpectedStateName
+		_, found = s.unexpectedStatesMap[state]
+		if !found {
+			state = unexpectedStateName
+		}
 	}
 	s.window.AddValue(now, state)
 }
@@ -64,7 +86,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 	histogram := activeWindow.Accumulator.(*TagHistogram)
 
 	expectedBreach, expectedMetric, expectedBreakdown := s.checkExpectedBreach(histogram)
-	unexpectedBreach, unexpectedMetric := s.checkUnexpectedBreach(histogram)
+	unexpectedBreach, unexpectedMetric, unexpectedBreakdown := s.checkUnexpectedBreach(histogram)
 
 	checks := make([]SLOCheck, 2)
 	checks = checks[:0]
@@ -85,7 +107,8 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 				Name:  unexpectedStateName,
 				Value: unexpectedMetric,
 			},
-			Breach: unexpectedBreach,
+			Breakdown: unexpectedBreakdown,
+			Breach:    unexpectedBreach,
 		})
 	}
 
@@ -93,22 +116,32 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 
 }
 
-func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, float64) {
-	unexpectedMetric := histogram.ComputePercentile(unexpectedStateName)
+func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, []Metric) {
+	breakDown := make([]Metric, len(s.unexpectedStatesMap))
+	breakDown = breakDown[:0]
+	unexpectedSum := float64(0)
+	for _, state := range s.unexpectedStates {
+		metric := histogram.ComputePercentile(state)
+		if metric != nil {
+			breakDown = append(breakDown, Metric{
+				Name:  state,
+				Value: *metric,
+			})
+			unexpectedSum += *metric
+		}
+	}
 
 	var breach *SLOBreach
-	var value float64 = 0
-	if unexpectedMetric != nil {
+	if unexpectedSum > s.unexpectedBreachThreshold {
 		breach = &SLOBreach{
-			ThresholdValue: roundTo(100.0-s.breachThreshold, 5),
+			ThresholdValue: s.unexpectedBreachThreshold,
 			ThresholdUnit:  "%",
 			Operation:      OperationL,
 			WindowDuration: s.window.Size,
 		}
-		value = *unexpectedMetric
 	}
 
-	return breach, value
+	return breach, unexpectedSum, breakDown
 }
 
 func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, []Metric) {
