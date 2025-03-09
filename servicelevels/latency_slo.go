@@ -7,6 +7,7 @@ import (
 type LatencySLO struct {
 	window      *SlidingWindow[float64]
 	percentiles []PercentileDefinition
+	tags        map[string]string
 }
 
 type PercentileDefinition struct {
@@ -15,7 +16,7 @@ type PercentileDefinition struct {
 	Name       string
 }
 
-func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Duration) *LatencySLO {
+func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Duration, tags map[string]string) *LatencySLO {
 	var splitLatencies []float64
 	for i := range percentiles {
 		splitLatencies = append(splitLatencies, float64(percentiles[i].Threshold))
@@ -27,6 +28,7 @@ func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Durat
 	return &LatencySLO{
 		percentiles: percentiles,
 		window:      window,
+		tags:        tags,
 	}
 }
 
@@ -55,6 +57,7 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 				Name:  definition.Name,
 				Value: metric,
 			},
+			Tags:   s.tags,
 			Breach: breach,
 		}
 	}

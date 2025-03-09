@@ -4,6 +4,7 @@ import "time"
 
 type SLOCheck struct {
 	Metric    Metric
+	Tags      map[string]string
 	Breakdown []Metric
 	Breach    *SLOBreach
 }

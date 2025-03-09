@@ -14,6 +14,7 @@ type StateSLO struct {
 	unexpectedStatesMap       map[string]int
 	breachThreshold           float64
 	unexpectedBreachThreshold float64
+	tags                      map[string]string
 }
 
 const unexpectedStateName = "unexpected"
@@ -23,7 +24,8 @@ func NewStateSLO(
 	expectedStates []string,
 	unexpectedStates []string,
 	breachThreshold Percent,
-	windowDuration time.Duration) *StateSLO {
+	windowDuration time.Duration,
+	tags map[string]string) *StateSLO {
 	expectedStates = uniqueSlice(filterOutUnknownTag(expectedStates))
 	unexpectedStates = uniqueSlice(filterOutUnknownTag(unexpectedStates))
 	unexpectedStates = append(unexpectedStates, unexpectedStateName)
@@ -37,10 +39,10 @@ func NewStateSLO(
 		unexpectedStatesMap[state] = i
 	}
 
-	tags := append([]string{}, expectedStates...)
-	tags = append(tags, unexpectedStates...)
+	stateNames := append([]string{}, expectedStates...)
+	stateNames = append(stateNames, unexpectedStates...)
 	window := NewSlidingWindow(func() Accumulator[string] {
-		return NewTagsHistogram(tags)
+		return NewTagsHistogram(stateNames)
 	}, windowDuration, 1*time.Minute)
 
 	expectedBreachThreshold := roundTo(breachThreshold.Value(), 5)
@@ -53,6 +55,7 @@ func NewStateSLO(
 		unexpectedStatesMap:       unexpectedStatesMap,
 		breachThreshold:           expectedBreachThreshold,
 		unexpectedBreachThreshold: unexpectedBreachThreshold,
+		tags:                      tags,
 	}
 }
 
@@ -98,6 +101,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 			},
 			Breakdown: expectedBreakdown,
 			Breach:    expectedBreach,
+			Tags:      s.tags,
 		})
 	}
 
@@ -109,6 +113,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 			},
 			Breakdown: unexpectedBreakdown,
 			Breach:    unexpectedBreach,
+			Tags:      s.tags,
 		})
 	}
 
