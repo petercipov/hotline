@@ -12,8 +12,15 @@ var _ = Describe("Http Api Slo", func() {
 
 	s := suthttpapislo{}
 
+	It("if no default provided, return no slo", func() {
+		s.forRouteSetup()
+		Expect(s.slo).Should(BeNil())
+		Expect(s.sloErr).Should(HaveOccurred())
+		Expect(s.sloErr.Error()).To(Equal("not found default route / in list of routes"))
+	})
+
 	It("check default path service levels when no definition is set", func() {
-		s.forDefaultSetup()
+		s.forRouteSetupWithDefault()
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
@@ -51,8 +58,8 @@ var _ = Describe("Http Api Slo", func() {
 		}))
 	})
 
-	It("check path service levels when route defined", func() {
-		s.forRouteSetup(servicelevels.HttpRouteSLODefinition{
+	It("check route service levels when route defined", func() {
+		s.forRouteSetupWithDefault(servicelevels.HttpRouteSLODefinition{
 			Path: "/users",
 			Host: "iam.example.com",
 			Latency: servicelevels.HttpLatencySLODefinition{
@@ -107,14 +114,36 @@ var _ = Describe("Http Api Slo", func() {
 			Breach: nil,
 		}))
 	})
+
+	It("duplicating default pattern will return no slo", func() {
+		s.forRouteSetupWithDefault(servicelevels.HttpRouteSLODefinition{
+			Path: "/",
+			Latency: servicelevels.HttpLatencySLODefinition{
+				Percentiles: []servicelevels.PercentileDefinition{
+					{
+						Percentile: 99.9,
+						Threshold:  2000,
+						Name:       "p99",
+					},
+				},
+				WindowDuration: 1 * time.Minute,
+			},
+			Status: servicelevels.HttpStatusSLODefinition{
+				Expected:        []string{"200", "201"},
+				BreachThreshold: 99.9,
+				WindowDuration:  1 * time.Hour,
+			},
+		})
+
+		Expect(s.slo).Should(BeNil())
+		Expect(s.sloErr).Should(HaveOccurred())
+		Expect(s.sloErr.Error()).To(Equal("pattern / conflicting with other route"))
+	})
 })
 
 type suthttpapislo struct {
-	slo *servicelevels.HttpApiSLO
-}
-
-func (s *suthttpapislo) forDefaultSetup() {
-	s.slo = servicelevels.NewHttpApiSLO(servicelevels.HttpApiSLODefinition{})
+	slo    *servicelevels.HttpApiSLO
+	sloErr error
 }
 
 func (s *suthttpapislo) Check() []servicelevels.SLOCheck {
@@ -128,9 +157,31 @@ func (s *suthttpapislo) AddRequest(request *servicelevels.HttpRequest) {
 }
 
 func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.HttpRouteSLODefinition) {
-	s.slo = servicelevels.NewHttpApiSLO(servicelevels.HttpApiSLODefinition{
+	s.slo, s.sloErr = servicelevels.NewHttpApiSLO(servicelevels.HttpApiSLODefinition{
 		RouteSLOs: routes,
 	})
+}
+
+func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRouteSLODefinition) {
+	routes = append(routes, servicelevels.HttpRouteSLODefinition{
+		Path: "/",
+		Latency: servicelevels.HttpLatencySLODefinition{
+			Percentiles: []servicelevels.PercentileDefinition{
+				{
+					Percentile: 99.9,
+					Threshold:  2000,
+					Name:       "p99",
+				},
+			},
+			WindowDuration: 1 * time.Minute,
+		},
+		Status: servicelevels.HttpStatusSLODefinition{
+			Expected:        []string{"200", "201"},
+			BreachThreshold: 99.9,
+			WindowDuration:  1 * time.Hour,
+		},
+	})
+	s.forRouteSetup(routes...)
 }
 
 func newUrl(urlString string) *url.URL {

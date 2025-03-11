@@ -1,6 +1,7 @@
 package servicelevels
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -16,8 +17,8 @@ type HttpRequest struct {
 }
 
 type HttpApiSLO struct {
-	mux      *http.ServeMux
-	pathSLOs []*HttpRouteSLO
+	mux       *http.ServeMux
+	routeSLOs []*HttpRouteSLO
 }
 
 type HttpApiSLODefinition struct {
@@ -41,24 +42,41 @@ type HttpStatusSLODefinition struct {
 	WindowDuration  time.Duration
 }
 
-func NewHttpApiSLO(definition HttpApiSLODefinition) *HttpApiSLO {
+func NewHttpApiSLO(definition HttpApiSLODefinition) (*HttpApiSLO, error) {
 	mux := http.NewServeMux()
-
-	pathSlos := make([]*HttpRouteSLO, len(definition.RouteSLOs)+1)
-	pathSlos = pathSlos[:0]
+	routeSLOs := make([]*HttpRouteSLO, len(definition.RouteSLOs)+1)
+	routeSLOs = routeSLOs[:0]
+	foundDefault := false
 	for _, routeSLO := range definition.RouteSLOs {
 		slo := NewHttpPathSLO(routeSLO)
-		mux.Handle(slo.routePattern, slo)
-		pathSlos = append(pathSlos, slo)
+		if slo.routePattern == "/" {
+			foundDefault = true
+		}
+		registerErr := safeRegisterInMux(mux, slo.routePattern, slo)
+		if registerErr != nil {
+			return nil, registerErr
+		}
+		routeSLOs = append(routeSLOs, slo)
 	}
-
-	defaultSlo := NewHttpDefaultPathSLO()
-	mux.Handle(defaultSlo.routePattern, defaultSlo)
-	pathSlos = append(pathSlos, defaultSlo)
+	if !foundDefault {
+		return nil, errors.New("not found default route / in list of routes")
+	}
 	return &HttpApiSLO{
-		mux:      mux,
-		pathSLOs: pathSlos,
-	}
+		mux:       mux,
+		routeSLOs: routeSLOs,
+	}, nil
+}
+
+func safeRegisterInMux(mux *http.ServeMux, pattern string, handler http.Handler) (err error) {
+	defer func() {
+		v := recover()
+		if v != nil {
+			err = fmt.Errorf("pattern %s conflicting with other route", pattern)
+		}
+	}()
+
+	mux.Handle(pattern, handler)
+	return nil
 }
 
 func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
@@ -78,7 +96,7 @@ func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
 
 func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
 	var checks []SLOCheck
-	for _, slo := range s.pathSLOs {
+	for _, slo := range s.routeSLOs {
 		check := slo.Check(now)
 		checks = append(checks, check...)
 	}
@@ -110,35 +128,6 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 			slo.Latency.WindowDuration,
 			map[string]string{
 				"http_route": pattern,
-			},
-		),
-	}
-}
-
-func NewHttpDefaultPathSLO() *HttpRouteSLO {
-	pathPattern := "/"
-	return &HttpRouteSLO{
-		routePattern: pathPattern,
-		stateSLO: NewStateSLO(
-			[]string{"200", "201"},
-			[]string{},
-			99.99,
-			1*time.Hour,
-			map[string]string{
-				"http_route": pathPattern,
-			},
-		),
-		latencySLO: NewLatencySLO(
-			[]PercentileDefinition{
-				{
-					Percentile: 99.0,
-					Threshold:  2000,
-					Name:       "p99",
-				},
-			},
-			1*time.Minute,
-			map[string]string{
-				"http_route": pathPattern,
 			},
 		),
 	}
