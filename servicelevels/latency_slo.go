@@ -35,7 +35,7 @@ func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Durat
 func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 	activeWindow := s.window.GetActiveWindow(now)
 	if activeWindow == nil {
-		return make([]SLOCheck, len(s.percentiles))
+		return nil
 	}
 
 	histogram := activeWindow.Accumulator.(*LatencyHistogram)

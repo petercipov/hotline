@@ -14,8 +14,8 @@ var _ = Describe("LatencyMs SLO", func() {
 	Context("no input data", func() {
 		It("should return return no current metric", func() {
 			sut.forEmptySLO()
-			metric := sut.getMetric()
-			Expect(metric.Metric.Value).To(BeNumerically("==", 0))
+			metric := sut.getMetrics()
+			Expect(metric).To(HaveLen(0))
 		})
 	})
 
@@ -23,14 +23,14 @@ var _ = Describe("LatencyMs SLO", func() {
 		It("should return non zero metric", func() {
 			sut.forEmptySLO()
 			sut.WithValues(100, 200, 300, 400)
-			metric := sut.getMetric()
+			metric := sut.getMetrics()[0]
 			Expect(metric.Metric.Value).To(BeNumerically(">", 0))
 		})
 
 		It("should return p50 metric", func() {
 			sut.forEmptySLO()
 			sut.WithValues(100, 200, 300, 400, 500)
-			metric := sut.getMetric()
+			metric := sut.getMetrics()[0]
 			Expect(metric.Metric.Value).Should(BeInInterval(308, 309))
 		})
 
@@ -38,7 +38,7 @@ var _ = Describe("LatencyMs SLO", func() {
 			sut.forSLO([]servicelevels.PercentileDefinition{
 				{Percentile: servicelevels.P50, Threshold: 5000}}, 1*time.Minute)
 			sut.WithValues(100, 200, 300, 400, 500)
-			metric := sut.getMetric()
+			metric := sut.getMetrics()[0]
 			Expect(metric.Metric.Name).Should(Equal("p50"))
 			Expect(metric.Metric.Value).Should(BeInInterval(308, 309))
 		})
@@ -49,7 +49,7 @@ var _ = Describe("LatencyMs SLO", func() {
 			sut.forSLO([]servicelevels.PercentileDefinition{
 				{Percentile: servicelevels.P99, Threshold: 5000}}, 1*time.Minute)
 			sut.WithRandomValues(100000, 5000)
-			metric := sut.getMetric()
+			metric := sut.getMetrics()[0]
 			Expect(metric.Metric.Value).Should(BeNumerically("<=", 5000))
 		})
 
@@ -100,10 +100,6 @@ func (s *latencySLOSUT) forEmptySLO() {
 	s.forSLO([]servicelevels.PercentileDefinition{
 		{Percentile: servicelevels.P50, Threshold: 5000}},
 		1*time.Minute)
-}
-
-func (s *latencySLOSUT) getMetric() servicelevels.SLOCheck {
-	return s.getMetrics()[0]
 }
 
 func (s *latencySLOSUT) getMetrics() []servicelevels.SLOCheck {
