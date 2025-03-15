@@ -11,12 +11,8 @@ type contextProcessId struct{}
 var contextProcessIdName = contextProcessId{}
 
 func GetProcessIdFromContext(ctx context.Context) string {
-	name, found := ctx.Value(contextProcessIdName).(string)
-	if found {
-		return name
-	} else {
-		return ""
-	}
+	name, _ := ctx.Value(contextProcessIdName).(string)
+	return name
 }
 
 type FanOut[M any] struct {
