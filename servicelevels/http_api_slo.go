@@ -104,32 +104,40 @@ func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
 	return checks
 }
 
+var httpRangeBreakdown = NewHttpStateRangeBreakdown()
+
 type HttpRouteSLO struct {
 	routePattern string
 	stateSLO     *StateSLO
 	latencySLO   *LatencySLO
+	expected     map[string]bool
 }
 
 func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 	pattern := fmt.Sprintf("%s%s", slo.Host, slo.Path)
+	tags := map[string]string{
+		"http_route": pattern,
+	}
+	expected := make(map[string]bool)
+	for _, status := range slo.Status.Expected {
+		expected[status] = true
+	}
+
 	return &HttpRouteSLO{
 		routePattern: pattern,
 		stateSLO: NewStateSLO(
 			slo.Status.Expected,
-			[]string{},
+			httpRangeBreakdown.GetRanges(),
 			slo.Status.BreachThreshold,
 			slo.Status.WindowDuration,
-			map[string]string{
-				"http_route": pattern,
-			},
+			tags,
 		),
 		latencySLO: NewLatencySLO(
 			slo.Latency.Percentiles,
 			slo.Latency.WindowDuration,
-			map[string]string{
-				"http_route": pattern,
-			},
+			tags,
 		),
+		expected: expected,
 	}
 }
 
@@ -138,7 +146,20 @@ func (s *HttpRouteSLO) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {
 }
 func (s *HttpRouteSLO) AddRequest(now time.Time, req *HttpRequest) {
 	s.latencySLO.AddLatency(now, req.Latency)
-	s.stateSLO.AddState(now, req.State)
+
+	_, isExpected := s.expected[req.State]
+	if isExpected {
+		s.stateSLO.AddState(now, req.State)
+		return
+	}
+
+	httpRange := httpRangeBreakdown.GetRange(req.State)
+	if httpRange != nil {
+		s.stateSLO.AddState(now, *httpRange)
+		return
+	}
+
+	s.stateSLO.AddState(now, "unknown")
 }
 
 func (s *HttpRouteSLO) Check(now time.Time) []SLOCheck {

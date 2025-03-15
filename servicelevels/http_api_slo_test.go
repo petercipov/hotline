@@ -59,25 +59,7 @@ var _ = Describe("Http Api Slo", func() {
 	})
 
 	It("check route service levels when route defined", func() {
-		s.forRouteSetupWithDefault(servicelevels.HttpRouteSLODefinition{
-			Path: "/users",
-			Host: "iam.example.com",
-			Latency: servicelevels.HttpLatencySLODefinition{
-				Percentiles: []servicelevels.PercentileDefinition{
-					{
-						Percentile: 99.9,
-						Threshold:  2000,
-						Name:       "p99",
-					},
-				},
-				WindowDuration: 1 * time.Minute,
-			},
-			Status: servicelevels.HttpStatusSLODefinition{
-				Expected:        []string{"200", "201"},
-				BreachThreshold: 99.9,
-				WindowDuration:  1 * time.Hour,
-			},
-		})
+		s.forRouteSetupWithDefault(defaultRouteDefinition("iam.example.com", "/users"))
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
@@ -139,6 +121,82 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(s.sloErr).Should(HaveOccurred())
 		Expect(s.sloErr.Error()).To(Equal("pattern / conflicting with other route"))
 	})
+
+	It("breaks unexpected states by ranges", func() {
+		s.forRouteSetupWithDefault(defaultRouteDefinition("iam.example.com", "/users"))
+		s.AddRequest(&servicelevels.HttpRequest{
+			Latency: 1000,
+			State:   "404",
+			Method:  "GET",
+			URL:     newUrl("https://iam.example.com/users"),
+		})
+		s.AddRequest(&servicelevels.HttpRequest{
+			Latency: 1000,
+			State:   "500",
+			Method:  "GET",
+			URL:     newUrl("https://iam.example.com/users"),
+		})
+		metrics := s.Check()
+		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Metric: servicelevels.Metric{
+				Name:  "unexpected",
+				Value: 100,
+			},
+			Tags: map[string]string{
+				"http_route": "iam.example.com/users",
+			},
+			Breakdown: []servicelevels.Metric{
+				{
+					Name:  "4xx",
+					Value: 50,
+				},
+				{
+					Name:  "5xx",
+					Value: 50,
+				},
+			},
+			Breach: &servicelevels.SLOBreach{
+				ThresholdValue: 0.1,
+				ThresholdUnit:  "%",
+				Operation:      "<",
+				WindowDuration: 1 * time.Hour,
+			},
+		}))
+	})
+
+	It("breaks unknown unexpected state", func() {
+		s.forRouteSetupWithDefault(defaultRouteDefinition("iam.example.com", "/users"))
+		s.AddRequest(&servicelevels.HttpRequest{
+			Latency: 1000,
+			State:   "unknown_state",
+			Method:  "GET",
+			URL:     newUrl("https://iam.example.com/users"),
+		})
+		metrics := s.Check()
+		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Metric: servicelevels.Metric{
+				Name:  "unexpected",
+				Value: 100,
+			},
+			Tags: map[string]string{
+				"http_route": "iam.example.com/users",
+			},
+			Breakdown: []servicelevels.Metric{
+				{
+					Name:  "unknown",
+					Value: 100,
+				},
+			},
+			Breach: &servicelevels.SLOBreach{
+				ThresholdValue: 0.1,
+				ThresholdUnit:  "%",
+				Operation:      "<",
+				WindowDuration: 1 * time.Hour,
+			},
+		}))
+	})
 })
 
 type suthttpapislo struct {
@@ -163,8 +221,14 @@ func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.HttpRouteSLODefini
 }
 
 func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRouteSLODefinition) {
-	routes = append(routes, servicelevels.HttpRouteSLODefinition{
-		Path: "/",
+	routes = append(routes, defaultRouteDefinition("", "/"))
+	s.forRouteSetup(routes...)
+}
+
+func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteSLODefinition {
+	return servicelevels.HttpRouteSLODefinition{
+		Path: path,
+		Host: host,
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{
@@ -180,8 +244,7 @@ func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRou
 			BreachThreshold: 99.9,
 			WindowDuration:  1 * time.Hour,
 		},
-	})
-	s.forRouteSetup(routes...)
+	}
 }
 
 func newUrl(urlString string) *url.URL {
