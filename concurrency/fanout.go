@@ -6,9 +6,18 @@ import (
 	"hash/fnv"
 )
 
-type ContextProcessId struct{}
+type contextProcessId struct{}
 
-var ContextProcessIdName = ContextProcessId{}
+var contextProcessIdName = contextProcessId{}
+
+func GetProcessIdFromContext(ctx context.Context) string {
+	name, found := ctx.Value(contextProcessIdName).(string)
+	if found {
+		return name
+	} else {
+		return ""
+	}
+}
 
 type FanOut[M any] struct {
 	channels []chan M
@@ -21,7 +30,7 @@ func NewFanOut[M any](process func(ctx context.Context, m M), numberOfQueues int
 		channels[i] = inputChannel
 		processId := fmt.Sprintf("fan%d", i)
 		go func(messages chan M, processID string) {
-			ctx := context.WithValue(context.Background(), ContextProcessIdName, processID)
+			ctx := context.WithValue(context.Background(), contextProcessIdName, processID)
 			for message := range messages {
 				process(ctx, message)
 			}

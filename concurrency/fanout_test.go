@@ -80,7 +80,7 @@ func (f *fanOutSut) forFanOut(numberOfQueues int) {
 	f.mu = new(sync.Mutex)
 	f.fanOut = concurrency.NewFanOut(func(ctx context.Context, m sutMessage) {
 		f.mu.Lock()
-		name := ctx.Value(concurrency.ContextProcessIdName).(string)
+		name := concurrency.GetProcessIdFromContext(ctx)
 		m.processId = name
 		f.messages = append(f.messages, m)
 		f.mu.Unlock()
