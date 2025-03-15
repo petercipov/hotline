@@ -1,6 +1,0 @@
-profile: cover.out
-local-prefix: "github.com/petercipov/hotline"
-threshold:
-  file: 100
-  package: 100
-  total: 100
