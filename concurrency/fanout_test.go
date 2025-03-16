@@ -6,7 +6,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"hotline/concurrency"
-	"sync"
 	"time"
 )
 
@@ -67,8 +66,10 @@ var _ = Describe("Fan Out", func() {
 })
 
 type fanOutSut struct {
-	fanOut   *concurrency.FanOut[sutMessage]
-	mu       *sync.Mutex
+	fanOut *concurrency.FanOut[sutMessage, *singleWriterScope]
+}
+
+type singleWriterScope struct {
 	messages []sutMessage
 }
 
@@ -77,14 +78,21 @@ func (f *fanOutSut) forSingleFanOut() {
 }
 
 func (f *fanOutSut) forFanOut(numberOfQueues int) {
-	f.mu = new(sync.Mutex)
-	f.fanOut = concurrency.NewFanOut(func(ctx context.Context, m sutMessage) {
-		f.mu.Lock()
-		name := concurrency.GetProcessIdFromContext(ctx)
-		m.processId = name
-		f.messages = append(f.messages, m)
-		f.mu.Unlock()
-	}, numberOfQueues)
+	var queueNames []string
+	for i := 0; i < numberOfQueues; i++ {
+		queueNames = append(queueNames, fmt.Sprintf("fan%d", i))
+	}
+
+	f.fanOut = concurrency.NewFanOut(
+		queueNames,
+		func(ctx context.Context, m sutMessage, scope *singleWriterScope) {
+			name := concurrency.GetQueueIDFromContext(ctx)
+			m.processId = name
+			scope.messages = append(scope.messages, m)
+		},
+		func(ctx context.Context) *singleWriterScope {
+			return &singleWriterScope{}
+		})
 }
 
 func (f *fanOutSut) forEmptyFanOut() {
@@ -93,7 +101,6 @@ func (f *fanOutSut) forEmptyFanOut() {
 
 func (f *fanOutSut) Close() {
 	f.fanOut.Close()
-	f.messages = nil
 }
 
 func (f *fanOutSut) scheduleMessage() {
@@ -114,14 +121,13 @@ func (f *fanOutSut) broadcastMessageWithId(id []byte) {
 
 func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
 	for {
-		f.mu.Lock()
-		messages := f.messages
-		f.mu.Unlock()
-		if len(messages) >= count {
-			f.mu.Lock()
-			f.messages = nil
-			f.mu.Unlock()
-			return messages
+		var allMessages []sutMessage
+		for _, scope := range f.fanOut.Scopes() {
+			allMessages = append(allMessages, scope.messages...)
+
+		}
+		if len(allMessages) >= count {
+			return allMessages
 		}
 		time.Sleep(time.Millisecond * 1)
 	}

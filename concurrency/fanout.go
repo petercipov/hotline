@@ -2,43 +2,47 @@ package concurrency
 
 import (
 	"context"
-	"fmt"
 	"hash/fnv"
+	"iter"
+	"maps"
 )
 
-type contextProcessId struct{}
+type contextQueueID struct{}
 
-var contextProcessIdName = contextProcessId{}
+var contextQueueIDName = contextQueueID{}
 
-func GetProcessIdFromContext(ctx context.Context) string {
-	name, _ := ctx.Value(contextProcessIdName).(string)
+func GetQueueIDFromContext(ctx context.Context) string {
+	name, _ := ctx.Value(contextQueueIDName).(string)
 	return name
 }
 
-type FanOut[M any] struct {
+type FanOut[M any, S any] struct {
 	channels []chan M
+	scopes   map[string]S
 }
 
-func NewFanOut[M any](process func(ctx context.Context, m M), numberOfQueues int) *FanOut[M] {
-	channels := make([]chan M, numberOfQueues)
-	for i := range numberOfQueues {
-		inputChannel := make(chan M)
-		channels[i] = inputChannel
-		processId := fmt.Sprintf("fan%d", i)
-		go func(messages chan M, processID string) {
-			ctx := context.WithValue(context.Background(), contextProcessIdName, processID)
+func NewFanOut[M any, S any](idsOfQueues []string, queueProcessor func(ctx context.Context, m M, scope S), createScope func(ctx context.Context) S) *FanOut[M, S] {
+	channels := make([]chan M, len(idsOfQueues))
+	scopes := make(map[string]S, len(idsOfQueues))
+	for i, queueID := range idsOfQueues {
+		ctx := context.WithValue(context.Background(), contextQueueIDName, queueID)
+		scopes[queueID] = createScope(ctx)
+		messages := make(chan M)
+		channels[i] = messages
+		go func(ctx context.Context, messages chan M, processID string, queueScope S) {
 			for message := range messages {
-				process(ctx, message)
+				queueProcessor(ctx, message, queueScope)
 			}
-		}(inputChannel, processId)
+		}(ctx, messages, queueID, scopes[queueID])
 	}
 
-	return &FanOut[M]{
+	return &FanOut[M, S]{
 		channels: channels,
+		scopes:   scopes,
 	}
 }
 
-func (f *FanOut[M]) Send(id []byte, m M) {
+func (f *FanOut[M, S]) Send(id []byte, m M) {
 	if len(f.channels) == 0 {
 		return
 	}
@@ -53,14 +57,19 @@ func (f *FanOut[M]) Send(id []byte, m M) {
 	f.channels[index] <- m
 }
 
-func (f *FanOut[M]) Broadcast(m M) {
+func (f *FanOut[M, S]) Broadcast(m M) {
 	for i := range f.channels {
 		f.channels[i] <- m
 	}
 }
 
-func (f *FanOut[M]) Close() {
+func (f *FanOut[M, S]) Scopes() iter.Seq2[string, S] {
+	return maps.All(f.scopes)
+}
+
+func (f *FanOut[M, S]) Close() {
 	for i := range f.channels {
 		close(f.channels[i])
 	}
+	f.scopes = map[string]S{}
 }
