@@ -48,19 +48,27 @@ func (l AttributeList) ToMap() AttributeMap {
 	return attrs
 }
 
-func (m AttributeMap) GetValue(name string) (string, bool) {
+func (l AttributeList) Remove(name string) AttributeList {
+	returnList := l
+	for i, attr := range l {
+		if attr.Key == name {
+			l[i] = l[len(l)-1]
+			returnList = l[:len(l)-1]
+			break
+		}
+	}
+	return returnList
+}
+
+func (m AttributeMap) GetStringValue(name string) (string, bool) {
 	attr, found := m[name]
 	if found {
-		return attr.Value.StringValue, true
+		return attr.Value["stringValue"].(string), true
 	}
 	return "", false
 }
 
 type Attribute struct {
-	Key   string      `json:"key"`
-	Value StringValue `json:"value"`
-}
-
-type StringValue struct {
-	StringValue string `json:"stringValue"`
+	Key   string                 `json:"key"`
+	Value map[string]interface{} `json:"value"`
 }

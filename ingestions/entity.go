@@ -14,4 +14,5 @@ type HttpRequest struct {
 	URL             *url.URL
 	StartTime       time.Time
 	EndTime         time.Time
+	ErrorType       string
 }

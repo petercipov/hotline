@@ -79,6 +79,30 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 
 		Expect(requests[0].IntegrationID).To(Equal("id.of.integration"))
 	})
+
+	It("refuses to ingest other than kind client spans", func() {
+		s.forHttpIngestion()
+		s.requestWithSimpleServerSpan()
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(0))
+	})
+
+	It("ingest trace without status code but error type", func() {
+		s.forHttpIngestion()
+		s.requestWithErrorType("timeout")
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(1))
+		Expect(requests[0]).To(Equal(ingestions.HttpRequest{
+			ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
+			IntegrationID:   "integration.com",
+			ProtocolVersion: "1.1",
+			Method:          "POST",
+			ErrorType:       "timeout",
+			URL:             newUrl("https://integration.com/order/123?param1=value1"),
+			StartTime:       parseTime("2018-12-13T14:51:00Z"),
+			EndTime:         parseTime("2018-12-13T14:51:01Z"),
+		}))
+	})
 })
 
 type otelSut struct {
@@ -161,28 +185,20 @@ func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []Attribute{
 					{
-						Key: "http.request.method",
-						Value: StringValue{
-							StringValue: "POST",
-						},
+						Key:   "http.request.method",
+						Value: stringValue("POST"),
 					},
 					{
-						Key: "network.protocol.version",
-						Value: StringValue{
-							StringValue: "1.1",
-						},
+						Key:   "network.protocol.version",
+						Value: stringValue("1.1"),
 					},
 					{
-						Key: "url.full",
-						Value: StringValue{
-							StringValue: "https://integration.com/order/123?param1=value1",
-						},
+						Key:   "url.full",
+						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key: "http.response.status_code",
-						Value: StringValue{
-							StringValue: "200",
-						},
+						Key:   "http.response.status_code",
+						Value: stringValue("200"),
 					},
 				},
 			}
@@ -207,13 +223,17 @@ func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount
 	})
 }
 
+func stringValue(value string) map[string]interface{} {
+	return map[string]interface{}{
+		"stringValue": value,
+	}
+}
+
 func (s *otelSut) requestWithSimpleTraceWithIntegrationID(integrationID string) {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *Span) {
 		span.Attributes = append(span.Attributes, Attribute{
-			Key: "integration.id",
-			Value: StringValue{
-				StringValue: integrationID,
-			},
+			Key:   "integration.id",
+			Value: stringValue(integrationID),
 		})
 	})
 }
@@ -234,6 +254,22 @@ func (s *otelSut) requestWithInvalidBody() int {
 	resp, reqErr := http.DefaultClient.Do(req)
 	Expect(reqErr).ToNot(HaveOccurred())
 	return resp.StatusCode
+}
+
+func (s *otelSut) requestWithSimpleServerSpan() {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *Span) {
+		span.Kind = 2
+	})
+}
+
+func (s *otelSut) requestWithErrorType(errorType string) {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *Span) {
+		span.Attributes = span.Attributes.Remove(DefaultAttributeNames.HttpStatusCode)
+		span.Attributes = append(span.Attributes, Attribute{
+			Key:   DefaultAttributeNames.ErrorType,
+			Value: stringValue(errorType),
+		})
+	})
 }
 
 type FakeIngestion struct {
