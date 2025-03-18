@@ -2,10 +2,13 @@ package otel
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
 	"hotline/ingestions"
 	"net/http"
 	"net/http/httptest"
@@ -118,26 +121,25 @@ func (s *otelSut) forHttpIngestion() {
 }
 
 func (s *otelSut) requestWithEmptyTraces() {
-	s.sendTraces(TracesMessage{
-		ResourceSpans: []ResourceSpan{
+	message := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{
 			{
-				ScopeSpans: []ScopeSpan{
+				ScopeSpans: []*tracepb.ScopeSpans{
 					{
-						Scope: Scope{
-							Name:       "otel",
-							Version:    "123",
-							Attributes: []Attribute{},
+						Scope: &commonpb.InstrumentationScope{
+							Name:    "otel",
+							Version: "123",
 						},
-						Spans: nil,
 					},
 				},
 			},
 		},
-	})
+	}
+	s.sendTraces(message)
 }
 
-func (s *otelSut) sendTraces(message TracesMessage) {
-	raw, marshalErr := json.Marshal(message)
+func (s *otelSut) sendTraces(message *coltracepb.ExportTraceServiceRequest) {
+	raw, marshalErr := proto.Marshal(message)
 	Expect(marshalErr).ToNot(HaveOccurred())
 	// https://github.com/open-telemetry/opentelemetry-collector/blob/432d92d8b366f6831323a928783f1ed867c42050/exporter/otlphttpexporter/otlp.go#L185
 	req, createErr := http.NewRequest(http.MethodPost, s.server.URL, bytes.NewReader(raw))
@@ -166,24 +168,24 @@ func (s *otelSut) requestWithMultipleSpans(count int) {
 }
 
 func (s *otelSut) requestWitMultiResourceMultipleSpans(resourceCount int, traceCount int) {
-	s.requestWitMultiResourceMultipleSpansWithModifier(resourceCount, traceCount, func(span *Span) {})
+	s.requestWitMultiResourceMultipleSpansWithModifier(resourceCount, traceCount, func(span *tracepb.Span) {})
 }
 
-func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount int, traceCount int, modifier func(span *Span)) {
-	var resourceSpans []ResourceSpan
+func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount int, traceCount int, modifier func(span *tracepb.Span)) {
+	var resourceSpans []*tracepb.ResourceSpans
 	for ri := 0; ri < resourceCount; ri++ {
-		var spans []Span
+		var spans []*tracepb.Span
 		for ti := 0; ti < traceCount; ti++ {
-			span := Span{
-				TraceId:           "5B8EFFF798038103D269B633813FC60C" + strconv.Itoa(ri),
-				SpanId:            "EEE19B7EC3C1B174" + strconv.Itoa(ti),
-				ParentSpanId:      "EEE19B7EC3C1B173",
+			span := &tracepb.Span{
+				TraceId:           []byte("5B8EFFF798038103D269B633813FC60C" + strconv.Itoa(ri)),
+				SpanId:            []byte("EEE19B7EC3C1B174" + strconv.Itoa(ti)),
+				ParentSpanId:      []byte("EEE19B7EC3C1B173"),
 				Name:              "request to remote integration",
-				StartTimeUnixNano: "1544712660000000000",
-				EndTimeUnixNano:   "1544712661000000000",
+				StartTimeUnixNano: 1544712660000000000,
+				EndTimeUnixNano:   1544712661000000000,
 				Kind:              3,
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
-				Attributes: []Attribute{
+				Attributes: []*commonpb.KeyValue{
 					{
 						Key:   "http.request.method",
 						Value: stringValue("POST"),
@@ -202,14 +204,14 @@ func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount
 					},
 				},
 			}
-			modifier(&span)
+			modifier(span)
 			spans = append(spans, span)
 		}
 
-		resourceSpans = append(resourceSpans, ResourceSpan{
-			ScopeSpans: []ScopeSpan{
+		resourceSpans = append(resourceSpans, &tracepb.ResourceSpans{
+			ScopeSpans: []*tracepb.ScopeSpans{
 				{
-					Scope: Scope{
+					Scope: &commonpb.InstrumentationScope{
 						Name:    "otel",
 						Version: "123",
 					},
@@ -218,20 +220,20 @@ func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount
 			},
 		})
 	}
-	s.sendTraces(TracesMessage{
+	s.sendTraces(&coltracepb.ExportTraceServiceRequest{
 		ResourceSpans: resourceSpans,
 	})
 }
 
-func stringValue(value string) map[string]interface{} {
-	return map[string]interface{}{
-		"stringValue": value,
+func stringValue(value string) *commonpb.AnyValue {
+	return &commonpb.AnyValue{
+		Value: &commonpb.AnyValue_StringValue{StringValue: value},
 	}
 }
 
 func (s *otelSut) requestWithSimpleTraceWithIntegrationID(integrationID string) {
-	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *Span) {
-		span.Attributes = append(span.Attributes, Attribute{
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
 			Key:   "integration.id",
 			Value: stringValue(integrationID),
 		})
@@ -257,15 +259,15 @@ func (s *otelSut) requestWithInvalidBody() int {
 }
 
 func (s *otelSut) requestWithSimpleServerSpan() {
-	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *Span) {
-		span.Kind = 2
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Kind = tracepb.Span_SPAN_KIND_SERVER
 	})
 }
 
 func (s *otelSut) requestWithErrorType(errorType string) {
-	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *Span) {
-		span.Attributes = span.Attributes.Remove(DefaultAttributeNames.HttpStatusCode)
-		span.Attributes = append(span.Attributes, Attribute{
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Attributes = remove(span.Attributes, DefaultAttributeNames.HttpStatusCode)
+		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
 			Key:   DefaultAttributeNames.ErrorType,
 			Value: stringValue(errorType),
 		})
@@ -296,4 +298,16 @@ type fakeErrReader int
 
 func (fakeErrReader) Read(_ []byte) (n int, err error) {
 	return 0, errors.New("test error")
+}
+
+func remove(l []*commonpb.KeyValue, name string) []*commonpb.KeyValue {
+	returnList := l
+	for i, attr := range l {
+		if attr.Key == name {
+			l[i] = l[len(l)-1]
+			returnList = l[:len(l)-1]
+			break
+		}
+	}
+	return returnList
 }

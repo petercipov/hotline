@@ -1,21 +1,22 @@
 package otel
 
 import (
-	"encoding/json"
 	"fmt"
+	"google.golang.org/protobuf/proto"
 	"hotline/ingestions"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
+
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 type Ingestion interface {
 	Ingest([]ingestions.HttpRequest)
 }
-
-const ClientKind = 3
 
 type AttributeNames struct {
 	HttpRequestMethod      string
@@ -54,26 +55,24 @@ func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "could not read body", http.StatusInternalServerError)
 	}
 
-	var message TracesMessage
-	unmarshalErr := json.Unmarshal(raw, &message)
+	var reqProto coltracepb.ExportTraceServiceRequest
+	unmarshalErr := proto.Unmarshal(raw, &reqProto)
 	if unmarshalErr != nil {
-		http.Error(w, "could not parse json", http.StatusBadRequest)
+		http.Error(w, "could not parse proto", http.StatusBadRequest)
 	}
-
-	h.ingestion.Ingest(h.convertMessageToHttp(message))
+	h.ingestion.Ingest(h.convertMessageToHttp(&reqProto))
 	w.WriteHeader(http.StatusCreated)
 }
 
-// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client
-func (h *TracesHandler) convertMessageToHttp(message TracesMessage) []ingestions.HttpRequest {
+func (h *TracesHandler) convertMessageToHttp(reqProto *coltracepb.ExportTraceServiceRequest) []ingestions.HttpRequest {
 	var requests []ingestions.HttpRequest
-	for _, resource := range message.ResourceSpans {
+	for _, resource := range reqProto.ResourceSpans {
 		for _, scope := range resource.ScopeSpans {
 			for _, span := range scope.Spans {
-				if span.Kind != ClientKind {
+				if span.Kind != tracepb.Span_SPAN_KIND_CLIENT {
 					continue
 				}
-				attrs := span.Attributes.ToMap()
+				attrs := toMap(span.Attributes)
 				id := fmt.Sprintf("%s:%s", span.TraceId, span.SpanId)
 				method, _ := attrs.GetStringValue(h.attNames.HttpRequestMethod)
 				statusCode, _ := attrs.GetStringValue(h.attNames.HttpStatusCode)
@@ -89,9 +88,6 @@ func (h *TracesHandler) convertMessageToHttp(message TracesMessage) []ingestions
 					integrationID = hotlineIntegrationId
 				}
 
-				startTimeNano, _ := strconv.ParseInt(span.StartTimeUnixNano, 10, 64)
-				endTimeNano, _ := strconv.ParseInt(span.EndTimeUnixNano, 10, 64)
-
 				errorType, _ := attrs.GetStringValue(h.attNames.ErrorType)
 
 				requests = append(requests, ingestions.HttpRequest{
@@ -101,12 +97,30 @@ func (h *TracesHandler) convertMessageToHttp(message TracesMessage) []ingestions
 					Method:          method,
 					StatusCode:      statusCode,
 					URL:             fullUrl,
-					StartTime:       time.Unix(0, startTimeNano).UTC(),
-					EndTime:         time.Unix(0, endTimeNano).UTC(),
+					StartTime:       time.Unix(0, int64(span.StartTimeUnixNano)).UTC(),
+					EndTime:         time.Unix(0, int64(span.EndTimeUnixNano)).UTC(),
 					ErrorType:       errorType,
 				})
 			}
 		}
 	}
 	return requests
+}
+
+type AttributePBMap map[string]*commonpb.KeyValue
+
+func toMap(attributes []*commonpb.KeyValue) AttributePBMap {
+	values := make(AttributePBMap)
+	for _, attribute := range attributes {
+		values[attribute.Key] = attribute
+	}
+	return values
+}
+
+func (m AttributePBMap) GetStringValue(name string) (string, bool) {
+	attr, found := m[name]
+	if found {
+		return attr.Value.GetStringValue(), true
+	}
+	return "", false
 }
