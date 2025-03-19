@@ -19,12 +19,12 @@ type Ingestion interface {
 }
 
 type AttributeNames struct {
-	HttpRequestMethod      string
-	HttpStatusCode         string
-	UrlFull                string
-	NetworkProtocolVersion string
-	IntegrationID          string
-	ErrorType              string
+	HttpRequestMethod      string //required
+	HttpStatusCode         string //conditionally required if no errorType
+	UrlFull                string //required
+	NetworkProtocolVersion string //Recommended
+	IntegrationID          string //Recommended
+	ErrorType              string //conditionally required if no status code
 }
 
 var DefaultAttributeNames = AttributeNames{
@@ -64,6 +64,7 @@ func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client
 func (h *TracesHandler) convertMessageToHttp(reqProto *coltracepb.ExportTraceServiceRequest) []ingestions.HttpRequest {
 	var requests []ingestions.HttpRequest
 	for _, resource := range reqProto.ResourceSpans {
@@ -74,21 +75,34 @@ func (h *TracesHandler) convertMessageToHttp(reqProto *coltracepb.ExportTraceSer
 				}
 				attrs := toMap(span.Attributes)
 				id := fmt.Sprintf("%s:%s", span.TraceId, span.SpanId)
-				method, _ := attrs.GetStringValue(h.attNames.HttpRequestMethod)
-				statusCode, _ := attrs.GetStringValue(h.attNames.HttpStatusCode)
+				method, foundMethod := attrs.GetStringValue(h.attNames.HttpRequestMethod)
+				if !foundMethod {
+					continue
+				}
+				statusCode, foundStatusCode := attrs.GetStringValue(h.attNames.HttpStatusCode)
+				errorType, foundErrorType := attrs.GetStringValue(h.attNames.ErrorType)
+				if !foundStatusCode && !foundErrorType {
+					continue
+				}
 
-				fullUrlString, _ := attrs.GetStringValue(h.attNames.UrlFull)
-				fullUrl, _ := url.Parse(fullUrlString)
+				fullUrlString, foundFullUrl := attrs.GetStringValue(h.attNames.UrlFull)
+				if !foundFullUrl {
+					continue
+				}
+				fullUrl, fullUrlParseErr := url.Parse(fullUrlString)
+				if fullUrl == nil || fullUrlParseErr != nil {
+					continue
+				}
 
 				protocolVersion, _ := attrs.GetStringValue(h.attNames.NetworkProtocolVersion)
-
 				integrationID := fullUrl.Host
 				hotlineIntegrationId, found := attrs.GetStringValue(h.attNames.IntegrationID)
 				if found {
 					integrationID = hotlineIntegrationId
 				}
-
-				errorType, _ := attrs.GetStringValue(h.attNames.ErrorType)
+				if len(integrationID) == 0 {
+					continue
+				}
 
 				requests = append(requests, ingestions.HttpRequest{
 					ID:              id,

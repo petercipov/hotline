@@ -106,6 +106,68 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 			EndTime:         parseTime("2018-12-13T14:51:01Z"),
 		}))
 	})
+
+	It("ingests minimal http trace", func() {
+		s.forHttpIngestion()
+		s.requestWithMinimalTrace()
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(2))
+		Expect(requests).To(Equal([]ingestions.HttpRequest{
+			{
+				ID:            "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
+				IntegrationID: "integration.com",
+				Method:        "GET",
+				StatusCode:    "200",
+				URL:           newUrl("https://integration.com/order/123?param1=value1"),
+				StartTime:     parseTime("2018-12-13T14:51:00Z"),
+				EndTime:       parseTime("2018-12-13T14:51:01Z"),
+			},
+			{
+				ID:            "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
+				IntegrationID: "integration.com",
+				Method:        "POST",
+				ErrorType:     "timeout",
+				URL:           newUrl("https://integration.com/order/123?param1=value1"),
+				StartTime:     parseTime("2018-12-13T14:51:00Z"),
+				EndTime:       parseTime("2018-12-13T14:51:01Z"),
+			},
+		}))
+	})
+
+	It("skips trace if no http method not present", func() {
+		s.forHttpIngestion()
+		s.requestWithoutHttpMethod()
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(0))
+	})
+
+	It("skips trace if no full url not present", func() {
+		s.forHttpIngestion()
+		s.requestWithoutFullUrl()
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(0))
+	})
+
+	It("skips trace if full url not parseable", func() {
+		s.forHttpIngestion()
+		s.requestWithUnparseableFullUrl()
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(0))
+	})
+
+	It("skips trace if integration id is empty", func() {
+		s.forHttpIngestion()
+		s.requestWithIntegrationIDEmpty()
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(0))
+	})
+
+	It("skips trace if no status and no error type", func() {
+		s.forHttpIngestion()
+		s.requestWithNoStatusNoErrorType()
+		requests := s.ingest()
+		Expect(requests).To(HaveLen(0))
+	})
 })
 
 type otelSut struct {
@@ -187,19 +249,19 @@ func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []*commonpb.KeyValue{
 					{
-						Key:   "http.request.method",
+						Key:   DefaultAttributeNames.HttpRequestMethod,
 						Value: stringValue("POST"),
 					},
 					{
-						Key:   "network.protocol.version",
+						Key:   DefaultAttributeNames.NetworkProtocolVersion,
 						Value: stringValue("1.1"),
 					},
 					{
-						Key:   "url.full",
+						Key:   DefaultAttributeNames.UrlFull,
 						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key:   "http.response.status_code",
+						Key:   DefaultAttributeNames.HttpStatusCode,
 						Value: stringValue("200"),
 					},
 				},
@@ -271,6 +333,83 @@ func (s *otelSut) requestWithErrorType(errorType string) {
 			Key:   DefaultAttributeNames.ErrorType,
 			Value: stringValue(errorType),
 		})
+	})
+}
+
+func (s *otelSut) requestWithMinimalTrace() {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Kind = tracepb.Span_SPAN_KIND_CLIENT
+		span.Attributes = []*commonpb.KeyValue{
+			{
+				Key:   DefaultAttributeNames.HttpRequestMethod,
+				Value: stringValue("GET"),
+			},
+			{
+				Key:   DefaultAttributeNames.HttpStatusCode,
+				Value: stringValue("200"),
+			},
+			{
+				Key:   DefaultAttributeNames.UrlFull,
+				Value: stringValue("https://integration.com/order/123?param1=value1"),
+			},
+		}
+	})
+
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Kind = tracepb.Span_SPAN_KIND_CLIENT
+		span.Attributes = []*commonpb.KeyValue{
+			{
+				Key:   DefaultAttributeNames.HttpRequestMethod,
+				Value: stringValue("POST"),
+			},
+			{
+				Key:   DefaultAttributeNames.ErrorType,
+				Value: stringValue("timeout"),
+			},
+			{
+				Key:   DefaultAttributeNames.UrlFull,
+				Value: stringValue("https://integration.com/order/123?param1=value1"),
+			},
+		}
+	})
+}
+
+func (s *otelSut) requestWithoutHttpMethod() {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Attributes = remove(span.Attributes, DefaultAttributeNames.HttpRequestMethod)
+	})
+}
+
+func (s *otelSut) requestWithoutFullUrl() {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Attributes = remove(span.Attributes, DefaultAttributeNames.UrlFull)
+	})
+}
+
+func (s *otelSut) requestWithUnparseableFullUrl() {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Attributes = remove(span.Attributes, DefaultAttributeNames.UrlFull)
+		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
+			Key:   DefaultAttributeNames.UrlFull,
+			Value: stringValue("%a"),
+		})
+	})
+}
+
+func (s *otelSut) requestWithIntegrationIDEmpty() {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Attributes = remove(span.Attributes, DefaultAttributeNames.IntegrationID)
+		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
+			Key:   DefaultAttributeNames.IntegrationID,
+			Value: stringValue(""),
+		})
+	})
+}
+
+func (s *otelSut) requestWithNoStatusNoErrorType() {
+	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
+		span.Attributes = remove(span.Attributes, DefaultAttributeNames.HttpStatusCode)
+		span.Attributes = remove(span.Attributes, DefaultAttributeNames.ErrorType)
 	})
 }
 
