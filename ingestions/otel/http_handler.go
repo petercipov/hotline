@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"hotline/ingestions"
+	"hotline/integrations"
 	"io"
 	"net/http"
 	"net/url"
@@ -106,7 +107,7 @@ func (h *TracesHandler) convertMessageToHttp(reqProto *coltracepb.ExportTraceSer
 
 				requests = append(requests, ingestions.HttpRequest{
 					ID:              id,
-					IntegrationID:   integrationID,
+					IntegrationID:   integrations.ID(integrationID),
 					ProtocolVersion: protocolVersion,
 					Method:          method,
 					StatusCode:      statusCode,

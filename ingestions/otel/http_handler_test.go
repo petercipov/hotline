@@ -10,6 +10,7 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 	"hotline/ingestions"
+	"hotline/integrations"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -80,7 +81,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		requests := s.ingest()
 		Expect(requests).To(HaveLen(1))
 
-		Expect(requests[0].IntegrationID).To(Equal("id.of.integration"))
+		Expect(requests[0].IntegrationID).To(Equal(integrations.ID("id.of.integration")))
 	})
 
 	It("refuses to ingest other than kind client spans", func() {

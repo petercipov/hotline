@@ -1,13 +1,14 @@
 package ingestions
 
 import (
+	"hotline/integrations"
 	"net/url"
 	"time"
 )
 
 type HttpRequest struct {
 	ID              string
-	IntegrationID   string
+	IntegrationID   integrations.ID
 	ProtocolVersion string
 	Method          string
 	StatusCode      string
