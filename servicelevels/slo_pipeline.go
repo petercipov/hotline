@@ -2,7 +2,6 @@ package servicelevels
 
 import (
 	"context"
-	"fmt"
 	"hotline/concurrency"
 	"hotline/integrations"
 	"time"
@@ -17,68 +16,55 @@ type SLOChecksReporter interface {
 }
 
 type SLOPipeline struct {
-	fanOut        *concurrency.FanOut[any, *integrationsByQueue]
+	fanOut        *concurrency.FanOut[any, *IntegrationsByQueue]
 	sloRepository IntegrationSLORepository
 	checkReporter SLOChecksReporter
 }
 
-func NewSLOPipeline(sloRepository IntegrationSLORepository, checkReporter SLOChecksReporter, numberOfQueues int) *SLOPipeline {
-	var queueIDs []string
-	for i := 0; i < numberOfQueues; i++ {
-		queueIDs = append(queueIDs, fmt.Sprintf("queue-%d", i))
-	}
-
+func NewSLOPipeline(sloRepository IntegrationSLORepository, checkReporter SLOChecksReporter, scopes *concurrency.Scopes[*IntegrationsByQueue]) *SLOPipeline {
 	p := &SLOPipeline{
 		sloRepository: sloRepository,
 		checkReporter: checkReporter,
 	}
-	fanOut := concurrency.NewFanOut(
-		queueIDs,
-		p.process,
-		func(_ context.Context) *integrationsByQueue {
-			return &integrationsByQueue{
-				integrations:     make(map[integrations.ID]*IntegrationSLO),
-				lastObservedTime: time.Time{},
-			}
-		})
+	fanOut := concurrency.NewFanOut(scopes, p.process)
 	p.fanOut = fanOut
 	return p
 }
 
-func (p *SLOPipeline) process(ctx context.Context, m any, scope *integrationsByQueue) {
+func (p *SLOPipeline) process(ctx context.Context, m any, scope *IntegrationsByQueue) {
 	if checkMessage, isCheckMessage := m.(CheckMessage); isCheckMessage {
-		if checkMessage.Now.After(scope.lastObservedTime) {
-			scope.lastObservedTime = checkMessage.Now
+		if checkMessage.Now.After(scope.LastObservedTime) {
+			scope.LastObservedTime = checkMessage.Now
 		}
 		p.processCheck(ctx, scope)
 	}
 
 	if httpMessage, isHttpMessage := m.(HttpReqsMessage); isHttpMessage {
-		if httpMessage.Now.After(scope.lastObservedTime) {
-			scope.lastObservedTime = httpMessage.Now
+		if httpMessage.Now.After(scope.LastObservedTime) {
+			scope.LastObservedTime = httpMessage.Now
 		}
 		p.processHttpReqMessage(ctx, scope, httpMessage.ID, httpMessage.Reqs)
 	}
 }
 
-func (p *SLOPipeline) processHttpReqMessage(ctx context.Context, scope *integrationsByQueue, id integrations.ID, reqs []*HttpRequest) {
-	slo, found := scope.integrations[id]
+func (p *SLOPipeline) processHttpReqMessage(ctx context.Context, scope *IntegrationsByQueue, id integrations.ID, reqs []*HttpRequest) {
+	slo, found := scope.Integrations[id]
 	if !found {
 		slo = p.sloRepository.GetIntegrationSLO(ctx, id)
 		if slo == nil {
 			return
 		}
-		scope.integrations[id] = slo
+		scope.Integrations[id] = slo
 	}
 	for _, req := range reqs {
-		slo.HttpApiSLO.AddRequest(scope.lastObservedTime, req)
+		slo.HttpApiSLO.AddRequest(scope.LastObservedTime, req)
 	}
 }
 
-func (p *SLOPipeline) processCheck(ctx context.Context, scope *integrationsByQueue) {
+func (p *SLOPipeline) processCheck(ctx context.Context, scope *IntegrationsByQueue) {
 	var checks []Check
-	for id, integration := range scope.integrations {
-		metrics := integration.HttpApiSLO.Check(scope.lastObservedTime)
+	for id, integration := range scope.Integrations {
+		metrics := integration.HttpApiSLO.Check(scope.LastObservedTime)
 		checks = append(checks, Check{
 			SLO:           metrics,
 			IntegrationID: id,
@@ -86,7 +72,7 @@ func (p *SLOPipeline) processCheck(ctx context.Context, scope *integrationsByQue
 	}
 
 	p.checkReporter.ReportChecks(ctx, CheckReport{
-		Now:    scope.lastObservedTime,
+		Now:    scope.LastObservedTime,
 		Checks: checks,
 	})
 }
@@ -114,9 +100,9 @@ type IntegrationSLO struct {
 	HttpApiSLO *HttpApiSLO
 }
 
-type integrationsByQueue struct {
-	integrations     map[integrations.ID]*IntegrationSLO
-	lastObservedTime time.Time
+type IntegrationsByQueue struct {
+	Integrations     map[integrations.ID]*IntegrationSLO
+	LastObservedTime time.Time
 }
 
 type CheckMessage struct {

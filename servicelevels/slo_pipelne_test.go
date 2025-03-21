@@ -2,8 +2,10 @@ package servicelevels_test
 
 import (
 	"context"
+	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/concurrency"
 	"hotline/integrations"
 	"hotline/servicelevels"
 	"strconv"
@@ -53,12 +55,23 @@ type sloPipelineSUT struct {
 
 func (s *sloPipelineSUT) forPipeline() {
 	s.numberOfQueues = 8
+	var queueIDs []string
+	for i := 0; i < s.numberOfQueues; i++ {
+		queueIDs = append(queueIDs, fmt.Sprintf("queue-%d", i))
+	}
+	scopes := concurrency.NewScopes(queueIDs, func(_ context.Context) *servicelevels.IntegrationsByQueue {
+		return &servicelevels.IntegrationsByQueue{
+			Integrations:     make(map[integrations.ID]*servicelevels.IntegrationSLO),
+			LastObservedTime: time.Time{},
+		}
+	})
+
 	s.sloRepository = &fakeSLORepository{}
 	s.sloReporter = &fakeSLOReporter{}
 	s.pipeline = servicelevels.NewSLOPipeline(
 		s.sloRepository,
 		s.sloReporter,
-		s.numberOfQueues,
+		scopes,
 	)
 }
 

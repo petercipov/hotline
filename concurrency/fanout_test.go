@@ -66,6 +66,7 @@ var _ = Describe("Fan Out", func() {
 })
 
 type fanOutSut struct {
+	scopes *concurrency.Scopes[*singleWriterScope]
 	fanOut *concurrency.FanOut[sutMessage, *singleWriterScope]
 }
 
@@ -83,15 +84,15 @@ func (f *fanOutSut) forFanOut(numberOfQueues int) {
 		queueNames = append(queueNames, fmt.Sprintf("fan%d", i))
 	}
 
+	f.scopes = concurrency.NewScopes(queueNames, func(ctx context.Context) *singleWriterScope {
+		return &singleWriterScope{}
+	})
 	f.fanOut = concurrency.NewFanOut(
-		queueNames,
+		f.scopes,
 		func(ctx context.Context, m sutMessage, scope *singleWriterScope) {
 			name := concurrency.GetQueueIDFromContext(ctx)
 			m.processId = name
 			scope.messages = append(scope.messages, m)
-		},
-		func(ctx context.Context) *singleWriterScope {
-			return &singleWriterScope{}
 		})
 }
 
@@ -122,8 +123,8 @@ func (f *fanOutSut) broadcastMessageWithId(id []byte) {
 func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
 	for {
 		var allMessages []sutMessage
-		for _, scope := range f.fanOut.Scopes() {
-			allMessages = append(allMessages, scope.messages...)
+		for _, scope := range f.scopes.ForEachScope() {
+			allMessages = append(allMessages, scope.Value.messages...)
 
 		}
 		if len(allMessages) >= count {
