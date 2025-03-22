@@ -36,7 +36,7 @@ var _ = Describe("SLO Pipeline", func() {
 		reports := sut.Report()
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 
-		var nonEmptyReports []servicelevels.CheckReport
+		var nonEmptyReports []*servicelevels.CheckReport
 		for _, report := range reports {
 			if len(report.Checks) > 0 {
 				nonEmptyReports = append(nonEmptyReports, report)
@@ -59,19 +59,14 @@ func (s *sloPipelineSUT) forPipeline() {
 	for i := 0; i < s.numberOfQueues; i++ {
 		queueIDs = append(queueIDs, fmt.Sprintf("queue-%d", i))
 	}
-	scopes := concurrency.NewScopes(queueIDs, func(_ context.Context) *servicelevels.IntegrationsByQueue {
-		return &servicelevels.IntegrationsByQueue{
-			Integrations:     make(map[integrations.ID]*servicelevels.IntegrationSLO),
-			LastObservedTime: time.Time{},
-		}
-	})
+	scopes := concurrency.NewScopes(queueIDs, servicelevels.NewEmptyIntegrationsScope)
 
 	s.sloRepository = &fakeSLORepository{}
 	s.sloReporter = &fakeSLOReporter{}
 	s.pipeline = servicelevels.NewSLOPipeline(
+		scopes,
 		s.sloRepository,
 		s.sloReporter,
-		scopes,
 	)
 }
 
@@ -79,9 +74,9 @@ func (s *sloPipelineSUT) NoConfigPresent() {
 	s.sloRepository.NoConfig()
 }
 
-func (s *sloPipelineSUT) Report() []servicelevels.CheckReport {
+func (s *sloPipelineSUT) Report() []*servicelevels.CheckReport {
 	now := parseTime("2025-02-22T12:04:55Z")
-	s.pipeline.Check(servicelevels.CheckMessage{
+	s.pipeline.Check(&servicelevels.CheckMessage{
 		Now: now,
 	})
 
@@ -97,7 +92,7 @@ func (s *sloPipelineSUT) Report() []servicelevels.CheckReport {
 
 func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID) {
 	now := parseTime("2025-02-22T12:04:05Z")
-	s.pipeline.IngestHttpRequests(servicelevels.HttpReqsMessage{
+	s.pipeline.IngestHttpRequests(&servicelevels.HttpReqsMessage{
 		ID:  id,
 		Now: now,
 		Reqs: []*servicelevels.HttpRequest{
@@ -112,11 +107,11 @@ func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID) {
 }
 
 type fakeSLOReporter struct {
-	reports []servicelevels.CheckReport
+	reports []*servicelevels.CheckReport
 	mux     sync.Mutex
 }
 
-func (f *fakeSLOReporter) ReportChecks(_ context.Context, report servicelevels.CheckReport) {
+func (f *fakeSLOReporter) ReportChecks(_ context.Context, report *servicelevels.CheckReport) {
 	f.mux.Lock()
 	f.reports = append(f.reports, report)
 	f.mux.Unlock()

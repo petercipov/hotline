@@ -66,8 +66,8 @@ var _ = Describe("Fan Out", func() {
 })
 
 type fanOutSut struct {
-	scopes *concurrency.Scopes[*singleWriterScope]
-	fanOut *concurrency.FanOut[sutMessage, *singleWriterScope]
+	scopes *concurrency.Scopes[singleWriterScope]
+	fanOut *concurrency.FanOut[sutMessage, singleWriterScope]
 }
 
 type singleWriterScope struct {
@@ -90,7 +90,7 @@ func (f *fanOutSut) forFanOut(numberOfQueues int) {
 	f.fanOut = concurrency.NewFanOut(
 		f.scopes,
 		func(ctx context.Context, m sutMessage, scope *singleWriterScope) {
-			name := concurrency.GetQueueIDFromContext(ctx)
+			name := concurrency.GetScopeIDFromContext(ctx)
 			m.processId = name
 			scope.messages = append(scope.messages, m)
 		})

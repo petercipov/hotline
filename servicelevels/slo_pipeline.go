@@ -11,17 +11,17 @@ type IntegrationSLORepository interface {
 	GetIntegrationSLO(ctx context.Context, id integrations.ID) *IntegrationSLO
 }
 
-type SLOChecksReporter interface {
-	ReportChecks(ctx context.Context, report CheckReport)
+type ChecksReporter interface {
+	ReportChecks(ctx context.Context, report *CheckReport)
 }
 
 type SLOPipeline struct {
-	fanOut        *concurrency.FanOut[any, *IntegrationsByQueue]
+	fanOut        *concurrency.FanOut[any, IntegrationsByQueue]
 	sloRepository IntegrationSLORepository
-	checkReporter SLOChecksReporter
+	checkReporter ChecksReporter
 }
 
-func NewSLOPipeline(sloRepository IntegrationSLORepository, checkReporter SLOChecksReporter, scopes *concurrency.Scopes[*IntegrationsByQueue]) *SLOPipeline {
+func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsByQueue], sloRepository IntegrationSLORepository, checkReporter ChecksReporter) *SLOPipeline {
 	p := &SLOPipeline{
 		sloRepository: sloRepository,
 		checkReporter: checkReporter,
@@ -32,14 +32,14 @@ func NewSLOPipeline(sloRepository IntegrationSLORepository, checkReporter SLOChe
 }
 
 func (p *SLOPipeline) process(ctx context.Context, m any, scope *IntegrationsByQueue) {
-	if checkMessage, isCheckMessage := m.(CheckMessage); isCheckMessage {
+	if checkMessage, isCheckMessage := m.(*CheckMessage); isCheckMessage {
 		if checkMessage.Now.After(scope.LastObservedTime) {
 			scope.LastObservedTime = checkMessage.Now
 		}
 		p.processCheck(ctx, scope)
 	}
 
-	if httpMessage, isHttpMessage := m.(HttpReqsMessage); isHttpMessage {
+	if httpMessage, isHttpMessage := m.(*HttpReqsMessage); isHttpMessage {
 		if httpMessage.Now.After(scope.LastObservedTime) {
 			scope.LastObservedTime = httpMessage.Now
 		}
@@ -71,17 +71,17 @@ func (p *SLOPipeline) processCheck(ctx context.Context, scope *IntegrationsByQue
 		})
 	}
 
-	p.checkReporter.ReportChecks(ctx, CheckReport{
+	p.checkReporter.ReportChecks(ctx, &CheckReport{
 		Now:    scope.LastObservedTime,
 		Checks: checks,
 	})
 }
 
-func (p *SLOPipeline) IngestHttpRequests(m HttpReqsMessage) {
+func (p *SLOPipeline) IngestHttpRequests(m *HttpReqsMessage) {
 	p.fanOut.Send([]byte(m.ID), m)
 }
 
-func (p *SLOPipeline) Check(m CheckMessage) {
+func (p *SLOPipeline) Check(m *CheckMessage) {
 	p.fanOut.Broadcast(m)
 }
 
@@ -103,6 +103,13 @@ type IntegrationSLO struct {
 type IntegrationsByQueue struct {
 	Integrations     map[integrations.ID]*IntegrationSLO
 	LastObservedTime time.Time
+}
+
+func NewEmptyIntegrationsScope(_ context.Context) *IntegrationsByQueue {
+	return &IntegrationsByQueue{
+		Integrations:     make(map[integrations.ID]*IntegrationSLO),
+		LastObservedTime: time.Time{},
+	}
 }
 
 type CheckMessage struct {

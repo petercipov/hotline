@@ -49,7 +49,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		s.requestWithSimpleTrace()
 		requests := s.ingest()
 		Expect(requests).To(HaveLen(1))
-		Expect(requests[0]).To(Equal(ingestions.HttpRequest{
+		Expect(requests[0]).To(Equal(&ingestions.HttpRequest{
 			ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 			IntegrationID:   "integration.com",
 			ProtocolVersion: "1.1",
@@ -96,7 +96,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		s.requestWithErrorType("timeout")
 		requests := s.ingest()
 		Expect(requests).To(HaveLen(1))
-		Expect(requests[0]).To(Equal(ingestions.HttpRequest{
+		Expect(requests[0]).To(Equal(&ingestions.HttpRequest{
 			ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 			IntegrationID:   "integration.com",
 			ProtocolVersion: "1.1",
@@ -113,7 +113,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		s.requestWithMinimalTrace()
 		requests := s.ingest()
 		Expect(requests).To(HaveLen(2))
-		Expect(requests).To(Equal([]ingestions.HttpRequest{
+		Expect(requests).To(Equal([]*ingestions.HttpRequest{
 			{
 				ID:            "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 				IntegrationID: "integration.com",
@@ -214,7 +214,7 @@ func (s *otelSut) sendTraces(message *coltracepb.ExportTraceServiceRequest) {
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 }
 
-func (s *otelSut) ingest() []ingestions.HttpRequest {
+func (s *otelSut) ingest() []*ingestions.HttpRequest {
 	return s.ingestion.requests
 }
 
@@ -415,10 +415,10 @@ func (s *otelSut) requestWithNoStatusNoErrorType() {
 }
 
 type FakeIngestion struct {
-	requests []ingestions.HttpRequest
+	requests []*ingestions.HttpRequest
 }
 
-func (f *FakeIngestion) Ingest(requests []ingestions.HttpRequest) {
+func (f *FakeIngestion) Ingest(requests []*ingestions.HttpRequest) {
 	f.requests = append(f.requests, requests...)
 }
 

@@ -16,7 +16,7 @@ import (
 )
 
 type Ingestion interface {
-	Ingest([]ingestions.HttpRequest)
+	Ingest([]*ingestions.HttpRequest)
 }
 
 type AttributeNames struct {
@@ -66,8 +66,8 @@ func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client
-func (h *TracesHandler) convertMessageToHttp(reqProto *coltracepb.ExportTraceServiceRequest) []ingestions.HttpRequest {
-	var requests []ingestions.HttpRequest
+func (h *TracesHandler) convertMessageToHttp(reqProto *coltracepb.ExportTraceServiceRequest) []*ingestions.HttpRequest {
+	var requests []*ingestions.HttpRequest
 	for _, resource := range reqProto.ResourceSpans {
 		for _, scope := range resource.ScopeSpans {
 			for _, span := range scope.Spans {
@@ -105,7 +105,7 @@ func (h *TracesHandler) convertMessageToHttp(reqProto *coltracepb.ExportTraceSer
 					continue
 				}
 
-				requests = append(requests, ingestions.HttpRequest{
+				requests = append(requests, &ingestions.HttpRequest{
 					ID:              id,
 					IntegrationID:   integrations.ID(integrationID),
 					ProtocolVersion: protocolVersion,
