@@ -19,7 +19,6 @@ jobs:
           go-version: 1.24
       - name: run tests
         run: |
-          cd src
           make test
       - name: check test coverage
         uses: vladopajic/go-test-coverage@992aa9921a42c39d1fe0015d32593f0820589586 # v2
