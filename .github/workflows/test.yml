@@ -19,17 +19,16 @@ jobs:
           go-version: 1.24
       - name: run tests
         run: |
+          cd src
           make test
-      - name: generate test coverage
-        run: go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
-
       - name: check test coverage
         uses: vladopajic/go-test-coverage@992aa9921a42c39d1fe0015d32593f0820589586 # v2
         with:
-          config: ./.testcoverage.yml
+          config: ./src/.testcoverage.yml
       - name: Update coverage report
         uses: ncruces/go-coverage-report@v0
         with:
+          coverage-file: src/cover.out
           report: true
           chart: true
           amend: true

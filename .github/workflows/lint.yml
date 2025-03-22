@@ -21,8 +21,10 @@ jobs:
         uses: golangci/golangci-lint-action@2226d7cb06a077cd73e56eedd38eecad18e5d837 # v6
         with:
           version: v1.64
+          working-directory: src
       - name: govulncheck
         uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
         with:
           go-version-input: 1.24
+          work-dir: src
           go-package: ./...
