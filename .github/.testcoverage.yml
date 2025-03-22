@@ -1,4 +1,4 @@
-profile: src/cover.out
+profile: cover.out
 local-prefix: "github.com/petercipov/hotline"
 threshold:
   file: 100

@@ -1,7 +1,7 @@
 package ingestions
 
 import (
-	"hotline/integrations"
+	"hotline/src/integrations"
 	"net/url"
 	"time"
 )

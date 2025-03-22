@@ -5,7 +5,7 @@ import (
 	"errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	http2 "hotline/http"
+	http2 "hotline/src/http"
 	"io"
 	"net/http"
 	"time"

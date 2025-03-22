@@ -3,8 +3,8 @@ package otel
 import (
 	"fmt"
 	"google.golang.org/protobuf/proto"
-	"hotline/ingestions"
-	"hotline/integrations"
+	"hotline/src/ingestions"
+	"hotline/src/integrations"
 	"io"
 	"net/http"
 	"net/url"
@@ -20,12 +20,12 @@ type Ingestion interface {
 }
 
 type AttributeNames struct {
-	HttpRequestMethod      string //required
-	HttpStatusCode         string //conditionally required if no errorType
-	UrlFull                string //required
-	NetworkProtocolVersion string //Recommended
-	IntegrationID          string //Recommended
-	ErrorType              string //conditionally required if no status code
+	HttpRequestMethod      string // required
+	HttpStatusCode         string // conditionally required if no errorType
+	UrlFull                string // required
+	NetworkProtocolVersion string // Recommended
+	IntegrationID          string // Recommended
+	ErrorType              string // conditionally required if no status code
 }
 
 var DefaultAttributeNames = AttributeNames{
