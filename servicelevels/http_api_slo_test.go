@@ -33,6 +33,7 @@ var _ = Describe("Http Api Slo", func() {
 			Metric: servicelevels.Metric{
 				Name:  "p99",
 				Value: 0,
+				Unit:  "ms",
 			},
 			Tags: map[string]string{
 				"http_route": "/",
@@ -44,6 +45,7 @@ var _ = Describe("Http Api Slo", func() {
 			Metric: servicelevels.Metric{
 				Name:  "expected",
 				Value: 100,
+				Unit:  "%",
 			},
 			Tags: map[string]string{
 				"http_route": "/",
@@ -52,6 +54,7 @@ var _ = Describe("Http Api Slo", func() {
 				{
 					Name:  "200",
 					Value: 100,
+					Unit:  "%",
 				},
 			},
 			Breach: nil,
@@ -72,6 +75,7 @@ var _ = Describe("Http Api Slo", func() {
 			Metric: servicelevels.Metric{
 				Name:  "p99",
 				Value: 0,
+				Unit:  "ms",
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
@@ -83,6 +87,7 @@ var _ = Describe("Http Api Slo", func() {
 			Metric: servicelevels.Metric{
 				Name:  "expected",
 				Value: 100,
+				Unit:  "%",
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
@@ -91,6 +96,7 @@ var _ = Describe("Http Api Slo", func() {
 				{
 					Name:  "200",
 					Value: 100,
+					Unit:  "%",
 				},
 			},
 			Breach: nil,
@@ -142,6 +148,7 @@ var _ = Describe("Http Api Slo", func() {
 			Metric: servicelevels.Metric{
 				Name:  "unexpected",
 				Value: 100,
+				Unit:  "%",
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
@@ -150,10 +157,12 @@ var _ = Describe("Http Api Slo", func() {
 				{
 					Name:  "4xx",
 					Value: 50,
+					Unit:  "%",
 				},
 				{
 					Name:  "5xx",
 					Value: 50,
+					Unit:  "%",
 				},
 			},
 			Breach: &servicelevels.SLOBreach{
@@ -179,6 +188,7 @@ var _ = Describe("Http Api Slo", func() {
 			Metric: servicelevels.Metric{
 				Name:  "unexpected",
 				Value: 100,
+				Unit:  "%",
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
@@ -187,6 +197,7 @@ var _ = Describe("Http Api Slo", func() {
 				{
 					Name:  "unknown",
 					Value: 100,
+					Unit:  "%",
 				},
 			},
 			Breach: &servicelevels.SLOBreach{

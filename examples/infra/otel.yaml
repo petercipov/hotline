@@ -1,0 +1,17 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+extensions:
+  health_check: {}
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:9090"
+    metric_expiration: 1m
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus]

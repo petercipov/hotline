@@ -27,11 +27,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 100,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "state1",
 						Value: 100,
+						Unit:  "%",
 					},
 				},
 			}))
@@ -49,14 +51,17 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 100,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "state1",
 						Value: 75,
+						Unit:  "%",
 					}, {
 						Name:  "state2",
 						Value: 25,
+						Unit:  "%",
 					},
 				},
 			}))
@@ -77,14 +82,17 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 100,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "20x",
 						Value: 75,
+						Unit:  "%",
 					}, {
 						Name:  "30x",
 						Value: 25,
+						Unit:  "%",
 					},
 				},
 			}))
@@ -103,11 +111,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "20x",
 						Value: 75,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -121,11 +131,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "unexpected",
 						Value: 25,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -150,11 +162,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 100,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "unexpected",
 						Value: 100,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -180,11 +194,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "state1",
 						Value: 75,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -198,11 +214,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "unexpected",
 						Value: 25,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -226,11 +244,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "state1",
 						Value: 75,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -244,11 +264,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "unexpected",
 						Value: 25,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -272,11 +294,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "state1",
 						Value: 75,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -290,11 +314,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "timeout",
 						Value: 25,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -319,11 +345,13 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 60,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "state1",
 						Value: 60,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -337,15 +365,18 @@ var _ = Describe("State SLO", func() {
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 40,
+					Unit:  "%",
 				},
 				Breakdown: []servicelevels.Metric{
 					{
 						Name:  "timeout",
 						Value: 20,
+						Unit:  "%",
 					},
 					{
 						Name:  "unexpected",
 						Value: 20,
+						Unit:  "%",
 					},
 				},
 				Breach: &servicelevels.SLOBreach{

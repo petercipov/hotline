@@ -1,0 +1,15 @@
+services:
+  otel:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel.yaml"]
+    volumes:
+      - ./otel.yaml:/etc/otel.yaml
+    ports:
+      - "4318:4318"
+      - "9091:9090"
+#  prometheus:
+#    image: prom/prometheus:latest
+#    volumes:
+#      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+#    ports:
+#      - "9090:9090"

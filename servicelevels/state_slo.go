@@ -98,6 +98,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 			Metric: Metric{
 				Name:  expectedStateName,
 				Value: expectedMetric,
+				Unit:  "%",
 			},
 			Breakdown: expectedBreakdown,
 			Breach:    expectedBreach,
@@ -110,6 +111,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 			Metric: Metric{
 				Name:  unexpectedStateName,
 				Value: unexpectedMetric,
+				Unit:  "%",
 			},
 			Breakdown: unexpectedBreakdown,
 			Breach:    unexpectedBreach,
@@ -131,6 +133,7 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, f
 			breakDown = append(breakDown, Metric{
 				Name:  state,
 				Value: *metric,
+				Unit:  "%",
 			})
 			unexpectedSum += *metric
 		}
@@ -159,6 +162,7 @@ func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, flo
 			breakDown = append(breakDown, Metric{
 				Name:  state,
 				Value: *metric,
+				Unit:  "%",
 			})
 			expectedSum += *metric
 		}

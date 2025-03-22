@@ -8,3 +8,6 @@ lint:
 	golangci-lint run
 	govulncheck ./...
 	gocritic check ./...
+
+run-infra:
+	docker-compose -f ./examples/infra/docker-compose.yml up

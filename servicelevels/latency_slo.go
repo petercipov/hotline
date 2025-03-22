@@ -56,6 +56,7 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 			Metric: Metric{
 				Name:  definition.Name,
 				Value: metric,
+				Unit:  "ms",
 			},
 			Tags:   s.tags,
 			Breach: breach,
