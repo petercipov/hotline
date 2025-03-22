@@ -30,6 +30,7 @@ var _ = Describe("Http Api Slo", func() {
 		metrics := s.Check()
 		Expect(len(metrics)).To(Equal(2))
 		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Namespace: "http_route",
 			Metric: servicelevels.Metric{
 				Name:  "p99",
 				Value: 0,
@@ -42,6 +43,7 @@ var _ = Describe("Http Api Slo", func() {
 			Breach:    nil,
 		}))
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Namespace: "http_route",
 			Metric: servicelevels.Metric{
 				Name:  "expected",
 				Value: 100,
@@ -72,6 +74,7 @@ var _ = Describe("Http Api Slo", func() {
 		metrics := s.Check()
 		Expect(len(metrics)).To(Equal(2))
 		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Namespace: "http_route",
 			Metric: servicelevels.Metric{
 				Name:  "p99",
 				Value: 0,
@@ -84,6 +87,7 @@ var _ = Describe("Http Api Slo", func() {
 			Breach:    nil,
 		}))
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Namespace: "http_route",
 			Metric: servicelevels.Metric{
 				Name:  "expected",
 				Value: 100,
@@ -145,6 +149,7 @@ var _ = Describe("Http Api Slo", func() {
 		metrics := s.Check()
 		Expect(len(metrics)).To(Equal(2))
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Namespace: "http_route",
 			Metric: servicelevels.Metric{
 				Name:  "unexpected",
 				Value: 100,
@@ -185,6 +190,7 @@ var _ = Describe("Http Api Slo", func() {
 		metrics := s.Check()
 		Expect(len(metrics)).To(Equal(2))
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Namespace: "http_route",
 			Metric: servicelevels.Metric{
 				Name:  "unexpected",
 				Value: 100,

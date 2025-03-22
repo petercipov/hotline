@@ -3,6 +3,7 @@ package servicelevels
 import "time"
 
 type SLOCheck struct {
+	Namespace string
 	Metric    Metric
 	Tags      map[string]string
 	Breakdown []Metric

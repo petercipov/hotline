@@ -14,6 +14,7 @@ type StateSLO struct {
 	unexpectedStatesMap       map[string]int
 	breachThreshold           float64
 	unexpectedBreachThreshold float64
+	namespace                 string
 	tags                      map[string]string
 }
 
@@ -25,6 +26,7 @@ func NewStateSLO(
 	unexpectedStates []string,
 	breachThreshold Percent,
 	windowDuration time.Duration,
+	namespace string,
 	tags map[string]string) *StateSLO {
 	expectedStates = uniqueSlice(filterOutUnknownTag(expectedStates))
 	unexpectedStates = uniqueSlice(filterOutUnknownTag(unexpectedStates))
@@ -55,6 +57,7 @@ func NewStateSLO(
 		unexpectedStatesMap:       unexpectedStatesMap,
 		breachThreshold:           expectedBreachThreshold,
 		unexpectedBreachThreshold: unexpectedBreachThreshold,
+		namespace:                 namespace,
 		tags:                      tags,
 	}
 }
@@ -95,6 +98,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 	checks = checks[:0]
 	if len(expectedBreakdown) > 0 {
 		checks = append(checks, SLOCheck{
+			Namespace: s.namespace,
 			Metric: Metric{
 				Name:  expectedStateName,
 				Value: expectedMetric,
@@ -108,6 +112,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 
 	if unexpectedBreach != nil {
 		checks = append(checks, SLOCheck{
+			Namespace: s.namespace,
 			Metric: Metric{
 				Name:  unexpectedStateName,
 				Value: unexpectedMetric,

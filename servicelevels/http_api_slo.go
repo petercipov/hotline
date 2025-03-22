@@ -130,11 +130,13 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 			httpRangeBreakdown.GetRanges(),
 			slo.Status.BreachThreshold,
 			slo.Status.WindowDuration,
+			"http_route",
 			tags,
 		),
 		latencySLO: NewLatencySLO(
 			slo.Latency.Percentiles,
 			slo.Latency.WindowDuration,
+			"http_route",
 			tags,
 		),
 		expected: expected,

@@ -119,7 +119,7 @@ func (s *latencySLOSUT) forSLO(percentiles []servicelevels.PercentileDefinition,
 		percentiles[i].Name = fmt.Sprintf("p%g", percentiles[i].Percentile*100)
 	}
 
-	s.slo = servicelevels.NewLatencySLO(percentiles, duration, nil)
+	s.slo = servicelevels.NewLatencySLO(percentiles, duration, "test-namespace", nil)
 }
 
 func (s *latencySLOSUT) WithRandomValues(count int, max float64) {

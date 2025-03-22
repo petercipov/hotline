@@ -24,6 +24,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 100,
@@ -48,6 +49,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 100,
@@ -79,6 +81,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 100,
@@ -108,6 +111,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
@@ -128,6 +132,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
@@ -159,6 +164,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 100,
@@ -191,6 +197,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
@@ -211,6 +218,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
@@ -241,6 +249,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
@@ -261,6 +270,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
@@ -291,6 +301,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 75,
@@ -311,6 +322,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 25,
@@ -342,6 +354,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "expected",
 					Value: 60,
@@ -362,6 +375,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
 					Name:  "unexpected",
 					Value: 40,
@@ -411,7 +425,7 @@ func (s *stateslosut) forSLOTRackingUnexpected(expectedStates []string, unexpect
 	p, failure := servicelevels.ParsePercent(99.99)
 	Expect(failure).To(BeNil())
 
-	s.slo = servicelevels.NewStateSLO(expectedStates, unexpectedStates, p, 1*time.Hour, nil)
+	s.slo = servicelevels.NewStateSLO(expectedStates, unexpectedStates, p, 1*time.Hour, "test-namespace", nil)
 }
 
 func (s *stateslosut) AddState(state string) {
