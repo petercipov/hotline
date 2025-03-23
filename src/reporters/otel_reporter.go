@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"errors"
 	"fmt"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -110,7 +109,7 @@ func (o *OtelReporter) ReportChecks(ctx context.Context, report *servicelevels.C
 	if sc := response.StatusCode; sc >= 200 && sc <= 299 {
 		return nil
 	}
-	return errors.New(fmt.Sprintf("Received unexpected status code: %d", response.StatusCode))
+	return fmt.Errorf("received unexpected status code: %d", response.StatusCode)
 }
 
 func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
