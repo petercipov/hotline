@@ -4,7 +4,7 @@ import (
 	"context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"hotline/src/concurrency"
+	"hotline/concurrency"
 	"strconv"
 	"time"
 )

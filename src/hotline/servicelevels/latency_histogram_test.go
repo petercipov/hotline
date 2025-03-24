@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
-	"hotline/src/servicelevels"
+	"hotline/servicelevels"
 )
 
 var _ = Describe("LatencyMs Histogram", func() {

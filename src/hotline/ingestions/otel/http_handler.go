@@ -3,8 +3,8 @@ package otel
 import (
 	"fmt"
 	"google.golang.org/protobuf/proto"
-	"hotline/src/ingestions"
-	"hotline/src/integrations"
+	"hotline/ingestions"
+	"hotline/integrations"
 	"io"
 	"net/http"
 	"net/url"

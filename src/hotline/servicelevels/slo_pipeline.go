@@ -2,8 +2,8 @@ package servicelevels
 
 import (
 	"context"
-	"hotline/src/concurrency"
-	"hotline/src/integrations"
+	"hotline/concurrency"
+	"hotline/integrations"
 	"time"
 )
 
