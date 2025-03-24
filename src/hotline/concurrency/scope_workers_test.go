@@ -99,6 +99,7 @@ func (s *workersSUT) forWorker(count int) {
 		func(ctx context.Context, scope *workerSUTScope, worker *workerSUTWorker, message *workerSUTMessage) {
 			message.workerID = concurrency.GetScopeIDFromContext(ctx)
 			scope.messages = append(scope.messages, message)
+			time.Sleep(1 * time.Microsecond)
 		},
 		10,
 	)
