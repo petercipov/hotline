@@ -77,8 +77,10 @@ func (p *SLOPipeline) processCheck(ctx context.Context, scope *IntegrationsByQue
 	})
 }
 
-func (p *SLOPipeline) IngestHttpRequests(m *HttpReqsMessage) {
-	p.fanOut.Send([]byte(m.ID), m)
+func (p *SLOPipeline) IngestHttpRequests(messages ...*HttpReqsMessage) {
+	for _, m := range messages {
+		p.fanOut.Send([]byte(m.ID), m)
+	}
 }
 
 func (p *SLOPipeline) Check(m *CheckMessage) {

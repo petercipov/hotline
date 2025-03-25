@@ -15,10 +15,6 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-type Ingestion interface {
-	Ingest([]*ingestions.HttpRequest)
-}
-
 type AttributeNames struct {
 	HttpRequestMethod      string // required
 	HttpStatusCode         string // conditionally required if no errorType
@@ -38,11 +34,11 @@ var DefaultAttributeNames = AttributeNames{
 }
 
 type TracesHandler struct {
-	ingestion Ingestion
+	ingestion func([]*ingestions.HttpRequest)
 	attNames  AttributeNames
 }
 
-func NewTracesHandler(ingestion Ingestion, attNames AttributeNames) *TracesHandler {
+func NewTracesHandler(ingestion func([]*ingestions.HttpRequest), attNames AttributeNames) *TracesHandler {
 	return &TracesHandler{
 		ingestion: ingestion,
 		attNames:  attNames,
@@ -61,7 +57,7 @@ func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if unmarshalErr != nil {
 		http.Error(w, "could not parse proto", http.StatusBadRequest)
 	}
-	h.ingestion.Ingest(h.convertMessageToHttp(&reqProto))
+	h.ingestion(h.convertMessageToHttp(&reqProto))
 	w.WriteHeader(http.StatusCreated)
 }
 

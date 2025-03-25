@@ -172,14 +172,16 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 })
 
 type otelSut struct {
-	server    *httptest.Server
-	handler   *TracesHandler
-	ingestion *FakeIngestion
+	server   *httptest.Server
+	handler  *TracesHandler
+	requests []*ingestions.HttpRequest
 }
 
 func (s *otelSut) forHttpIngestion() {
-	s.ingestion = &FakeIngestion{}
-	s.handler = NewTracesHandler(s.ingestion, DefaultAttributeNames)
+	s.requests = nil
+	s.handler = NewTracesHandler(func(requests []*ingestions.HttpRequest) {
+		s.requests = append(s.requests, requests...)
+	}, DefaultAttributeNames)
 	s.server = httptest.NewServer(s.handler)
 }
 
@@ -215,7 +217,7 @@ func (s *otelSut) sendTraces(message *coltracepb.ExportTraceServiceRequest) {
 }
 
 func (s *otelSut) ingest() []*ingestions.HttpRequest {
-	return s.ingestion.requests
+	return s.requests
 }
 
 func (s *otelSut) Close() {
@@ -412,14 +414,6 @@ func (s *otelSut) requestWithNoStatusNoErrorType() {
 		span.Attributes = remove(span.Attributes, DefaultAttributeNames.HttpStatusCode)
 		span.Attributes = remove(span.Attributes, DefaultAttributeNames.ErrorType)
 	})
-}
-
-type FakeIngestion struct {
-	requests []*ingestions.HttpRequest
-}
-
-func (f *FakeIngestion) Ingest(requests []*ingestions.HttpRequest) {
-	f.requests = append(f.requests, requests...)
 }
 
 func newUrl(s string) *url.URL {
