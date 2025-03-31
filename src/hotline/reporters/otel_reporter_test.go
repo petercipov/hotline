@@ -8,6 +8,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/protobuf/proto"
 	"hotline/reporters"
 	"hotline/servicelevels"
@@ -16,6 +18,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"time"
+
+	gf "github.com/onsi/gomega/format"
 )
 
 var _ = Describe("OTEL Reporter", func() {
@@ -35,6 +39,75 @@ var _ = Describe("OTEL Reporter", func() {
 		Expect(err).To(BeNil())
 		messages := sut.receivedOtelMessages()
 		Expect(messages).To(HaveLen(1))
+		Expect(messages[0].ResourceMetrics).To(HaveLen(1))
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics).To(HaveLen(1))
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics).To(HaveLen(3))
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[0]).To(Equal(&metricspb.Metric{
+			Name: "service_levels_http_route_status_unexpected",
+			Unit: "%",
+			Data: &metricspb.Metric_Gauge{
+				Gauge: &metricspb.Gauge{
+					DataPoints: []*metricspb.NumberDataPoint{
+						{
+							Attributes: []*commonpb.KeyValue{
+								reporters.StringAttribute("integration_id", "integration-abcd"),
+								reporters.BoolAttribute("breached", true),
+								reporters.StringAttribute("http_route", "iam.example.com/users"),
+							},
+							TimeUnixNano: 1740225845000000000,
+							Value: &metricspb.NumberDataPoint_AsDouble{
+								AsDouble: 100,
+							},
+						},
+					},
+				},
+			},
+		}))
+		gf.MaxLength = 10000000
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[1]).To(Equal(&metricspb.Metric{
+			Name: "service_levels_http_route_status_unexpected_breakdown",
+			Unit: "%",
+			Data: &metricspb.Metric_Gauge{
+				Gauge: &metricspb.Gauge{
+					DataPoints: []*metricspb.NumberDataPoint{
+						{
+							Attributes: []*commonpb.KeyValue{
+								reporters.StringAttribute("integration_id", "integration-abcd"),
+								reporters.StringAttribute("breakdown", "4xx"),
+								reporters.BoolAttribute("breached", true),
+								reporters.StringAttribute("http_route", "iam.example.com/users"),
+							},
+							TimeUnixNano: 1740225845000000000,
+							Value: &metricspb.NumberDataPoint_AsDouble{
+								AsDouble: 50,
+							},
+						},
+					},
+				},
+			},
+		}))
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[2]).To(Equal(&metricspb.Metric{
+			Name: "service_levels_http_route_status_unexpected_breakdown",
+			Unit: "%",
+			Data: &metricspb.Metric_Gauge{
+				Gauge: &metricspb.Gauge{
+					DataPoints: []*metricspb.NumberDataPoint{
+						{
+							Attributes: []*commonpb.KeyValue{
+								reporters.StringAttribute("integration_id", "integration-abcd"),
+								reporters.StringAttribute("breakdown", "5xx"),
+								reporters.BoolAttribute("breached", true),
+								reporters.StringAttribute("http_route", "iam.example.com/users"),
+							},
+							TimeUnixNano: 1740225845000000000,
+							Value: &metricspb.NumberDataPoint_AsDouble{
+								AsDouble: 50,
+							},
+						},
+					},
+				},
+			},
+		}))
 	})
 
 	It("should fail sending message if message not marshalled", func() {
@@ -191,6 +264,7 @@ func simpleSLOCheck() []servicelevels.Check {
 					Metric: servicelevels.Metric{
 						Name:  "unexpected",
 						Value: 100,
+						Unit:  "%",
 					},
 					Tags: map[string]string{
 						"http_route": "iam.example.com/users",
@@ -199,10 +273,12 @@ func simpleSLOCheck() []servicelevels.Check {
 						{
 							Name:  "4xx",
 							Value: 50,
+							Unit:  "%",
 						},
 						{
 							Name:  "5xx",
 							Value: 50,
+							Unit:  "%",
 						},
 					},
 					Breach: &servicelevels.SLOBreach{

@@ -117,18 +117,18 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 	for _, slo := range check.SLO {
 
 		attributes := []*commonpb.KeyValue{
-			stringAttribute("integration_id", string(check.IntegrationID)),
-			boolAttribute("breached", slo.Breach != nil),
+			StringAttribute("integration_id", string(check.IntegrationID)),
+			BoolAttribute("breached", slo.Breach != nil),
 		}
 		for key, val := range slo.Tags {
-			attributes = append(attributes, stringAttribute(key, val))
+			attributes = append(attributes, StringAttribute(key, val))
 		}
 
 		metricID := fmt.Sprintf("service_levels_%s_%s", slo.Namespace, slo.Metric.Name)
 
 		metrics = append(metrics, &metricspb.Metric{
 			Name: metricID,
-			Unit: "percent",
+			Unit: slo.Metric.Unit,
 			Data: &metricspb.Metric_Gauge{
 				Gauge: &metricspb.Gauge{
 					DataPoints: []*metricspb.NumberDataPoint{
@@ -144,18 +144,21 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 			},
 		})
 
+		breakDownMetricID := fmt.Sprintf("%s_breakdown", metricID)
+
 		for _, breakdown := range slo.Breakdown {
 			attributes = []*commonpb.KeyValue{
-				stringAttribute("integration_id", string(check.IntegrationID)),
-				stringAttribute("breakdown", breakdown.Name),
+				StringAttribute("integration_id", string(check.IntegrationID)),
+				StringAttribute("breakdown", breakdown.Name),
+				BoolAttribute("breached", slo.Breach != nil),
 			}
 			for key, val := range slo.Tags {
-				attributes = append(attributes, stringAttribute(key, val))
+				attributes = append(attributes, StringAttribute(key, val))
 			}
 
 			metrics = append(metrics, &metricspb.Metric{
-				Name: metricID,
-				Unit: "percent",
+				Name: breakDownMetricID,
+				Unit: breakdown.Unit,
 				Data: &metricspb.Metric_Gauge{
 					Gauge: &metricspb.Gauge{
 						DataPoints: []*metricspb.NumberDataPoint{
@@ -176,7 +179,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 	return metrics
 }
 
-func stringAttribute(key string, value string) *commonpb.KeyValue {
+func StringAttribute(key string, value string) *commonpb.KeyValue {
 	return &commonpb.KeyValue{
 		Key: key,
 		Value: &commonpb.AnyValue{
@@ -185,7 +188,7 @@ func stringAttribute(key string, value string) *commonpb.KeyValue {
 	}
 }
 
-func boolAttribute(key string, value bool) *commonpb.KeyValue {
+func BoolAttribute(key string, value bool) *commonpb.KeyValue {
 	return &commonpb.KeyValue{
 		Key: key,
 		Value: &commonpb.AnyValue{
