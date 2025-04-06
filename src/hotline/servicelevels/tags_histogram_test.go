@@ -52,7 +52,8 @@ func (s *suttagshistogram) forEmptyHistogram() {
 }
 
 func (s *suttagshistogram) getPercentile(tag string) *float64 {
-	return s.histogram.ComputePercentile(tag)
+	p, _ := s.histogram.ComputePercentile(tag)
+	return p
 }
 
 func (s *suttagshistogram) forHistogram(tags ...string) {

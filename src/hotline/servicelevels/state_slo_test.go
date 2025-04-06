@@ -26,15 +26,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 100,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "state1",
-						Value: 100,
-						Unit:  "%",
+						Name:        "state1",
+						Value:       100,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 			}))
@@ -51,19 +53,22 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 100,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 4,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "state1",
-						Value: 75,
-						Unit:  "%",
+						Name:        "state1",
+						Value:       75,
+						Unit:        "%",
+						EventsCount: 3,
 					}, {
-						Name:  "state2",
-						Value: 25,
-						Unit:  "%",
+						Name:        "state2",
+						Value:       25,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 			}))
@@ -83,19 +88,22 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 100,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 4,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "20x",
-						Value: 75,
-						Unit:  "%",
+						Name:        "20x",
+						Value:       75,
+						Unit:        "%",
+						EventsCount: 3,
 					}, {
-						Name:  "30x",
-						Value: 25,
-						Unit:  "%",
+						Name:        "30x",
+						Value:       25,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 			}))
@@ -113,15 +121,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 75,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       75,
+					Unit:        "%",
+					EventsCount: 3,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "20x",
-						Value: 75,
-						Unit:  "%",
+						Name:        "20x",
+						Value:       75,
+						Unit:        "%",
+						EventsCount: 3,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -134,15 +144,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "unexpected",
-					Value: 25,
-					Unit:  "%",
+					Name:        "unexpected",
+					Value:       25,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "unexpected",
-						Value: 25,
-						Unit:  "%",
+						Name:        "unexpected",
+						Value:       25,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -166,15 +178,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "unexpected",
-					Value: 100,
-					Unit:  "%",
+					Name:        "unexpected",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 4,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "unexpected",
-						Value: 100,
-						Unit:  "%",
+						Name:        "unexpected",
+						Value:       100,
+						Unit:        "%",
+						EventsCount: 4,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -199,15 +213,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 75,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       75,
+					Unit:        "%",
+					EventsCount: 3,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "state1",
-						Value: 75,
-						Unit:  "%",
+						Name:        "state1",
+						Value:       75,
+						Unit:        "%",
+						EventsCount: 3,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -220,15 +236,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "unexpected",
-					Value: 25,
-					Unit:  "%",
+					Name:        "unexpected",
+					Value:       25,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "unexpected",
-						Value: 25,
-						Unit:  "%",
+						Name:        "unexpected",
+						Value:       25,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -251,15 +269,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 75,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       75,
+					Unit:        "%",
+					EventsCount: 3,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "state1",
-						Value: 75,
-						Unit:  "%",
+						Name:        "state1",
+						Value:       75,
+						Unit:        "%",
+						EventsCount: 3,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -272,15 +292,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "unexpected",
-					Value: 25,
-					Unit:  "%",
+					Name:        "unexpected",
+					Value:       25,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "unexpected",
-						Value: 25,
-						Unit:  "%",
+						Name:        "unexpected",
+						Value:       25,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -303,15 +325,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 75,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       75,
+					Unit:        "%",
+					EventsCount: 3,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "state1",
-						Value: 75,
-						Unit:  "%",
+						Name:        "state1",
+						Value:       75,
+						Unit:        "%",
+						EventsCount: 3,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -324,15 +348,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "unexpected",
-					Value: 25,
-					Unit:  "%",
+					Name:        "unexpected",
+					Value:       25,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "timeout",
-						Value: 25,
-						Unit:  "%",
+						Name:        "timeout",
+						Value:       25,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -356,15 +382,17 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "expected",
-					Value: 60,
-					Unit:  "%",
+					Name:        "expected",
+					Value:       60,
+					Unit:        "%",
+					EventsCount: 3,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "state1",
-						Value: 60,
-						Unit:  "%",
+						Name:        "state1",
+						Value:       60,
+						Unit:        "%",
+						EventsCount: 3,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{
@@ -377,20 +405,23 @@ var _ = Describe("State SLO", func() {
 			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 				Namespace: "test-namespace",
 				Metric: servicelevels.Metric{
-					Name:  "unexpected",
-					Value: 40,
-					Unit:  "%",
+					Name:        "unexpected",
+					Value:       40,
+					Unit:        "%",
+					EventsCount: 2,
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:  "timeout",
-						Value: 20,
-						Unit:  "%",
+						Name:        "timeout",
+						Value:       20,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 					{
-						Name:  "unexpected",
-						Value: 20,
-						Unit:  "%",
+						Name:        "unexpected",
+						Value:       20,
+						Unit:        "%",
+						EventsCount: 1,
 					},
 				},
 				Breach: &servicelevels.SLOBreach{

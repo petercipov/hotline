@@ -18,8 +18,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"time"
-
-	gf "github.com/onsi/gomega/format"
 )
 
 var _ = Describe("OTEL Reporter", func() {
@@ -41,9 +39,9 @@ var _ = Describe("OTEL Reporter", func() {
 		Expect(messages).To(HaveLen(1))
 		Expect(messages[0].ResourceMetrics).To(HaveLen(1))
 		Expect(messages[0].ResourceMetrics[0].ScopeMetrics).To(HaveLen(1))
-		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics).To(HaveLen(3))
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics).To(HaveLen(6))
 		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[0]).To(Equal(&metricspb.Metric{
-			Name: "service_levels_http_route_status_unexpected",
+			Name: "service_levels_http_route_status",
 			Unit: "%",
 			Data: &metricspb.Metric_Gauge{
 				Gauge: &metricspb.Gauge{
@@ -51,6 +49,7 @@ var _ = Describe("OTEL Reporter", func() {
 						{
 							Attributes: []*commonpb.KeyValue{
 								reporters.StringAttribute("integration_id", "integration-abcd"),
+								reporters.StringAttribute("metric", "unexpected"),
 								reporters.BoolAttribute("breached", true),
 								reporters.StringAttribute("http_route", "iam.example.com/users"),
 							},
@@ -63,9 +62,31 @@ var _ = Describe("OTEL Reporter", func() {
 				},
 			},
 		}))
-		gf.MaxLength = 10000000
 		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[1]).To(Equal(&metricspb.Metric{
-			Name: "service_levels_http_route_status_unexpected_breakdown",
+			Name: "service_levels_http_route_status_events",
+			Unit: "#",
+			Data: &metricspb.Metric_Sum{
+				Sum: &metricspb.Sum{
+					AggregationTemporality: 1,
+					DataPoints: []*metricspb.NumberDataPoint{
+						{
+							Attributes: []*commonpb.KeyValue{
+								reporters.StringAttribute("integration_id", "integration-abcd"),
+								reporters.StringAttribute("metric", "unexpected"),
+								reporters.BoolAttribute("breached", true),
+								reporters.StringAttribute("http_route", "iam.example.com/users"),
+							},
+							TimeUnixNano: 1740225845000000000,
+							Value: &metricspb.NumberDataPoint_AsInt{
+								AsInt: 2,
+							},
+						},
+					},
+				},
+			},
+		}))
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[2]).To(Equal(&metricspb.Metric{
+			Name: "service_levels_http_route_status_breakdown",
 			Unit: "%",
 			Data: &metricspb.Metric_Gauge{
 				Gauge: &metricspb.Gauge{
@@ -74,6 +95,7 @@ var _ = Describe("OTEL Reporter", func() {
 							Attributes: []*commonpb.KeyValue{
 								reporters.StringAttribute("integration_id", "integration-abcd"),
 								reporters.StringAttribute("breakdown", "4xx"),
+								reporters.StringAttribute("metric", "unexpected"),
 								reporters.BoolAttribute("breached", true),
 								reporters.StringAttribute("http_route", "iam.example.com/users"),
 							},
@@ -86,8 +108,34 @@ var _ = Describe("OTEL Reporter", func() {
 				},
 			},
 		}))
-		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[2]).To(Equal(&metricspb.Metric{
-			Name: "service_levels_http_route_status_unexpected_breakdown",
+
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[3]).To(Equal(&metricspb.Metric{
+			Name: "service_levels_http_route_status_breakdown_events",
+			Unit: "#",
+			Data: &metricspb.Metric_Sum{
+				Sum: &metricspb.Sum{
+					AggregationTemporality: 1,
+					DataPoints: []*metricspb.NumberDataPoint{
+						{
+							Attributes: []*commonpb.KeyValue{
+								reporters.StringAttribute("integration_id", "integration-abcd"),
+								reporters.StringAttribute("breakdown", "4xx"),
+								reporters.StringAttribute("metric", "unexpected"),
+								reporters.BoolAttribute("breached", true),
+								reporters.StringAttribute("http_route", "iam.example.com/users"),
+							},
+							TimeUnixNano: 1740225845000000000,
+							Value: &metricspb.NumberDataPoint_AsInt{
+								AsInt: 1,
+							},
+						},
+					},
+				},
+			},
+		}))
+
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[4]).To(Equal(&metricspb.Metric{
+			Name: "service_levels_http_route_status_breakdown",
 			Unit: "%",
 			Data: &metricspb.Metric_Gauge{
 				Gauge: &metricspb.Gauge{
@@ -96,12 +144,38 @@ var _ = Describe("OTEL Reporter", func() {
 							Attributes: []*commonpb.KeyValue{
 								reporters.StringAttribute("integration_id", "integration-abcd"),
 								reporters.StringAttribute("breakdown", "5xx"),
+								reporters.StringAttribute("metric", "unexpected"),
 								reporters.BoolAttribute("breached", true),
 								reporters.StringAttribute("http_route", "iam.example.com/users"),
 							},
 							TimeUnixNano: 1740225845000000000,
 							Value: &metricspb.NumberDataPoint_AsDouble{
 								AsDouble: 50,
+							},
+						},
+					},
+				},
+			},
+		}))
+
+		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[5]).To(Equal(&metricspb.Metric{
+			Name: "service_levels_http_route_status_breakdown_events",
+			Unit: "#",
+			Data: &metricspb.Metric_Sum{
+				Sum: &metricspb.Sum{
+					AggregationTemporality: 1,
+					DataPoints: []*metricspb.NumberDataPoint{
+						{
+							Attributes: []*commonpb.KeyValue{
+								reporters.StringAttribute("integration_id", "integration-abcd"),
+								reporters.StringAttribute("breakdown", "5xx"),
+								reporters.StringAttribute("metric", "unexpected"),
+								reporters.BoolAttribute("breached", true),
+								reporters.StringAttribute("http_route", "iam.example.com/users"),
+							},
+							TimeUnixNano: 1740225845000000000,
+							Value: &metricspb.NumberDataPoint_AsInt{
+								AsInt: 1,
 							},
 						},
 					},
@@ -262,23 +336,26 @@ func simpleSLOCheck() []servicelevels.Check {
 				{
 					Namespace: "http_route_status",
 					Metric: servicelevels.Metric{
-						Name:  "unexpected",
-						Value: 100,
-						Unit:  "%",
+						Name:        "unexpected",
+						Value:       100,
+						Unit:        "%",
+						EventsCount: 2,
 					},
 					Tags: map[string]string{
 						"http_route": "iam.example.com/users",
 					},
 					Breakdown: []servicelevels.Metric{
 						{
-							Name:  "4xx",
-							Value: 50,
-							Unit:  "%",
+							Name:        "4xx",
+							Value:       50,
+							Unit:        "%",
+							EventsCount: 1,
 						},
 						{
-							Name:  "5xx",
-							Value: 50,
-							Unit:  "%",
+							Name:        "5xx",
+							Value:       50,
+							Unit:        "%",
+							EventsCount: 1,
 						},
 					},
 					Breach: &servicelevels.SLOBreach{

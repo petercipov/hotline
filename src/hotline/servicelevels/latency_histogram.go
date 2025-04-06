@@ -42,10 +42,10 @@ type Bucket struct {
 	To   float64
 }
 
-func (h *LatencyHistogram) ComputePercentile(percentile float64) Bucket {
+func (h *LatencyHistogram) ComputePercentile(percentile float64) (Bucket, int64) {
 	count := h.buckets.Sum()
 	if count <= 2 {
-		return Bucket{}
+		return Bucket{}, count
 	}
 
 	pThreshold := int64(math.Ceil(float64(count) * percentile))
@@ -60,9 +60,10 @@ func (h *LatencyHistogram) ComputePercentile(percentile float64) Bucket {
 		to = *split
 	}
 	return Bucket{
-		From: h.layout.bucketFrom(index),
-		To:   to,
-	}
+			From: h.layout.bucketFrom(index),
+			To:   to,
+		},
+		count
 }
 
 func (h *LatencyHistogram) findFirstBucketOverThreshold(threshold int64) (bucketIndex, int64) {

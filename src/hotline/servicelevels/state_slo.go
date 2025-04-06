@@ -91,8 +91,8 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 	}
 	histogram := activeWindow.Accumulator.(*TagHistogram)
 
-	expectedBreach, expectedMetric, expectedBreakdown := s.checkExpectedBreach(histogram)
-	unexpectedBreach, unexpectedMetric, unexpectedBreakdown := s.checkUnexpectedBreach(histogram)
+	expectedBreach, expectedMetric, expectedEventsCount, expectedBreakdown := s.checkExpectedBreach(histogram)
+	unexpectedBreach, unexpectedMetric, unexpectedEventsCount, unexpectedBreakdown := s.checkUnexpectedBreach(histogram)
 
 	checks := make([]SLOCheck, 2)
 	checks = checks[:0]
@@ -100,9 +100,10 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 		checks = append(checks, SLOCheck{
 			Namespace: s.namespace,
 			Metric: Metric{
-				Name:  expectedStateName,
-				Value: expectedMetric,
-				Unit:  "%",
+				Name:        expectedStateName,
+				Value:       expectedMetric,
+				Unit:        "%",
+				EventsCount: expectedEventsCount,
 			},
 			Breakdown: expectedBreakdown,
 			Breach:    expectedBreach,
@@ -114,9 +115,10 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 		checks = append(checks, SLOCheck{
 			Namespace: s.namespace,
 			Metric: Metric{
-				Name:  unexpectedStateName,
-				Value: unexpectedMetric,
-				Unit:  "%",
+				Name:        unexpectedStateName,
+				Value:       unexpectedMetric,
+				Unit:        "%",
+				EventsCount: unexpectedEventsCount,
 			},
 			Breakdown: unexpectedBreakdown,
 			Breach:    unexpectedBreach,
@@ -128,17 +130,21 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 
 }
 
-func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, []Metric) {
+func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, int64, []Metric) {
 	breakDown := make([]Metric, len(s.unexpectedStatesMap))
 	breakDown = breakDown[:0]
 	unexpectedSum := float64(0)
+	eventsSum := int64(0)
+
 	for _, state := range s.unexpectedStates {
-		metric := histogram.ComputePercentile(state)
+		metric, count := histogram.ComputePercentile(state)
+		eventsSum += count
 		if metric != nil {
 			breakDown = append(breakDown, Metric{
-				Name:  state,
-				Value: *metric,
-				Unit:  "%",
+				Name:        state,
+				Value:       *metric,
+				Unit:        "%",
+				EventsCount: count,
 			})
 			unexpectedSum += *metric
 		}
@@ -154,20 +160,24 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, f
 		}
 	}
 
-	return breach, unexpectedSum, breakDown
+	return breach, unexpectedSum, eventsSum, breakDown
 }
 
-func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, []Metric) {
+func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, int64, []Metric) {
 	breakDown := make([]Metric, len(s.expectedStates))
 	breakDown = breakDown[:0]
 	expectedSum := float64(0)
+	eventsSum := int64(0)
+
 	for _, state := range s.expectedStates {
-		metric := histogram.ComputePercentile(state)
+		metric, count := histogram.ComputePercentile(state)
+		eventsSum += count
 		if metric != nil {
 			breakDown = append(breakDown, Metric{
-				Name:  state,
-				Value: *metric,
-				Unit:  "%",
+				Name:        state,
+				Value:       *metric,
+				Unit:        "%",
+				EventsCount: count,
 			})
 			expectedSum += *metric
 		}
@@ -182,7 +192,7 @@ func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, flo
 			WindowDuration: s.window.Size,
 		}
 	}
-	return breach, expectedSum, breakDown
+	return breach, expectedSum, eventsSum, breakDown
 }
 
 func uniqueSlice(values []string) []string {

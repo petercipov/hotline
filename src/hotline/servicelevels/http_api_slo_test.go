@@ -32,9 +32,10 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_latency",
 			Metric: servicelevels.Metric{
-				Name:  "p99",
-				Value: 0,
-				Unit:  "ms",
+				Name:        "p99",
+				Value:       0,
+				Unit:        "ms",
+				EventsCount: 1,
 			},
 			Tags: map[string]string{
 				"http_route": "/",
@@ -45,18 +46,20 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_status",
 			Metric: servicelevels.Metric{
-				Name:  "expected",
-				Value: 100,
-				Unit:  "%",
+				Name:        "expected",
+				Value:       100,
+				Unit:        "%",
+				EventsCount: 1,
 			},
 			Tags: map[string]string{
 				"http_route": "/",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
-					Name:  "200",
-					Value: 100,
-					Unit:  "%",
+					Name:        "200",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 			},
 			Breach: nil,
@@ -76,9 +79,10 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_latency",
 			Metric: servicelevels.Metric{
-				Name:  "p99",
-				Value: 0,
-				Unit:  "ms",
+				Name:        "p99",
+				Value:       0,
+				Unit:        "ms",
+				EventsCount: 1,
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
@@ -89,18 +93,20 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_status",
 			Metric: servicelevels.Metric{
-				Name:  "expected",
-				Value: 100,
-				Unit:  "%",
+				Name:        "expected",
+				Value:       100,
+				Unit:        "%",
+				EventsCount: 1,
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
-					Name:  "200",
-					Value: 100,
-					Unit:  "%",
+					Name:        "200",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 			},
 			Breach: nil,
@@ -151,23 +157,26 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_status",
 			Metric: servicelevels.Metric{
-				Name:  "unexpected",
-				Value: 100,
-				Unit:  "%",
+				Name:        "unexpected",
+				Value:       100,
+				Unit:        "%",
+				EventsCount: 2,
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
-					Name:  "4xx",
-					Value: 50,
-					Unit:  "%",
+					Name:        "4xx",
+					Value:       50,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 				{
-					Name:  "5xx",
-					Value: 50,
-					Unit:  "%",
+					Name:        "5xx",
+					Value:       50,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 			},
 			Breach: &servicelevels.SLOBreach{
@@ -192,18 +201,20 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_status",
 			Metric: servicelevels.Metric{
-				Name:  "unexpected",
-				Value: 100,
-				Unit:  "%",
+				Name:        "unexpected",
+				Value:       100,
+				Unit:        "%",
+				EventsCount: 1,
 			},
 			Tags: map[string]string{
 				"http_route": "iam.example.com/users",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
-					Name:  "unknown",
-					Value: 100,
-					Unit:  "%",
+					Name:        "unknown",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 1,
 				},
 			},
 			Breach: &servicelevels.SLOBreach{

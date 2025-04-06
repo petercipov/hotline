@@ -20,19 +20,19 @@ func (h *TagHistogram) Add(tag string) {
 	h.buckets.Add(*key, 1)
 }
 
-func (h *TagHistogram) ComputePercentile(tag string) *float64 {
+func (h *TagHistogram) ComputePercentile(tag string) (*float64, int64) {
 	key := h.layout.key(tag)
 	if key == nil {
-		return nil
+		return nil, 0
 	}
 	total := float64(h.buckets.Sum())
 	counter := h.buckets.GetCounter(*key)
 	if counter == nil {
-		return nil
+		return nil, 0
 	}
 	sum := counter.Sum()
 	percentile := float64(sum) / total * 100.0
-	return &percentile
+	return &percentile, sum
 }
 
 type tagsLayout struct {

@@ -11,9 +11,10 @@ type SLOCheck struct {
 }
 
 type Metric struct {
-	Name  string
-	Value float64
-	Unit  string
+	Name        string
+	Value       float64
+	Unit        string
+	EventsCount int64
 }
 
 type Operation string

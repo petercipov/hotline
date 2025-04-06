@@ -118,13 +118,15 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 
 		attributes := []*commonpb.KeyValue{
 			StringAttribute("integration_id", string(check.IntegrationID)),
+			StringAttribute("metric", slo.Metric.Name),
 			BoolAttribute("breached", slo.Breach != nil),
 		}
 		for key, val := range slo.Tags {
 			attributes = append(attributes, StringAttribute(key, val))
 		}
 
-		metricID := fmt.Sprintf("service_levels_%s_%s", slo.Namespace, slo.Metric.Name)
+		metricID := fmt.Sprintf("service_levels_%s", slo.Namespace)
+		metricIDEvents := metricID + "_events"
 
 		metrics = append(metrics, &metricspb.Metric{
 			Name: metricID,
@@ -142,14 +144,33 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 					},
 				},
 			},
+		}, &metricspb.Metric{
+			Name: metricIDEvents,
+			Unit: "#",
+			Data: &metricspb.Metric_Sum{
+				Sum: &metricspb.Sum{
+					DataPoints: []*metricspb.NumberDataPoint{
+						{
+							Attributes:   attributes,
+							TimeUnixNano: uint64(now.UnixNano()),
+							Value: &metricspb.NumberDataPoint_AsInt{
+								AsInt: slo.Metric.EventsCount,
+							},
+						},
+					},
+					AggregationTemporality: metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA,
+				},
+			},
 		})
 
-		breakDownMetricID := fmt.Sprintf("%s_breakdown", metricID)
+		breakDownMetricID := metricID + "_breakdown"
+		breakDownCountID := breakDownMetricID + "_events"
 
 		for _, breakdown := range slo.Breakdown {
 			attributes = []*commonpb.KeyValue{
 				StringAttribute("integration_id", string(check.IntegrationID)),
 				StringAttribute("breakdown", breakdown.Name),
+				StringAttribute("metric", slo.Metric.Name),
 				BoolAttribute("breached", slo.Breach != nil),
 			}
 			for key, val := range slo.Tags {
@@ -170,6 +191,23 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 								},
 							},
 						},
+					},
+				},
+			}, &metricspb.Metric{
+				Name: breakDownCountID,
+				Unit: "#",
+				Data: &metricspb.Metric_Sum{
+					Sum: &metricspb.Sum{
+						DataPoints: []*metricspb.NumberDataPoint{
+							{
+								Attributes:   attributes,
+								TimeUnixNano: uint64(now.UnixNano()),
+								Value: &metricspb.NumberDataPoint_AsInt{
+									AsInt: breakdown.EventsCount,
+								},
+							},
+						},
+						AggregationTemporality: metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA,
 					},
 				},
 			})

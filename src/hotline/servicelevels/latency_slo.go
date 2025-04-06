@@ -43,7 +43,8 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 	histogram := activeWindow.Accumulator.(*LatencyHistogram)
 	metrics := make([]SLOCheck, len(s.percentiles))
 	for i, definition := range s.percentiles {
-		metric := histogram.ComputePercentile(definition.Percentile.Normalized()).To
+		bucket, eventsCount := histogram.ComputePercentile(definition.Percentile.Normalized())
+		metric := bucket.To
 
 		var breach *SLOBreach
 		if !(metric < float64(definition.Threshold)) {
@@ -57,9 +58,10 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 		metrics[i] = SLOCheck{
 			Namespace: s.namespace,
 			Metric: Metric{
-				Name:  definition.Name,
-				Value: metric,
-				Unit:  "ms",
+				Name:        definition.Name,
+				Value:       metric,
+				Unit:        "ms",
+				EventsCount: eventsCount,
 			},
 			Tags:   s.tags,
 			Breach: breach,

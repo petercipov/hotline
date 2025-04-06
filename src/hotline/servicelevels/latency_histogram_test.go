@@ -116,7 +116,8 @@ func (s *sutlatencyhistogram) forEmptyHistogram() {
 }
 
 func (s *sutlatencyhistogram) computeP50() servicelevels.Bucket {
-	return s.h.ComputePercentile(0.5)
+	b, _ := s.h.ComputePercentile(0.5)
+	return b
 }
 
 func (s *sutlatencyhistogram) fillLatencies(latencies ...float64) {
@@ -148,7 +149,8 @@ func (s *sutlatencyhistogram) forEmptyHistogramWithSplit(splitLatency ...float64
 }
 
 func (s *sutlatencyhistogram) computeP99() servicelevels.Bucket {
-	return s.h.ComputePercentile(0.99)
+	p, _ := s.h.ComputePercentile(0.99)
+	return p
 }
 
 func BeInInterval(start float64, end float64) types.GomegaMatcher {

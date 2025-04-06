@@ -98,31 +98,32 @@ func (a *appSut) sloMetricsAreReceivedInCollector(ctx context.Context, metrics *
 
 	var expectedMetrics []ExpectedMetric
 	for _, row := range metrics.Rows[1:] {
-		metricName := row.Cells[header["Metric Name"]].Value
+		metricName := row.Cells[header["Name"]].Value
 		timestampUTC := row.Cells[header["Timestamp UTC"]].Value
-		metricType := row.Cells[header["Metric Type"]].Value
-		metricValue := row.Cells[header["Metric Value"]].Value
-		metricUnit := row.Cells[header["Metric Unit"]].Value
-		metricAttrs := row.Cells[header["Metric Attributes"]].Value
+		metricType := row.Cells[header["Type"]].Value
+		metricValue := row.Cells[header["Value"]].Value
+		metricUnit := row.Cells[header["Unit"]].Value
+		metricAttrs := row.Cells[header["Attributes"]].Value
 
-		var kv []KeyVal
+		var kv KeyVals
 		for _, keyval := range strings.Split(metricAttrs, ";") {
+			if len(keyval) == 0 {
+				continue
+			}
 			split := strings.Split(strings.TrimSpace(keyval), ":")
 			key := strings.TrimSpace(split[0])
 			value := strings.TrimSpace(split[1])
+
+			if len(key) == 0 || len(value) == 0 {
+				continue
+			}
+
 			kv = append(kv, KeyVal{
 				Key:   key,
 				Value: value,
 			})
 		}
 
-		slices.SortFunc(kv, func(a, b KeyVal) int {
-			keyCmp := strings.Compare(a.Key, b.Key)
-			if keyCmp == 0 {
-				return strings.Compare(a.Value, b.Value)
-			}
-			return keyCmp
-		})
 		value, _ := strconv.ParseFloat(metricValue, 64)
 		expectedMetrics = append(expectedMetrics, ExpectedMetric{
 			Name:      metricName,
@@ -130,7 +131,7 @@ func (a *appSut) sloMetricsAreReceivedInCollector(ctx context.Context, metrics *
 			Unit:      metricUnit,
 			Value:     roundTo(value, 3),
 			Type:      metricType,
-			KeyVals:   kv,
+			KeyVals:   kv.Sorted(),
 		})
 	}
 
@@ -145,6 +146,23 @@ func (a *appSut) sloMetricsAreReceivedInCollector(ctx context.Context, metrics *
 			time.Sleep(5 * time.Millisecond)
 		} else {
 			e := &errorT{}
+
+			slices.SortFunc(receivedMettrics, func(a, b ExpectedMetric) int {
+				typeCmp := strings.Compare(a.Type, b.Type)
+				if typeCmp == 0 {
+					nameCmp := strings.Compare(a.Name, b.Name)
+					if nameCmp == 0 {
+						return strings.Compare(a.Timestamp, b.Timestamp)
+					}
+					return nameCmp
+				}
+				return typeCmp
+			})
+
+			for _, metric := range receivedMettrics {
+				fmt.Printf("# %s %s %s %.2f %s %s\n", metric.Timestamp, metric.Name, metric.Type, metric.Value, metric.Unit, metric.KeyVals.String())
+			}
+
 			assert.Equal(e, expectedMetrics, receivedMettrics, "Metrics are not equal")
 			return ctx, e.err
 		}
@@ -165,12 +183,38 @@ type ExpectedMetric struct {
 	Value     float64
 	Unit      string
 	Type      string
-	KeyVals   []KeyVal
+	KeyVals   KeyVals
 }
 
 type KeyVal struct {
 	Key   string
 	Value string
+}
+
+type KeyVals []KeyVal
+
+func (kvs KeyVals) Sorted() KeyVals {
+	slices.SortFunc(kvs, func(a, b KeyVal) int {
+		keyCmp := strings.Compare(a.Key, b.Key)
+		if keyCmp == 0 {
+			return strings.Compare(a.Value, b.Value)
+		}
+		return keyCmp
+	})
+	return kvs
+}
+
+func (kvs KeyVals) String() string {
+	var sb strings.Builder
+	sb.WriteString("[ ")
+	for _, kv := range kvs {
+		sb.WriteString(kv.Key)
+		sb.WriteString(":")
+		sb.WriteString(kv.Value)
+		sb.WriteString("; ")
+	}
+	sb.WriteString("]")
+	return sb.String()
 }
 
 func (a *appSut) Close() error {
@@ -270,43 +314,69 @@ func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 	for _, resource := range message.ResourceMetrics {
 		for _, scopeMetrics := range resource.ScopeMetrics {
 			for _, metric := range scopeMetrics.Metrics {
-				g := metric.Data.(*metricspb.Metric_Gauge)
-				for _, dp := range g.Gauge.DataPoints {
-					val := dp.Value.(*metricspb.NumberDataPoint_AsDouble)
-					var atts []KeyVal
-					for _, att := range dp.Attributes {
+				g, isGauge := metric.Data.(*metricspb.Metric_Gauge)
+				if isGauge {
+					for _, dp := range g.Gauge.DataPoints {
+						val := dp.Value.(*metricspb.NumberDataPoint_AsDouble)
+						var atts KeyVals
+						for _, att := range dp.Attributes {
 
-						_, isBool := att.GetValue().Value.(*commonpb.AnyValue_BoolValue)
-						if isBool {
-							atts = append(atts, KeyVal{
-								Key:   att.Key,
-								Value: fmt.Sprintf("%t", att.Value.GetBoolValue()),
-							})
-						} else {
-							atts = append(atts, KeyVal{
-								Key:   att.Key,
-								Value: att.Value.GetStringValue(),
-							})
+							_, isBool := att.GetValue().Value.(*commonpb.AnyValue_BoolValue)
+							if isBool {
+								atts = append(atts, KeyVal{
+									Key:   att.Key,
+									Value: fmt.Sprintf("%t", att.Value.GetBoolValue()),
+								})
+							} else {
+								atts = append(atts, KeyVal{
+									Key:   att.Key,
+									Value: att.Value.GetStringValue(),
+								})
+							}
 						}
+
+						received = append(received, ExpectedMetric{
+							Name:      metric.Name,
+							Unit:      metric.Unit,
+							Type:      "Gauge",
+							Value:     roundTo(val.AsDouble, 3),
+							Timestamp: time.Unix(0, int64(dp.TimeUnixNano)).UTC().Format(time.RFC3339),
+							KeyVals:   atts.Sorted(),
+						})
 					}
-					slices.SortFunc(atts, func(a, b KeyVal) int {
-						keyCmp := strings.Compare(a.Key, b.Key)
-						if keyCmp == 0 {
-							return strings.Compare(a.Value, b.Value)
-						}
-						return keyCmp
-					})
-
-					received = append(received, ExpectedMetric{
-						Name:      metric.Name,
-						Unit:      metric.Unit,
-						Type:      "Gauge",
-						Value:     roundTo(val.AsDouble, 3),
-						Timestamp: time.Unix(0, int64(dp.TimeUnixNano)).UTC().Format(time.RFC3339),
-						KeyVals:   atts,
-					})
+					continue
 				}
 
+				s, isSum := metric.Data.(*metricspb.Metric_Sum)
+				if isSum {
+					for _, dp := range s.Sum.DataPoints {
+						val := dp.Value.(*metricspb.NumberDataPoint_AsInt)
+						var atts KeyVals
+						for _, att := range dp.Attributes {
+							_, isBool := att.GetValue().Value.(*commonpb.AnyValue_BoolValue)
+							if isBool {
+								atts = append(atts, KeyVal{
+									Key:   att.Key,
+									Value: fmt.Sprintf("%t", att.Value.GetBoolValue()),
+								})
+							} else {
+								atts = append(atts, KeyVal{
+									Key:   att.Key,
+									Value: att.Value.GetStringValue(),
+								})
+							}
+						}
+
+						received = append(received, ExpectedMetric{
+							Name:      metric.Name,
+							Unit:      metric.Unit,
+							Type:      "Sum",
+							Value:     roundTo(float64(val.AsInt), 3),
+							Timestamp: time.Unix(0, int64(dp.TimeUnixNano)).UTC().Format(time.RFC3339),
+							KeyVals:   atts.Sorted(),
+						})
+					}
+				}
 			}
 		}
 	}
@@ -320,10 +390,10 @@ func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 
 func (c *fakeCollector) GetMetrics() []ExpectedMetric {
 	c.sync.Lock()
-	m := c.metrics
+	metrics := c.metrics
 	c.sync.Unlock()
 
-	return m
+	return metrics
 }
 
 func uncompressedGzip(reader io.Reader) ([]byte, error) {
