@@ -1,6 +1,9 @@
 package setup
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 type HttpServer interface {
 	Host() string
@@ -31,8 +34,9 @@ func (g *GoHttpServer) Close() error {
 func NewGoHttpServer(host string, handler http.Handler) HttpServer {
 	return &GoHttpServer{
 		server: &http.Server{
-			Addr:    host,
-			Handler: handler,
+			Addr:        host,
+			Handler:     handler,
+			ReadTimeout: 5 * time.Second,
 		},
 	}
 }
