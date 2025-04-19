@@ -1,30 +1,24 @@
-Resource SchemaURL: 
-Resource attributes:
-     -> service.name: Str(external-integrations-proxy)
-     -> telemetry.sdk.language: Str(cpp)
-     -> telemetry.sdk.name: Str(envoy)
-     -> telemetry.sdk.version: Str(2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL)
 ScopeSpans #0
 ScopeSpans SchemaURL: 
 InstrumentationScope envoy 2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL
 Span #0
-    Trace ID       : d41d1fc0a0f8f5b178a9d9a4b0105159
+    Trace ID       : 2639d6e27ed144dcc088ad61e2db2fe1
     Parent ID      : 
-    ID             : a06b3c13bc888760
+    ID             : 5194744cb08d0db7
     Name           : ingress
     Kind           : Server
-    Start time     : 2025-04-19 14:14:43.581264 +0000 UTC
-    End time       : 2025-04-19 14:14:43.614623 +0000 UTC
+    Start time     : 2025-04-19 18:29:39.044648 +0000 UTC
+    End time       : 2025-04-19 18:29:39.263379 +0000 UTC
     Status code    : Unset
     Status message : 
 Attributes:
      -> node_id: Str()
      -> zone: Str()
-     -> guid:x-request-id: Str(31451832-559a-9c6d-9c52-959cfb25b170)
+     -> guid:x-request-id: Str(9fa5bc26-1c2b-9de9-8145-a096dbe9eae1)
      -> http.url: Str(https://www.petercipov.com/)
      -> http.method: Str(GET)
      -> downstream_cluster: Str(-)
-     -> user_agent: Str(curl/7.87.0)
+     -> user_agent: Str(integration-id-1)
      -> http.protocol: Str(HTTP/1.1)
      -> peer.address: Str(192.168.65.1)
      -> request_size: Str(0)
