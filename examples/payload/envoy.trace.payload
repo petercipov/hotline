@@ -2,30 +2,30 @@ ScopeSpans #0
 ScopeSpans SchemaURL: 
 InstrumentationScope envoy 2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL
 Span #0
-    Trace ID       : 2639d6e27ed144dcc088ad61e2db2fe1
+    Trace ID       : bb2d57558f783993809bfebf1277c0b9
     Parent ID      : 
-    ID             : 5194744cb08d0db7
+    ID             : 6abdaf4c16b7b562
     Name           : ingress
     Kind           : Server
-    Start time     : 2025-04-19 18:29:39.044648 +0000 UTC
-    End time       : 2025-04-19 18:29:39.263379 +0000 UTC
+    Start time     : 2025-04-19 19:50:56.652959 +0000 UTC
+    End time       : 2025-04-19 19:50:56.902644 +0000 UTC
     Status code    : Unset
     Status message : 
 Attributes:
      -> node_id: Str()
      -> zone: Str()
-     -> guid:x-request-id: Str(9fa5bc26-1c2b-9de9-8145-a096dbe9eae1)
-     -> http.url: Str(https://www.petercipov.com/)
-     -> http.method: Str(GET)
+     -> guid:x-request-id: Str(c04a6961-8fbb-9e41-ab51-99e54fd47b5f)
+     -> url.full: Str(https://www.petercipov.com/path?a=b)
+     -> http.request.method: Str(GET)
      -> downstream_cluster: Str(-)
      -> user_agent: Str(integration-id-1)
-     -> http.protocol: Str(HTTP/1.1)
+     -> network.protocol.version: Str(HTTP/1.1)
      -> peer.address: Str(192.168.65.1)
      -> request_size: Str(0)
-     -> response_size: Str(16902)
+     -> response_size: Str(7412)
      -> component: Str(proxy)
      -> upstream_cluster: Str(dynamic_forward_proxy_cluster)
      -> upstream_cluster.name: Str(dynamic_forward_proxy_cluster)
-     -> http.status_code: Str(200)
+     -> http.response.status_code: Str(404)
      -> response_flags: Str(-)
      {"otelcol.component.id": "debug", "otelcol.component.kind": "Exporter", "otelcol.signal": "traces"}

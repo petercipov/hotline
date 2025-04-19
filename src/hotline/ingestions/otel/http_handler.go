@@ -29,7 +29,7 @@ var DefaultAttributeNames = AttributeNames{
 	HttpStatusCode:         "http.response.status_code",
 	UrlFull:                "url.full",
 	NetworkProtocolVersion: "network.protocol.version",
-	IntegrationID:          "integration.id",
+	IntegrationID:          "user_agent",
 	ErrorType:              "error.type",
 }
 

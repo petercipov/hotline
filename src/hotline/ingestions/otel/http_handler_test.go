@@ -299,7 +299,7 @@ func stringValue(value string) *commonpb.AnyValue {
 func (s *otelSut) requestWithSimpleTraceWithIntegrationID(integrationID string) {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   "integration.id",
+			Key:   DefaultAttributeNames.IntegrationID,
 			Value: stringValue(integrationID),
 		})
 	})
