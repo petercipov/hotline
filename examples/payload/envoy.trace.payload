@@ -1,0 +1,37 @@
+Resource SchemaURL: 
+Resource attributes:
+     -> service.name: Str(external-integrations-proxy)
+     -> telemetry.sdk.language: Str(cpp)
+     -> telemetry.sdk.name: Str(envoy)
+     -> telemetry.sdk.version: Str(2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL)
+ScopeSpans #0
+ScopeSpans SchemaURL: 
+InstrumentationScope envoy 2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL
+Span #0
+    Trace ID       : d41d1fc0a0f8f5b178a9d9a4b0105159
+    Parent ID      : 
+    ID             : a06b3c13bc888760
+    Name           : ingress
+    Kind           : Server
+    Start time     : 2025-04-19 14:14:43.581264 +0000 UTC
+    End time       : 2025-04-19 14:14:43.614623 +0000 UTC
+    Status code    : Unset
+    Status message : 
+Attributes:
+     -> node_id: Str()
+     -> zone: Str()
+     -> guid:x-request-id: Str(31451832-559a-9c6d-9c52-959cfb25b170)
+     -> http.url: Str(https://www.petercipov.com/)
+     -> http.method: Str(GET)
+     -> downstream_cluster: Str(-)
+     -> user_agent: Str(curl/7.87.0)
+     -> http.protocol: Str(HTTP/1.1)
+     -> peer.address: Str(192.168.65.1)
+     -> request_size: Str(0)
+     -> response_size: Str(16902)
+     -> component: Str(proxy)
+     -> upstream_cluster: Str(dynamic_forward_proxy_cluster)
+     -> upstream_cluster.name: Str(dynamic_forward_proxy_cluster)
+     -> http.status_code: Str(200)
+     -> response_flags: Str(-)
+     {"otelcol.component.id": "debug", "otelcol.component.kind": "Exporter", "otelcol.signal": "traces"}
