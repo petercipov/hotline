@@ -7,6 +7,13 @@ services:
     ports:
       - "4318:4318"
       - "9091:9090"
+      - "55679:55679"
+  envoy:
+    image: envoyproxy/envoy:v1.33.2
+    ports:
+     - 10000:10000
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml
 #  prometheus:
 #    image: prom/prometheus:latest
 #    volumes:
