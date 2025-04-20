@@ -7,7 +7,8 @@ services:
     ports:
       - "4318:4318"
       - "9091:9090"
-      - "55679:55679"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   envoy:
     image: envoyproxy/envoy:v1.33.2
     ports:

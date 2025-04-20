@@ -224,13 +224,13 @@ var _ = Describe("OTELUrl", func() {
 	It("should return a valid unsecure URL", func() {
 		otel, parseErr := reporters.NewOtelUrl(false, "localhost:4318")
 		Expect(parseErr).To(BeNil())
-		Expect(otel.String()).To(Equal("http://localhost:4318/v1/reporters"))
+		Expect(otel.String()).To(Equal("http://localhost:4318/v1/metrics"))
 	})
 
 	It("should return a valid secure URL", func() {
 		otel, parseErr := reporters.NewOtelUrl(true, "localhost:4318")
 		Expect(parseErr).To(BeNil())
-		Expect(otel.String()).To(Equal("https://localhost:4318/v1/reporters"))
+		Expect(otel.String()).To(Equal("https://localhost:4318/v1/metrics"))
 	})
 
 	It("should fail if host invalid", func() {

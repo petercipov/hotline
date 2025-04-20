@@ -50,12 +50,14 @@ func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	if readErr != nil {
 		http.Error(w, "could not read body", http.StatusInternalServerError)
+		return
 	}
 
 	var reqProto coltracepb.ExportTraceServiceRequest
 	unmarshalErr := proto.Unmarshal(raw, &reqProto)
 	if unmarshalErr != nil {
 		http.Error(w, "could not parse proto", http.StatusBadRequest)
+		return
 	}
 	h.ingestion(h.convertMessageToHttp(&reqProto))
 	w.WriteHeader(http.StatusCreated)

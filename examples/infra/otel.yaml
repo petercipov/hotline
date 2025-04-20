@@ -11,6 +11,7 @@ processors:
       - replace_all_patterns(span.attributes, "key", "http[.]status_code", "http.response.status_code")
       - replace_all_patterns(span.attributes, "key", "http[.]url", "url.full")
       - replace_all_patterns(span.attributes, "key", "http[.]protocol", "network.protocol.version")
+      - set(span.kind, 3)
 extensions:
   health_check: {}
 exporters:
@@ -19,6 +20,9 @@ exporters:
     metric_expiration: 1m
   debug:
     verbosity: detailed
+  otlphttp:
+    endpoint: http://host.docker.internal:8080
+    compression: none
 service:
   extensions: [health_check]
   pipelines:
@@ -27,5 +31,5 @@ service:
       exporters: [prometheus]
     traces:
       receivers: [ otlp ]
-      exporters: [debug]
+      exporters: [debug, otlphttp]
       processors: [transform]

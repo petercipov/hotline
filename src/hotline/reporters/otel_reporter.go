@@ -23,7 +23,7 @@ func NewOtelUrl(secure bool, host string) (OtelUrl, error) {
 	if !secure {
 		scheme = "http"
 	}
-	otelUrl, parseErr := url.ParseRequestURI(fmt.Sprintf("%s://%s/v1/reporters", scheme, host))
+	otelUrl, parseErr := url.ParseRequestURI(fmt.Sprintf("%s://%s/v1/metrics", scheme, host))
 	if parseErr != nil {
 		return "", parseErr
 	}
@@ -109,7 +109,7 @@ func (o *OtelReporter) ReportChecks(ctx context.Context, report *servicelevels.C
 	if sc := response.StatusCode; sc >= 200 && sc <= 299 {
 		return nil
 	}
-	return fmt.Errorf("received unexpected status code: %d", response.StatusCode)
+	return fmt.Errorf("received unexpected status code: %d for req %s %s", response.StatusCode, postReq.Method, postReq.URL.String())
 }
 
 func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
