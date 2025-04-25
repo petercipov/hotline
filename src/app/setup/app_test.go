@@ -36,6 +36,7 @@ type appSut struct {
 	collectorServer setup.HttpServer
 
 	ingestionClient *IngestionClient
+	envoyClient     *EnvoyClient
 	fakeCollector   *fakeCollector
 }
 
@@ -47,9 +48,18 @@ func (a *appSut) sloReporterIsPointingToCollector() {
 	a.cfg.OtelHttpReporter.Host = a.collectorServer.Host()
 }
 
-func (a *appSut) sendTraffic(ctx context.Context, integrationID string) (context.Context, error) {
+func (a *appSut) sendTraffic(ctx context.Context, flavour string, integrationID string) (context.Context, error) {
 	now := a.managedTime.Now()
-	statusCode, sendErr := a.ingestionClient.SendSomeTraffic(now, integrationID)
+
+	var statusCode int
+	var sendErr error
+	switch flavour {
+	case "envoy otel":
+		statusCode, sendErr = a.envoyClient.SendSomeTraffic(now, integrationID)
+	default:
+		statusCode, sendErr = a.ingestionClient.SendSomeTraffic(now, integrationID)
+	}
+
 	if sendErr != nil {
 		return ctx, sendErr
 	}
@@ -85,6 +95,10 @@ func (a *appSut) runHotline() error {
 	a.app.Start()
 
 	a.ingestionClient = &IngestionClient{
+		URL: a.app.GetIngestionUrl(),
+	}
+
+	a.envoyClient = &EnvoyClient{
 		URL: a.app.GetIngestionUrl(),
 	}
 	return nil
@@ -248,7 +262,7 @@ func TestApp(t *testing.T) {
 			sctx.Given("slo reporter is pointing to collector", sut.sloReporterIsPointingToCollector)
 			sctx.Given("hotline is running", sut.runHotline)
 
-			sctx.When(`traffic is sent to OTEL ingestion for integration ID "([^"]*)"`, sut.sendTraffic)
+			sctx.When(`([^"]*) otel traffic is sent for ingestion for integration ID "([^"]*)"`, sut.sendTraffic)
 			sctx.When("advance time by (\\d+)s", sut.advanceTime)
 
 			sctx.Then("slo metrics are received in collector", sut.sloMetricsAreReceivedInCollector)

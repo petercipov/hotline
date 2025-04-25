@@ -8,15 +8,19 @@ import (
 	"net/http"
 )
 
-type TracesHandler struct {
-	ingestion           func([]*ingestions.HttpRequest)
-	convertProtoMessage func(c *coltracepb.ExportTraceServiceRequest) []*ingestions.HttpRequest
+type MessageConverter interface {
+	Convert(c *coltracepb.ExportTraceServiceRequest) []*ingestions.HttpRequest
 }
 
-func NewTracesHandler(ingestion func([]*ingestions.HttpRequest), convertProtoMessage func(c *coltracepb.ExportTraceServiceRequest) []*ingestions.HttpRequest) *TracesHandler {
+type TracesHandler struct {
+	ingestion        func([]*ingestions.HttpRequest)
+	messageConverter MessageConverter
+}
+
+func NewTracesHandler(ingestion func([]*ingestions.HttpRequest), messageConverter MessageConverter) *TracesHandler {
 	return &TracesHandler{
-		ingestion:           ingestion,
-		convertProtoMessage: convertProtoMessage,
+		ingestion:        ingestion,
+		messageConverter: messageConverter,
 	}
 }
 
@@ -34,6 +38,6 @@ func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "could not parse proto", http.StatusBadRequest)
 		return
 	}
-	h.ingestion(h.convertProtoMessage(&reqProto))
+	h.ingestion(h.messageConverter.Convert(&reqProto))
 	w.WriteHeader(http.StatusCreated)
 }

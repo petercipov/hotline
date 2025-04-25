@@ -59,11 +59,11 @@ func NewApp(cfg *Config, managedTime ManagedTime, createServer CreateServer) (*A
 	fakeRepository := new(FakeSLOConfigRepository)
 	sloPipeline := servicelevels.NewSLOPipeline(sloPipelineScopes, fakeRepository, reporter)
 
-	attMapping := otel.NewStandardMapping()
+	converter := otel.NewProtoConverter()
 	otelTraceHttpIngestion := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
 		sloRequests := ingestions.ToSLORequest(requests, managedTime.Now())
 		sloPipeline.IngestHttpRequests(sloRequests...)
-	}, attMapping.ConvertMessageToHttp)
+	}, converter)
 
 	ingestionServer := createServer(cfg.OtelHttpIngestion.Host, otelTraceHttpIngestion)
 

@@ -1,23 +1,21 @@
 package setup_test
 
 import (
-	"bytes"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-	"google.golang.org/protobuf/proto"
 	"hotline/ingestions/otel"
 	"math/rand"
-	"net/http"
 	"strconv"
 	"time"
 )
 
-type IngestionClient struct {
+type EnvoyClient struct {
 	URL string
 }
 
-func (s *IngestionClient) SendSomeTraffic(now time.Time, integrationID string) (int, error) {
+func (s *EnvoyClient) SendSomeTraffic(now time.Time, integrationID string) (int, error) {
 	r := rand.New(rand.NewSource(0))
 
 	statusCodes := []string{
@@ -34,13 +32,13 @@ func (s *IngestionClient) SendSomeTraffic(now time.Time, integrationID string) (
 
 		statusCode := statusCodes[r.Intn(len(statusCodes))]
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   otel.StandardMappingNames.HttpStatusCode,
+			Key:   otel.EnvoyMappingNames.HttpStatusCode,
 			Value: stringValue(statusCode),
 		})
 	})
 }
 
-func (s *IngestionClient) sendTraffic(integrationID string, resourceCount int, traceCount int, modifier func(span *tracepb.Span)) (int, error) {
+func (s *EnvoyClient) sendTraffic(integrationID string, resourceCount int, traceCount int, modifier func(span *tracepb.Span)) (int, error) {
 	var resourceSpans []*tracepb.ResourceSpans
 	for ri := 0; ri < resourceCount; ri++ {
 		var spans []*tracepb.Span
@@ -52,24 +50,28 @@ func (s *IngestionClient) sendTraffic(integrationID string, resourceCount int, t
 				Name:              "request to remote integration",
 				StartTimeUnixNano: 1544712660000000000,
 				EndTimeUnixNano:   1544712661000000000,
-				Kind:              3,
+				Kind:              2,
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []*commonpb.KeyValue{
 					{
-						Key:   otel.StandardMappingNames.HttpRequestMethod,
+						Key:   otel.EnvoyMappingNames.HttpRequestMethod,
 						Value: stringValue("POST"),
 					},
 					{
-						Key:   otel.StandardMappingNames.NetworkProtocolVersion,
+						Key:   otel.EnvoyMappingNames.NetworkProtocolVersion,
 						Value: stringValue("1.1"),
 					},
 					{
-						Key:   otel.StandardMappingNames.UrlFull,
+						Key:   otel.EnvoyMappingNames.UrlFull,
 						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key:   otel.StandardMappingNames.IntegrationID,
+						Key:   otel.EnvoyMappingNames.IntegrationID,
 						Value: stringValue(integrationID),
+					},
+					{
+						Key:   "guid:x-request-id",
+						Value: stringValue("req-id-value"),
 					},
 				},
 			}
@@ -81,10 +83,30 @@ func (s *IngestionClient) sendTraffic(integrationID string, resourceCount int, t
 			ScopeSpans: []*tracepb.ScopeSpans{
 				{
 					Scope: &commonpb.InstrumentationScope{
-						Name:    "otel",
-						Version: "123",
+						Name:    "envoy",
+						Version: "2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL",
 					},
 					Spans: spans,
+				},
+			},
+			Resource: &resourcepb.Resource{
+				Attributes: []*commonpb.KeyValue{
+					{
+						Key:   "service.name",
+						Value: stringValue("external-integrations-proxy"),
+					},
+					{
+						Key:   "telemetry.sdk.language",
+						Value: stringValue("cpp"),
+					},
+					{
+						Key:   "telemetry.sdk.name",
+						Value: stringValue("envoy"),
+					},
+					{
+						Key:   "telemetry.sdk.version",
+						Value: stringValue("2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL"),
+					},
 				},
 			},
 		})
@@ -92,29 +114,4 @@ func (s *IngestionClient) sendTraffic(integrationID string, resourceCount int, t
 	return sendTraces(s.URL, &coltracepb.ExportTraceServiceRequest{
 		ResourceSpans: resourceSpans,
 	})
-}
-
-func sendTraces(URL string, message *coltracepb.ExportTraceServiceRequest) (int, error) {
-	raw, marshalErr := proto.Marshal(message)
-	if marshalErr != nil {
-		return 0, marshalErr
-	}
-	// https://github.com/open-telemetry/opentelemetry-collector/blob/432d92d8b366f6831323a928783f1ed867c42050/exporter/otlphttpexporter/otlp.go#L185
-	req, createErr := http.NewRequest(http.MethodPost, URL, bytes.NewReader(raw))
-	if createErr != nil {
-		return 0, createErr
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "remote-service-otel-exporter")
-	resp, reqErr := http.DefaultClient.Do(req)
-	if reqErr != nil {
-		return 0, reqErr
-	}
-	return resp.StatusCode, nil
-}
-
-func stringValue(value string) *commonpb.AnyValue {
-	return &commonpb.AnyValue{
-		Value: &commonpb.AnyValue_StringValue{StringValue: value},
-	}
 }

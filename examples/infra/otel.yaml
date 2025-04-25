@@ -3,15 +3,6 @@ receivers:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
-processors:
-  transform:
-    error_mode: ignore
-    trace_statements:
-      - replace_all_patterns(span.attributes, "key", "http[.]method", "http.request.method")
-      - replace_all_patterns(span.attributes, "key", "http[.]status_code", "http.response.status_code")
-      - replace_all_patterns(span.attributes, "key", "http[.]url", "url.full")
-      - replace_all_patterns(span.attributes, "key", "http[.]protocol", "network.protocol.version")
-      - set(span.kind, 3)
 extensions:
   health_check: {}
 exporters:
@@ -32,4 +23,3 @@ service:
     traces:
       receivers: [ otlp ]
       exporters: [debug, otlphttp]
-      processors: [transform]

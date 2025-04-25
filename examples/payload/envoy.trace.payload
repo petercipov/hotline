@@ -1,31 +1,38 @@
+ResourceSpans #0
+Resource SchemaURL: 
+Resource attributes:
+     -> service.name: Str(external-integrations-proxy)
+     -> telemetry.sdk.language: Str(cpp)
+     -> telemetry.sdk.name: Str(envoy)
+     -> telemetry.sdk.version: Str(2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL)
 ScopeSpans #0
 ScopeSpans SchemaURL: 
 InstrumentationScope envoy 2135e1a42f002a939d60581096291acb6abce695/1.33.2/Clean/RELEASE/BoringSSL
 Span #0
-    Trace ID       : bb2d57558f783993809bfebf1277c0b9
+    Trace ID       : f8d525c40284bd032b9ec427c122cd4a
     Parent ID      : 
-    ID             : 6abdaf4c16b7b562
+    ID             : dd39a30d140f5741
     Name           : ingress
     Kind           : Server
-    Start time     : 2025-04-19 19:50:56.652959 +0000 UTC
-    End time       : 2025-04-19 19:50:56.902644 +0000 UTC
+    Start time     : 2025-04-25 05:40:28.353696 +0000 UTC
+    End time       : 2025-04-25 05:40:29.884632 +0000 UTC
     Status code    : Unset
     Status message : 
 Attributes:
      -> node_id: Str()
      -> zone: Str()
-     -> guid:x-request-id: Str(c04a6961-8fbb-9e41-ab51-99e54fd47b5f)
-     -> url.full: Str(https://www.petercipov.com/path?a=b)
-     -> http.request.method: Str(GET)
+     -> guid:x-request-id: Str(e76202b9-e773-94dc-8ea2-7bd810e13d14)
+     -> http.url: Str(https://www.petercipov.com/path?a=b)
+     -> http.method: Str(GET)
      -> downstream_cluster: Str(-)
      -> user_agent: Str(integration-id-1)
-     -> network.protocol.version: Str(HTTP/1.1)
+     -> http.protocol: Str(HTTP/1.1)
      -> peer.address: Str(192.168.65.1)
      -> request_size: Str(0)
      -> response_size: Str(7412)
      -> component: Str(proxy)
      -> upstream_cluster: Str(dynamic_forward_proxy_cluster)
      -> upstream_cluster.name: Str(dynamic_forward_proxy_cluster)
-     -> http.response.status_code: Str(404)
+     -> http.status_code: Str(404)
      -> response_flags: Str(-)
      {"otelcol.component.id": "debug", "otelcol.component.kind": "Exporter", "otelcol.signal": "traces"}

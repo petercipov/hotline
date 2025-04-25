@@ -179,10 +179,10 @@ type otelSut struct {
 
 func (s *otelSut) forHttpIngestion() {
 	s.requests = nil
-	attMapping := NewStandardMapping()
+	converter := NewProtoConverter()
 	s.handler = NewTracesHandler(func(requests []*ingestions.HttpRequest) {
 		s.requests = append(s.requests, requests...)
-	}, attMapping.ConvertMessageToHttp)
+	}, converter)
 	s.server = httptest.NewServer(s.handler)
 }
 
@@ -201,14 +201,14 @@ func (s *otelSut) requestWithEmptyTraces() {
 			},
 		},
 	}
-	s.sendTraces(message)
+	sendTraces(s.server.URL, message)
 }
 
-func (s *otelSut) sendTraces(message *coltracepb.ExportTraceServiceRequest) {
+func sendTraces(URL string, message *coltracepb.ExportTraceServiceRequest) {
 	raw, marshalErr := proto.Marshal(message)
 	Expect(marshalErr).ToNot(HaveOccurred())
 	// https://github.com/open-telemetry/opentelemetry-collector/blob/432d92d8b366f6831323a928783f1ed867c42050/exporter/otlphttpexporter/otlp.go#L185
-	req, createErr := http.NewRequest(http.MethodPost, s.server.URL, bytes.NewReader(raw))
+	req, createErr := http.NewRequest(http.MethodPost, URL, bytes.NewReader(raw))
 	Expect(createErr).ToNot(HaveOccurred())
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "remote-service-otel-exporter")
@@ -286,7 +286,7 @@ func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount
 			},
 		})
 	}
-	s.sendTraces(&coltracepb.ExportTraceServiceRequest{
+	sendTraces(s.server.URL, &coltracepb.ExportTraceServiceRequest{
 		ResourceSpans: resourceSpans,
 	})
 }

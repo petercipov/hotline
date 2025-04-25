@@ -1,14 +1,14 @@
 Feature: Hotline should be able to
-  1) ingest otel standard http traces,
+  1) ingest envoy http traces,
   2) compute slo
   3 report slos to otel
 
-  Scenario: Integration traffic is ingested and slos are computed
+  Scenario: envoy http traffic is ingested and slos are computed
     OTEL ingestion is enabled
     And slo reporter is pointing to collector
     And hotline is running
 
-    When standard otel traffic is sent for ingestion for integration ID "IN-dd0391f11aba"
+    When envoy otel traffic is sent for ingestion for integration ID "IN-dd0391f11aba"
     And advance time by 10s
 
     Then slo metrics are received in collector:
