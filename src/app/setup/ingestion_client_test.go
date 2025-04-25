@@ -34,7 +34,7 @@ func (s *IngestionClient) SendSomeTraffic(now time.Time, integrationID string) (
 
 		statusCode := statusCodes[r.Intn(len(statusCodes))]
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   otel.DefaultAttributeNames.HttpStatusCode,
+			Key:   otel.StandardMappingNames.HttpStatusCode,
 			Value: stringValue(statusCode),
 		})
 	})
@@ -56,19 +56,19 @@ func (s *IngestionClient) sendTraffic(integrationID string, resourceCount int, t
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []*commonpb.KeyValue{
 					{
-						Key:   otel.DefaultAttributeNames.HttpRequestMethod,
+						Key:   otel.StandardMappingNames.HttpRequestMethod,
 						Value: stringValue("POST"),
 					},
 					{
-						Key:   otel.DefaultAttributeNames.NetworkProtocolVersion,
+						Key:   otel.StandardMappingNames.NetworkProtocolVersion,
 						Value: stringValue("1.1"),
 					},
 					{
-						Key:   otel.DefaultAttributeNames.UrlFull,
+						Key:   otel.StandardMappingNames.UrlFull,
 						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key:   otel.DefaultAttributeNames.IntegrationID,
+						Key:   otel.StandardMappingNames.IntegrationID,
 						Value: stringValue(integrationID),
 					},
 				},
