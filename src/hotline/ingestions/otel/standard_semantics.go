@@ -18,6 +18,7 @@ type AttributeNames struct {
 	NetworkProtocolVersion string // Recommended
 	IntegrationID          string // Recommended
 	ErrorType              string // conditionally required if no status code
+	CorrelationID          string // required
 }
 
 var StandardMappingNames = AttributeNames{
@@ -25,7 +26,7 @@ var StandardMappingNames = AttributeNames{
 	HttpStatusCode:         "http.response.status_code",
 	UrlFull:                "url.full",
 	NetworkProtocolVersion: "network.protocol.version",
-	IntegrationID:          "user_agent",
+	IntegrationID:          "user_agent.original",
 	ErrorType:              "error.type",
 }
 
@@ -48,6 +49,7 @@ func (h *StandardMapping) ConvertMessageToHttp(reqProto *coltracepb.ExportTraceS
 				}
 				attrs := toMap(span.Attributes)
 				id := fmt.Sprintf("%s:%s", span.TraceId, span.SpanId)
+				correlationID, _ := attrs.GetStringValue(h.attNames.CorrelationID)
 				method, foundMethod := attrs.GetStringValue(h.attNames.HttpRequestMethod)
 				if !foundMethod {
 					continue
@@ -87,6 +89,7 @@ func (h *StandardMapping) ConvertMessageToHttp(reqProto *coltracepb.ExportTraceS
 					StartTime:       time.Unix(0, int64(span.StartTimeUnixNano)).UTC(),
 					EndTime:         time.Unix(0, int64(span.EndTimeUnixNano)).UTC(),
 					ErrorType:       errorType,
+					CorrelationID:   correlationID,
 				})
 			}
 		}

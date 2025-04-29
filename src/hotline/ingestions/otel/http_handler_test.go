@@ -122,6 +122,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 				URL:           newUrl("https://integration.com/order/123?param1=value1"),
 				StartTime:     parseTime("2018-12-13T14:51:00Z"),
 				EndTime:       parseTime("2018-12-13T14:51:01Z"),
+				CorrelationID: "req-id-value",
 			},
 			{
 				ID:            "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
@@ -204,11 +205,11 @@ func (s *otelSut) requestWithEmptyTraces() {
 	sendTraces(s.server.URL, message)
 }
 
-func sendTraces(URL string, message *coltracepb.ExportTraceServiceRequest) {
+func sendTraces(url string, message *coltracepb.ExportTraceServiceRequest) {
 	raw, marshalErr := proto.Marshal(message)
 	Expect(marshalErr).ToNot(HaveOccurred())
 	// https://github.com/open-telemetry/opentelemetry-collector/blob/432d92d8b366f6831323a928783f1ed867c42050/exporter/otlphttpexporter/otlp.go#L185
-	req, createErr := http.NewRequest(http.MethodPost, URL, bytes.NewReader(raw))
+	req, createErr := http.NewRequest(http.MethodPost, url, bytes.NewReader(raw))
 	Expect(createErr).ToNot(HaveOccurred())
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "remote-service-otel-exporter")
@@ -355,6 +356,10 @@ func (s *otelSut) requestWithMinimalTrace() {
 			{
 				Key:   StandardMappingNames.UrlFull,
 				Value: stringValue("https://integration.com/order/123?param1=value1"),
+			},
+			{
+				Key:   StandardMappingNames.CorrelationID,
+				Value: stringValue("req-id-value"),
 			},
 		}
 	})

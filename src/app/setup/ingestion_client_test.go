@@ -94,13 +94,13 @@ func (s *IngestionClient) sendTraffic(integrationID string, resourceCount int, t
 	})
 }
 
-func sendTraces(URL string, message *coltracepb.ExportTraceServiceRequest) (int, error) {
+func sendTraces(url string, message *coltracepb.ExportTraceServiceRequest) (int, error) {
 	raw, marshalErr := proto.Marshal(message)
 	if marshalErr != nil {
 		return 0, marshalErr
 	}
 	// https://github.com/open-telemetry/opentelemetry-collector/blob/432d92d8b366f6831323a928783f1ed867c42050/exporter/otlphttpexporter/otlp.go#L185
-	req, createErr := http.NewRequest(http.MethodPost, URL, bytes.NewReader(raw))
+	req, createErr := http.NewRequest(http.MethodPost, url, bytes.NewReader(raw))
 	if createErr != nil {
 		return 0, createErr
 	}

@@ -1,6 +1,7 @@
 package otel
 
 import (
+	"fmt"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"hotline/ingestions"
 	"hotline/integrations"
@@ -14,7 +15,7 @@ type EnvoyAttributeNames struct {
 	UrlFull                string // required
 	NetworkProtocolVersion string // Recommended
 	IntegrationID          string // Recommended
-	RequestID              string // required
+	CorrelationID          string // optional
 }
 
 var EnvoyMappingNames = EnvoyAttributeNames{
@@ -23,7 +24,7 @@ var EnvoyMappingNames = EnvoyAttributeNames{
 	UrlFull:                "http.url",
 	NetworkProtocolVersion: "http.protocol",
 	IntegrationID:          "user_agent",
-	RequestID:              "guid:x-request-id",
+	CorrelationID:          "guid:x-request-id",
 }
 
 type EnvoyMapping struct {
@@ -40,10 +41,8 @@ func (h *EnvoyMapping) ConvertMessageToHttp(reqProto *coltracepb.ExportTraceServ
 		for _, scope := range resource.ScopeSpans {
 			for _, span := range scope.Spans {
 				attrs := toMap(span.Attributes)
-				id, foundId := attrs.GetStringValue(h.attNames.RequestID)
-				if !foundId {
-					continue
-				}
+				id := fmt.Sprintf("%s:%s", span.TraceId, span.SpanId)
+				correlationID, _ := attrs.GetStringValue(h.attNames.CorrelationID)
 				method, foundMethod := attrs.GetStringValue(h.attNames.HttpRequestMethod)
 				if !foundMethod {
 					continue
@@ -78,6 +77,7 @@ func (h *EnvoyMapping) ConvertMessageToHttp(reqProto *coltracepb.ExportTraceServ
 					URL:             fullUrl,
 					StartTime:       time.Unix(0, int64(span.StartTimeUnixNano)).UTC(),
 					EndTime:         time.Unix(0, int64(span.EndTimeUnixNano)).UTC(),
+					CorrelationID:   correlationID,
 				})
 			}
 		}

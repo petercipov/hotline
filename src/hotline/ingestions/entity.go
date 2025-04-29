@@ -17,6 +17,7 @@ type HttpRequest struct {
 	StartTime       time.Time
 	EndTime         time.Time
 	ErrorType       string
+	CorrelationID   string
 }
 
 func ToSLORequest(requests []*HttpRequest, now time.Time) []*servicelevels.HttpReqsMessage {

@@ -21,7 +21,7 @@ var _ = Describe("Envoy Ingestion of Traces", func() {
 		requests := s.ingest()
 		Expect(requests).To(HaveLen(1))
 		Expect(requests[0]).To(Equal(&ingestions.HttpRequest{
-			ID:              "req-id-value",
+			ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 			IntegrationID:   "integration_id",
 			ProtocolVersion: "1.1",
 			Method:          "POST",
@@ -29,6 +29,7 @@ var _ = Describe("Envoy Ingestion of Traces", func() {
 			URL:             newUrl("https://integration.com/order/123?param1=value1"),
 			StartTime:       parseTime("2018-12-13T14:51:00Z"),
 			EndTime:         parseTime("2018-12-13T14:51:01Z"),
+			CorrelationID:   "req-id-value",
 		}))
 	})
 
@@ -144,7 +145,7 @@ func (s *envoySut) requestWitMultiResourceMultipleSpansWithModifier(resourceCoun
 						Value: stringValue("200"),
 					},
 					{
-						Key:   EnvoyMappingNames.RequestID,
+						Key:   EnvoyMappingNames.CorrelationID,
 						Value: stringValue("req-id-value"),
 					},
 					{
