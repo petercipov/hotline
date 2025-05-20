@@ -4,7 +4,10 @@ import (
 	"errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
+	"hotline/ingestions"
 	"hotline/ingestions/egress"
+	"hotline/uuid"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -55,6 +58,8 @@ var _ = Describe("Proxy", func() {
 })
 
 type proxySUT struct {
+	managedTime *clock.ManualClock
+
 	proxyServer      *httptest.Server
 	dedicatedServer  *httptest.Server
 	receivedRequests []*http.Request
@@ -63,11 +68,22 @@ type proxySUT struct {
 }
 
 func (s *proxySUT) ForRunningProxy() {
-	s.ForRunningProxyWithRoundTripper(&http.Transport{}, 10*time.Millisecond)
+	s.ForRunningProxyWithRoundTripper(&http.Transport{})
 }
 
-func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTripper, timeout time.Duration) {
-	s.proxyServer = httptest.NewServer(egress.New(roundtripper, timeout))
+func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTripper) {
+	s.managedTime = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"))
+
+	s.proxyServer = httptest.NewServer(egress.New(
+		roundtripper,
+		func(req []*ingestions.HttpRequest) {},
+		s.managedTime,
+		10*time.Millisecond,
+		uuid.NewDeterministicV7(
+			s.managedTime.Now,
+			&constantRandReader{},
+		),
+	))
 
 	proxyURL, parseErr := url.Parse(s.proxyServer.URL)
 	Expect(parseErr).NotTo(HaveOccurred())
@@ -78,7 +94,7 @@ func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTrippe
 }
 
 func (s *proxySUT) ForRunningProxyWithBrokenRoundTripper() {
-	s.ForRunningProxyWithRoundTripper(&failingTransport{}, 10*time.Millisecond)
+	s.ForRunningProxyWithRoundTripper(&failingTransport{})
 }
 
 func (s *proxySUT) ForDedicatedServer() {
@@ -94,7 +110,7 @@ func (s *proxySUT) ForDedicatedServer() {
 func (s *proxySUT) ForDedicatedServerWithBigLatency() {
 	s.dedicatedServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.receivedRequests = append(s.receivedRequests, r.Clone(r.Context()))
-		time.Sleep(1 * time.Second)
+		s.managedTime.Advance(1 * time.Second)
 		w.Header().Add("server", "dedicated")
 		w.Header().Add("content-type", "text/plain")
 		w.WriteHeader(http.StatusOK)
@@ -146,4 +162,14 @@ type failingReader struct{}
 
 func (r *failingReader) Read(_ []byte) (int, error) {
 	return 0, errors.New("some error")
+}
+
+type constantRandReader struct {
+}
+
+func (m *constantRandReader) Read(p []byte) (n int, err error) {
+	for i := 0; i < len(p); i++ {
+		p[i] = byte(1)
+	}
+	return len(p), nil
 }

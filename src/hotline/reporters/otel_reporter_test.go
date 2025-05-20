@@ -11,6 +11,7 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/protobuf/proto"
+	"hotline/clock"
 	"hotline/reporters"
 	"hotline/servicelevels"
 	"io"
@@ -309,7 +310,7 @@ func (r *otelReporterSUT) receivedOtelMessages() []*colmetricspb.ExportMetricsSe
 
 func (r *otelReporterSUT) sendEmptyMetrics() {
 	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now: parseTime("2025-02-22T12:04:05Z"),
+		Now: clock.ParseTime("2025-02-22T12:04:05Z"),
 	})
 	Expect(reportErr).NotTo(HaveOccurred())
 }
@@ -321,7 +322,7 @@ func (r *otelReporterSUT) Close() {
 
 func (r *otelReporterSUT) sendSloCheck() error {
 	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    parseTime("2025-02-22T12:04:05Z"),
+		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
 		Checks: simpleSLOCheck(),
 	})
 
@@ -376,7 +377,7 @@ func (r *otelReporterSUT) sendUnmarshalableMessage() error {
 	}
 
 	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    parseTime("2025-02-22T12:04:05Z"),
+		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
 		Checks: simpleSLOCheck(),
 	})
 	r.marshalFunc = proto.Marshal
@@ -387,7 +388,7 @@ func (r *otelReporterSUT) sendUnmarshalableMessage() error {
 func (r *otelReporterSUT) sendMesaageWithWrongMethod() error {
 	r.cfg.Method = "❌"
 	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    parseTime("2025-02-22T12:04:05Z"),
+		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
 		Checks: simpleSLOCheck(),
 	})
 	r.cfg.Method = http.MethodPost
@@ -400,17 +401,11 @@ func (r *otelReporterSUT) sendMessageWithNetworkFailure() interface{} {
 	previous := r.httpClient.Transport
 	r.httpClient.Transport = failing
 	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    parseTime("2025-02-22T12:04:05Z"),
+		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
 		Checks: simpleSLOCheck(),
 	})
 	r.httpClient.Transport = previous
 	return reportErr
-}
-
-func parseTime(nowString string) time.Time {
-	now, parseErr := time.Parse(time.RFC3339, nowString)
-	Expect(parseErr).NotTo(HaveOccurred())
-	return now
 }
 
 type failingTransport struct {

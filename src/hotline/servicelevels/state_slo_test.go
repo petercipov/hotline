@@ -3,6 +3,7 @@ package servicelevels_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
 	"hotline/servicelevels"
 	"time"
 )
@@ -444,7 +445,7 @@ func (s *stateslosut) forEmptySLO() {
 }
 
 func (s *stateslosut) getMetrics() []servicelevels.SLOCheck {
-	now := parseTime("2025-02-22T12:04:55Z")
+	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	return s.slo.Check(now)
 }
 
@@ -460,6 +461,6 @@ func (s *stateslosut) forSLOTRackingUnexpected(expectedStates []string, unexpect
 }
 
 func (s *stateslosut) AddState(state string) {
-	now := parseTime("2025-02-22T12:04:55Z")
+	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	s.slo.AddState(now, state)
 }

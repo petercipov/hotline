@@ -4,6 +4,7 @@ import (
 	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
 	"hotline/servicelevels"
 	"math/rand"
 	"time"
@@ -103,12 +104,12 @@ func (s *latencySLOSUT) forEmptySLO() {
 }
 
 func (s *latencySLOSUT) getMetrics() []servicelevels.SLOCheck {
-	now := parseTime("2025-02-22T12:04:55Z")
+	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	return s.slo.Check(now)
 }
 
 func (s *latencySLOSUT) WithValues(latencies ...servicelevels.LatencyMs) {
-	now := parseTime("2025-02-22T12:04:05Z")
+	now := clock.ParseTime("2025-02-22T12:04:05Z")
 	for _, latency := range latencies {
 		s.slo.AddLatency(now, latency)
 	}
@@ -123,7 +124,7 @@ func (s *latencySLOSUT) forSLO(percentiles []servicelevels.PercentileDefinition,
 }
 
 func (s *latencySLOSUT) WithRandomValues(count int, max float64) {
-	now := parseTime("2025-02-22T12:04:05Z")
+	now := clock.ParseTime("2025-02-22T12:04:05Z")
 	r := rand.New(rand.NewSource(10000))
 	for range count {
 		value := r.Float64() * max

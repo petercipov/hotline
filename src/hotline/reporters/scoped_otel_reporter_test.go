@@ -4,6 +4,7 @@ import (
 	"context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/reporters"
 	"hotline/servicelevels"
@@ -84,7 +85,7 @@ func (r *scopedReporterSUT) forConcurrentReporter() {
 
 func (r *scopedReporterSUT) sendCommand() {
 	r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    parseTime("2025-02-22T12:04:05Z"),
+		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
 		Checks: simpleSLOCheck(),
 	})
 }

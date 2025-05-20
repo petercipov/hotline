@@ -3,6 +3,7 @@ package servicelevels_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
 	"hotline/servicelevels"
 	"slices"
 	"time"
@@ -117,23 +118,17 @@ func (s *sutslidingwindow) forEmptySlidingWindow() {
 }
 
 func parseTimePtr(nowString string) *time.Time {
-	now := parseTime(nowString)
+	now := clock.ParseTime(nowString)
 	return &now
 }
 
-func parseTime(nowString string) time.Time {
-	now, parseErr := time.Parse(time.RFC3339, nowString)
-	Expect(parseErr).NotTo(HaveOccurred())
-	return now
-}
-
 func (s *sutslidingwindow) getActiveWindow(nowString string) *servicelevels.Window[float64] {
-	now := parseTime(nowString)
+	now := clock.ParseTime(nowString)
 	return s.slidingWindow.GetActiveWindow(now)
 }
 
 func (s *sutslidingwindow) addValue(latency float64, nowString string) {
-	now := parseTime(nowString)
+	now := clock.ParseTime(nowString)
 	s.slidingWindow.AddValue(now, latency)
 }
 
@@ -143,7 +138,7 @@ func (s *sutslidingwindow) windowContains(window *servicelevels.Window[float64],
 }
 
 func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolledWindows {
-	now := parseTime(nowStr)
+	now := clock.ParseTime(nowStr)
 	var windows []*servicelevels.Window[float64]
 	for i := 0; i < count; i++ {
 		tNow := now.Add(s.slidingWindow.GracePeriod * time.Duration(i))

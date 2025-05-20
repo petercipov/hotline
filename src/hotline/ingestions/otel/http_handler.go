@@ -13,11 +13,11 @@ type MessageConverter interface {
 }
 
 type TracesHandler struct {
-	ingestion        func([]*ingestions.HttpRequest)
+	ingestion        ingestions.IngestHttpRequests
 	messageConverter MessageConverter
 }
 
-func NewTracesHandler(ingestion func([]*ingestions.HttpRequest), messageConverter MessageConverter) *TracesHandler {
+func NewTracesHandler(ingestion ingestions.IngestHttpRequests, messageConverter MessageConverter) *TracesHandler {
 	return &TracesHandler{
 		ingestion:        ingestion,
 		messageConverter: messageConverter,

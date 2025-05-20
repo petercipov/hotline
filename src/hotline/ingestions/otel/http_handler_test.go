@@ -9,13 +9,13 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
+	"hotline/clock"
 	"hotline/ingestions"
 	"hotline/integrations"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
-	"time"
 )
 
 var _ = Describe("Otel Http Ingestion of Traces", func() {
@@ -56,8 +56,8 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 			Method:          "POST",
 			StatusCode:      "200",
 			URL:             newUrl("https://integration.com/order/123?param1=value1"),
-			StartTime:       parseTime("2018-12-13T14:51:00Z"),
-			EndTime:         parseTime("2018-12-13T14:51:01Z"),
+			StartTime:       clock.ParseTime("2018-12-13T14:51:00Z"),
+			EndTime:         clock.ParseTime("2018-12-13T14:51:01Z"),
 		}))
 	})
 
@@ -103,8 +103,8 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 			Method:          "POST",
 			ErrorType:       "timeout",
 			URL:             newUrl("https://integration.com/order/123?param1=value1"),
-			StartTime:       parseTime("2018-12-13T14:51:00Z"),
-			EndTime:         parseTime("2018-12-13T14:51:01Z"),
+			StartTime:       clock.ParseTime("2018-12-13T14:51:00Z"),
+			EndTime:         clock.ParseTime("2018-12-13T14:51:01Z"),
 		}))
 	})
 
@@ -120,8 +120,8 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 				Method:        "GET",
 				StatusCode:    "200",
 				URL:           newUrl("https://integration.com/order/123?param1=value1"),
-				StartTime:     parseTime("2018-12-13T14:51:00Z"),
-				EndTime:       parseTime("2018-12-13T14:51:01Z"),
+				StartTime:     clock.ParseTime("2018-12-13T14:51:00Z"),
+				EndTime:       clock.ParseTime("2018-12-13T14:51:01Z"),
 				CorrelationID: "req-id-value",
 			},
 			{
@@ -130,8 +130,8 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 				Method:        "POST",
 				ErrorType:     "timeout",
 				URL:           newUrl("https://integration.com/order/123?param1=value1"),
-				StartTime:     parseTime("2018-12-13T14:51:00Z"),
-				EndTime:       parseTime("2018-12-13T14:51:01Z"),
+				StartTime:     clock.ParseTime("2018-12-13T14:51:00Z"),
+				EndTime:       clock.ParseTime("2018-12-13T14:51:01Z"),
 			},
 		}))
 	})
@@ -426,12 +426,6 @@ func newUrl(s string) *url.URL {
 	parsedUrl, parseErr := url.Parse(s)
 	Expect(parseErr).ToNot(HaveOccurred())
 	return parsedUrl
-}
-
-func parseTime(nowString string) time.Time {
-	now, parseErr := time.Parse(time.RFC3339, nowString)
-	Expect(parseErr).NotTo(HaveOccurred())
-	return now
 }
 
 type fakeErrReader int

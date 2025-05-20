@@ -2,6 +2,7 @@ package main
 
 import (
 	"app/setup"
+	"hotline/clock"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -10,7 +11,7 @@ import (
 )
 
 func main() {
-	systemTime := setup.NewSystemTime()
+	systemClock := clock.NewSystemClock()
 	app, appErr := setup.NewApp(&setup.Config{
 		OtelHttpReporter: struct {
 			Secured bool
@@ -22,7 +23,7 @@ func main() {
 		SloPipeline: struct{ CheckPeriod time.Duration }{
 			CheckPeriod: 10 * time.Second,
 		},
-	}, systemTime, setup.NewGoHttpServer)
+	}, systemClock, setup.NewGoHttpServer)
 
 	if appErr != nil {
 		panic(appErr)

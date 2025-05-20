@@ -3,14 +3,14 @@ package ingestions
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
 	"hotline/servicelevels"
 	"net/url"
-	"time"
 )
 
 var _ = Describe("Entities", func() {
 	It("should transform empty array", func() {
-		slos := ToSLORequest(nil, parseTime("2018-12-13T14:51:00Z"))
+		slos := ToSLORequest(nil, clock.ParseTime("2018-12-13T14:51:00Z"))
 		Expect(slos).To(HaveLen(0))
 	})
 
@@ -23,14 +23,14 @@ var _ = Describe("Entities", func() {
 				Method:          "POST",
 				StatusCode:      "200",
 				URL:             newUrl("https://integration.com/order/123?param1=value1"),
-				StartTime:       parseTime("2018-12-13T14:51:00Z"),
-				EndTime:         parseTime("2018-12-13T14:51:01Z"),
+				StartTime:       clock.ParseTime("2018-12-13T14:51:00Z"),
+				EndTime:         clock.ParseTime("2018-12-13T14:51:01Z"),
 			},
-		}, parseTime("2018-12-13T14:51:00Z"))
+		}, clock.ParseTime("2018-12-13T14:51:00Z"))
 		Expect(slos).To(HaveLen(1))
 		Expect(slos[0]).To(Equal(&servicelevels.HttpReqsMessage{
 			ID:  "integration.com",
-			Now: parseTime("2018-12-13T14:51:00Z"),
+			Now: clock.ParseTime("2018-12-13T14:51:00Z"),
 			Reqs: []*servicelevels.HttpRequest{
 				{
 					Latency: servicelevels.LatencyMs(1000),
@@ -51,14 +51,14 @@ var _ = Describe("Entities", func() {
 				Method:          "POST",
 				ErrorType:       "timeout",
 				URL:             newUrl("https://integration.com/order/123?param1=value1"),
-				StartTime:       parseTime("2018-12-13T14:51:00Z"),
-				EndTime:         parseTime("2018-12-13T14:51:01Z"),
+				StartTime:       clock.ParseTime("2018-12-13T14:51:00Z"),
+				EndTime:         clock.ParseTime("2018-12-13T14:51:01Z"),
 			},
-		}, parseTime("2018-12-13T14:51:00Z"))
+		}, clock.ParseTime("2018-12-13T14:51:00Z"))
 		Expect(slos).To(HaveLen(1))
 		Expect(slos[0]).To(Equal(&servicelevels.HttpReqsMessage{
 			ID:  "integration.com",
-			Now: parseTime("2018-12-13T14:51:00Z"),
+			Now: clock.ParseTime("2018-12-13T14:51:00Z"),
 			Reqs: []*servicelevels.HttpRequest{
 				{
 					Latency: servicelevels.LatencyMs(1000),
@@ -70,12 +70,6 @@ var _ = Describe("Entities", func() {
 		}))
 	})
 })
-
-func parseTime(nowString string) time.Time {
-	now, parseErr := time.Parse(time.RFC3339, nowString)
-	Expect(parseErr).NotTo(HaveOccurred())
-	return now
-}
 
 func newUrl(s string) *url.URL {
 	parsedUrl, parseErr := url.Parse(s)

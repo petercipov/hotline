@@ -5,6 +5,7 @@ import (
 	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/integrations"
 	"hotline/servicelevels"
@@ -75,7 +76,7 @@ func (s *sloPipelineSUT) NoConfigPresent() {
 }
 
 func (s *sloPipelineSUT) Report() []*servicelevels.CheckReport {
-	now := parseTime("2025-02-22T12:04:55Z")
+	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	s.pipeline.Check(&servicelevels.CheckMessage{
 		Now: now,
 	})
@@ -91,7 +92,7 @@ func (s *sloPipelineSUT) Report() []*servicelevels.CheckReport {
 }
 
 func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID) {
-	now := parseTime("2025-02-22T12:04:05Z")
+	now := clock.ParseTime("2025-02-22T12:04:05Z")
 	s.pipeline.IngestHttpRequests(&servicelevels.HttpReqsMessage{
 		ID:  id,
 		Now: now,

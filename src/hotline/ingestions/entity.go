@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+type IngestHttpRequests func(req []*HttpRequest)
+
 type HttpRequest struct {
 	ID              string
 	IntegrationID   integrations.ID

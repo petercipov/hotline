@@ -12,6 +12,7 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/protobuf/proto"
+	"hotline/clock"
 	"io"
 	"log/slog"
 	"math"
@@ -29,9 +30,9 @@ import (
 )
 
 type appSut struct {
-	cfg         setup.Config
-	app         *setup.App
-	managedTime *setup.ManualTime
+	cfg          setup.Config
+	app          *setup.App
+	managedClock *clock.ManualClock
 
 	collectorServer setup.HttpServer
 
@@ -49,7 +50,7 @@ func (a *appSut) sloReporterIsPointingToCollector() {
 }
 
 func (a *appSut) sendTraffic(ctx context.Context, flavour string, integrationID string) (context.Context, error) {
-	now := a.managedTime.Now()
+	now := a.managedClock.Now()
 
 	var statusCode int
 	var sendErr error
@@ -76,8 +77,8 @@ func (a *appSut) sendTraffic(ctx context.Context, flavour string, integrationID 
 }
 
 func (a *appSut) advanceTime(ctx context.Context, seconds int) (context.Context, error) {
-	a.managedTime.Advance(time.Duration(seconds) * time.Second)
-	nowString := a.managedTime.Now().UTC().String()
+	a.managedClock.Advance(time.Duration(seconds) * time.Second)
+	nowString := a.managedClock.Now().UTC().String()
 
 	time.Sleep(1000 * time.Millisecond)
 	return godog.Attach(ctx, godog.Attachment{
@@ -87,7 +88,7 @@ func (a *appSut) advanceTime(ctx context.Context, seconds int) (context.Context,
 }
 
 func (a *appSut) runHotline() error {
-	app, appErr := setup.NewApp(&a.cfg, a.managedTime, NewTestHttpServer)
+	app, appErr := setup.NewApp(&a.cfg, a.managedClock, NewTestHttpServer)
 	if appErr != nil {
 		return appErr
 	}
@@ -249,7 +250,7 @@ func TestApp(t *testing.T) {
 			collector := &fakeCollector{}
 			sut := &appSut{
 				fakeCollector:   collector,
-				managedTime:     setup.NewManualTime(parseTime("2025-02-22T12:02:10Z")),
+				managedClock:    clock.NewManualClock(clock.ParseTime("2025-02-22T12:02:10Z")),
 				collectorServer: NewTestHttpServer("", collector),
 			}
 
@@ -419,11 +420,6 @@ func uncompressedGzip(reader io.Reader) ([]byte, error) {
 	}
 	_ = decompressor.Close()
 	return uncompressed.Bytes(), nil
-}
-
-func parseTime(nowString string) time.Time {
-	now, _ := time.Parse(time.RFC3339, nowString)
-	return now
 }
 
 func roundTo(value float64, decimals uint32) float64 {

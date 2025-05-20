@@ -3,6 +3,7 @@ package servicelevels_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"hotline/clock"
 	"hotline/servicelevels"
 	"net/url"
 	"time"
@@ -233,12 +234,12 @@ type suthttpapislo struct {
 }
 
 func (s *suthttpapislo) Check() []servicelevels.SLOCheck {
-	now := parseTime("2025-02-22T12:04:55Z")
+	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	return s.slo.Check(now)
 }
 
 func (s *suthttpapislo) AddRequest(request *servicelevels.HttpRequest) {
-	now := parseTime("2025-02-22T12:04:05Z")
+	now := clock.ParseTime("2025-02-22T12:04:05Z")
 	s.slo.AddRequest(now, request)
 }
 

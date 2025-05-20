@@ -2,6 +2,7 @@ package setup
 
 import (
 	"fmt"
+	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/ingestions"
 	"hotline/ingestions/otel"
@@ -31,14 +32,14 @@ type App struct {
 	sloPipeline   *servicelevels.SLOPipeline
 	otelIngestion *otel.TracesHandler
 	otelReporter  *reporters.ScopedOtelReporter
-	managedTime   ManagedTime
+	managedTime   clock.ManagedTime
 
 	stopTick func()
 
 	ingestionServer HttpServer
 }
 
-func NewApp(cfg *Config, managedTime ManagedTime, createServer CreateServer) (*App, error) {
+func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer) (*App, error) {
 	sloPipelineScopes := concurrency.NewScopes(
 		createIds("slo-queue-", 8),
 		servicelevels.NewEmptyIntegrationsScope)
