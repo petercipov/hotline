@@ -35,6 +35,7 @@ var _ = Describe("Proxy", func() {
 		bodyBytes, readErr := io.ReadAll(resp.Body)
 		Expect(readErr).To(BeNil())
 		Expect(string(bodyBytes)).To(Equal("OK"))
+		Expect(len(sut.IngestedRequests())).To(Equal(1))
 	})
 
 	It("return gateway timeout for request with long latency", func() {
@@ -55,6 +56,14 @@ var _ = Describe("Proxy", func() {
 		resp := sut.WhenRequestIsSend()
 		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 	})
+
+	It("return gateway error for broken transport", func() {
+		sut.ForRunningProxyWithFailingRand()
+		sut.ForDedicatedServer()
+		resp := sut.WhenRequestIsSend()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(len(sut.IngestedRequests())).To(Equal(0))
+	})
 })
 
 type proxySUT struct {
@@ -64,24 +73,28 @@ type proxySUT struct {
 	dedicatedServer  *httptest.Server
 	receivedRequests []*http.Request
 
+	ingestedRequests []*ingestions.HttpRequest
+
 	proxyClient *http.Transport
 }
 
 func (s *proxySUT) ForRunningProxy() {
-	s.ForRunningProxyWithRoundTripper(&http.Transport{})
+	s.ForRunningProxyWithRoundTripper(&http.Transport{}, &constantRandReader{})
 }
 
-func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTripper) {
+func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTripper, reader io.Reader) {
 	s.managedTime = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"))
 
 	s.proxyServer = httptest.NewServer(egress.New(
 		roundtripper,
-		func(req []*ingestions.HttpRequest) {},
+		func(req []*ingestions.HttpRequest) {
+			s.ingestedRequests = append(s.ingestedRequests, req...)
+		},
 		s.managedTime,
 		10*time.Millisecond,
 		uuid.NewDeterministicV7(
 			s.managedTime.Now,
-			&constantRandReader{},
+			reader,
 		),
 	))
 
@@ -94,7 +107,11 @@ func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTrippe
 }
 
 func (s *proxySUT) ForRunningProxyWithBrokenRoundTripper() {
-	s.ForRunningProxyWithRoundTripper(&failingTransport{})
+	s.ForRunningProxyWithRoundTripper(&failingTransport{}, &constantRandReader{})
+}
+
+func (s *proxySUT) ForRunningProxyWithFailingRand() {
+	s.ForRunningProxyWithRoundTripper(&http.Transport{}, &failingReader{})
 }
 
 func (s *proxySUT) ForDedicatedServer() {
@@ -105,6 +122,10 @@ func (s *proxySUT) ForDedicatedServer() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	}))
+}
+
+func (s *proxySUT) IngestedRequests() []*ingestions.HttpRequest {
+	return s.ingestedRequests
 }
 
 func (s *proxySUT) ForDedicatedServerWithBigLatency() {
@@ -142,6 +163,7 @@ func (s *proxySUT) Close() {
 		req.Body.Close()
 	}
 	s.receivedRequests = nil
+	s.ingestedRequests = nil
 }
 
 func (s *proxySUT) RequestsAreProxiedToDedicatedServer() []*http.Request {
