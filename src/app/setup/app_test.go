@@ -250,7 +250,7 @@ func TestApp(t *testing.T) {
 			collector := &fakeCollector{}
 			sut := &appSut{
 				fakeCollector:   collector,
-				managedClock:    clock.NewManualClock(clock.ParseTime("2025-02-22T12:02:10Z")),
+				managedClock:    clock.NewManualClock(clock.ParseTime("2025-02-22T12:02:10Z"), 0),
 				collectorServer: NewTestHttpServer("", collector),
 			}
 

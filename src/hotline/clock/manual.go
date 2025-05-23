@@ -6,16 +6,18 @@ import (
 )
 
 type ManualClock struct {
-	now     time.Time
-	tickers map[*timeKey]*manualTicker
-	s       *sync.Mutex
+	now          time.Time
+	tickers      map[*timeKey]*manualTicker
+	s            *sync.Mutex
+	advanceOnNow time.Duration
 }
 
-func NewManualClock(now time.Time) *ManualClock {
+func NewManualClock(now time.Time, advanceOnNow time.Duration) *ManualClock {
 	return &ManualClock{
-		now:     now,
-		tickers: make(map[*timeKey]*manualTicker),
-		s:       &sync.Mutex{},
+		now:          now,
+		tickers:      make(map[*timeKey]*manualTicker),
+		s:            &sync.Mutex{},
+		advanceOnNow: advanceOnNow,
 	}
 }
 
@@ -39,6 +41,10 @@ func (t *ManualClock) Now() time.Time {
 	t.s.Lock()
 	currentTime := t.now
 	t.s.Unlock()
+
+	if t.advanceOnNow > 0 {
+		t.Advance(t.advanceOnNow)
+	}
 
 	return currentTime
 }

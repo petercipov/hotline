@@ -12,21 +12,21 @@ var _ = Describe("Manual Clock", func() {
 	sut := manualClockSUT{}
 
 	It("should execute after function after given duration", func() {
-		sut.ForSystemClock()
+		sut.ForManualClock()
 		now := sut.Now()
 		afterTime := sut.After()
 		Expect(afterTime.After(now)).To(BeTrue())
 	})
 
 	It("should sleep for given time", func() {
-		sut.ForSystemClock()
+		sut.ForManualClock()
 		now := sut.Now()
 		afterSleep := sut.Sleep()
 		Expect(afterSleep.After(now)).To(BeTrue())
 	})
 
 	It("should tick periodically", func() {
-		sut.ForSystemClock()
+		sut.ForManualClock()
 		now := sut.Now()
 		ticks := sut.TickPeriodically(10)
 		Expect(len(ticks)).To(Equal(10))
@@ -36,14 +36,36 @@ var _ = Describe("Manual Clock", func() {
 			now = tick
 		}
 	})
+
+	It("should not advance automatically if not set", func() {
+		sut.ForManualClock()
+
+		now := sut.Now()
+		next := sut.Now()
+
+		Expect(now).To(Equal(next))
+	})
+
+	It("should advance automatically if set", func() {
+		sut.WithAutoAdvance()
+
+		now := sut.Now()
+		next := sut.Now()
+
+		Expect(next.After(now)).To(BeTrue())
+	})
 })
 
 type manualClockSUT struct {
 	clock *clock.ManualClock
 }
 
-func (s *manualClockSUT) ForSystemClock() {
-	s.clock = clock.NewManualClock(time.Time{})
+func (s *manualClockSUT) ForManualClock() {
+	s.clock = clock.NewManualClock(time.Time{}, 0)
+}
+
+func (s *manualClockSUT) WithAutoAdvance() {
+	s.clock = clock.NewManualClock(time.Time{}, 1)
 }
 
 func (s *manualClockSUT) Sleep() time.Time {

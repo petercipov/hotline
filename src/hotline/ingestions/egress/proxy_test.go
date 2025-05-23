@@ -35,7 +35,25 @@ var _ = Describe("Proxy", func() {
 		bodyBytes, readErr := io.ReadAll(resp.Body)
 		Expect(readErr).To(BeNil())
 		Expect(string(bodyBytes)).To(Equal("OK"))
-		Expect(len(sut.IngestedRequests())).To(Equal(1))
+		ingested := sut.IngestedRequests()
+		Expect(len(ingested)).To(Equal(1))
+		ingestedRequest := ingested[0]
+
+		Expect(ingestedRequest).To(Equal(&ingestions.HttpRequest{
+			ID:              ingestedRequest.ID,
+			IntegrationID:   "integration 123",
+			ProtocolVersion: "HTTP/1.1",
+			Method:          "GET",
+			StatusCode:      "200",
+			URL:             ingestedRequest.URL,
+			StartTime:       ingestedRequest.StartTime,
+			EndTime:         ingestedRequest.EndTime,
+			ErrorType:       "",
+			CorrelationID:   "request-id-123",
+		}))
+		Expect(len(ingestedRequest.ID)).To(Equal(36))
+		Expect(ingestedRequest.URL.Path).To(Equal("/abcd"))
+		Expect(ingestedRequest.EndTime.After(ingestedRequest.StartTime)).To(BeTrue())
 	})
 
 	It("return gateway timeout for request with long latency", func() {
@@ -43,25 +61,40 @@ var _ = Describe("Proxy", func() {
 		sut.ForDedicatedServerWithBigLatency()
 		resp := sut.WhenRequestIsSend()
 		Expect(resp.StatusCode).To(Equal(http.StatusGatewayTimeout))
+
+		ingested := sut.IngestedRequests()
+		Expect(len(ingested)).To(Equal(1))
+		ingestedRequest := ingested[0]
+		Expect(ingestedRequest.ErrorType).To(Equal("timeout"))
 	})
 
 	It("return gateway error for request without backend", func() {
 		sut.ForRunningProxy()
 		resp := sut.WhenRequestIsSend()
 		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+
+		ingested := sut.IngestedRequests()
+		Expect(len(ingested)).To(Equal(1))
+		ingestedRequest := ingested[0]
+		Expect(ingestedRequest.ErrorType).To(Equal("unknown"))
 	})
 
 	It("return gateway error for broken transport", func() {
 		sut.ForRunningProxyWithBrokenRoundTripper()
 		resp := sut.WhenRequestIsSend()
 		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
+
+		ingested := sut.IngestedRequests()
+		Expect(len(ingested)).To(Equal(1))
+		ingestedRequest := ingested[0]
+		Expect(ingestedRequest.ErrorType).To(Equal("proxy_copy_err"))
 	})
 
 	It("return gateway error for broken transport", func() {
 		sut.ForRunningProxyWithFailingRand()
 		sut.ForDedicatedServer()
 		resp := sut.WhenRequestIsSend()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 		Expect(len(sut.IngestedRequests())).To(Equal(0))
 	})
 })
@@ -83,12 +116,12 @@ func (s *proxySUT) ForRunningProxy() {
 }
 
 func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTripper, reader io.Reader) {
-	s.managedTime = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"))
+	s.managedTime = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"), 1*time.Second)
 
 	s.proxyServer = httptest.NewServer(egress.New(
 		roundtripper,
-		func(req []*ingestions.HttpRequest) {
-			s.ingestedRequests = append(s.ingestedRequests, req...)
+		func(req *ingestions.HttpRequest) {
+			s.ingestedRequests = append(s.ingestedRequests, req)
 		},
 		s.managedTime,
 		10*time.Millisecond,
@@ -146,6 +179,8 @@ func (s *proxySUT) WhenRequestIsSend() *http.Response {
 	}
 
 	req, _ := http.NewRequest(http.MethodGet, serverURL, nil)
+	req.Header.Add("x-request-id", "request-id-123")
+	req.Header.Add("User-Agent", "integration 123")
 	resp, respErr := s.proxyClient.RoundTrip(req)
 	Expect(respErr).To(BeNil())
 	return resp

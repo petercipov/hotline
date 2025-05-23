@@ -11,18 +11,19 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptrace"
+	"strconv"
 	"time"
 )
 
 type Proxy struct {
 	transport http.RoundTripper
 	timeout   time.Duration
-	ingestion ingestions.IngestHttpRequests
+	ingestion func(req *ingestions.HttpRequest)
 	time      clock.ManagedTime
 	v7        uuid.V7StringGenerator
 }
 
-func New(transport http.RoundTripper, ingestion ingestions.IngestHttpRequests, time clock.ManagedTime, timeout time.Duration, v7 uuid.V7StringGenerator) *Proxy {
+func New(transport http.RoundTripper, ingestion func(req *ingestions.HttpRequest), time clock.ManagedTime, timeout time.Duration, v7 uuid.V7StringGenerator) *Proxy {
 	return &Proxy{
 		ingestion: ingestion,
 		transport: transport,
@@ -34,6 +35,23 @@ func New(transport http.RoundTripper, ingestion ingestions.IngestHttpRequests, t
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	receivedTime := p.time.Now()
+	v7String, v7Err := p.v7(receivedTime)
+	if v7Err != nil {
+		log.Printf("Error generating v7 string: %s", v7Err.Error())
+		rw.WriteHeader(http.StatusBadGateway)
+		return
+	}
+
+	ingestedRequest := &ingestions.HttpRequest{
+		ID:              v7String,
+		IntegrationID:   integrations.ID(req.Header.Get("User-Agent")),
+		ProtocolVersion: req.Proto,
+		Method:          req.Method,
+		URL:             req.URL,
+		StartTime:       receivedTime,
+		CorrelationID:   req.Header.Get("x-request-id"),
+	}
+
 	reqCtx, cancel := context.WithCancel(req.Context())
 	defer cancel()
 	p.time.AfterFunc(p.timeout, func(_ time.Time) {
@@ -45,11 +63,15 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if errors.Is(respErr, context.Canceled) {
 			log.Printf("Error proxying request: timeout")
 			rw.WriteHeader(http.StatusGatewayTimeout)
+			ingestedRequest.ErrorType = "timeout"
+			p.ingestion(ingestedRequest)
 			return
 		}
 
 		log.Printf("Error proxying request: %s", respErr.Error())
 		rw.WriteHeader(http.StatusBadGateway)
+		ingestedRequest.ErrorType = "unknown"
+		p.ingestion(ingestedRequest)
 		return
 	}
 	defer func() {
@@ -62,27 +84,12 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	_, copyErr := io.Copy(rw, resp.Body)
 	if copyErr != nil {
 		log.Printf("Error copying response, http status already sent,: %s", copyErr.Error())
+		ingestedRequest.ErrorType = "proxy_copy_err"
+		p.ingestion(ingestedRequest)
 		return
 	}
 
-	endTime := p.time.Now()
-	v7String, v7Err := p.v7(receivedTime)
-	if v7Err != nil {
-		log.Printf("Error ingesting request: %s", v7Err.Error())
-	} else {
-		p.ingestion([]*ingestions.HttpRequest{
-			{
-				ID:              v7String,
-				IntegrationID:   integrations.ID(req.Header.Get("User-Agent")),
-				ProtocolVersion: req.Proto,
-				Method:          req.Method,
-				StatusCode:      resp.Status,
-				URL:             req.URL,
-				StartTime:       receivedTime,
-				EndTime:         endTime,
-				ErrorType:       "",
-				CorrelationID:   req.Header.Get("x-request-id"),
-			},
-		})
-	}
+	ingestedRequest.StatusCode = strconv.Itoa(resp.StatusCode)
+	ingestedRequest.EndTime = p.time.Now()
+	p.ingestion(ingestedRequest)
 }
