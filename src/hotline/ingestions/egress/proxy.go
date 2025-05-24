@@ -15,21 +15,39 @@ import (
 	"time"
 )
 
+type RequestSemantics struct {
+	IntegrationIDName string
+	RequestIDName     string
+}
+
+var DefaultRequestSemantics = RequestSemantics{
+	IntegrationIDName: "User-Agent", // required
+	RequestIDName:     "x-request-id",
+}
+
 type Proxy struct {
 	transport http.RoundTripper
 	timeout   time.Duration
 	ingestion func(req *ingestions.HttpRequest)
 	time      clock.ManagedTime
 	v7        uuid.V7StringGenerator
+	semantics *RequestSemantics
 }
 
-func New(transport http.RoundTripper, ingestion func(req *ingestions.HttpRequest), time clock.ManagedTime, timeout time.Duration, v7 uuid.V7StringGenerator) *Proxy {
+func New(
+	transport http.RoundTripper,
+	ingestion func(req *ingestions.HttpRequest),
+	time clock.ManagedTime,
+	timeout time.Duration,
+	v7 uuid.V7StringGenerator,
+	semantics *RequestSemantics) *Proxy {
 	return &Proxy{
 		ingestion: ingestion,
 		transport: transport,
 		timeout:   timeout,
 		time:      time,
 		v7:        v7,
+		semantics: semantics,
 	}
 }
 
@@ -38,18 +56,25 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	v7String, v7Err := p.v7(receivedTime)
 	if v7Err != nil {
 		log.Printf("Error generating v7 string: %s", v7Err.Error())
-		rw.WriteHeader(http.StatusBadGateway)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	integrationID, parseErr := parseIntegrationID(req.Header.Get(p.semantics.IntegrationIDName))
+	if parseErr != nil {
+		log.Printf("Error parsing integration id: %s", parseErr.Error())
+		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	ingestedRequest := &ingestions.HttpRequest{
 		ID:              v7String,
-		IntegrationID:   integrations.ID(req.Header.Get("User-Agent")),
+		IntegrationID:   integrationID,
 		ProtocolVersion: req.Proto,
 		Method:          req.Method,
 		URL:             req.URL,
 		StartTime:       receivedTime,
-		CorrelationID:   req.Header.Get("x-request-id"),
+		CorrelationID:   req.Header.Get(p.semantics.RequestIDName),
 	}
 
 	reqCtx, cancel := context.WithCancel(req.Context())
@@ -92,4 +117,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	ingestedRequest.StatusCode = strconv.Itoa(resp.StatusCode)
 	ingestedRequest.EndTime = p.time.Now()
 	p.ingestion(ingestedRequest)
+}
+
+func parseIntegrationID(headerValue string) (integrations.ID, error) {
+	if len(headerValue) == 0 {
+		return "", errors.New("integration id not found")
+	}
+	return integrations.ID(headerValue), nil
 }

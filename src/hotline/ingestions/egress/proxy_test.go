@@ -90,12 +90,18 @@ var _ = Describe("Proxy", func() {
 		Expect(ingestedRequest.ErrorType).To(Equal("proxy_copy_err"))
 	})
 
-	It("return gateway error for broken transport", func() {
+	It("return gateway error for internal rand issue", func() {
 		sut.ForRunningProxyWithFailingRand()
 		sut.ForDedicatedServer()
 		resp := sut.WhenRequestIsSend()
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 		Expect(len(sut.IngestedRequests())).To(Equal(0))
+	})
+
+	It("return bad gateway for missing integration id", func() {
+		sut.ForRunningProxy()
+		resp := sut.WhenRequestWithoutIntegrationIDIsSend()
+		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 	})
 })
 
@@ -109,6 +115,10 @@ type proxySUT struct {
 	ingestedRequests []*ingestions.HttpRequest
 
 	proxyClient *http.Transport
+
+	semantics egress.RequestSemantics
+
+	integrationID string
 }
 
 func (s *proxySUT) ForRunningProxy() {
@@ -118,6 +128,8 @@ func (s *proxySUT) ForRunningProxy() {
 func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTripper, reader io.Reader) {
 	s.managedTime = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"), 1*time.Second)
 
+	s.semantics = egress.DefaultRequestSemantics
+	s.integrationID = "integration 123"
 	s.proxyServer = httptest.NewServer(egress.New(
 		roundtripper,
 		func(req *ingestions.HttpRequest) {
@@ -129,6 +141,7 @@ func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTrippe
 			s.managedTime.Now,
 			reader,
 		),
+		&s.semantics,
 	))
 
 	proxyURL, parseErr := url.Parse(s.proxyServer.URL)
@@ -179,8 +192,8 @@ func (s *proxySUT) WhenRequestIsSend() *http.Response {
 	}
 
 	req, _ := http.NewRequest(http.MethodGet, serverURL, nil)
-	req.Header.Add("x-request-id", "request-id-123")
-	req.Header.Add("User-Agent", "integration 123")
+	req.Header.Add(s.semantics.RequestIDName, "request-id-123")
+	req.Header.Add(s.semantics.IntegrationIDName, s.integrationID)
 	resp, respErr := s.proxyClient.RoundTrip(req)
 	Expect(respErr).To(BeNil())
 	return resp
@@ -203,6 +216,11 @@ func (s *proxySUT) Close() {
 
 func (s *proxySUT) RequestsAreProxiedToDedicatedServer() []*http.Request {
 	return s.receivedRequests
+}
+
+func (s *proxySUT) WhenRequestWithoutIntegrationIDIsSend() *http.Response {
+	s.integrationID = ""
+	return s.WhenRequestIsSend()
 }
 
 type failingTransport struct {
