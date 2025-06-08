@@ -28,12 +28,24 @@ var _ = Describe("Manual Clock", func() {
 	It("should tick periodically", func() {
 		sut.ForManualClock()
 		now := sut.Now()
-		ticks := sut.TickPeriodically(10)
+		ticks := sut.TickPeriodicallyAndCancel(10)
 		Expect(len(ticks)).To(Equal(10))
 
 		for _, tick := range ticks {
 			Expect(tick.After(now)).To(BeTrue())
 			now = tick
+		}
+	})
+
+	It("should reset periodical tickers", func() {
+		sut.ForManualClock()
+		starTime := sut.Now()
+
+		ticks := sut.TickPeriodicallyAndResetOnce(10, starTime)
+		Expect(len(ticks)).To(Equal(20))
+
+		for i := 0; i < 10; i++ {
+			Expect(ticks[i]).To(Equal(ticks[i+10]))
 		}
 	})
 
@@ -61,11 +73,11 @@ type manualClockSUT struct {
 }
 
 func (s *manualClockSUT) ForManualClock() {
-	s.clock = clock.NewManualClock(time.Time{}, 0)
+	s.clock = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"), 0)
 }
 
 func (s *manualClockSUT) WithAutoAdvance() {
-	s.clock = clock.NewManualClock(time.Time{}, 1)
+	s.clock = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"), 1)
 }
 
 func (s *manualClockSUT) Sleep() time.Time {
@@ -101,7 +113,7 @@ func (s *manualClockSUT) After() time.Time {
 	return afterFunc
 }
 
-func (s *manualClockSUT) TickPeriodically(n int) []time.Time {
+func (s *manualClockSUT) TickPeriodicallyAndCancel(n int) []time.Time {
 	var ticks []time.Time
 
 	var w sync.WaitGroup
@@ -115,6 +127,33 @@ func (s *manualClockSUT) TickPeriodically(n int) []time.Time {
 		ticks = append(ticks, t)
 		w.Done()
 	})
+	w.Wait()
+	cancel()
+	return ticks
+}
+
+func (s *manualClockSUT) TickPeriodicallyAndResetOnce(n int, resetTime time.Time) []time.Time {
+	var ticks []time.Time
+
+	var w sync.WaitGroup
+	w.Add(n)
+
+	go func() {
+		s.clock.Advance(time.Duration(n) * time.Millisecond)
+	}()
+
+	cancel := s.clock.TickPeriodically(1*time.Millisecond, func(t time.Time) {
+		ticks = append(ticks, t)
+		w.Done()
+	})
+	w.Wait()
+	w.Add(n)
+	s.clock.Reset(resetTime)
+
+	go func() {
+		s.clock.Advance(time.Duration(n) * time.Millisecond)
+	}()
+
 	w.Wait()
 	cancel()
 	return ticks

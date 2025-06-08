@@ -7,7 +7,8 @@ import (
 
 type ManualClock struct {
 	now          time.Time
-	tickers      map[*timeKey]*manualTicker
+	tickers      map[int64]*manualTicker
+	tickerIDs    int64
 	s            *sync.Mutex
 	advanceOnNow time.Duration
 }
@@ -15,13 +16,12 @@ type ManualClock struct {
 func NewManualClock(now time.Time, advanceOnNow time.Duration) *ManualClock {
 	return &ManualClock{
 		now:          now,
-		tickers:      make(map[*timeKey]*manualTicker),
+		tickers:      make(map[int64]*manualTicker),
 		s:            &sync.Mutex{},
 		advanceOnNow: advanceOnNow,
 	}
 }
 
-type timeKey struct{}
 type manualTicker struct {
 	handler       func(now time.Time)
 	monotonicTime time.Time
@@ -37,6 +37,10 @@ func (m *manualTicker) tick(now time.Time) {
 	}
 }
 
+func (m *manualTicker) reset(now time.Time) {
+	m.monotonicTime = now
+}
+
 func (t *ManualClock) Now() time.Time {
 	t.s.Lock()
 	currentTime := t.now
@@ -50,12 +54,7 @@ func (t *ManualClock) Now() time.Time {
 }
 
 func (t *ManualClock) Sleep(d time.Duration) {
-	var w sync.WaitGroup
-	w.Add(1)
-	t.AfterFunc(d, func(_ time.Time) {
-		w.Done()
-	})
-	w.Wait()
+	t.Advance(d)
 }
 
 func (t *ManualClock) Advance(duration time.Duration) {
@@ -71,9 +70,10 @@ func (t *ManualClock) Advance(duration time.Duration) {
 }
 
 func (t *ManualClock) TickPeriodically(duration time.Duration, handler func(t time.Time)) func() {
-	key := &timeKey{}
 	now := t.Now()
 	t.s.Lock()
+	t.tickerIDs++
+	key := t.tickerIDs
 	t.tickers[key] = &manualTicker{
 		handler:       handler,
 		monotonicTime: now,
@@ -89,9 +89,10 @@ func (t *ManualClock) TickPeriodically(duration time.Duration, handler func(t ti
 }
 
 func (t *ManualClock) AfterFunc(duration time.Duration, f func(now time.Time)) {
-	key := &timeKey{}
 	now := t.Now()
 	t.s.Lock()
+	t.tickerIDs++
+	key := t.tickerIDs
 	t.tickers[key] = &manualTicker{
 		handler: func(now time.Time) {
 			t.s.Lock()
@@ -103,4 +104,14 @@ func (t *ManualClock) AfterFunc(duration time.Duration, f func(now time.Time)) {
 		duration:      duration,
 	}
 	t.s.Unlock()
+}
+
+func (t *ManualClock) Reset(now time.Time) {
+	t.s.Lock()
+	defer t.s.Unlock()
+
+	t.now = now
+	for _, ticker := range t.tickers {
+		ticker.reset(t.now)
+	}
 }

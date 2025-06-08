@@ -13,11 +13,9 @@ var _ = Describe("Http Api Slo", func() {
 
 	s := suthttpapislo{}
 
-	It("if no default provided, return no slo", func() {
+	It("if no default provided, return slo object", func() {
 		s.forRouteSetup()
-		Expect(s.slo).Should(BeNil())
-		Expect(s.sloErr).Should(HaveOccurred())
-		Expect(s.sloErr.Error()).To(Equal("not found default route / in list of routes"))
+		Expect(s.slo).ShouldNot(BeNil())
 	})
 
 	It("check default path service levels when no definition is set", func() {
@@ -226,6 +224,33 @@ var _ = Describe("Http Api Slo", func() {
 			},
 		}))
 	})
+
+	It("creates pattern per http method", func() {
+		s.forRouteSetupWithDefault(defaultRouteDefinitionForMethod("POST", "iam.example.com", "/users"))
+		s.AddRequest(&servicelevels.HttpRequest{
+			Latency: 1000,
+			State:   "200",
+			Method:  "POST",
+			URL:     newUrl("https://iam.example.com/users"),
+		})
+
+		metrics := s.Check()
+		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Namespace: "http_route_latency",
+			Metric: servicelevels.Metric{
+				Name:        "p99",
+				Value:       0,
+				Unit:        "ms",
+				EventsCount: 1,
+			},
+			Tags: map[string]string{
+				"http_route": "POST iam.example.com/users",
+			},
+			Breakdown: nil,
+			Breach:    nil,
+		}))
+	})
 })
 
 type suthttpapislo struct {
@@ -254,10 +279,11 @@ func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRou
 	s.forRouteSetup(routes...)
 }
 
-func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteSLODefinition {
+func defaultRouteDefinitionForMethod(method string, host string, path string) servicelevels.HttpRouteSLODefinition {
 	return servicelevels.HttpRouteSLODefinition{
-		Path: path,
-		Host: host,
+		Method: method,
+		Path:   path,
+		Host:   host,
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{
@@ -274,6 +300,10 @@ func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteSLO
 			WindowDuration:  1 * time.Hour,
 		},
 	}
+}
+
+func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteSLODefinition {
+	return defaultRouteDefinitionForMethod("", host, path)
 }
 
 func newUrl(urlString string) *url.URL {

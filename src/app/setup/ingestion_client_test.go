@@ -13,11 +13,11 @@ import (
 	"time"
 )
 
-type IngestionClient struct {
+type OTELClient struct {
 	URL string
 }
 
-func (s *IngestionClient) SendSomeTraffic(now time.Time, integrationID string) (int, error) {
+func (s *OTELClient) SendSomeTraffic(now time.Time, integrationID string) (int, error) {
 	r := rand.New(rand.NewSource(0))
 
 	statusCodes := []string{
@@ -40,7 +40,7 @@ func (s *IngestionClient) SendSomeTraffic(now time.Time, integrationID string) (
 	})
 }
 
-func (s *IngestionClient) sendTraffic(integrationID string, resourceCount int, traceCount int, modifier func(span *tracepb.Span)) (int, error) {
+func (s *OTELClient) sendTraffic(integrationID string, resourceCount int, traceCount int, modifier func(span *tracepb.Span)) (int, error) {
 	var resourceSpans []*tracepb.ResourceSpans
 	for ri := 0; ri < resourceCount; ri++ {
 		var spans []*tracepb.Span

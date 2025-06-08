@@ -10,12 +10,12 @@ import (
 
 var _ = Describe("Entities", func() {
 	It("should transform empty array", func() {
-		slos := ToSLORequest(nil, clock.ParseTime("2018-12-13T14:51:00Z"))
+		slos := ToSLORequests(nil, clock.ParseTime("2018-12-13T14:51:00Z"))
 		Expect(slos).To(HaveLen(0))
 	})
 
 	It("should ingested request", func() {
-		slos := ToSLORequest([]*HttpRequest{
+		slos := ToSLORequests([]*HttpRequest{
 			{
 				ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 				IntegrationID:   "integration.com",
@@ -43,7 +43,7 @@ var _ = Describe("Entities", func() {
 	})
 
 	It("should ingested error request", func() {
-		slos := ToSLORequest([]*HttpRequest{
+		slos := ToSLORequests([]*HttpRequest{
 			{
 				ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 				IntegrationID:   "integration.com",

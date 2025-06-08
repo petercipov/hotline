@@ -2,8 +2,10 @@ package main
 
 import (
 	"app/setup"
+	"app/setup/config"
 	"hotline/clock"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,18 +14,26 @@ import (
 
 func main() {
 	systemClock := clock.NewSystemClock()
-	app, appErr := setup.NewApp(&setup.Config{
-		OtelHttpReporter: struct {
-			Secured bool
-			Host    string
-		}{Secured: false, Host: "localhost:4318"},
-		OtelHttpIngestion: struct{ Host string }{
-			Host: "localhost:8080",
+	fakeRepository := config.NewFakeSLOConfigRepository()
+	app, appErr := setup.NewApp(
+		&setup.Config{
+			OtelHttpReporter: struct {
+				Secured bool
+				Host    string
+			}{Secured: false, Host: "localhost:4318"},
+			OtelHttpIngestion: struct{ Host string }{
+				Host: "localhost:8080",
+			},
+			SloPipeline: struct{ CheckPeriod time.Duration }{
+				CheckPeriod: 10 * time.Second,
+			},
 		},
-		SloPipeline: struct{ CheckPeriod time.Duration }{
-			CheckPeriod: 10 * time.Second,
+		systemClock,
+		func(host string, handler http.Handler) setup.HttpServer {
+			return setup.NewGoHttpServer(host, handler)
 		},
-	}, systemClock, setup.NewGoHttpServer)
+		fakeRepository,
+	)
 
 	if appErr != nil {
 		panic(appErr)

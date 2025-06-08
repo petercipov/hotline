@@ -1,9 +1,9 @@
 Feature: Hotline should be able to
   1) ingest envoy http traces,
   2) compute slo
-  3 report slos to otel
+  3) report slos to otel
 
-  Scenario: envoy http traffic is ingested and slos are computed
+  Scenario: otel envoy http traffic is ingested and slos are computed
     OTEL ingestion is enabled
     And slo reporter is pointing to collector
     And hotline is running

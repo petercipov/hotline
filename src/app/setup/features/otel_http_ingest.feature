@@ -1,9 +1,9 @@
 Feature: Hotline should be able to
   1) ingest otel standard http traces,
   2) compute slo
-  3 report slos to otel
+  3) report slos to otel
 
-  Scenario: Integration traffic is ingested and slos are computed
+  Scenario: otel standard traffic is ingested and slos are computed
     OTEL ingestion is enabled
     And slo reporter is pointing to collector
     And hotline is running

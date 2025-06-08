@@ -22,7 +22,7 @@ type HttpRequest struct {
 	CorrelationID   string
 }
 
-func ToSLORequest(requests []*HttpRequest, now time.Time) []*servicelevels.HttpReqsMessage {
+func ToSLORequests(requests []*HttpRequest, now time.Time) []*servicelevels.HttpReqsMessage {
 	byIntegrationId := make(map[integrations.ID][]*HttpRequest)
 	for _, request := range requests {
 		byIntegrationId[request.IntegrationID] = append(byIntegrationId[request.IntegrationID], request)
@@ -51,4 +51,26 @@ func ToSLORequest(requests []*HttpRequest, now time.Time) []*servicelevels.HttpR
 		})
 	}
 	return result
+}
+
+func ToSLORequest(httpRequest *HttpRequest, now time.Time) *servicelevels.HttpReqsMessage {
+	latency := servicelevels.LatencyMs(
+		httpRequest.EndTime.Sub(httpRequest.StartTime).Milliseconds())
+	state := httpRequest.ErrorType
+	if len(httpRequest.StatusCode) > 0 {
+		state = httpRequest.StatusCode
+	}
+	return &servicelevels.HttpReqsMessage{
+		Now: now,
+		ID:  httpRequest.IntegrationID,
+		Reqs: []*servicelevels.HttpRequest{
+			{
+				Latency: latency,
+				State:   state,
+				Method:  httpRequest.Method,
+				URL:     httpRequest.URL,
+			},
+		},
+	}
+
 }

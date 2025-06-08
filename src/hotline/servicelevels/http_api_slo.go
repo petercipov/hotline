@@ -1,7 +1,6 @@
 package servicelevels
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -26,6 +25,7 @@ type HttpApiSLODefinition struct {
 }
 
 type HttpRouteSLODefinition struct {
+	Method  string
 	Path    string
 	Host    string
 	Latency HttpLatencySLODefinition
@@ -46,20 +46,13 @@ func NewHttpApiSLO(definition HttpApiSLODefinition) (*HttpApiSLO, error) {
 	mux := http.NewServeMux()
 	routeSLOs := make([]*HttpRouteSLO, len(definition.RouteSLOs)+1)
 	routeSLOs = routeSLOs[:0]
-	foundDefault := false
 	for _, routeSLO := range definition.RouteSLOs {
 		slo := NewHttpPathSLO(routeSLO)
-		if slo.routePattern == "/" {
-			foundDefault = true
-		}
 		registerErr := safeRegisterInMux(mux, slo.routePattern, slo)
 		if registerErr != nil {
 			return nil, registerErr
 		}
 		routeSLOs = append(routeSLOs, slo)
-	}
-	if !foundDefault {
-		return nil, errors.New("not found default route / in list of routes")
 	}
 	return &HttpApiSLO{
 		mux:       mux,
@@ -114,7 +107,13 @@ type HttpRouteSLO struct {
 }
 
 func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
-	pattern := fmt.Sprintf("%s%s", slo.Host, slo.Path)
+	pattern := ""
+	if len(slo.Method) > 0 {
+		pattern = fmt.Sprintf("%s %s%s", slo.Method, slo.Host, slo.Path)
+	} else {
+		pattern = fmt.Sprintf("%s%s", slo.Host, slo.Path)
+	}
+
 	tags := map[string]string{
 		"http_route": pattern,
 	}

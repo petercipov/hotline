@@ -1,13 +1,16 @@
 package setup
 
 import (
+	"crypto/rand"
 	"fmt"
 	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/ingestions"
+	"hotline/ingestions/egress"
 	"hotline/ingestions/otel"
 	"hotline/reporters"
 	"hotline/servicelevels"
+	"hotline/uuid"
 	"log/slog"
 	"net/http"
 	"time"
@@ -19,6 +22,9 @@ type Config struct {
 		Host    string
 	}
 	OtelHttpIngestion struct {
+		Host string
+	}
+	EgressHttpIngestion struct {
 		Host string
 	}
 	SloPipeline struct {
@@ -36,10 +42,11 @@ type App struct {
 
 	stopTick func()
 
-	ingestionServer HttpServer
+	otelIngestionServer   HttpServer
+	egressIngestionServer HttpServer
 }
 
-func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer) (*App, error) {
+func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository servicelevels.IntegrationSLORepository) (*App, error) {
 	sloPipelineScopes := concurrency.NewScopes(
 		createIds("slo-queue-", 8),
 		servicelevels.NewEmptyIntegrationsScope)
@@ -57,24 +64,44 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 		Method:    http.MethodPost,
 	}
 	reporter := reporters.NewScopedOtelReporter(otelReporterScopes, managedTime.Sleep, reporterCfg, 100)
-	fakeRepository := new(FakeSLOConfigRepository)
-	sloPipeline := servicelevels.NewSLOPipeline(sloPipelineScopes, fakeRepository, reporter)
+
+	sloPipeline := servicelevels.NewSLOPipeline(sloPipelineScopes, sloConfigRepository, reporter)
 
 	converter := otel.NewProtoConverter()
-	otelTraceHttpIngestion := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
-		sloRequests := ingestions.ToSLORequest(requests, managedTime.Now())
+	otelHandler := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
+		sloRequests := ingestions.ToSLORequests(requests, managedTime.Now())
 		sloPipeline.IngestHttpRequests(sloRequests...)
 	}, converter)
 
-	ingestionServer := createServer(cfg.OtelHttpIngestion.Host, otelTraceHttpIngestion)
+	otelIngestionServer := createServer(cfg.OtelHttpIngestion.Host, otelHandler)
+
+	egressTransport := &http.Transport{}
+	uuidGenerator := uuid.NewDeterministicV7(
+		managedTime.Now,
+		rand.Reader)
+
+	egressHandler := egress.New(
+		egressTransport,
+		func(req *ingestions.HttpRequest) {
+			sloRequest := ingestions.ToSLORequest(req, managedTime.Now())
+			sloPipeline.IngestHttpRequests(sloRequest)
+		},
+		managedTime,
+		60*time.Second,
+		uuidGenerator,
+		&egress.DefaultRequestSemantics,
+	)
+
+	egressIngestionServer := createServer(cfg.EgressHttpIngestion.Host, egressHandler)
 
 	return &App{
-		cfg:             cfg,
-		sloPipeline:     sloPipeline,
-		managedTime:     managedTime,
-		otelIngestion:   otelTraceHttpIngestion,
-		otelReporter:    reporter,
-		ingestionServer: ingestionServer,
+		cfg:                   cfg,
+		sloPipeline:           sloPipeline,
+		managedTime:           managedTime,
+		otelIngestion:         otelHandler,
+		otelReporter:          reporter,
+		otelIngestionServer:   otelIngestionServer,
+		egressIngestionServer: egressIngestionServer,
 	}, nil
 }
 
@@ -89,18 +116,24 @@ func (a *App) Start() {
 		})
 		slog.Info("Finished check of metrics ", slog.Time("now", currentTime))
 	})
-	a.ingestionServer.Start()
-	slog.Info("Started ingestion server", slog.String("url", a.ingestionServer.Host()))
+	a.otelIngestionServer.Start()
+	slog.Info("Started OTEL ingestion server", slog.String("otel-url", a.otelIngestionServer.Host()))
+
+	a.egressIngestionServer.Start()
+	slog.Info("Started Egress ingestion server", slog.String("egress-url", a.egressIngestionServer.Host()))
 }
 
-func (a *App) GetIngestionUrl() string {
-	return "http://" + a.ingestionServer.Host()
+func (a *App) GetOTELIngestionUrl() string {
+	return "http://" + a.otelIngestionServer.Host()
 }
 
 func (a *App) Stop() error {
-	ingestionStopErr := a.ingestionServer.Close()
-	if ingestionStopErr != nil {
-		return ingestionStopErr
+	if a == nil {
+		return nil
+	}
+	stopErr := a.otelIngestionServer.Close()
+	if stopErr != nil {
+		return stopErr
 	}
 	slog.Info("Closed ingestion server")
 	if a.stopTick != nil {
@@ -108,6 +141,10 @@ func (a *App) Stop() error {
 	}
 
 	return nil
+}
+
+func (a *App) GetEgressIngestionUrl() string {
+	return "http://" + a.egressIngestionServer.Host()
 }
 
 func createIds(prefix string, count int) []string {
