@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Proxy", func() {
+var _ = Describe("Proxy", Ordered, func() {
 	sut := proxySUT{}
 
 	AfterEach(func() {
