@@ -22,7 +22,7 @@ type HttpRequest struct {
 	CorrelationID   string
 }
 
-func ToSLORequests(requests []*HttpRequest, now time.Time) []*servicelevels.HttpReqsMessage {
+func ToSLORequestMessage(requests []*HttpRequest, now time.Time) []*servicelevels.HttpReqsMessage {
 	byIntegrationId := make(map[integrations.ID][]*HttpRequest)
 	for _, request := range requests {
 		byIntegrationId[request.IntegrationID] = append(byIntegrationId[request.IntegrationID], request)
@@ -31,18 +31,7 @@ func ToSLORequests(requests []*HttpRequest, now time.Time) []*servicelevels.Http
 	for integrationID, httpRequests := range byIntegrationId {
 		var reqs []*servicelevels.HttpRequest
 		for _, httpRequest := range httpRequests {
-			latency := servicelevels.LatencyMs(
-				httpRequest.EndTime.Sub(httpRequest.StartTime).Milliseconds())
-			state := httpRequest.ErrorType
-			if len(httpRequest.StatusCode) > 0 {
-				state = httpRequest.StatusCode
-			}
-			reqs = append(reqs, &servicelevels.HttpRequest{
-				Latency: latency,
-				State:   state,
-				Method:  httpRequest.Method,
-				URL:     httpRequest.URL,
-			})
+			reqs = append(reqs, ToSLORequest(httpRequest))
 		}
 		result = append(result, &servicelevels.HttpReqsMessage{
 			Now:  now,
@@ -53,24 +42,27 @@ func ToSLORequests(requests []*HttpRequest, now time.Time) []*servicelevels.Http
 	return result
 }
 
-func ToSLORequest(httpRequest *HttpRequest, now time.Time) *servicelevels.HttpReqsMessage {
+func ToSLOSingleRequestMessage(request *HttpRequest, now time.Time) *servicelevels.HttpReqsMessage {
+	return &servicelevels.HttpReqsMessage{
+		ID:  request.IntegrationID,
+		Now: now,
+		Reqs: []*servicelevels.HttpRequest{
+			ToSLORequest(request),
+		},
+	}
+}
+
+func ToSLORequest(httpRequest *HttpRequest) *servicelevels.HttpRequest {
 	latency := servicelevels.LatencyMs(
 		httpRequest.EndTime.Sub(httpRequest.StartTime).Milliseconds())
 	state := httpRequest.ErrorType
 	if len(httpRequest.StatusCode) > 0 {
 		state = httpRequest.StatusCode
 	}
-	return &servicelevels.HttpReqsMessage{
-		Now: now,
-		ID:  httpRequest.IntegrationID,
-		Reqs: []*servicelevels.HttpRequest{
-			{
-				Latency: latency,
-				State:   state,
-				Method:  httpRequest.Method,
-				URL:     httpRequest.URL,
-			},
-		},
+	return &servicelevels.HttpRequest{
+		Latency: latency,
+		State:   state,
+		Method:  httpRequest.Method,
+		URL:     httpRequest.URL,
 	}
-
 }

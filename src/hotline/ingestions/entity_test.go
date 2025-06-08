@@ -10,12 +10,38 @@ import (
 
 var _ = Describe("Entities", func() {
 	It("should transform empty array", func() {
-		slos := ToSLORequests(nil, clock.ParseTime("2018-12-13T14:51:00Z"))
+		slos := ToSLORequestMessage(nil, clock.ParseTime("2018-12-13T14:51:00Z"))
 		Expect(slos).To(HaveLen(0))
 	})
 
+	It("should ingested single request", func() {
+		message := ToSLOSingleRequestMessage(&HttpRequest{
+			ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
+			IntegrationID:   "integration.com",
+			ProtocolVersion: "1.1",
+			Method:          "POST",
+			StatusCode:      "200",
+			URL:             newUrl("https://integration.com/order/123?param1=value1"),
+			StartTime:       clock.ParseTime("2018-12-13T14:51:00Z"),
+			EndTime:         clock.ParseTime("2018-12-13T14:51:01Z"),
+		}, clock.ParseTime("2018-12-13T14:51:00Z"))
+
+		Expect(message).To(Equal(&servicelevels.HttpReqsMessage{
+			ID:  "integration.com",
+			Now: clock.ParseTime("2018-12-13T14:51:00Z"),
+			Reqs: []*servicelevels.HttpRequest{
+				{
+					Latency: servicelevels.LatencyMs(1000),
+					State:   "200",
+					Method:  "POST",
+					URL:     newUrl("https://integration.com/order/123?param1=value1"),
+				},
+			},
+		}))
+	})
+
 	It("should ingested request", func() {
-		slos := ToSLORequests([]*HttpRequest{
+		slos := ToSLORequestMessage([]*HttpRequest{
 			{
 				ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 				IntegrationID:   "integration.com",
@@ -43,7 +69,7 @@ var _ = Describe("Entities", func() {
 	})
 
 	It("should ingested error request", func() {
-		slos := ToSLORequests([]*HttpRequest{
+		slos := ToSLORequestMessage([]*HttpRequest{
 			{
 				ID:              "5B8EFFF798038103D269B633813FC60C0:EEE19B7EC3C1B1740",
 				IntegrationID:   "integration.com",

@@ -82,6 +82,7 @@ func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
 	handler, _ := s.mux.Handler(r)
 	pathSLO, sloExists := handler.(*HttpRouteSLO)
 	if sloExists {
+		pathSLO.ServeHTTP(nil, r)
 		pathSLO.AddRequest(now, req)
 	}
 
