@@ -2,15 +2,16 @@ package uuid
 
 import (
 	"github.com/gofrs/uuid/v5"
-	"hotline/clock"
 	"io"
 	"time"
 )
 
-func NewDeterministicV7(now clock.NowFunc, reader io.Reader) V7StringGenerator {
+func NewDeterministicV7(randReader io.Reader) V7StringGenerator {
 	gen := uuid.NewGenWithOptions(
-		uuid.WithEpochFunc(uuid.EpochFunc(now)),
-		uuid.WithRandomReader(reader),
+		uuid.WithEpochFunc(func() time.Time {
+			return time.Time{}
+		}),
+		uuid.WithRandomReader(randReader),
 	)
 
 	return func(time time.Time) (string, error) {

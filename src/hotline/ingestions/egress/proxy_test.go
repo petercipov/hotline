@@ -138,7 +138,6 @@ func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTrippe
 		s.managedTime,
 		10*time.Millisecond,
 		uuid.NewDeterministicV7(
-			s.managedTime.Now,
 			reader,
 		),
 		&s.semantics,

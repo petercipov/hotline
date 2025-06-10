@@ -76,9 +76,7 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 	otelIngestionServer := createServer(cfg.OtelHttpIngestion.Host, otelHandler)
 
 	egressTransport := &http.Transport{}
-	uuidGenerator := uuid.NewDeterministicV7(
-		managedTime.Now,
-		rand.Reader)
+	uuidGenerator := uuid.NewDeterministicV7(rand.Reader)
 
 	egressHandler := egress.New(
 		egressTransport,
