@@ -4,21 +4,28 @@ import (
 	"strings"
 )
 
-type RoutePattern struct {
+type Route struct {
 	Method      string
 	PathPattern string // /user/{user-id}/login/{session-id}/
-
-	preParsed   []pathPart
-	methodLower string
 }
 
-func NewRoutePattern(method string, pathPattern string) *RoutePattern {
-	return &RoutePattern{
-		Method:      method,
-		PathPattern: pathPattern,
+func (r *Route) Normalize() Route {
+	return Route{
+		Method:      strings.ToUpper(r.Method),
+		PathPattern: strings.ToLower(r.PathPattern),
+	}
+}
 
-		methodLower: strings.ToLower(method),
-		preParsed:   parsePath(pathPattern),
+type RoutePattern struct {
+	route Route
+
+	preParsed []pathPart
+}
+
+func NewRoutePattern(route Route) *RoutePattern {
+	return &RoutePattern{
+		route:     route.Normalize(),
+		preParsed: parsePath(route.PathPattern),
 	}
 }
 
@@ -58,7 +65,7 @@ func parseWildcard(part string) (bool, string) {
 }
 
 func (p *RoutePattern) Matches(method, path string) bool {
-	if p.methodLower != strings.ToLower(method) {
+	if p.route.Method != strings.ToUpper(method) {
 		return false
 	}
 

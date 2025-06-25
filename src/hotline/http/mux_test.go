@@ -9,7 +9,7 @@ import (
 var _ = Describe("HTTP RoutePattern Matching", func() {
 
 	Context("Just Root Path", func() {
-		pattern := http.NewRoutePattern("GET", "/")
+		pattern := http.NewRoutePattern(http.Route{Method: "GET", PathPattern: "/"})
 
 		DescribeTable("Mismatches All except root",
 			func(method, path string) {
@@ -27,7 +27,7 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 	})
 
 	Context("Simple path", func() {
-		pattern := http.NewRoutePattern("Get", "/users")
+		pattern := http.NewRoutePattern(http.Route{Method: "Get", PathPattern: "/users"})
 
 		DescribeTable("Mismatches",
 			func(method, path string) {
@@ -53,7 +53,7 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 	})
 
 	Context("Named Wildcard", func() {
-		pattern := http.NewRoutePattern("GET", "/users/{user-id}")
+		pattern := http.NewRoutePattern(http.Route{Method: "GET", PathPattern: "/users/{user-id}"})
 
 		DescribeTable("Mismatches",
 			func(method, path string) {
@@ -75,7 +75,7 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 	})
 
 	Context("Multi Named Wildcard", func() {
-		pattern := http.NewRoutePattern("GET", "/users/{user-id}/logins/{login-id}")
+		pattern := http.NewRoutePattern(http.Route{Method: "GET", PathPattern: "/users/{user-id}/logins/{login-id}"})
 
 		DescribeTable("Mismatches",
 			func(method, path string) {
