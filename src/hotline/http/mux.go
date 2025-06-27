@@ -4,15 +4,21 @@ import (
 	"strings"
 )
 
+const UndefinedPort = 0
+
 type Route struct {
 	Method      string
 	PathPattern string // /user/{user-id}/login/{session-id}/
+	Host        string
+	Port        int
 }
 
 func (r *Route) Normalize() Route {
 	return Route{
 		Method:      strings.ToUpper(r.Method),
 		PathPattern: strings.ToLower(r.PathPattern),
+		Host:        strings.ToLower(r.Host),
+		Port:        r.Port,
 	}
 }
 
@@ -23,9 +29,10 @@ type RoutePattern struct {
 }
 
 func NewRoutePattern(route Route) *RoutePattern {
+	normalizedRoute := route.Normalize()
 	return &RoutePattern{
-		route:     route.Normalize(),
-		preParsed: parsePath(route.PathPattern),
+		route:     normalizedRoute,
+		preParsed: parsePath(normalizedRoute.PathPattern),
 	}
 }
 
@@ -64,8 +71,16 @@ func parseWildcard(part string) (bool, string) {
 	return false, ""
 }
 
-func (p *RoutePattern) Matches(method, path string) bool {
+func (p *RoutePattern) Matches(method, path string, host string, port int) bool {
 	if p.route.Method != strings.ToUpper(method) {
+		return false
+	}
+
+	if p.route.Host != "" && p.route.Host != strings.ToLower(host) {
+		return false
+	}
+
+	if p.route.Port != UndefinedPort && p.route.Port != port {
 		return false
 	}
 
@@ -77,7 +92,7 @@ func (p *RoutePattern) matchesPath(path string) bool {
 		return path == "/"
 	}
 
-	pathParts := normalizedPathParts(path)
+	pathParts := normalizedPathParts(strings.ToLower(path))
 
 	if len(pathParts) < len(p.preParsed) {
 		return false
@@ -101,7 +116,7 @@ func normalizedPathParts(path string) []string {
 	pathParts = make([]string, 0, len(parts))
 	for _, part := range parts {
 		if len(part) != 0 {
-			pathParts = append(pathParts, strings.ToLower(part))
+			pathParts = append(pathParts, part)
 		}
 	}
 	return pathParts
