@@ -158,7 +158,7 @@ func (c *fakeCollector) ExpectCollectorMetrics(ctx context.Context, expectedTabl
 			if len(keyval) == 0 {
 				continue
 			}
-			split := strings.Split(strings.TrimSpace(keyval), ":")
+			split := strings.SplitN(strings.TrimSpace(keyval), ":", 2)
 			key := strings.TrimSpace(split[0])
 			value := strings.TrimSpace(split[1])
 

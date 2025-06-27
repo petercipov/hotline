@@ -1,10 +1,10 @@
 package servicelevels
 
 import (
-	"fmt"
-	"net/http"
 	"net/url"
 	"time"
+
+	hotlinehttp "hotline/http"
 )
 
 type HttpRequest struct {
@@ -16,7 +16,7 @@ type HttpRequest struct {
 }
 
 type HttpApiSLO struct {
-	mux       *http.ServeMux
+	mux       *hotlinehttp.Mux[HttpRouteSLO]
 	routeSLOs []*HttpRouteSLO
 }
 
@@ -43,15 +43,12 @@ type HttpStatusSLODefinition struct {
 }
 
 func NewHttpApiSLO(definition HttpApiSLODefinition) (*HttpApiSLO, error) {
-	mux := http.NewServeMux()
+	mux := &hotlinehttp.Mux[HttpRouteSLO]{}
 	routeSLOs := make([]*HttpRouteSLO, len(definition.RouteSLOs)+1)
 	routeSLOs = routeSLOs[:0]
 	for _, routeSLO := range definition.RouteSLOs {
 		slo := NewHttpPathSLO(routeSLO)
-		registerErr := safeRegisterInMux(mux, slo.routePattern, slo)
-		if registerErr != nil {
-			return nil, registerErr
-		}
+		mux.Add(slo.route, slo)
 		routeSLOs = append(routeSLOs, slo)
 	}
 	return &HttpApiSLO{
@@ -60,32 +57,18 @@ func NewHttpApiSLO(definition HttpApiSLODefinition) (*HttpApiSLO, error) {
 	}, nil
 }
 
-func safeRegisterInMux(mux *http.ServeMux, pattern string, handler http.Handler) (err error) {
-	defer func() {
-		v := recover()
-		if v != nil {
-			err = fmt.Errorf("pattern %s conflicting with other route", pattern)
-		}
-	}()
-
-	mux.Handle(pattern, handler)
-	return nil
-}
-
 func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
-	r := &http.Request{
+	locator := hotlinehttp.RequestLocator{
 		Method: req.Method,
-		URL:    req.URL,
-		Host:   req.URL.Host,
+		Path:   req.URL.Path,
+		Host:   req.URL.Hostname(),
+		Port:   80,
 	}
 
-	handler, _ := s.mux.Handler(r)
-	pathSLO, sloExists := handler.(*HttpRouteSLO)
-	if sloExists {
-		pathSLO.ServeHTTP(nil, r)
-		pathSLO.AddRequest(now, req)
+	handler := s.mux.LocaleHandler(locator)
+	if handler != nil {
+		handler.AddRequest(now, req)
 	}
-
 }
 
 func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
@@ -101,22 +84,22 @@ func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
 var httpRangeBreakdown = NewHttpStateRangeBreakdown()
 
 type HttpRouteSLO struct {
-	routePattern string
-	stateSLO     *StateSLO
-	latencySLO   *LatencySLO
-	expected     map[string]bool
+	route      hotlinehttp.Route
+	stateSLO   *StateSLO
+	latencySLO *LatencySLO
+	expected   map[string]bool
 }
 
 func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
-	pattern := ""
-	if len(slo.Method) > 0 {
-		pattern = fmt.Sprintf("%s %s%s", slo.Method, slo.Host, slo.Path)
-	} else {
-		pattern = fmt.Sprintf("%s%s", slo.Host, slo.Path)
+	route := hotlinehttp.Route{
+		Method:      slo.Method,
+		PathPattern: slo.Path,
+		Host:        slo.Host,
+		Port:        hotlinehttp.AnyPort,
 	}
 
 	tags := map[string]string{
-		"http_route": pattern,
+		"http_route": route.ID(),
 	}
 	expected := make(map[string]bool)
 	for _, status := range slo.Status.Expected {
@@ -124,7 +107,7 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 	}
 
 	return &HttpRouteSLO{
-		routePattern: pattern,
+		route: route,
 		stateSLO: NewStateSLO(
 			slo.Status.Expected,
 			httpRangeBreakdown.GetRanges(),
@@ -143,9 +126,6 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 	}
 }
 
-func (s *HttpRouteSLO) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {
-	// empty, used only for mux
-}
 func (s *HttpRouteSLO) AddRequest(now time.Time, req *HttpRequest) {
 	s.latencySLO.AddLatency(now, req.Latency)
 

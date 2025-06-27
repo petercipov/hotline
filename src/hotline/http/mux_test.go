@@ -8,28 +8,42 @@ import (
 
 var _ = Describe("HTTP RoutePattern Matching", func() {
 
-	Context("Just Root Path", func() {
-		pattern := http.NewRoutePattern(http.Route{Method: "GET", PathPattern: "/"})
+	Context("Route", func() {
+		It("creates Id from all parts", func() {
+			r := http.Route{
+				Method:      "GET",
+				PathPattern: "/users/{user-id}",
+				Host:        "example.com",
+				Port:        443,
+			}
 
-		DescribeTable("Mismatches All except root",
-			func(method, path string) {
-				match := pattern.Matches(http.RequestLocator{
-					Method: method,
-					Path:   path,
-				})
-				Expect(match).To(BeFalse())
-			},
-			Entry("mismatch empty", "GET", ""),
-			Entry("mismatch root", "GET", "/users"),
-		)
-
-		It("matches root", func() {
-			match := pattern.Matches(http.RequestLocator{
-				Method: "GET",
-				Path:   "/",
-			})
-			Expect(match).To(BeTrue())
+			Expect(r.ID()).To(Equal(
+				"GET:example.com:443:/users/{user-id}",
+			))
 		})
+
+		It("creates Id from empty", func() {
+			r := http.Route{}
+			Expect(r.ID()).To(Equal(
+				":::",
+			))
+		})
+	})
+
+	Context("Just Root Path", func() {
+		pattern := http.NewRoutePattern(http.Route{PathPattern: "/"})
+
+		DescribeTable("Matches All except root",
+			func(path string) {
+				match := pattern.Matches(http.RequestLocator{
+					Path: path,
+				})
+				Expect(match).To(BeTrue())
+			},
+			Entry("empty", ""),
+			Entry("root", "/"),
+			Entry("anything", "/users"),
+		)
 	})
 
 	Context("Simple path", func() {
@@ -178,6 +192,23 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 				Expect(match).To(BeTrue())
 			},
 			Entry("match", "GET", "/users", "example.com", 443),
+		)
+	})
+
+	Context("match missing method", func() {
+		pattern := http.NewRoutePattern(http.Route{PathPattern: "/users", Host: "example.com", Port: 443})
+
+		DescribeTable("Matches",
+			func(method, path, host string, port int) {
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+					Host:   host,
+					Port:   port,
+				})
+				Expect(match).To(BeTrue())
+			},
+			Entry("any match", "GET", "/users", "example.com", 443),
 		)
 	})
 })

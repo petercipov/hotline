@@ -37,7 +37,7 @@ var _ = Describe("Http Api Slo", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "/",
+				"http_route": ":::/",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -51,7 +51,7 @@ var _ = Describe("Http Api Slo", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "/",
+				"http_route": ":::/",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -84,7 +84,7 @@ var _ = Describe("Http Api Slo", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "iam.example.com/users",
+				"http_route": ":iam.example.com::/users",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -98,7 +98,7 @@ var _ = Describe("Http Api Slo", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "iam.example.com/users",
+				"http_route": ":iam.example.com::/users",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -110,31 +110,6 @@ var _ = Describe("Http Api Slo", func() {
 			},
 			Breach: nil,
 		}))
-	})
-
-	It("duplicating default pattern will return no slo", func() {
-		s.forRouteSetupWithDefault(servicelevels.HttpRouteSLODefinition{
-			Path: "/",
-			Latency: servicelevels.HttpLatencySLODefinition{
-				Percentiles: []servicelevels.PercentileDefinition{
-					{
-						Percentile: 99.9,
-						Threshold:  2000,
-						Name:       "p99",
-					},
-				},
-				WindowDuration: 1 * time.Minute,
-			},
-			Status: servicelevels.HttpStatusSLODefinition{
-				Expected:        []string{"200", "201"},
-				BreachThreshold: 99.9,
-				WindowDuration:  1 * time.Hour,
-			},
-		})
-
-		Expect(s.slo).Should(BeNil())
-		Expect(s.sloErr).Should(HaveOccurred())
-		Expect(s.sloErr.Error()).To(Equal("pattern / conflicting with other route"))
 	})
 
 	It("breaks unexpected states by ranges", func() {
@@ -162,7 +137,7 @@ var _ = Describe("Http Api Slo", func() {
 				EventsCount: 2,
 			},
 			Tags: map[string]string{
-				"http_route": "iam.example.com/users",
+				"http_route": ":iam.example.com::/users",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -206,7 +181,7 @@ var _ = Describe("Http Api Slo", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "iam.example.com/users",
+				"http_route": ":iam.example.com::/users",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -245,7 +220,7 @@ var _ = Describe("Http Api Slo", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "POST iam.example.com/users",
+				"http_route": "POST:iam.example.com::/users",
 			},
 			Breakdown: nil,
 			Breach:    nil,

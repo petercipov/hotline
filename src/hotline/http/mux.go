@@ -51,7 +51,8 @@ func (m *Mux[H]) Add(route Route, handler *H) {
 	})
 }
 
-const UndefinedPort = 0
+const AnyPort = 0
+const AnyMethod = ""
 
 type Route struct {
 	Method      string
@@ -67,6 +68,13 @@ func (r *Route) Normalize() Route {
 		Host:        strings.ToLower(r.Host),
 		Port:        r.Port,
 	}
+}
+
+func (r *Route) ID() string {
+	if r.Port == AnyPort {
+		return fmt.Sprintf("%s:%s::%s", r.Method, r.Host, r.PathPattern)
+	}
+	return fmt.Sprintf("%s:%s:%d:%s", r.Method, r.Host, r.Port, r.PathPattern)
 }
 
 type RoutePattern struct {
@@ -136,7 +144,7 @@ func parseWildcard(part string) (bool, string) {
 
 func (p *RoutePattern) Matches(locator RequestLocator) bool {
 	locator = locator.Normalize()
-	if p.route.Method != locator.Method {
+	if p.route.Method != AnyMethod && p.route.Method != locator.Method {
 		return false
 	}
 
@@ -144,7 +152,7 @@ func (p *RoutePattern) Matches(locator RequestLocator) bool {
 		return false
 	}
 
-	if p.route.Port != UndefinedPort && p.route.Port != locator.Port {
+	if p.route.Port != AnyPort && p.route.Port != locator.Port {
 		return false
 	}
 
@@ -153,7 +161,7 @@ func (p *RoutePattern) Matches(locator RequestLocator) bool {
 
 func (p *RoutePattern) matchesPath(path string) bool {
 	if len(p.preParsed) == 0 {
-		return path == "/"
+		return true
 	}
 
 	pathParts := normalizedPathParts(path)
