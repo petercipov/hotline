@@ -13,7 +13,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Mismatches All except root",
 			func(method, path string) {
-				match := pattern.Matches(method, path, "", http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+				})
 				Expect(match).To(BeFalse())
 			},
 			Entry("mismatch empty", "GET", ""),
@@ -21,7 +24,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 		)
 
 		It("matches root", func() {
-			match := pattern.Matches("GET", "/", "", http.UndefinedPort)
+			match := pattern.Matches(http.RequestLocator{
+				Method: "GET",
+				Path:   "/",
+			})
 			Expect(match).To(BeTrue())
 		})
 	})
@@ -31,7 +37,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Mismatches",
 			func(method, path string) {
-				match := pattern.Matches(method, path, "", http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+				})
 				Expect(match).To(BeFalse())
 			},
 			Entry("mismatch in http method", "POST", "/users"),
@@ -41,7 +50,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Matches",
 			func(method, path string) {
-				match := pattern.Matches(method, path, "", http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+				})
 				Expect(match).To(BeTrue())
 			},
 			Entry("match", "GET", "/users"),
@@ -57,7 +69,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Mismatches",
 			func(method, path string) {
-				match := pattern.Matches(method, path, "", http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+				})
 				Expect(match).To(BeFalse())
 			},
 			Entry("mismatch in short path", "GET", "/users"),
@@ -66,7 +81,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Matches",
 			func(method, path string) {
-				match := pattern.Matches(method, path, "", http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+				})
 				Expect(match).To(BeTrue())
 			},
 			Entry("match in path", "GET", "/users/1234567890"),
@@ -79,7 +97,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Mismatches",
 			func(method, path string) {
-				match := pattern.Matches(method, path, "", http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+				})
 				Expect(match).To(BeFalse())
 			},
 			Entry("mismatch in 1. level", "GET", "/users"),
@@ -90,7 +111,10 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Matches",
 			func(method, path string) {
-				match := pattern.Matches(method, path, "", http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+				})
 				Expect(match).To(BeTrue())
 			},
 			Entry("match multi wildcard", "GET", "/users/1234567890/logins/L1234567890"),
@@ -104,7 +128,11 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Mismatches",
 			func(method, path, host string) {
-				match := pattern.Matches(method, path, host, http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+					Host:   host,
+				})
 				Expect(match).NotTo(BeTrue())
 			},
 			Entry("mismatch", "GET", "/users", "other.example.com"),
@@ -112,7 +140,11 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Matches",
 			func(method, path, host string) {
-				match := pattern.Matches(method, path, host, http.UndefinedPort)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+					Host:   host,
+				})
 				Expect(match).To(BeTrue())
 			},
 			Entry("match", "GET", "/users", "example.com"),
@@ -124,7 +156,12 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Mismatches",
 			func(method, path, host string, port int) {
-				match := pattern.Matches(method, path, host, port)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+					Host:   host,
+					Port:   port,
+				})
 				Expect(match).NotTo(BeTrue())
 			},
 			Entry("mismatch", "GET", "/users", "example.com", 80),
@@ -132,10 +169,63 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 
 		DescribeTable("Matches",
 			func(method, path, host string, port int) {
-				match := pattern.Matches(method, path, host, port)
+				match := pattern.Matches(http.RequestLocator{
+					Method: method,
+					Path:   path,
+					Host:   host,
+					Port:   port,
+				})
 				Expect(match).To(BeTrue())
 			},
 			Entry("match", "GET", "/users", "example.com", 443),
 		)
+	})
+})
+
+var _ = Describe("Mux", func() {
+	Context("Request", func() {
+		It("will not match if mux is empty", func() {
+			mux := http.Mux[string]{}
+			result := mux.LocaleHandler(http.RequestLocator{
+				Method: "GET",
+				Path:   "/users",
+				Host:   "example.com",
+				Port:   443,
+			})
+
+			Expect(result).To(BeNil())
+		})
+
+		It("will match simple path", func() {
+			mux := http.Mux[string]{}
+			var handler = "handler"
+			mux.Add(http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}, &handler)
+
+			result := mux.LocaleHandler(http.RequestLocator{
+				Method: "GET",
+				Path:   "/users",
+				Host:   "example.com",
+				Port:   443,
+			})
+
+			Expect(result).To(Equal(&handler))
+		})
+
+		It("will match longer pattern first", func() {
+			mux := http.Mux[string]{}
+			var handler1 = "handler1"
+			var handler2 = "handler2"
+			mux.Add(http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}, &handler1)
+			mux.Add(http.Route{Method: "GET", PathPattern: "/users/{user-id}", Host: "example.com", Port: 443}, &handler2)
+
+			result := mux.LocaleHandler(http.RequestLocator{
+				Method: "GET",
+				Path:   "/users/1234",
+				Host:   "example.com",
+				Port:   443,
+			})
+
+			Expect(result).To(Equal(&handler2))
+		})
 	})
 })

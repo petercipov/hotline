@@ -1,8 +1,55 @@
 package http
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 )
+
+type RequestLocator struct {
+	Method string
+	Path   string
+	Host   string
+	Port   int
+}
+
+func (l *RequestLocator) Normalize() RequestLocator {
+	return RequestLocator{
+		Method: strings.ToUpper(l.Method),
+		Path:   strings.ToLower(l.Path),
+		Host:   strings.ToLower(l.Host),
+		Port:   l.Port,
+	}
+}
+
+type Mux[H any] struct {
+	entries []patternEntry[H]
+}
+type patternEntry[H any] struct {
+	pattern *RoutePattern
+	handler *H
+}
+
+func (m *Mux[H]) LocaleHandler(locator RequestLocator) *H {
+	for _, entry := range m.entries {
+		if entry.pattern.Matches(locator) {
+			return entry.handler
+		}
+	}
+	return nil
+}
+
+func (m *Mux[H]) Add(route Route, handler *H) {
+	pattern := NewRoutePattern(route)
+	m.entries = append(m.entries, patternEntry[H]{
+		pattern: pattern,
+		handler: handler,
+	})
+
+	sort.Slice(m.entries, func(i, j int) bool {
+		return len(m.entries[i].pattern.ID) > len(m.entries[j].pattern.ID)
+	})
+}
 
 const UndefinedPort = 0
 
@@ -23,16 +70,19 @@ func (r *Route) Normalize() Route {
 }
 
 type RoutePattern struct {
-	route Route
-
+	ID        string
+	route     Route
 	preParsed []pathPart
 }
 
 func NewRoutePattern(route Route) *RoutePattern {
-	normalizedRoute := route.Normalize()
+	normalized := route.Normalize()
+	parsed := parsePath(normalized.PathPattern)
+
 	return &RoutePattern{
-		route:     normalizedRoute,
-		preParsed: parsePath(normalizedRoute.PathPattern),
+		ID:        fmt.Sprintf("%s:%s:%d:%s", normalized.Method, normalized.Host, normalized.Port, parsed.ID()),
+		route:     normalized,
+		preParsed: parsed,
 	}
 }
 
@@ -44,23 +94,36 @@ type pathPart struct {
 
 const urlDelimiter = "/"
 
-func parsePath(pathPattern string) []pathPart {
-	parts := normalizedPathParts(pathPattern)
-	if len(parts) == 0 {
-		return []pathPart{}
+type pathParts []pathPart
+
+func (p pathParts) ID() string {
+	id := ""
+	for _, part := range p {
+		if part.isWildcard {
+			id += "/{}"
+		} else {
+			id += "/" + part.valueLower
+		}
+	}
+	return id
+}
+
+func parsePath(pathPattern string) pathParts {
+	normalized := normalizedPathParts(pathPattern)
+	if len(normalized) == 0 {
+		return pathParts{}
 	}
 
-	pathParts := make([]pathPart, 0, len(parts))
-	for _, part := range parts {
+	parts := make(pathParts, 0, len(normalized))
+	for _, part := range normalized {
 		isWildcard, name := parseWildcard(part)
-		pathParts = append(pathParts, pathPart{
+		parts = append(parts, pathPart{
 			valueLower: part,
 			isWildcard: isWildcard,
 			name:       name,
 		})
 	}
-
-	return pathParts
+	return parts
 }
 
 func parseWildcard(part string) (bool, string) {
@@ -71,20 +134,21 @@ func parseWildcard(part string) (bool, string) {
 	return false, ""
 }
 
-func (p *RoutePattern) Matches(method, path string, host string, port int) bool {
-	if p.route.Method != strings.ToUpper(method) {
+func (p *RoutePattern) Matches(locator RequestLocator) bool {
+	locator = locator.Normalize()
+	if p.route.Method != locator.Method {
 		return false
 	}
 
-	if p.route.Host != "" && p.route.Host != strings.ToLower(host) {
+	if p.route.Host != "" && p.route.Host != locator.Host {
 		return false
 	}
 
-	if p.route.Port != UndefinedPort && p.route.Port != port {
+	if p.route.Port != UndefinedPort && p.route.Port != locator.Port {
 		return false
 	}
 
-	return p.matchesPath(path)
+	return p.matchesPath(locator.Path)
 }
 
 func (p *RoutePattern) matchesPath(path string) bool {
@@ -92,7 +156,7 @@ func (p *RoutePattern) matchesPath(path string) bool {
 		return path == "/"
 	}
 
-	pathParts := normalizedPathParts(strings.ToLower(path))
+	pathParts := normalizedPathParts(path)
 
 	if len(pathParts) < len(p.preParsed) {
 		return false
