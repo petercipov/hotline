@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: HTTP API SLO Definitions API
+  description: API for managing HTTP API service level objective definitions
+  version: 1.0.0
+
+paths:
+  /slo-definitions/:
+    get:
+      summary: List SLO definitions
+      description: Retrieve HTTP API SLO definitions
+      operationId: getSLOConfig
+      tags:
+        - SLO Definitions
+      parameters:
+        - $ref: '#/components/parameters/IntegrationID'
+      responses:
+        '200':
+          description: SLO configuration details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDefinitions'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: create SLO definitions
+      description: Create HTTP API SLO definition
+      operationId: createSLOConfig
+      tags:
+        - SLO Definitions
+      parameters:
+        - $ref: '#/components/parameters/IntegrationID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSLORequest'
+      responses:
+        '200':
+          description: Updated slo configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedSLORequest'
+        '201':
+          description: Created slo configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedSLORequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /slo-definitions/{route-key}:
+    delete:
+      summary: Delete SLO definitions
+      description: Delete an existing HTTP API SLO configuration
+      operationId: deleteSLOConfig
+      tags:
+        - SLO Definitions
+      parameters:
+        - $ref: '#/components/parameters/RouteKey'
+        - $ref: '#/components/parameters/IntegrationID'
+      responses:
+        '204':
+          description: SLO configuration deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  parameters:
+    RouteKey:
+      in: path
+      name: route-key
+      description: unique key defining route
+      schema:
+        $ref: '#/components/schemas/RouteKey'
+
+    IntegrationID:
+      name: x-integration-id
+      in: header
+      required: true
+      description: Unique identifier of the SLO configuration
+      schema:
+        type: string
+        minLength: 32
+        maxLength: 32
+        pattern: "IN[A-Z0-9]+"
+        example: IN7AB56CD456OP98BN54CAUB43211OU7
+
+  schemas:
+    CreatedSLORequest:
+      type: object
+      properties:
+        routeKey:
+          $ref: '#/components/schemas/RouteKey'
+
+    CreateSLORequest:
+      type: object
+      properties:
+        route:
+          $ref: '#/components/schemas/Route'
+        definition:
+          $ref: '#/components/schemas/SLODefinition'
+
+    RouteKey:
+      type: string
+      minLength: 1
+      example: GET:api.example.com:8080:/api/users/{id}
+
+    PercentileValue:
+      type: number
+      format: double
+      description: Percentile value (0.0 to 100.0)
+      minimum: 0
+      maximum: 100
+      example: 99.9
+
+    ListDefinitions:
+      type: object
+      required:
+        - routes
+      properties:
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RouteSLoDefinition'
+          description: List of route-specific SLO configurations
+
+    Route:
+      type: object
+      properties:
+        method:
+          type: string
+          enum: [ GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH ]
+          description: HTTP method (GET, POST, PUT, DELETE, etc.)
+          example: "GET"
+        host:
+          type: string
+          description: Host name
+          example: "api.example.com"
+        port:
+          type: integer
+          example: 8080
+        path:
+          type: string
+          minLength: 1
+          description: URL path pattern
+          example: "/api/users/{id}"
+
+    RouteSLoDefinition:
+      type: object
+      properties:
+        routeKey:
+          $ref: '#/components/schemas/RouteKey'
+        route:
+          $ref: '#/components/schemas/Route'
+        definition:
+          $ref: '#/components/schemas/SLODefinition'
+
+    SLODefinition:
+      type: object
+      required:
+        - latency
+        - status
+      properties:
+        latency:
+          $ref: '#/components/schemas/LatencySLODefinition'
+        status:
+          $ref: '#/components/schemas/StatusSLODefinition'
+
+    LatencySLODefinition:
+      type: object
+      required:
+        - percentiles
+        - windowDuration
+      properties:
+        percentiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/PercentileThreshold'
+          description: Latency percentile definitions
+        windowDuration:
+          type: string
+          x-go-type: Duration
+          description: Duration string (e.g., "5m", "1h", "30s")
+          example: "5m"
+
+    StatusSLODefinition:
+      type: object
+      required:
+        - expected
+        - breachThreshold
+        - windowDuration
+      properties:
+        expected:
+          type: array
+          items:
+            type: string
+          description: List of expected HTTP status codes
+          example: ["200", "201", "204"]
+        breachThreshold:
+          $ref: '#/components/schemas/PercentileValue'
+        windowDuration:
+          type: string
+          x-go-type: Duration
+          description: Duration string (e.g., "5m", "1h", "30s")
+          example: "1h"
+
+    PercentileThreshold:
+      type: object
+      required:
+        - percentile
+        - breachThreshold
+      properties:
+        percentile:
+          $ref: '#/components/schemas/PercentileValue'
+        breachThreshold:
+          type: string
+          x-go-type: Duration
+          description: Latency threshold (e.g., "1s", "2500ms", "20s")
+          example: "2s"
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+tags:
+  - name: SLO Definitions
+    description: Operations for managing HTTP API SLO definitions

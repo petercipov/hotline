@@ -53,6 +53,7 @@ func (m *Mux[H]) Add(route Route, handler *H) {
 
 const AnyPort = 0
 const AnyMethod = ""
+const AnyHost = ""
 
 type Route struct {
 	Method      string
@@ -148,7 +149,7 @@ func (p *RoutePattern) Matches(locator RequestLocator) bool {
 		return false
 	}
 
-	if p.route.Host != "" && p.route.Host != locator.Host {
+	if p.route.Host != AnyHost && p.route.Host != locator.Host {
 		return false
 	}
 

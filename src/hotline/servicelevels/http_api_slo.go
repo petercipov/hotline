@@ -28,6 +28,7 @@ type HttpRouteSLODefinition struct {
 	Method  string
 	Path    string
 	Host    string
+	Port    int
 	Latency HttpLatencySLODefinition
 	Status  HttpStatusSLODefinition
 }
@@ -95,7 +96,7 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 		Method:      slo.Method,
 		PathPattern: slo.Path,
 		Host:        slo.Host,
-		Port:        hotlinehttp.AnyPort,
+		Port:        slo.Port,
 	}
 
 	tags := map[string]string{

@@ -31,6 +31,7 @@ type HttpRouteSLOConfig struct {
 	Method  string               `json:"method,omitempty"`
 	Path    string               `json:"path,omitempty"`
 	Host    string               `json:"host,omitempty"`
+	Port    int                  `json:"port,omitempty"`
 	Latency HttpLatencySLOConfig `json:"latency"`
 	Status  HttpStatusSLOConfig  `json:"status"`
 }
@@ -62,6 +63,7 @@ func FromServiceLevel(definition servicelevels.HttpApiSLODefinition) HttpApiSLOC
 			Method: routeSLO.Method,
 			Path:   routeSLO.Path,
 			Host:   routeSLO.Host,
+			Port:   routeSLO.Port,
 			Latency: HttpLatencySLOConfig{
 				Percentiles:    fromPercentileDefinitions(routeSLO.Latency.Percentiles),
 				WindowDuration: Duration(routeSLO.Latency.WindowDuration),
@@ -119,6 +121,7 @@ func ParseServiceLevel(config HttpApiSLOConfig) (servicelevels.HttpApiSLODefinit
 			Method: routeSLO.Method,
 			Path:   routeSLO.Path,
 			Host:   routeSLO.Host,
+			Port:   routeSLO.Port,
 			Latency: servicelevels.HttpLatencySLODefinition{
 				Percentiles:    defs,
 				WindowDuration: time.Duration(routeSLO.Latency.WindowDuration),
