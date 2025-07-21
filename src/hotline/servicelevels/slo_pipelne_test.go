@@ -60,14 +60,15 @@ func (s *sloPipelineSUT) forPipeline() {
 	for i := 0; i < s.numberOfQueues; i++ {
 		queueIDs = append(queueIDs, fmt.Sprintf("queue-%d", i))
 	}
-	scopes := concurrency.NewScopes(queueIDs, servicelevels.NewEmptyIntegrationsScope)
 
 	s.sloRepository = &fakeSLORepository{}
 	s.sloReporter = &fakeSLOReporter{}
+
+	scopes := concurrency.NewScopes(queueIDs, func(_ context.Context) *servicelevels.IntegrationsScope {
+		return servicelevels.NewEmptyIntegrationsScope(s.sloRepository, s.sloReporter)
+	})
 	s.pipeline = servicelevels.NewSLOPipeline(
 		scopes,
-		s.sloRepository,
-		s.sloReporter,
 	)
 }
 

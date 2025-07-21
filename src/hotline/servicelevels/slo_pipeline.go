@@ -16,70 +16,19 @@ type ChecksReporter interface {
 }
 
 type SLOPipeline struct {
-	fanOut        *concurrency.FanOut[any, IntegrationsScope]
-	sloRepository IntegrationSLORepository
-	checkReporter ChecksReporter
+	fanOut *concurrency.FanOut[concurrency.ScopedAction[IntegrationsScope], IntegrationsScope]
 }
 
-func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsScope], sloRepository IntegrationSLORepository, checkReporter ChecksReporter) *SLOPipeline {
+func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsScope]) *SLOPipeline {
 	p := &SLOPipeline{
-		sloRepository: sloRepository,
-		checkReporter: checkReporter,
+		fanOut: concurrency.NewActionFanOut(scopes),
 	}
-	fanOut := concurrency.NewFanOut(scopes, p.process)
-	p.fanOut = fanOut
 	return p
-}
-
-func (p *SLOPipeline) process(ctx context.Context, m any, scope *IntegrationsScope) {
-	if checkMessage, isCheckMessage := m.(*CheckMessage); isCheckMessage {
-		if checkMessage.Now.After(scope.LastObservedTime) {
-			scope.LastObservedTime = checkMessage.Now
-		}
-		p.processCheck(ctx, scope)
-	}
-
-	if httpMessage, isHttpMessage := m.(*HttpReqsMessage); isHttpMessage {
-		if httpMessage.Now.After(scope.LastObservedTime) {
-			scope.LastObservedTime = httpMessage.Now
-		}
-		p.processHttpReqMessage(ctx, scope, httpMessage.ID, httpMessage.Reqs)
-	}
-}
-
-func (p *SLOPipeline) processHttpReqMessage(ctx context.Context, scope *IntegrationsScope, id integrations.ID, reqs []*HttpRequest) {
-	slo, found := scope.Integrations[id]
-	if !found {
-		slo = p.sloRepository.GetIntegrationSLO(ctx, id)
-		if slo == nil {
-			return
-		}
-		scope.Integrations[id] = slo
-	}
-	for _, req := range reqs {
-		slo.HttpApiSLO.AddRequest(scope.LastObservedTime, req)
-	}
-}
-
-func (p *SLOPipeline) processCheck(ctx context.Context, scope *IntegrationsScope) {
-	var checks []Check
-	for id, integration := range scope.Integrations {
-		metrics := integration.HttpApiSLO.Check(scope.LastObservedTime)
-		checks = append(checks, Check{
-			SLO:           metrics,
-			IntegrationID: id,
-		})
-	}
-
-	p.checkReporter.ReportChecks(ctx, &CheckReport{
-		Now:    scope.LastObservedTime,
-		Checks: checks,
-	})
 }
 
 func (p *SLOPipeline) IngestHttpRequests(messages ...*HttpReqsMessage) {
 	for _, m := range messages {
-		p.fanOut.Send([]byte(m.ID), m)
+		p.fanOut.Send(m.GetMessageID(), m)
 	}
 }
 
@@ -105,12 +54,18 @@ type IntegrationSLO struct {
 type IntegrationsScope struct {
 	Integrations     map[integrations.ID]*IntegrationSLO
 	LastObservedTime time.Time
+
+	sloRepository IntegrationSLORepository
+	checkReporter ChecksReporter
 }
 
-func NewEmptyIntegrationsScope(_ context.Context) *IntegrationsScope {
+func NewEmptyIntegrationsScope(sloRepository IntegrationSLORepository, checkReporter ChecksReporter) *IntegrationsScope {
 	return &IntegrationsScope{
 		Integrations:     make(map[integrations.ID]*IntegrationSLO),
 		LastObservedTime: time.Time{},
+
+		sloRepository: sloRepository,
+		checkReporter: checkReporter,
 	}
 }
 
@@ -118,9 +73,51 @@ type CheckMessage struct {
 	Now time.Time
 }
 
+func (m *CheckMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+	if m.Now.After(scope.LastObservedTime) {
+		scope.LastObservedTime = m.Now
+	}
+
+	var checks []Check
+	for id, integration := range scope.Integrations {
+		metrics := integration.HttpApiSLO.Check(scope.LastObservedTime)
+		checks = append(checks, Check{
+			SLO:           metrics,
+			IntegrationID: id,
+		})
+	}
+
+	scope.checkReporter.ReportChecks(ctx, &CheckReport{
+		Now:    scope.LastObservedTime,
+		Checks: checks,
+	})
+}
+
 type HttpReqsMessage struct {
 	ID  integrations.ID
 	Now time.Time
 
 	Reqs []*HttpRequest
+}
+
+func (m *HttpReqsMessage) GetMessageID() []byte {
+	return []byte(m.ID)
+}
+
+func (m *HttpReqsMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+	if m.Now.After(scope.LastObservedTime) {
+		scope.LastObservedTime = m.Now
+	}
+
+	slo, found := scope.Integrations[m.ID]
+	if !found {
+		slo = scope.sloRepository.GetIntegrationSLO(ctx, m.ID)
+		if slo == nil {
+			return
+		}
+		scope.Integrations[m.ID] = slo
+	}
+	for _, req := range m.Reqs {
+		slo.HttpApiSLO.AddRequest(scope.LastObservedTime, req)
+	}
 }

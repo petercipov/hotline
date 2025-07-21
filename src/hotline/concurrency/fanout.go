@@ -57,3 +57,13 @@ func (f *FanOut[M, S]) Close() {
 	}
 	f.scopes = nil
 }
+
+type ScopedAction[S any] interface {
+	Execute(ctx context.Context, scope *S)
+}
+
+func NewActionFanOut[S any](scopes *Scopes[S]) *FanOut[ScopedAction[S], S] {
+	return NewFanOut(scopes, func(ctx context.Context, action ScopedAction[S], scope *S) {
+		action.Execute(ctx, scope)
+	})
+}

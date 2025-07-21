@@ -67,7 +67,7 @@ var _ = Describe("Fan Out", func() {
 
 type fanOutSut struct {
 	scopes *concurrency.Scopes[singleWriterScope]
-	fanOut *concurrency.FanOut[sutMessage, singleWriterScope]
+	fanOut *concurrency.FanOut[concurrency.ScopedAction[singleWriterScope], singleWriterScope]
 }
 
 type singleWriterScope struct {
@@ -87,13 +87,7 @@ func (f *fanOutSut) forFanOut(numberOfQueues int) {
 	f.scopes = concurrency.NewScopes(queueNames, func(ctx context.Context) *singleWriterScope {
 		return &singleWriterScope{}
 	})
-	f.fanOut = concurrency.NewFanOut(
-		f.scopes,
-		func(ctx context.Context, m sutMessage, scope *singleWriterScope) {
-			name := concurrency.GetScopeIDFromContext(ctx)
-			m.processId = name
-			scope.messages = append(scope.messages, m)
-		})
+	f.fanOut = concurrency.NewActionFanOut(f.scopes)
 }
 
 func (f *fanOutSut) forEmptyFanOut() {
@@ -109,13 +103,13 @@ func (f *fanOutSut) scheduleMessage() {
 }
 
 func (f *fanOutSut) sendMessageWithId(id []byte) {
-	f.fanOut.Send(id, sutMessage{
+	f.fanOut.Send(id, &sutMessage{
 		id: id,
 	})
 }
 
 func (f *fanOutSut) broadcastMessageWithId(id []byte) {
-	f.fanOut.Broadcast(sutMessage{
+	f.fanOut.Broadcast(&sutMessage{
 		id: id,
 	})
 }
@@ -137,4 +131,10 @@ func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
 type sutMessage struct {
 	id        []byte
 	processId string
+}
+
+func (m *sutMessage) Execute(ctx context.Context, scope *singleWriterScope) {
+	name := concurrency.GetScopeIDFromContext(ctx)
+	m.processId = name
+	scope.messages = append(scope.messages, *m)
 }

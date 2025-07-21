@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"hotline/clock"
@@ -47,9 +48,6 @@ type App struct {
 }
 
 func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository servicelevels.IntegrationSLORepository) (*App, error) {
-	sloPipelineScopes := concurrency.NewScopes(
-		createIds("slo-queue-", 8),
-		servicelevels.NewEmptyIntegrationsScope)
 	otelReporterScopes := concurrency.NewScopes(
 		createIds("otel-reporter-", 8),
 		reporters.NewEmptyOtelReporterScope)
@@ -65,7 +63,13 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 	}
 	reporter := reporters.NewScopedOtelReporter(otelReporterScopes, managedTime.Sleep, reporterCfg, 100)
 
-	sloPipeline := servicelevels.NewSLOPipeline(sloPipelineScopes, sloConfigRepository, reporter)
+	sloPipelineScopes := concurrency.NewScopes(
+		createIds("slo-queue-", 8),
+		func(_ context.Context) *servicelevels.IntegrationsScope {
+			return servicelevels.NewEmptyIntegrationsScope(sloConfigRepository, reporter)
+		},
+	)
+	sloPipeline := servicelevels.NewSLOPipeline(sloPipelineScopes)
 
 	converter := otel.NewProtoConverter()
 	otelHandler := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
