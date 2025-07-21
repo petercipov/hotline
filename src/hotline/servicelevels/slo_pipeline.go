@@ -16,12 +16,12 @@ type ChecksReporter interface {
 }
 
 type SLOPipeline struct {
-	fanOut        *concurrency.FanOut[any, IntegrationsByQueue]
+	fanOut        *concurrency.FanOut[any, IntegrationsScope]
 	sloRepository IntegrationSLORepository
 	checkReporter ChecksReporter
 }
 
-func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsByQueue], sloRepository IntegrationSLORepository, checkReporter ChecksReporter) *SLOPipeline {
+func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsScope], sloRepository IntegrationSLORepository, checkReporter ChecksReporter) *SLOPipeline {
 	p := &SLOPipeline{
 		sloRepository: sloRepository,
 		checkReporter: checkReporter,
@@ -31,7 +31,7 @@ func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsByQueue], sloReposito
 	return p
 }
 
-func (p *SLOPipeline) process(ctx context.Context, m any, scope *IntegrationsByQueue) {
+func (p *SLOPipeline) process(ctx context.Context, m any, scope *IntegrationsScope) {
 	if checkMessage, isCheckMessage := m.(*CheckMessage); isCheckMessage {
 		if checkMessage.Now.After(scope.LastObservedTime) {
 			scope.LastObservedTime = checkMessage.Now
@@ -47,7 +47,7 @@ func (p *SLOPipeline) process(ctx context.Context, m any, scope *IntegrationsByQ
 	}
 }
 
-func (p *SLOPipeline) processHttpReqMessage(ctx context.Context, scope *IntegrationsByQueue, id integrations.ID, reqs []*HttpRequest) {
+func (p *SLOPipeline) processHttpReqMessage(ctx context.Context, scope *IntegrationsScope, id integrations.ID, reqs []*HttpRequest) {
 	slo, found := scope.Integrations[id]
 	if !found {
 		slo = p.sloRepository.GetIntegrationSLO(ctx, id)
@@ -61,7 +61,7 @@ func (p *SLOPipeline) processHttpReqMessage(ctx context.Context, scope *Integrat
 	}
 }
 
-func (p *SLOPipeline) processCheck(ctx context.Context, scope *IntegrationsByQueue) {
+func (p *SLOPipeline) processCheck(ctx context.Context, scope *IntegrationsScope) {
 	var checks []Check
 	for id, integration := range scope.Integrations {
 		metrics := integration.HttpApiSLO.Check(scope.LastObservedTime)
@@ -102,13 +102,13 @@ type IntegrationSLO struct {
 	HttpApiSLO *HttpApiSLO
 }
 
-type IntegrationsByQueue struct {
+type IntegrationsScope struct {
 	Integrations     map[integrations.ID]*IntegrationSLO
 	LastObservedTime time.Time
 }
 
-func NewEmptyIntegrationsScope(_ context.Context) *IntegrationsByQueue {
-	return &IntegrationsByQueue{
+func NewEmptyIntegrationsScope(_ context.Context) *IntegrationsScope {
+	return &IntegrationsScope{
 		Integrations:     make(map[integrations.ID]*IntegrationSLO),
 		LastObservedTime: time.Time{},
 	}
