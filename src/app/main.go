@@ -30,7 +30,7 @@ func main() {
 		},
 		systemClock,
 		func(host string, handler http.Handler) setup.HttpServer {
-			return setup.NewGoHttpServer(host, handler)
+			return NewGoHttpServer(host, handler)
 		},
 		fakeRepository,
 	)
@@ -45,4 +45,35 @@ func main() {
 	<-graceShuthdown
 	slog.Info("Shutting down")
 	_ = app.Stop()
+}
+
+type GoHttpServer struct {
+	server *http.Server
+}
+
+func NewGoHttpServer(host string, handler http.Handler) *GoHttpServer {
+	return &GoHttpServer{
+		server: &http.Server{
+			Addr:        host,
+			Handler:     handler,
+			ReadTimeout: 5 * time.Second,
+		},
+	}
+}
+
+func (g *GoHttpServer) Host() string {
+	return g.server.Addr
+}
+
+func (g *GoHttpServer) Start() {
+	go func() {
+		_ = g.server.ListenAndServe()
+	}()
+}
+
+func (g *GoHttpServer) Close() error {
+	if g == nil {
+		return nil
+	}
+	return g.server.Close()
 }

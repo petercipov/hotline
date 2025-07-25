@@ -10,8 +10,7 @@ import (
 type Duration time.Duration
 
 func (d *Duration) MarshalJSON() ([]byte, error) {
-	str := time.Duration(*d).String()
-	return json.Marshal(str)
+	return json.Marshal(time.Duration(*d).String())
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) error {

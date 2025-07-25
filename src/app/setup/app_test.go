@@ -46,8 +46,8 @@ func newAppSut() *appSut {
 		fakeEgressTarget:        target,
 		fakeSLOConfigRepository: fakeSLOConfigRepository,
 		managedClock:            manualClock,
-		collectorServer:         setup.NewHttpTestServer("", collector),
-		egressTargetServer:      setup.NewHttpTestServer("", target),
+		collectorServer:         setup.NewHttpTestServer(collector),
+		egressTargetServer:      setup.NewHttpTestServer(target),
 	}
 }
 
@@ -57,17 +57,21 @@ func (a *appSut) otelIngestionIsEnabled() {
 
 func (a *appSut) egressIngestionIsEnabled() {
 	a.cfg.EgressHttpIngestion.Host = "localhost"
+
+	a.egressTargetServer.Start()
 }
 
 func (a *appSut) sloReporterIsPointingToCollector() {
+	a.collectorServer.Start()
 	a.cfg.OtelHttpReporter.Host = a.collectorServer.Host()
 }
 
 func (a *appSut) sendEgressTraffic(ctx context.Context, integrationID string) (context.Context, error) {
 	now := a.managedClock.Now()
+	targetURL := "http://" + a.egressTargetServer.Host()
 	for i := 0; i < 1000; i++ {
 		a.managedClock.Reset(now)
-		_, sendErr := a.egressClient.SendTraffic(integrationID)
+		_, sendErr := a.egressClient.SendTraffic(integrationID, targetURL)
 		if sendErr != nil {
 			return ctx, sendErr
 		}
@@ -125,8 +129,8 @@ func (a *appSut) startHotline() error {
 	app, appErr := setup.NewApp(
 		&a.cfg,
 		a.managedClock,
-		func(host string, handler http.Handler) setup.HttpServer {
-			return setup.NewHttpTestServer(host, handler)
+		func(_ string, handler http.Handler) setup.HttpServer {
+			return setup.NewHttpTestServer(handler)
 		},
 		a.fakeSLOConfigRepository,
 	)
@@ -149,7 +153,6 @@ func (a *appSut) startHotline() error {
 	proxyURL, _ := url.Parse(a.app.GetEgressIngestionUrl())
 	a.egressClient = NewEgressClient(
 		proxyURL,
-		"http://"+a.egressTargetServer.Host(),
 		1234,
 	)
 	return nil

@@ -1,3 +1,5 @@
 .idea
 cover.out
 cover.app.out
+cover.app.filtered.out
+.DS_Store

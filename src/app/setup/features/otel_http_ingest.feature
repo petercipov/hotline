@@ -4,7 +4,7 @@ Feature: Hotline should be able to
   3) report slos to otel
 
   Scenario: otel standard traffic is ingested and slos are computed
-    OTEL ingestion is enabled
+    Given OTEL ingestion is enabled
     And slo reporter is pointing to collector
     And hotline is running
 

@@ -4,7 +4,7 @@ Feature: Hotline should be able to
   3) report slos to otel
 
   Scenario: egress traffic is ingested, proxied and slos are computed
-    Egress ingestion is enabled
+    Given Egress ingestion is enabled
     And slo reporter is pointing to collector
     And slo configuration for "IN-dd0391f11aba" is:
       """

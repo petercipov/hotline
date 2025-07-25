@@ -6,7 +6,8 @@ test:
 
 cover:
 	-go tool cover -func cover.out | grep -v "100.0"
-	#-go tool cover -func cover.app.out | grep -v "100.0"
+	cat cover.app.out | (grep -v "app/main.go" || true ) > cover.app.filtered.out
+	-go tool cover -func cover.app.filtered.out | grep -v "100.0"
 	! go tool cover -func cover.out | grep -v "100.0" || exit 1
 	#! go tool cover -func cover.app.out | grep -v "100.0" || exit 1
 
