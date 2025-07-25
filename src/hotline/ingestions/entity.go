@@ -22,18 +22,18 @@ type HttpRequest struct {
 	CorrelationID   string
 }
 
-func ToSLORequestMessage(requests []*HttpRequest, now time.Time) []*servicelevels.HttpReqsMessage {
+func ToSLORequestMessage(requests []*HttpRequest, now time.Time) []*servicelevels.IngestRequestsMessage {
 	byIntegrationId := make(map[integrations.ID][]*HttpRequest)
 	for _, request := range requests {
 		byIntegrationId[request.IntegrationID] = append(byIntegrationId[request.IntegrationID], request)
 	}
-	var result []*servicelevels.HttpReqsMessage
+	var result []*servicelevels.IngestRequestsMessage
 	for integrationID, httpRequests := range byIntegrationId {
 		var reqs []*servicelevels.HttpRequest
 		for _, httpRequest := range httpRequests {
 			reqs = append(reqs, ToSLORequest(httpRequest))
 		}
-		result = append(result, &servicelevels.HttpReqsMessage{
+		result = append(result, &servicelevels.IngestRequestsMessage{
 			Now:  now,
 			ID:   integrationID,
 			Reqs: reqs,
@@ -42,8 +42,8 @@ func ToSLORequestMessage(requests []*HttpRequest, now time.Time) []*servicelevel
 	return result
 }
 
-func ToSLOSingleRequestMessage(request *HttpRequest, now time.Time) *servicelevels.HttpReqsMessage {
-	return &servicelevels.HttpReqsMessage{
+func ToSLOSingleRequestMessage(request *HttpRequest, now time.Time) *servicelevels.IngestRequestsMessage {
+	return &servicelevels.IngestRequestsMessage{
 		ID:  request.IntegrationID,
 		Now: now,
 		Reqs: []*servicelevels.HttpRequest{

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"hotline/http"
 	"hotline/servicelevels"
 	"time"
 )
@@ -53,44 +54,6 @@ type PercentileDefinition struct {
 	Name        string  `json:"name"`
 }
 
-func FromServiceLevel(definition servicelevels.HttpApiSLODefinition) HttpApiSLOConfig {
-	result := HttpApiSLOConfig{
-		RouteSLOs: make([]HttpRouteSLOConfig, len(definition.RouteSLOs)),
-	}
-
-	for i, routeSLO := range definition.RouteSLOs {
-		result.RouteSLOs[i] = HttpRouteSLOConfig{
-			Method: routeSLO.Method,
-			Path:   routeSLO.Path,
-			Host:   routeSLO.Host,
-			Port:   routeSLO.Port,
-			Latency: HttpLatencySLOConfig{
-				Percentiles:    fromPercentileDefinitions(routeSLO.Latency.Percentiles),
-				WindowDuration: Duration(routeSLO.Latency.WindowDuration),
-			},
-			Status: HttpStatusSLOConfig{
-				Expected:        routeSLO.Status.Expected,
-				BreachThreshold: float64(routeSLO.Status.BreachThreshold),
-				WindowDuration:  Duration(routeSLO.Status.WindowDuration),
-			},
-		}
-	}
-
-	return result
-}
-
-func fromPercentileDefinitions(percentiles []servicelevels.PercentileDefinition) []PercentileDefinition {
-	result := make([]PercentileDefinition, len(percentiles))
-	for i, percentile := range percentiles {
-		result[i] = PercentileDefinition{
-			Percentile:  percentile.Percentile.Normalized(),
-			ThresholdMs: int64(percentile.Threshold),
-			Name:        percentile.Name,
-		}
-	}
-	return result
-}
-
 func ParseServiceLevelFromBytes(data []byte) (servicelevels.HttpApiSLODefinition, error) {
 	var config HttpApiSLOConfig
 	unmarshalErr := json.Unmarshal(data, &config)
@@ -118,10 +81,12 @@ func ParseServiceLevel(config HttpApiSLOConfig) (servicelevels.HttpApiSLODefinit
 		}
 
 		result.RouteSLOs[i] = servicelevels.HttpRouteSLODefinition{
-			Method: routeSLO.Method,
-			Path:   routeSLO.Path,
-			Host:   routeSLO.Host,
-			Port:   routeSLO.Port,
+			Route: http.Route{
+				Method:      routeSLO.Method,
+				PathPattern: routeSLO.Path,
+				Host:        routeSLO.Host,
+				Port:        routeSLO.Port,
+			},
 			Latency: servicelevels.HttpLatencySLODefinition{
 				Percentiles:    defs,
 				WindowDuration: time.Duration(routeSLO.Latency.WindowDuration),

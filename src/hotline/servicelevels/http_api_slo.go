@@ -25,10 +25,7 @@ type HttpApiSLODefinition struct {
 }
 
 type HttpRouteSLODefinition struct {
-	Method  string
-	Path    string
-	Host    string
-	Port    int
+	Route   hotlinehttp.Route
 	Latency HttpLatencySLODefinition
 	Status  HttpStatusSLODefinition
 }
@@ -92,15 +89,8 @@ type HttpRouteSLO struct {
 }
 
 func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
-	route := hotlinehttp.Route{
-		Method:      slo.Method,
-		PathPattern: slo.Path,
-		Host:        slo.Host,
-		Port:        slo.Port,
-	}
-
 	tags := map[string]string{
-		"http_route": route.ID(),
+		"http_route": slo.Route.ID(),
 	}
 	expected := make(map[string]bool)
 	for _, status := range slo.Status.Expected {
@@ -108,7 +98,7 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 	}
 
 	return &HttpRouteSLO{
-		route: route,
+		route: slo.Route,
 		stateSLO: NewStateSLO(
 			slo.Status.Expected,
 			httpRangeBreakdown.GetRanges(),

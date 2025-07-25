@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"hotline/http"
 	"hotline/integrations"
 	"hotline/servicelevels"
 	"sync"
@@ -19,7 +20,7 @@ func NewFakeSLOConfigRepository() *FakeSLOConfigRepository {
 	}
 }
 
-func (f *FakeSLOConfigRepository) GetIntegrationSLO(_ context.Context, integrationID integrations.ID) *servicelevels.IntegrationSLO {
+func (f *FakeSLOConfigRepository) GetConfig(_ context.Context, integrationID integrations.ID) *servicelevels.HttpApiSLODefinition {
 	f.mutex.Lock()
 	cfg, foundCfg := f.config[integrationID]
 	f.mutex.Unlock()
@@ -30,15 +31,7 @@ func (f *FakeSLOConfigRepository) GetIntegrationSLO(_ context.Context, integrati
 		}
 	}
 
-	apiSLO, createErr := servicelevels.NewHttpApiSLO(cfg)
-	if createErr != nil {
-		return nil
-	}
-
-	return &servicelevels.IntegrationSLO{
-		ID:         integrationID,
-		HttpApiSLO: apiSLO,
-	}
+	return &cfg
 }
 
 func (f *FakeSLOConfigRepository) SetConfig(integrationID integrations.ID, cfg servicelevels.HttpApiSLODefinition) {
@@ -47,11 +40,14 @@ func (f *FakeSLOConfigRepository) SetConfig(integrationID integrations.ID, cfg s
 	f.mutex.Unlock()
 }
 
-func defaultRouteDefinition(method string, host string, path string) servicelevels.HttpRouteSLODefinition {
+func defaultRouteDefinition(method string, host string, pathPattern string) servicelevels.HttpRouteSLODefinition {
 	return servicelevels.HttpRouteSLODefinition{
-		Method: method,
-		Path:   path,
-		Host:   host,
+		Route: http.Route{
+			Method:      method,
+			PathPattern: pathPattern,
+			Host:        host,
+			Port:        0,
+		},
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{

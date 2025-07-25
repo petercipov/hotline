@@ -26,7 +26,7 @@ var _ = Describe("Entities", func() {
 			EndTime:         clock.ParseTime("2018-12-13T14:51:01Z"),
 		}, clock.ParseTime("2018-12-13T14:51:00Z"))
 
-		Expect(message).To(Equal(&servicelevels.HttpReqsMessage{
+		Expect(message).To(Equal(&servicelevels.IngestRequestsMessage{
 			ID:  "integration.com",
 			Now: clock.ParseTime("2018-12-13T14:51:00Z"),
 			Reqs: []*servicelevels.HttpRequest{
@@ -54,7 +54,7 @@ var _ = Describe("Entities", func() {
 			},
 		}, clock.ParseTime("2018-12-13T14:51:00Z"))
 		Expect(slos).To(HaveLen(1))
-		Expect(slos[0]).To(Equal(&servicelevels.HttpReqsMessage{
+		Expect(slos[0]).To(Equal(&servicelevels.IngestRequestsMessage{
 			ID:  "integration.com",
 			Now: clock.ParseTime("2018-12-13T14:51:00Z"),
 			Reqs: []*servicelevels.HttpRequest{
@@ -82,7 +82,7 @@ var _ = Describe("Entities", func() {
 			},
 		}, clock.ParseTime("2018-12-13T14:51:00Z"))
 		Expect(slos).To(HaveLen(1))
-		Expect(slos[0]).To(Equal(&servicelevels.HttpReqsMessage{
+		Expect(slos[0]).To(Equal(&servicelevels.IngestRequestsMessage{
 			ID:  "integration.com",
 			Now: clock.ParseTime("2018-12-13T14:51:00Z"),
 			Reqs: []*servicelevels.HttpRequest{

@@ -4,6 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"hotline/clock"
+	"hotline/http"
 	"hotline/servicelevels"
 	"net/url"
 	"time"
@@ -254,11 +255,13 @@ func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRou
 	s.forRouteSetup(routes...)
 }
 
-func defaultRouteDefinitionForMethod(method string, host string, path string) servicelevels.HttpRouteSLODefinition {
+func defaultRouteDefinitionForMethod(method string, host string, pathPattern string) servicelevels.HttpRouteSLODefinition {
 	return servicelevels.HttpRouteSLODefinition{
-		Method: method,
-		Path:   path,
-		Host:   host,
+		Route: http.Route{
+			Method:      method,
+			PathPattern: pathPattern,
+			Host:        host,
+		},
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{

@@ -94,7 +94,7 @@ func (s *sloPipelineSUT) Report() []*servicelevels.CheckReport {
 
 func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID) {
 	now := clock.ParseTime("2025-02-22T12:04:05Z")
-	s.pipeline.IngestHttpRequests(&servicelevels.HttpReqsMessage{
+	s.pipeline.IngestHttpRequests(&servicelevels.IngestRequestsMessage{
 		ID:  id,
 		Now: now,
 		Reqs: []*servicelevels.HttpRequest{
@@ -123,21 +123,15 @@ type fakeSLORepository struct {
 	noConfig bool
 }
 
-func (f *fakeSLORepository) GetIntegrationSLO(_ context.Context, integrationID integrations.ID) *servicelevels.IntegrationSLO {
+func (f *fakeSLORepository) GetConfig(_ context.Context, _ integrations.ID) *servicelevels.HttpApiSLODefinition {
 	if f.noConfig {
 		return nil
 	}
-	apiSLO, createErr := servicelevels.NewHttpApiSLO(servicelevels.HttpApiSLODefinition{
+	apiSLO := servicelevels.HttpApiSLODefinition{
 		RouteSLOs: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
-	})
-	if createErr != nil {
-		return nil
 	}
 
-	return &servicelevels.IntegrationSLO{
-		ID:         integrationID,
-		HttpApiSLO: apiSLO,
-	}
+	return &apiSLO
 }
 
 func (f *fakeSLORepository) NoConfig() {

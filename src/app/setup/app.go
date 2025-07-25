@@ -47,7 +47,7 @@ type App struct {
 	egressIngestionServer HttpServer
 }
 
-func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository servicelevels.IntegrationSLORepository) (*App, error) {
+func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository servicelevels.SLODefinitionRepository) (*App, error) {
 	otelReporterScopes := concurrency.NewScopes(
 		createIds("otel-reporter-", 8),
 		reporters.NewEmptyOtelReporterScope)
