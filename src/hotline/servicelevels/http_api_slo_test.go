@@ -230,8 +230,7 @@ var _ = Describe("Http Api Slo", func() {
 })
 
 type suthttpapislo struct {
-	slo    *servicelevels.HttpApiSLO
-	sloErr error
+	slo *servicelevels.HttpApiSLO
 }
 
 func (s *suthttpapislo) Check() []servicelevels.SLOCheck {
@@ -245,7 +244,7 @@ func (s *suthttpapislo) AddRequest(request *servicelevels.HttpRequest) {
 }
 
 func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.HttpRouteSLODefinition) {
-	s.slo, s.sloErr = servicelevels.NewHttpApiSLO(servicelevels.HttpApiSLODefinition{
+	s.slo = servicelevels.NewHttpApiSLO(servicelevels.HttpApiSLODefinition{
 		RouteSLOs: routes,
 	})
 }

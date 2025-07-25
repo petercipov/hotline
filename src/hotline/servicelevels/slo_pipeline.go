@@ -110,13 +110,8 @@ func (m *IngestRequestsMessage) Execute(ctx context.Context, scope *Integrations
 		if config == nil {
 			return
 		}
-		newSlo, createErr := NewHttpApiSLO(*config)
-		if createErr != nil {
-			return
-		}
-
-		scope.Integrations[m.ID] = newSlo
-		slo = newSlo
+		slo = NewHttpApiSLO(*config)
+		scope.Integrations[m.ID] = slo
 	}
 	for _, req := range m.Reqs {
 		slo.AddRequest(scope.LastObservedTime, req)

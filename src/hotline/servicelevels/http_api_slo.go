@@ -40,7 +40,7 @@ type HttpStatusSLODefinition struct {
 	WindowDuration  time.Duration
 }
 
-func NewHttpApiSLO(definition HttpApiSLODefinition) (*HttpApiSLO, error) {
+func NewHttpApiSLO(definition HttpApiSLODefinition) *HttpApiSLO {
 	mux := &hotlinehttp.Mux[HttpRouteSLO]{}
 	routeSLOs := make([]*HttpRouteSLO, len(definition.RouteSLOs)+1)
 	routeSLOs = routeSLOs[:0]
@@ -52,7 +52,7 @@ func NewHttpApiSLO(definition HttpApiSLODefinition) (*HttpApiSLO, error) {
 	return &HttpApiSLO{
 		mux:       mux,
 		routeSLOs: routeSLOs,
-	}, nil
+	}
 }
 
 func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {

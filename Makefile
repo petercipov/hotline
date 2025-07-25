@@ -1,6 +1,14 @@
+.SILENT:
+
 test:
 	go test ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...
-	go test ./src/app/... -coverprofile=./cover.app.out -covermode=atomic -coverpkg=./src/hotline/...
+	go test ./src/app/... -coverprofile=./cover.app.out -covermode=atomic -coverpkg=./src/app/...
+
+cover:
+	-go tool cover -func cover.out | grep -v "100.0"
+	#-go tool cover -func cover.app.out | grep -v "100.0"
+	! go tool cover -func cover.out | grep -v "100.0" || exit 1
+	#! go tool cover -func cover.app.out | grep -v "100.0" || exit 1
 
 deps:
 	go mod download
