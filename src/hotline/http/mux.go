@@ -2,6 +2,7 @@ package http
 
 import (
 	"fmt"
+	"iter"
 	"sort"
 	"strings"
 )
@@ -26,6 +27,7 @@ type Mux[H any] struct {
 	entries []patternEntry[H]
 }
 type patternEntry[H any] struct {
+	route   Route
 	pattern *RoutePattern
 	handler *H
 }
@@ -39,16 +41,34 @@ func (m *Mux[H]) LocaleHandler(locator RequestLocator) *H {
 	return nil
 }
 
-func (m *Mux[H]) Add(route Route, handler *H) {
+func (m *Mux[H]) Upsert(route Route, handler *H) {
+	for index, entry := range m.entries {
+		if entry.route == route {
+			m.entries[index].handler = handler
+			return
+		}
+	}
+
 	pattern := NewRoutePattern(route)
 	m.entries = append(m.entries, patternEntry[H]{
+		route:   route,
 		pattern: pattern,
 		handler: handler,
 	})
 
-	sort.Slice(m.entries, func(i, j int) bool {
+	sort.SliceStable(m.entries, func(i, j int) bool {
 		return len(m.entries[i].pattern.ID) > len(m.entries[j].pattern.ID)
 	})
+}
+
+func (m *Mux[H]) Handlers() iter.Seq2[Route, H] {
+	return func(yield func(Route, H) bool) {
+		for _, entry := range m.entries {
+			if !yield(entry.route, *entry.handler) {
+				break
+			}
+		}
+	}
 }
 
 const AnyPort = 0

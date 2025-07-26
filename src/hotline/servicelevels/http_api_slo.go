@@ -16,8 +16,7 @@ type HttpRequest struct {
 }
 
 type HttpApiSLO struct {
-	mux       *hotlinehttp.Mux[HttpRouteSLO]
-	routeSLOs []*HttpRouteSLO
+	mux *hotlinehttp.Mux[HttpRouteSLO]
 }
 
 type HttpApiSLODefinition struct {
@@ -41,18 +40,13 @@ type HttpStatusSLODefinition struct {
 }
 
 func NewHttpApiSLO(definition HttpApiSLODefinition) *HttpApiSLO {
-	mux := &hotlinehttp.Mux[HttpRouteSLO]{}
-	routeSLOs := make([]*HttpRouteSLO, len(definition.RouteSLOs)+1)
-	routeSLOs = routeSLOs[:0]
-	for _, routeSLO := range definition.RouteSLOs {
-		slo := NewHttpPathSLO(routeSLO)
-		mux.Add(slo.route, slo)
-		routeSLOs = append(routeSLOs, slo)
+	apiSlo := &HttpApiSLO{
+		mux: &hotlinehttp.Mux[HttpRouteSLO]{},
 	}
-	return &HttpApiSLO{
-		mux:       mux,
-		routeSLOs: routeSLOs,
+	for _, routeDefinition := range definition.RouteSLOs {
+		apiSlo.UpsertRoute(routeDefinition)
 	}
+	return apiSlo
 }
 
 func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
@@ -71,12 +65,17 @@ func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
 
 func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
 	var checks []SLOCheck
-	for _, slo := range s.routeSLOs {
+	for _, slo := range s.mux.Handlers() {
 		check := slo.Check(now)
 		checks = append(checks, check...)
 	}
 
 	return checks
+}
+
+func (s *HttpApiSLO) UpsertRoute(routeDefinition HttpRouteSLODefinition) {
+	slo := NewHttpPathSLO(routeDefinition)
+	s.mux.Upsert(slo.route, slo)
 }
 
 var httpRangeBreakdown = NewHttpStateRangeBreakdown()

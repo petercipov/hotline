@@ -4,6 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"hotline/http"
+	"maps"
 )
 
 var _ = Describe("HTTP RoutePattern Matching", func() {
@@ -230,7 +231,7 @@ var _ = Describe("Mux", func() {
 		It("will match simple path", func() {
 			mux := http.Mux[string]{}
 			var handler = "handler"
-			mux.Add(http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}, &handler)
+			mux.Upsert(http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}, &handler)
 
 			result := mux.LocaleHandler(http.RequestLocator{
 				Method: "GET",
@@ -246,8 +247,8 @@ var _ = Describe("Mux", func() {
 			mux := http.Mux[string]{}
 			var handler1 = "handler1"
 			var handler2 = "handler2"
-			mux.Add(http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}, &handler1)
-			mux.Add(http.Route{Method: "GET", PathPattern: "/users/{user-id}", Host: "example.com", Port: 443}, &handler2)
+			mux.Upsert(http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}, &handler1)
+			mux.Upsert(http.Route{Method: "GET", PathPattern: "/users/{user-id}", Host: "example.com", Port: 443}, &handler2)
 
 			result := mux.LocaleHandler(http.RequestLocator{
 				Method: "GET",
@@ -257,6 +258,61 @@ var _ = Describe("Mux", func() {
 			})
 
 			Expect(result).To(Equal(&handler2))
+		})
+	})
+
+	Context("Handlers", func() {
+		It("will return handlers", func() {
+			mux := http.Mux[string]{}
+			handler1 := "handler1"
+			route1 := http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}
+			handler2 := "handler2"
+			route2 := http.Route{Method: "GET", PathPattern: "/users/{user-id}", Host: "example.com", Port: 443}
+			mux.Upsert(route1, &handler1)
+			mux.Upsert(route2, &handler2)
+
+			collected := maps.Collect(mux.Handlers())
+
+			Expect(collected).To(HaveKeyWithValue(route1, handler1))
+			Expect(collected).To(HaveKeyWithValue(route2, handler2))
+		})
+
+		It("will stop collecting after break", func() {
+			mux := http.Mux[string]{}
+			handler1 := "handler1"
+			route1 := http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}
+			handler2 := "handler2"
+			route2 := http.Route{Method: "GET", PathPattern: "/users/{user-id}", Host: "example.com", Port: 443}
+			mux.Upsert(route1, &handler1)
+			mux.Upsert(route2, &handler2)
+
+			for route, handler := range mux.Handlers() {
+				Expect(route2).To(Equal(route))
+				Expect(handler2).To(Equal(handler))
+				break
+			}
+		})
+	})
+
+	Context("Upsert", func() {
+		It("will update handler for same route", func() {
+			mux := http.Mux[string]{}
+			handler1 := "handler1"
+			route1 := http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}
+			handler2 := "handler2"
+			mux.Upsert(route1, &handler1)
+			mux.Upsert(route1, &handler2)
+
+			count := 0
+			for range mux.Handlers() {
+				count++
+			}
+			Expect(count).To(Equal(1))
+
+			for route, handler := range mux.Handlers() {
+				Expect(route).To(Equal(route1))
+				Expect(handler).To(Equal(handler2))
+			}
 		})
 	})
 })
