@@ -130,7 +130,7 @@ components:
         routes:
           type: array
           items:
-            $ref: '#/components/schemas/RouteSLoDefinition'
+            $ref: '#/components/schemas/RouteSLODefinition'
           description: List of route-specific SLO configurations
 
     Route:
@@ -154,7 +154,7 @@ components:
           description: URL path pattern
           example: "/api/users/{id}"
 
-    RouteSLoDefinition:
+    RouteSLODefinition:
       type: object
       properties:
         routeKey:
@@ -216,9 +216,13 @@ components:
     PercentileThreshold:
       type: object
       required:
+        - name
         - percentile
         - breachThreshold
       properties:
+        name:
+          type: string
+          minLength: 1
         percentile:
           $ref: '#/components/schemas/PercentileValue'
         breachThreshold:

@@ -9,28 +9,34 @@ Feature: Hotline should be able to
     And slo configuration for "IN-dd0391f11aba" is:
       """
       {
-        "routeSLOs": [
+        "routes": [
           {
-            "method": "GET", "host": "127.0.0.1", "path": "/bookings",
-            "latency": {
-              "percentiles": [{ "percentile": 99.9, "thresholdMs": 2000, "name": "p99" }],
-              "windowDuration": "1m0s"
-            },
-            "status": { "expected": [ "200" ], "breachThreshold": 99.9, "windowDuration": "1h0m0s" }
+            "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
+            "definition": {
+              "latency": {
+                "percentiles": [{ "percentile": 99.9, "breachThreshold": "2s", "name": "p99" }],
+                "windowDuration": "1m0s"
+              },
+              "status": { "expected": [ "200" ], "breachThreshold": 99.9, "windowDuration": "1h0m0s" }
+            }
           }, {
-            "method": "POST", "host": "127.0.0.1", "path": "/bookings",
-            "latency": {
-              "percentiles": [{ "percentile": 99.9, "thresholdMs": 2000, "name": "p99" }],
-              "windowDuration": "1m0s"
-            },
-            "status": { "expected": [ "201" ], "breachThreshold": 99.9, "windowDuration": "1h0m0s" }
+            "route": { "method": "POST", "host": "127.0.0.1", "path": "/bookings" },
+            "definition": {
+              "latency": {
+                "percentiles": [{ "percentile": 99.9, "breachThreshold": "2s", "name": "p99" }],
+                "windowDuration": "1m0s"
+              },
+              "status": { "expected": [ "201" ], "breachThreshold": 99.9, "windowDuration": "1h0m0s" }
+            }
           }, {
-            "method": "DELETE", "host": "127.0.0.1", "path": "/bookings/{bookingId}",
-            "latency": {
-              "percentiles": [{ "percentile": 99.9, "thresholdMs": 2000, "name": "p99" }],
-              "windowDuration": "1m0s"
-            },
-            "status": { "expected": [ "204" ], "breachThreshold": 99.9, "windowDuration": "1h0m0s" }
+            "route": { "method": "DELETE", "host": "127.0.0.1", "path": "/bookings/{bookingId}" },
+            "definition": {
+              "latency": {
+                "percentiles": [{ "percentile": 99.9, "breachThreshold": "2s", "name": "p99" }],
+                "windowDuration": "1m0s"
+              },
+              "status": { "expected": [ "204" ], "breachThreshold": 99.9, "windowDuration": "1h0m0s" }
+            }
           }
         ]
       }
