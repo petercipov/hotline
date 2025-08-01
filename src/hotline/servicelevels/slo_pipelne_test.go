@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 	"hotline/clock"
 	"hotline/concurrency"
+	"hotline/http"
 	"hotline/integrations"
 	"hotline/servicelevels"
 	"strconv"
@@ -18,11 +19,13 @@ var _ = Describe("SLO Pipeline", func() {
 	sut := sloPipelineSUT{}
 	It("should report no metrics if configuration not available", func() {
 		sut.forPipeline()
-		sut.NoConfigPresent()
+
 		for i := 0; i < 1000; i++ {
-			sut.IngestOKRequest(integrations.ID("unknown_integration_id-" + strconv.Itoa(i)))
+			id := integrations.ID("unknown_integration_id-" + strconv.Itoa(i))
+			sut.NoConfigPresent(id, "2025-02-22T12:04:00Z")
+			sut.IngestOKRequest(id, "2025-02-22T12:04:05Z")
 		}
-		reports := sut.Report()
+		reports := sut.Report("2025-02-22T12:04:55Z")
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 		for _, report := range reports {
 			Expect(report.Checks).To(BeEmpty())
@@ -31,10 +34,11 @@ var _ = Describe("SLO Pipeline", func() {
 
 	It("should report metrics if configuration available", func() {
 		sut.forPipeline()
+		sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
 		for i := 0; i < 1000; i++ {
-			sut.IngestOKRequest("known_integration_id")
+			sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
 		}
-		reports := sut.Report()
+		reports := sut.Report("2025-02-22T12:04:55Z")
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 		var nonEmptyReports []*servicelevels.CheckReport
@@ -44,6 +48,45 @@ var _ = Describe("SLO Pipeline", func() {
 			}
 		}
 		Expect(nonEmptyReports).To(HaveLen(1))
+	})
+
+	Context("updating slo config", func() {
+		It("should report different config if route was changed", func() {
+			sut.forPipeline()
+			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
+			for i := 0; i < 1000; i++ {
+				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
+			}
+
+			sut.ChangeConfig("known_integration_id", "2025-02-22T12:05:05Z")
+
+			reports := sut.Report("2025-02-22T12:05:05Z")
+			Expect(reports).To(HaveLen(sut.numberOfQueues))
+
+			var nonEmptyReports []*servicelevels.CheckReport
+			for _, report := range reports {
+				if len(report.Checks) > 0 {
+					nonEmptyReports = append(nonEmptyReports, report)
+				}
+			}
+			Expect(nonEmptyReports).To(HaveLen(1))
+		})
+
+		It("should report nothing config was removed", func() {
+			sut.forPipeline()
+			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
+			for i := 0; i < 10; i++ {
+				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
+			}
+			sut.NoConfigPresent("known_integration_id", "2025-02-22T12:04:05Z")
+
+			reports := sut.Report("2025-02-22T12:05:05Z")
+			Expect(reports).To(HaveLen(sut.numberOfQueues))
+
+			for _, report := range reports {
+				Expect(report.Checks).To(BeEmpty())
+			}
+		})
 	})
 })
 
@@ -61,7 +104,9 @@ func (s *sloPipelineSUT) forPipeline() {
 		queueIDs = append(queueIDs, fmt.Sprintf("queue-%d", i))
 	}
 
-	s.sloRepository = &fakeSLORepository{}
+	s.sloRepository = &fakeSLORepository{
+		configs: make(map[integrations.ID]*servicelevels.HttpApiSLODefinition),
+	}
 	s.sloReporter = &fakeSLOReporter{}
 
 	scopes := concurrency.NewScopes(queueIDs, func(_ context.Context) *servicelevels.IntegrationsScope {
@@ -72,12 +117,22 @@ func (s *sloPipelineSUT) forPipeline() {
 	)
 }
 
-func (s *sloPipelineSUT) NoConfigPresent() {
-	s.sloRepository.NoConfig()
+func (s *sloPipelineSUT) NoConfigPresent(id integrations.ID, timeStr string) {
+	s.sloRepository.NoConfig(id)
+
+	now := clock.ParseTime(timeStr)
+	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
+		ID:  id,
+		Now: now,
+
+		Route: http.Route{
+			PathPattern: "/",
+		},
+	})
 }
 
-func (s *sloPipelineSUT) Report() []*servicelevels.CheckReport {
-	now := clock.ParseTime("2025-02-22T12:04:55Z")
+func (s *sloPipelineSUT) Report(timeStr string) []*servicelevels.CheckReport {
+	now := clock.ParseTime(timeStr)
 	s.pipeline.Check(&servicelevels.CheckMessage{
 		Now: now,
 	})
@@ -92,9 +147,9 @@ func (s *sloPipelineSUT) Report() []*servicelevels.CheckReport {
 	}
 }
 
-func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID) {
-	now := clock.ParseTime("2025-02-22T12:04:05Z")
-	s.pipeline.IngestHttpRequests(&servicelevels.IngestRequestsMessage{
+func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID, timeStr string) {
+	now := clock.ParseTime(timeStr)
+	s.pipeline.IngestHttpRequest(&servicelevels.IngestRequestsMessage{
 		ID:  id,
 		Now: now,
 		Reqs: []*servicelevels.HttpRequest{
@@ -104,6 +159,40 @@ func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID) {
 				Method:  "GET",
 				URL:     newUrl("https://test.com/api/"),
 			},
+		},
+	})
+}
+
+func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr string) {
+	now := clock.ParseTime(timeStr)
+
+	s.sloRepository.SetConfig(integrationID, &servicelevels.HttpApiSLODefinition{
+		RouteSLOs: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
+	})
+
+	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
+		ID:  integrationID,
+		Now: now,
+
+		Route: http.Route{
+			PathPattern: "/",
+		},
+	})
+}
+
+func (s *sloPipelineSUT) ForDefaultConfig(integrationID integrations.ID, timeStr string) {
+	now := clock.ParseTime(timeStr)
+
+	s.sloRepository.SetConfig(integrationID, &servicelevels.HttpApiSLODefinition{
+		RouteSLOs: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
+	})
+
+	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
+		ID:  integrationID,
+		Now: now,
+
+		Route: http.Route{
+			PathPattern: "/",
 		},
 	})
 }
@@ -120,20 +209,23 @@ func (f *fakeSLOReporter) ReportChecks(_ context.Context, report *servicelevels.
 }
 
 type fakeSLORepository struct {
-	noConfig bool
+	configs map[integrations.ID]*servicelevels.HttpApiSLODefinition
 }
 
-func (f *fakeSLORepository) GetConfig(_ context.Context, _ integrations.ID) *servicelevels.HttpApiSLODefinition {
-	if f.noConfig {
+func (f *fakeSLORepository) GetConfig(_ context.Context, id integrations.ID) *servicelevels.HttpApiSLODefinition {
+
+	sloConf, found := f.configs[id]
+	if !found {
 		return nil
 	}
-	apiSLO := servicelevels.HttpApiSLODefinition{
-		RouteSLOs: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
-	}
 
-	return &apiSLO
+	return sloConf
 }
 
-func (f *fakeSLORepository) NoConfig() {
-	f.noConfig = true
+func (f *fakeSLORepository) SetConfig(id integrations.ID, slo *servicelevels.HttpApiSLODefinition) {
+	f.configs[id] = slo
+}
+
+func (f *fakeSLORepository) NoConfig(id integrations.ID) {
+	delete(f.configs, id)
 }

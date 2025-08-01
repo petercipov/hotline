@@ -74,7 +74,9 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 	converter := otel.NewProtoConverter()
 	otelHandler := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
 		sloRequests := ingestions.ToSLORequestMessage(requests, managedTime.Now())
-		sloPipeline.IngestHttpRequests(sloRequests...)
+		for _, req := range sloRequests {
+			sloPipeline.IngestHttpRequest(req)
+		}
 	}, converter)
 
 	otelIngestionServer := createServer(cfg.OtelHttpIngestion.Host, otelHandler)
@@ -86,7 +88,7 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 		egressTransport,
 		func(req *ingestions.HttpRequest) {
 			sloRequest := ingestions.ToSLOSingleRequestMessage(req, managedTime.Now())
-			sloPipeline.IngestHttpRequests(sloRequest)
+			sloPipeline.IngestHttpRequest(sloRequest)
 		},
 		managedTime,
 		60*time.Second,

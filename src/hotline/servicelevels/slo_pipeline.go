@@ -3,6 +3,7 @@ package servicelevels
 import (
 	"context"
 	"hotline/concurrency"
+	"hotline/http"
 	"hotline/integrations"
 	"time"
 )
@@ -26,14 +27,16 @@ func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsScope]) *SLOPipeline 
 	return p
 }
 
-func (p *SLOPipeline) IngestHttpRequests(messages ...*IngestRequestsMessage) {
-	for _, m := range messages {
-		p.fanOut.Send(m.GetMessageID(), m)
-	}
+func (p *SLOPipeline) IngestHttpRequest(m *IngestRequestsMessage) {
+	p.fanOut.Send(m.GetMessageID(), m)
 }
 
 func (p *SLOPipeline) Check(m *CheckMessage) {
 	p.fanOut.Broadcast(m)
+}
+
+func (p *SLOPipeline) ModifyRoute(m *ModifyRouteMessage) {
+	p.fanOut.Send(m.GetMessageID(), m)
 }
 
 type Check struct {
@@ -54,6 +57,12 @@ type IntegrationsScope struct {
 	checkReporter ChecksReporter
 }
 
+func (scope *IntegrationsScope) AdvanceTime(now time.Time) {
+	if now.After(scope.LastObservedTime) {
+		scope.LastObservedTime = now
+	}
+}
+
 func NewEmptyIntegrationsScope(sloRepository SLODefinitionRepository, checkReporter ChecksReporter) *IntegrationsScope {
 	return &IntegrationsScope{
 		Integrations:     make(map[integrations.ID]*HttpApiSLO),
@@ -68,10 +77,8 @@ type CheckMessage struct {
 	Now time.Time
 }
 
-func (m *CheckMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
-	if m.Now.After(scope.LastObservedTime) {
-		scope.LastObservedTime = m.Now
-	}
+func (message *CheckMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+	scope.AdvanceTime(message.Now)
 
 	var checks []Check
 	for id, integration := range scope.Integrations {
@@ -95,25 +102,56 @@ type IngestRequestsMessage struct {
 	Reqs []*HttpRequest
 }
 
-func (m *IngestRequestsMessage) GetMessageID() []byte {
-	return []byte(m.ID)
+func (message *IngestRequestsMessage) GetMessageID() []byte {
+	return []byte(message.ID)
 }
 
-func (m *IngestRequestsMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
-	if m.Now.After(scope.LastObservedTime) {
-		scope.LastObservedTime = m.Now
-	}
+func (message *IngestRequestsMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+	scope.AdvanceTime(message.Now)
 
-	slo, found := scope.Integrations[m.ID]
+	slo, found := scope.Integrations[message.ID]
 	if !found {
-		config := scope.sloRepository.GetConfig(ctx, m.ID)
+		config := scope.sloRepository.GetConfig(ctx, message.ID)
 		if config == nil {
 			return
 		}
 		slo = NewHttpApiSLO(*config)
-		scope.Integrations[m.ID] = slo
+		scope.Integrations[message.ID] = slo
 	}
-	for _, req := range m.Reqs {
+	for _, req := range message.Reqs {
 		slo.AddRequest(scope.LastObservedTime, req)
 	}
+}
+
+type ModifyRouteMessage struct {
+	ID  integrations.ID
+	Now time.Time
+
+	Route http.Route
+}
+
+func (message *ModifyRouteMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+	scope.AdvanceTime(message.Now)
+
+	slo, found := scope.Integrations[message.ID]
+	if !found {
+		return
+	}
+
+	config := scope.sloRepository.GetConfig(ctx, message.ID)
+	if config == nil {
+		delete(scope.Integrations, message.ID)
+		return
+	}
+
+	for _, slosConfig := range config.RouteSLOs {
+		if slosConfig.Route == message.Route {
+			slo.UpsertRoute(slosConfig)
+			break
+		}
+	}
+}
+
+func (message *ModifyRouteMessage) GetMessageID() []byte {
+	return []byte(message.ID)
 }
