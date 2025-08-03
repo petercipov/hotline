@@ -11,6 +11,10 @@ import (
 var _ = Describe("Manual Clock", func() {
 	sut := manualClockSUT{}
 
+	AfterEach(func() {
+		sut.clock = nil
+	})
+
 	It("should execute after function after given duration", func() {
 		sut.ForManualClock()
 		now := sut.Now()
@@ -83,6 +87,9 @@ func (s *manualClockSUT) WithAutoAdvance() {
 func (s *manualClockSUT) Sleep() time.Time {
 	duration := 1 * time.Millisecond
 	go func() {
+		if s.clock == nil {
+			return
+		}
 		s.Advance(duration)
 	}()
 	s.clock.Sleep(duration)
@@ -94,7 +101,13 @@ func (s *manualClockSUT) Now() time.Time {
 }
 
 func (s *manualClockSUT) Advance(d time.Duration) time.Time {
+	if s.clock == nil {
+		return time.Time{}
+	}
 	s.clock.Advance(d)
+	if s.clock == nil {
+		return time.Time{}
+	}
 	return s.clock.Now()
 }
 
