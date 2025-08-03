@@ -67,7 +67,6 @@ type ListDefinitions struct {
 type PercentileThreshold struct {
 	// BreachThreshold Latency threshold (e.g., "1s", "2500ms", "20s")
 	BreachThreshold Duration `json:"breachThreshold"`
-	Name            string   `json:"name"`
 
 	// Percentile Percentile value (0.0 to 100.0)
 	Percentile PercentileValue `json:"percentile"`

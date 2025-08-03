@@ -85,7 +85,7 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 		result[i] = servicelevels.PercentileDefinition{
 			Percentile: percentileValue,
 			Threshold:  servicelevels.LatencyMs(percentile.BreachThreshold.toMs()),
-			Name:       percentile.Name,
+			Name:       percentileValue.Name(),
 		}
 	}
 	return result, nil

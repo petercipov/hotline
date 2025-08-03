@@ -216,13 +216,9 @@ components:
     PercentileThreshold:
       type: object
       required:
-        - name
         - percentile
         - breachThreshold
       properties:
-        name:
-          type: string
-          minLength: 1
         percentile:
           $ref: '#/components/schemas/PercentileValue'
         breachThreshold:
