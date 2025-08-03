@@ -33,7 +33,7 @@ var _ = Describe("Fan Out", func() {
 	It("will pass multiple message to multiple queues", func() {
 		sut.forFanOut(8)
 		for i := 0; i < 100000; i++ {
-			sut.sendMessageWithId([]byte(fmt.Sprintf("message id %d", i)))
+			sut.sendMessageWithId(fmt.Sprintf("message id %d", i))
 		}
 		messages := sut.expectMessageReceived(100000)
 		Expect(messages).To(HaveLen(100000))
@@ -48,18 +48,18 @@ var _ = Describe("Fan Out", func() {
 	It("will broadcast same sage to multiple queues", func() {
 		sut.forFanOut(8)
 		for i := 0; i < 100; i++ {
-			sut.broadcastMessageWithId([]byte(fmt.Sprintf("message id %d", i)))
+			sut.broadcastMessageWithId(fmt.Sprintf("message id %d", i))
 		}
-		messages := sut.expectMessageReceived(8 * 100)
-		Expect(messages).To(HaveLen(8 * 100))
+		received := sut.expectMessageReceived(8 * 100)
+		Expect(received).To(HaveLen(8 * 100))
 
-		processIds := map[string]int{}
-		for _, message := range messages {
-			processIds[message.processId]++
+		byProcessId := map[string][]sutMessage{}
+		for _, message := range received {
+			byProcessId[message.processId] = append(byProcessId[message.processId], message)
 		}
-		Expect(processIds).To(HaveLen(8))
-
-		for _, count := range processIds {
+		Expect(byProcessId).To(HaveLen(8))
+		for _, messages := range byProcessId {
+			count := len(messages)
 			Expect(count).To(Equal(100))
 		}
 	})
@@ -96,19 +96,20 @@ func (f *fanOutSut) forEmptyFanOut() {
 
 func (f *fanOutSut) Close() {
 	f.fanOut.Close()
+	f.fanOut = nil
 }
 
 func (f *fanOutSut) scheduleMessage() {
-	f.sendMessageWithId([]byte{})
+	f.sendMessageWithId("")
 }
 
-func (f *fanOutSut) sendMessageWithId(id []byte) {
-	f.fanOut.Send(id, &sutMessage{
+func (f *fanOutSut) sendMessageWithId(id string) {
+	f.fanOut.Send([]byte(id), &sutMessage{
 		id: id,
 	})
 }
 
-func (f *fanOutSut) broadcastMessageWithId(id []byte) {
+func (f *fanOutSut) broadcastMessageWithId(id string) {
 	f.fanOut.Broadcast(&sutMessage{
 		id: id,
 	})
@@ -119,7 +120,6 @@ func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
 		var allMessages []sutMessage
 		for _, scope := range f.scopes.ForEachScope() {
 			allMessages = append(allMessages, scope.Value.messages...)
-
 		}
 		if len(allMessages) >= count {
 			return allMessages
@@ -129,7 +129,7 @@ func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
 }
 
 type sutMessage struct {
-	id        []byte
+	id        string
 	processId string
 }
 

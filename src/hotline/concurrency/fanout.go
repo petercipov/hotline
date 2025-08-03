@@ -12,15 +12,17 @@ type FanOut[M any, S any] struct {
 
 func NewFanOut[M any, S any](scopes *Scopes[S], queueProcessor func(ctx context.Context, m M, scope *S)) *FanOut[M, S] {
 	channels := make([]chan M, scopes.Len())
+	for i := range channels {
+		channels[i] = make(chan M)
+	}
+
 	i := 0
 	for queueID, scope := range scopes.ForEachScope() {
-		messages := make(chan M)
-		channels[i] = messages
 		go func(ctx context.Context, messages chan M, processID string, queueScope *S) {
 			for message := range messages {
 				queueProcessor(ctx, message, queueScope)
 			}
-		}(scope.Ctx, messages, queueID, scope.Value)
+		}(scope.Ctx, channels[i], queueID, scope.Value)
 		i++
 	}
 
