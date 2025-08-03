@@ -115,12 +115,10 @@ components:
       example: GET:api.example.com:8080:/api/users/{id}
 
     PercentileValue:
-      type: number
-      format: double
-      description: Percentile value (0.0 to 100.0)
-      minimum: 0
-      maximum: 100
-      example: 99.9
+      type: string
+      description: Percentile value (0.0% to 100.0%)
+      example: "99.9%"
+      x-go-type: Percentile
 
     ListDefinitions:
       type: object

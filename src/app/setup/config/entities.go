@@ -27,6 +27,26 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+type Percentile servicelevels.Percentile
+
+func (p *Percentile) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	val, err := servicelevels.ParsePercentileFromValue(str)
+	if err != nil {
+		return err
+	}
+	*p = Percentile(val)
+	return nil
+}
+
+func (p *Percentile) Cast() *servicelevels.Percentile {
+	return (*servicelevels.Percentile)(p)
+}
+
 func ParseServiceLevelFromBytes(data []byte) (servicelevels.HttpApiSLODefinition, error) {
 	var config ListDefinitions
 	unmarshalErr := json.Unmarshal(data, &config)
@@ -42,7 +62,8 @@ func ParseServiceLevel(config ListDefinitions) (servicelevels.HttpApiSLODefiniti
 	}
 
 	for i, route := range config.Routes {
-		breachThreshold, breachErr := servicelevels.ParsePercent(route.Definition.Status.BreachThreshold)
+		percentile := route.Definition.Status.BreachThreshold.Cast()
+		breachThreshold, breachErr := servicelevels.ParsePercent(percentile.Normalized() * 100)
 		if breachErr != nil {
 			return servicelevels.HttpApiSLODefinition{}, breachErr
 		}
@@ -78,12 +99,9 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 	result := make([]servicelevels.PercentileDefinition, len(percentiles))
 
 	for i, percentile := range percentiles {
-		percentileValue, parseErr := servicelevels.ParsePercentile(percentile.Percentile)
-		if parseErr != nil {
-			return nil, parseErr
-		}
+		percentileValue := percentile.Percentile.Cast()
 		result[i] = servicelevels.PercentileDefinition{
-			Percentile: percentileValue,
+			Percentile: *percentileValue,
 			Threshold:  servicelevels.LatencyMs(percentile.BreachThreshold.toMs()),
 			Name:       percentileValue.Name(),
 		}

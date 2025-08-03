@@ -68,12 +68,12 @@ type PercentileThreshold struct {
 	// BreachThreshold Latency threshold (e.g., "1s", "2500ms", "20s")
 	BreachThreshold Duration `json:"breachThreshold"`
 
-	// Percentile Percentile value (0.0 to 100.0)
+	// Percentile Percentile value (0.0% to 100.0%)
 	Percentile PercentileValue `json:"percentile"`
 }
 
-// PercentileValue Percentile value (0.0 to 100.0)
-type PercentileValue = float64
+// PercentileValue Percentile value (0.0% to 100.0%)
+type PercentileValue = Percentile
 
 // Route defines model for Route.
 type Route struct {
@@ -109,7 +109,7 @@ type SLODefinition struct {
 
 // StatusSLODefinition defines model for StatusSLODefinition.
 type StatusSLODefinition struct {
-	// BreachThreshold Percentile value (0.0 to 100.0)
+	// BreachThreshold Percentile value (0.0% to 100.0%)
 	BreachThreshold PercentileValue `json:"breachThreshold"`
 
 	// Expected List of expected HTTP status codes

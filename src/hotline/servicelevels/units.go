@@ -3,6 +3,7 @@ package servicelevels
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -18,7 +19,17 @@ func ParsePercentile(value float64) (Percentile, error) {
 	if value > 0 && value <= 100.0 {
 		return Percentile(value / 100.0), nil
 	}
-	return Percentile(0), errors.New("value out of range")
+	return Percentile(0), errors.New("value out of range >0 and <=100")
+}
+
+func ParsePercentileFromValue(value string) (Percentile, error) {
+	strVal := strings.TrimSpace(strings.ReplaceAll(value, "%", ""))
+
+	floatVal, parseErr := strconv.ParseFloat(strVal, 64)
+	if parseErr != nil {
+		return Percentile(0), parseErr
+	}
+	return ParsePercentile(floatVal)
 }
 
 func (p *Percentile) Normalized() float64 {
