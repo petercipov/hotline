@@ -215,11 +215,11 @@ components:
       type: object
       required:
         - percentile
-        - breachThreshold
+        - breachLatency
       properties:
         percentile:
           $ref: '#/components/schemas/PercentileValue'
-        breachThreshold:
+        breachLatency:
           type: string
           x-go-type: Duration
           description: Latency threshold (e.g., "1s", "2500ms", "20s")

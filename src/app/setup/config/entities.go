@@ -94,7 +94,7 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 		percentileValue := percentile.Percentile.Cast()
 		result[i] = servicelevels.PercentileDefinition{
 			Percentile: *percentileValue,
-			Threshold:  servicelevels.LatencyMs(percentile.BreachThreshold.toMs()),
+			Threshold:  servicelevels.LatencyMs(percentile.BreachLatency.toMs()),
 			Name:       percentileValue.Name(),
 		}
 	}
