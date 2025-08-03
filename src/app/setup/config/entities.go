@@ -9,8 +9,13 @@ import (
 
 type Duration time.Duration
 
-func (d *Duration) toMs() int64 {
-	return time.Duration(*d).Milliseconds()
+func (d Duration) toMs() int64 {
+	return time.Duration(d).Milliseconds()
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	tVal := time.Duration(d).String()
+	return json.Marshal(tVal)
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) error {
@@ -24,6 +29,11 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 }
 
 type Percentile servicelevels.Percentile
+
+func (p Percentile) MarshalJSON() ([]byte, error) {
+	str := p.Cast().AsValue()
+	return json.Marshal(str)
+}
 
 func (p *Percentile) UnmarshalJSON(data []byte) error {
 	var str string
@@ -43,48 +53,31 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 	return (*servicelevels.Percentile)(p)
 }
 
-func ParseServiceLevelFromBytes(data []byte) (servicelevels.HttpApiSLODefinition, error) {
-	var config ListDefinitions
-	unmarshalErr := json.Unmarshal(data, &config)
-	if unmarshalErr != nil {
-		return servicelevels.HttpApiSLODefinition{}, unmarshalErr
-	}
-	return ParseServiceLevel(config)
-}
+func ParseRoute(definition SLODefinition, route Route) (servicelevels.HttpRouteSLODefinition, error) {
+	percentile := definition.Status.BreachThreshold.Cast()
 
-func ParseServiceLevel(config ListDefinitions) (servicelevels.HttpApiSLODefinition, error) {
-	result := servicelevels.HttpApiSLODefinition{
-		RouteSLOs: make([]servicelevels.HttpRouteSLODefinition, len(config.Routes)),
+	defs, defsErr := parsePercentileDefinitions(definition.Latency.Percentiles)
+	if defsErr != nil {
+		return servicelevels.HttpRouteSLODefinition{}, defsErr
 	}
 
-	for i, route := range config.Routes {
-		percentile := route.Definition.Status.BreachThreshold.Cast()
-
-		defs, defsErr := parsePercentileDefinitions(route.Definition.Latency.Percentiles)
-		if defsErr != nil {
-			return servicelevels.HttpApiSLODefinition{}, defsErr
-		}
-
-		result.RouteSLOs[i] = servicelevels.HttpRouteSLODefinition{
-			Route: http.Route{
-				Method:      string(route.Route.Method),
-				PathPattern: route.Route.Path,
-				Host:        route.Route.Host,
-				Port:        route.Route.Port,
-			},
-			Latency: servicelevels.HttpLatencySLODefinition{
-				Percentiles:    defs,
-				WindowDuration: time.Duration(route.Definition.Latency.WindowDuration),
-			},
-			Status: servicelevels.HttpStatusSLODefinition{
-				Expected:        route.Definition.Status.Expected,
-				BreachThreshold: *percentile,
-				WindowDuration:  time.Duration(route.Definition.Status.WindowDuration),
-			},
-		}
-	}
-
-	return result, nil
+	return servicelevels.HttpRouteSLODefinition{
+		Route: http.Route{
+			Method:      string(route.Method),
+			PathPattern: route.Path,
+			Host:        route.Host,
+			Port:        route.Port,
+		},
+		Latency: servicelevels.HttpLatencySLODefinition{
+			Percentiles:    defs,
+			WindowDuration: time.Duration(definition.Latency.WindowDuration),
+		},
+		Status: servicelevels.HttpStatusSLODefinition{
+			Expected:        definition.Status.Expected,
+			BreachThreshold: *percentile,
+			WindowDuration:  time.Duration(definition.Status.WindowDuration),
+		},
+	}, nil
 }
 
 func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelevels.PercentileDefinition, error) {

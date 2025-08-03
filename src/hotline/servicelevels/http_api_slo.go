@@ -20,7 +20,17 @@ type HttpApiSLO struct {
 }
 
 type HttpApiSLODefinition struct {
-	RouteSLOs []HttpRouteSLODefinition
+	Routes []HttpRouteSLODefinition
+}
+
+func (d *HttpApiSLODefinition) Upsert(definition HttpRouteSLODefinition) {
+	for i, route := range d.Routes {
+		if route.Route == definition.Route {
+			d.Routes[i] = definition
+			return
+		}
+	}
+	d.Routes = append(d.Routes, definition)
 }
 
 type HttpRouteSLODefinition struct {
@@ -43,7 +53,7 @@ func NewHttpApiSLO(definition HttpApiSLODefinition) *HttpApiSLO {
 	apiSlo := &HttpApiSLO{
 		mux: &hotlinehttp.Mux[HttpRouteSLO]{},
 	}
-	for _, routeDefinition := range definition.RouteSLOs {
+	for _, routeDefinition := range definition.Routes {
 		apiSlo.UpsertRoute(routeDefinition)
 	}
 	return apiSlo

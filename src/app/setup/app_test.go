@@ -4,12 +4,13 @@ import (
 	"app/setup"
 	"app/setup/config"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hotline/clock"
-	"hotline/integrations"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,7 +32,7 @@ type appSut struct {
 	fakeCollector    *fakeCollector
 	fakeEgressTarget *fakeEgressTarget
 
-	fakeSLOConfigRepository *config.FakeSLOConfigRepository
+	fakeSLOConfigRepository *config.InMemorySLODefinitions
 }
 
 func newAppSut() *appSut {
@@ -40,7 +41,7 @@ func newAppSut() *appSut {
 		500*time.Microsecond)
 	collector := &fakeCollector{}
 	target := newFakeEgressTarget(manualClock, 1234)
-	fakeSLOConfigRepository := config.NewFakeSLOConfigRepository()
+	fakeSLOConfigRepository := config.NewInMemorySLODefinitions()
 	return &appSut{
 		fakeCollector:           collector,
 		fakeEgressTarget:        target,
@@ -80,12 +81,29 @@ func (a *appSut) sendEgressTraffic(ctx context.Context, integrationID string) (c
 }
 
 func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
-	definition, parseErr := config.ParseServiceLevelFromBytes([]byte(configRaw))
-	if parseErr != nil {
-		return ctx, parseErr
+	routeRaws := strings.Split(configRaw, "|||")
+
+	configClient, createClientErr := config.NewClient(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
 	}
 
-	a.fakeSLOConfigRepository.SetConfig(integrations.ID(integrationID), definition)
+	for _, routeRaw := range routeRaws {
+		var reqObj config.UpsertSLOConfigJSONRequestBody
+		unmarshalErr := json.Unmarshal([]byte(strings.TrimSpace(routeRaw)), &reqObj)
+		if unmarshalErr != nil {
+			return ctx, unmarshalErr
+		}
+		_, responseErr := configClient.UpsertSLOConfig(
+			ctx,
+			&config.UpsertSLOConfigParams{XIntegrationId: integrationID},
+			reqObj)
+
+		if responseErr != nil {
+			return ctx, responseErr
+		}
+	}
+
 	return ctx, nil
 }
 

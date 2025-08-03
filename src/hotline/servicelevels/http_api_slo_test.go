@@ -227,6 +227,24 @@ var _ = Describe("Http Api Slo", func() {
 			Breach:    nil,
 		}))
 	})
+
+	It("will override default route definition", func() {
+		def := defaultRouteDefinition("iam.example.com", "/users")
+		def.Latency.WindowDuration = 1 * time.Minute
+
+		sloDef := servicelevels.HttpApiSLODefinition{}
+
+		sloDef.Upsert(def)
+		Expect(sloDef.Routes[0].Latency.WindowDuration).To(Equal(1 * time.Minute))
+
+		defNext := defaultRouteDefinition("iam.example.com", "/users")
+		defNext.Latency.WindowDuration = 10 * time.Minute
+		sloDef.Upsert(defNext)
+
+		Expect(sloDef.Routes).To(HaveLen(1))
+		Expect(sloDef.Routes[0].Latency.WindowDuration).To(Equal(10 * time.Minute))
+
+	})
 })
 
 type suthttpapislo struct {
@@ -244,9 +262,13 @@ func (s *suthttpapislo) AddRequest(request *servicelevels.HttpRequest) {
 }
 
 func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.HttpRouteSLODefinition) {
-	s.slo = servicelevels.NewHttpApiSLO(servicelevels.HttpApiSLODefinition{
-		RouteSLOs: routes,
-	})
+	definition := servicelevels.HttpApiSLODefinition{}
+
+	for _, route := range routes {
+		definition.Upsert(route)
+	}
+
+	s.slo = servicelevels.NewHttpApiSLO(definition)
 }
 
 func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRouteSLODefinition) {

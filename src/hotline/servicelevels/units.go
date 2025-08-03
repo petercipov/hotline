@@ -47,4 +47,11 @@ func (p *Percentile) Name() string {
 	return strings.TrimRight(strings.TrimRight(formattedStr, "0"), ".")
 }
 
+func (p *Percentile) AsValue() string {
+	percentile := p.AsPercent()
+
+	formattedStr := fmt.Sprintf("%.5f", percentile)
+	return strings.TrimRight(strings.TrimRight(formattedStr, "0"), ".") + "%"
+}
+
 type LatencyMs int64

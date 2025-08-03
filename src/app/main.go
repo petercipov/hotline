@@ -14,7 +14,7 @@ import (
 
 func main() {
 	systemClock := clock.NewSystemClock()
-	fakeRepository := config.NewFakeSLOConfigRepository()
+	fakeRepository := config.NewInMemorySLODefinitions()
 	app, appErr := setup.NewApp(
 		&setup.Config{
 			OtelHttpReporter: struct {

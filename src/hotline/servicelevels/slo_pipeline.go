@@ -144,7 +144,7 @@ func (message *ModifyRouteMessage) Execute(ctx context.Context, scope *Integrati
 		return
 	}
 
-	for _, slosConfig := range config.RouteSLOs {
+	for _, slosConfig := range config.Routes {
 		if slosConfig.Route == message.Route {
 			slo.UpsertRoute(slosConfig)
 			break

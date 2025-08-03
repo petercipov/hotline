@@ -6,8 +6,14 @@
 package config
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/oapi-codegen/runtime"
 )
@@ -25,24 +31,10 @@ const (
 	TRACE   RouteMethod = "TRACE"
 )
 
-// CreateSLORequest defines model for CreateSLORequest.
-type CreateSLORequest struct {
-	Definition SLODefinition `json:"definition,omitempty"`
-	Route      Route         `json:"route,omitempty"`
-}
-
-// CreatedSLORequest defines model for CreatedSLORequest.
-type CreatedSLORequest struct {
-	RouteKey RouteKey `json:"routeKey,omitempty"`
-}
-
 // Error defines model for Error.
 type Error struct {
-	// Details Additional error details
-	Details map[string]interface{} `json:"details,omitempty"`
-
-	// Error Error code
-	Error string `json:"error"`
+	// Code Error code
+	Code string `json:"code"`
 
 	// Message Human-readable error message
 	Message string `json:"message"`
@@ -69,11 +61,8 @@ type PercentileThreshold struct {
 	BreachLatency Duration `json:"breachLatency"`
 
 	// Percentile Percentile value (0.0% to 100.0%)
-	Percentile PercentileValue `json:"percentile"`
+	Percentile Percentile `json:"percentile"`
 }
-
-// PercentileValue Percentile value (0.0% to 100.0%)
-type PercentileValue = Percentile
 
 // Route defines model for Route.
 type Route struct {
@@ -110,7 +99,7 @@ type SLODefinition struct {
 // StatusSLODefinition defines model for StatusSLODefinition.
 type StatusSLODefinition struct {
 	// BreachThreshold Percentile value (0.0% to 100.0%)
-	BreachThreshold PercentileValue `json:"breachThreshold"`
+	BreachThreshold Percentile `json:"breachThreshold"`
 
 	// Expected List of expected HTTP status codes
 	Expected []string `json:"expected"`
@@ -119,8 +108,22 @@ type StatusSLODefinition struct {
 	WindowDuration Duration `json:"windowDuration"`
 }
 
+// UpsertSLORequest defines model for UpsertSLORequest.
+type UpsertSLORequest struct {
+	Definition SLODefinition `json:"definition,omitempty"`
+	Route      Route         `json:"route,omitempty"`
+}
+
+// UpsertSLOResponse defines model for UpsertSLOResponse.
+type UpsertSLOResponse struct {
+	RouteKey RouteKey `json:"routeKey,omitempty"`
+}
+
 // IntegrationID defines model for IntegrationID.
 type IntegrationID = string
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Error
 
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = Error
@@ -134,8 +137,8 @@ type GetSLOConfigParams struct {
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
-// CreateSLOConfigParams defines parameters for CreateSLOConfig.
-type CreateSLOConfigParams struct {
+// UpsertSLOConfigParams defines parameters for UpsertSLOConfig.
+type UpsertSLOConfigParams struct {
 	// XIntegrationId Unique identifier of the SLO configuration
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
@@ -146,20 +149,575 @@ type DeleteSLOConfigParams struct {
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
-// CreateSLOConfigJSONRequestBody defines body for CreateSLOConfig for application/json ContentType.
-type CreateSLOConfigJSONRequestBody = CreateSLORequest
+// UpsertSLOConfigJSONRequestBody defines body for UpsertSLOConfig for application/json ContentType.
+type UpsertSLOConfigJSONRequestBody = UpsertSLORequest
+
+// RequestEditorFn  is the function signature for the RequestEditor callback function
+type RequestEditorFn func(ctx context.Context, req *http.Request) error
+
+// Doer performs HTTP requests.
+//
+// The standard http.Client implements this interface.
+type HttpRequestDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Client which conforms to the OpenAPI3 specification for this service.
+type Client struct {
+	// The endpoint of the server conforming to this interface, with scheme,
+	// https://api.deepmap.com for example. This can contain a path relative
+	// to the server, such as https://api.deepmap.com/dev-test, and all the
+	// paths in the swagger spec will be appended to the server.
+	Server string
+
+	// Doer for performing requests, typically a *http.Client with any
+	// customized settings, such as certificate chains.
+	Client HttpRequestDoer
+
+	// A list of callbacks for modifying requests which are generated before sending over
+	// the network.
+	RequestEditors []RequestEditorFn
+}
+
+// ClientOption allows setting custom parameters during construction
+type ClientOption func(*Client) error
+
+// Creates a new Client, with reasonable defaults
+func NewClient(server string, opts ...ClientOption) (*Client, error) {
+	// create a client with sane default values
+	client := Client{
+		Server: server,
+	}
+	// mutate client and add all optional params
+	for _, o := range opts {
+		if err := o(&client); err != nil {
+			return nil, err
+		}
+	}
+	// ensure the server URL always has a trailing slash
+	if !strings.HasSuffix(client.Server, "/") {
+		client.Server += "/"
+	}
+	// create httpClient, if not already present
+	if client.Client == nil {
+		client.Client = &http.Client{}
+	}
+	return &client, nil
+}
+
+// WithHTTPClient allows overriding the default Doer, which is
+// automatically created using http.Client. This is useful for tests.
+func WithHTTPClient(doer HttpRequestDoer) ClientOption {
+	return func(c *Client) error {
+		c.Client = doer
+		return nil
+	}
+}
+
+// WithRequestEditorFn allows setting up a callback function, which will be
+// called right before sending the request. This can be used to mutate the request.
+func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
+	return func(c *Client) error {
+		c.RequestEditors = append(c.RequestEditors, fn)
+		return nil
+	}
+}
+
+// The interface specification for the client above.
+type ClientInterface interface {
+	// GetSLOConfig request
+	GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpsertSLOConfigWithBody request with any body
+	UpsertSLOConfigWithBody(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpsertSLOConfig(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSLOConfig request
+	DeleteSLOConfig(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSLOConfigRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpsertSLOConfigWithBody(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertSLOConfigRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpsertSLOConfig(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertSLOConfigRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteSLOConfig(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSLOConfigRequest(c.Server, routekey, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewGetSLOConfigRequest generates requests for GetSLOConfig
+func NewGetSLOConfigRequest(server string, params *GetSLOConfigParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/slo-definitions/")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewUpsertSLOConfigRequest calls the generic UpsertSLOConfig builder with application/json body
+func NewUpsertSLOConfigRequest(server string, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpsertSLOConfigRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewUpsertSLOConfigRequestWithBody generates requests for UpsertSLOConfig with any type of body
+func NewUpsertSLOConfigRequestWithBody(server string, params *UpsertSLOConfigParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/slo-definitions/")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewDeleteSLOConfigRequest generates requests for DeleteSLOConfig
+func NewDeleteSLOConfigRequest(server string, routekey RouteKey, params *DeleteSLOConfigParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "routekey", runtime.ParamLocationPath, routekey)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/slo-definitions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
+	for _, r := range c.RequestEditors {
+		if err := r(ctx, req); err != nil {
+			return err
+		}
+	}
+	for _, r := range additionalEditors {
+		if err := r(ctx, req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ClientWithResponses builds on ClientInterface to offer response payloads
+type ClientWithResponses struct {
+	ClientInterface
+}
+
+// NewClientWithResponses creates a new ClientWithResponses, which wraps
+// Client with return type handling
+func NewClientWithResponses(server string, opts ...ClientOption) (*ClientWithResponses, error) {
+	client, err := NewClient(server, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &ClientWithResponses{client}, nil
+}
+
+// WithBaseURL overrides the baseURL.
+func WithBaseURL(baseURL string) ClientOption {
+	return func(c *Client) error {
+		newBaseURL, err := url.Parse(baseURL)
+		if err != nil {
+			return err
+		}
+		c.Server = newBaseURL.String()
+		return nil
+	}
+}
+
+// ClientWithResponsesInterface is the interface specification for the client with responses above.
+type ClientWithResponsesInterface interface {
+	// GetSLOConfigWithResponse request
+	GetSLOConfigWithResponse(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*GetSLOConfigResponse, error)
+
+	// UpsertSLOConfigWithBodyWithResponse request with any body
+	UpsertSLOConfigWithBodyWithResponse(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error)
+
+	UpsertSLOConfigWithResponse(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error)
+
+	// DeleteSLOConfigWithResponse request
+	DeleteSLOConfigWithResponse(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*DeleteSLOConfigResponse, error)
+}
+
+type GetSLOConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListDefinitions
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSLOConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSLOConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpsertSLOConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *UpsertSLOResponse
+	JSON201      *UpsertSLOResponse
+	JSON400      *BadRequest
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpsertSLOConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpsertSLOConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteSLOConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSLOConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSLOConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// GetSLOConfigWithResponse request returning *GetSLOConfigResponse
+func (c *ClientWithResponses) GetSLOConfigWithResponse(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*GetSLOConfigResponse, error) {
+	rsp, err := c.GetSLOConfig(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSLOConfigResponse(rsp)
+}
+
+// UpsertSLOConfigWithBodyWithResponse request with arbitrary body returning *UpsertSLOConfigResponse
+func (c *ClientWithResponses) UpsertSLOConfigWithBodyWithResponse(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error) {
+	rsp, err := c.UpsertSLOConfigWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertSLOConfigResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpsertSLOConfigWithResponse(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error) {
+	rsp, err := c.UpsertSLOConfig(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertSLOConfigResponse(rsp)
+}
+
+// DeleteSLOConfigWithResponse request returning *DeleteSLOConfigResponse
+func (c *ClientWithResponses) DeleteSLOConfigWithResponse(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*DeleteSLOConfigResponse, error) {
+	rsp, err := c.DeleteSLOConfig(ctx, routekey, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSLOConfigResponse(rsp)
+}
+
+// ParseGetSLOConfigResponse parses an HTTP response from a GetSLOConfigWithResponse call
+func ParseGetSLOConfigResponse(rsp *http.Response) (*GetSLOConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSLOConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListDefinitions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpsertSLOConfigResponse parses an HTTP response from a UpsertSLOConfigWithResponse call
+func ParseUpsertSLOConfigResponse(rsp *http.Response) (*UpsertSLOConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpsertSLOConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpsertSLOResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UpsertSLOResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSLOConfigResponse parses an HTTP response from a DeleteSLOConfigWithResponse call
+func ParseDeleteSLOConfigResponse(rsp *http.Response) (*DeleteSLOConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSLOConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List SLO definitions
 	// (GET /slo-definitions/)
 	GetSLOConfig(w http.ResponseWriter, r *http.Request, params GetSLOConfigParams)
-	// create SLO definitions
+	// Upserts SLO definitions
 	// (POST /slo-definitions/)
-	CreateSLOConfig(w http.ResponseWriter, r *http.Request, params CreateSLOConfigParams)
+	UpsertSLOConfig(w http.ResponseWriter, r *http.Request, params UpsertSLOConfigParams)
 	// Delete SLO definitions
-	// (DELETE /slo-definitions/{route-key})
-	DeleteSLOConfig(w http.ResponseWriter, r *http.Request, routeKey RouteKey, params DeleteSLOConfigParams)
+	// (DELETE /slo-definitions/{routekey})
+	DeleteSLOConfig(w http.ResponseWriter, r *http.Request, routekey RouteKey, params DeleteSLOConfigParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -215,13 +773,13 @@ func (siw *ServerInterfaceWrapper) GetSLOConfig(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// CreateSLOConfig operation middleware
-func (siw *ServerInterfaceWrapper) CreateSLOConfig(w http.ResponseWriter, r *http.Request) {
+// UpsertSLOConfig operation middleware
+func (siw *ServerInterfaceWrapper) UpsertSLOConfig(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params CreateSLOConfigParams
+	var params UpsertSLOConfigParams
 
 	headers := r.Header
 
@@ -249,7 +807,7 @@ func (siw *ServerInterfaceWrapper) CreateSLOConfig(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateSLOConfig(w, r, params)
+		siw.Handler.UpsertSLOConfig(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -264,12 +822,12 @@ func (siw *ServerInterfaceWrapper) DeleteSLOConfig(w http.ResponseWriter, r *htt
 
 	var err error
 
-	// ------------- Path parameter "route-key" -------------
-	var routeKey RouteKey
+	// ------------- Path parameter "routekey" -------------
+	var routekey RouteKey
 
-	err = runtime.BindStyledParameterWithOptions("simple", "route-key", r.PathValue("route-key"), &routeKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: false})
+	err = runtime.BindStyledParameterWithOptions("simple", "routekey", r.PathValue("routekey"), &routekey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: false})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "route-key", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "routekey", Err: err})
 		return
 	}
 
@@ -302,7 +860,7 @@ func (siw *ServerInterfaceWrapper) DeleteSLOConfig(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSLOConfig(w, r, routeKey, params)
+		siw.Handler.DeleteSLOConfig(w, r, routekey, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -433,8 +991,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc("GET "+options.BaseURL+"/slo-definitions/", wrapper.GetSLOConfig)
-	m.HandleFunc("POST "+options.BaseURL+"/slo-definitions/", wrapper.CreateSLOConfig)
-	m.HandleFunc("DELETE "+options.BaseURL+"/slo-definitions/{route-key}", wrapper.DeleteSLOConfig)
+	m.HandleFunc("POST "+options.BaseURL+"/slo-definitions/", wrapper.UpsertSLOConfig)
+	m.HandleFunc("DELETE "+options.BaseURL+"/slo-definitions/{routekey}", wrapper.DeleteSLOConfig)
 
 	return m
 }

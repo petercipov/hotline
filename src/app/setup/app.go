@@ -1,14 +1,17 @@
 package setup
 
 import (
+	"app/setup/config"
 	"context"
 	"crypto/rand"
 	"fmt"
 	"hotline/clock"
 	"hotline/concurrency"
+	hotlinehttp "hotline/http"
 	"hotline/ingestions"
 	"hotline/ingestions/egress"
 	"hotline/ingestions/otel"
+	"hotline/integrations"
 	"hotline/reporters"
 	"hotline/servicelevels"
 	"hotline/uuid"
@@ -31,6 +34,9 @@ type Config struct {
 	SloPipeline struct {
 		CheckPeriod time.Duration
 	}
+	ConfigAPI struct {
+		Host string
+	}
 }
 
 type App struct {
@@ -45,9 +51,10 @@ type App struct {
 
 	otelIngestionServer   HttpServer
 	egressIngestionServer HttpServer
+	cfgAPIServer          HttpServer
 }
 
-func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository servicelevels.SLODefinitionRepository) (*App, error) {
+func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository *config.InMemorySLODefinitions) (*App, error) {
 	otelReporterScopes := concurrency.NewScopes(
 		createIds("otel-reporter-", 8),
 		reporters.NewEmptyOtelReporterScope)
@@ -97,6 +104,16 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 	)
 
 	egressIngestionServer := createServer(cfg.EgressHttpIngestion.Host, egressHandler)
+	cfgAPIHandler := config.HandlerWithOptions(config.NewHttpHandler(sloConfigRepository,
+		func(integrationID integrations.ID, route hotlinehttp.Route) {
+			sloPipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
+				ID:    integrationID,
+				Now:   managedTime.Now(),
+				Route: route,
+			})
+		},
+	), config.StdHTTPServerOptions{})
+	cfgAPIServer := createServer(cfg.ConfigAPI.Host, cfgAPIHandler)
 
 	return &App{
 		cfg:                   cfg,
@@ -106,6 +123,7 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 		otelReporter:          reporter,
 		otelIngestionServer:   otelIngestionServer,
 		egressIngestionServer: egressIngestionServer,
+		cfgAPIServer:          cfgAPIServer,
 	}, nil
 }
 
@@ -125,6 +143,9 @@ func (a *App) Start() {
 
 	a.egressIngestionServer.Start()
 	slog.Info("Started Egress ingestion server", slog.String("egress-url", a.egressIngestionServer.Host()))
+
+	a.cfgAPIServer.Start()
+	slog.Info("Started Config API server", slog.String("config-api-url", a.cfgAPIServer.Host()))
 }
 
 func (a *App) GetOTELIngestionUrl() string {
@@ -149,6 +170,10 @@ func (a *App) Stop() error {
 
 func (a *App) GetEgressIngestionUrl() string {
 	return "http://" + a.egressIngestionServer.Host()
+}
+
+func (a *App) GetCfgAPIUrl() string {
+	return "http://" + a.cfgAPIServer.Host()
 }
 
 func createIds(prefix string, count int) []string {

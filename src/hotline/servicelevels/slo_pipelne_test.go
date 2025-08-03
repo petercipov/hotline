@@ -167,7 +167,7 @@ func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr str
 	now := clock.ParseTime(timeStr)
 
 	s.sloRepository.SetConfig(integrationID, &servicelevels.HttpApiSLODefinition{
-		RouteSLOs: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
+		Routes: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
 	})
 
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
@@ -184,7 +184,7 @@ func (s *sloPipelineSUT) ForDefaultConfig(integrationID integrations.ID, timeStr
 	now := clock.ParseTime(timeStr)
 
 	s.sloRepository.SetConfig(integrationID, &servicelevels.HttpApiSLODefinition{
-		RouteSLOs: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
+		Routes: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
 	})
 
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{

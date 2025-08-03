@@ -1,7 +1,7 @@
 .SILENT:
 
 generate:
-	cd ./src/app/setup/config && oapi-codegen -config=codegen.config.yaml slo-definitions.openapi.yaml
+	cd ./src/app/setup/config && oapi-codegen -config=codegen.config.yaml config.openapi.yaml
 
 test:
 	go test ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...

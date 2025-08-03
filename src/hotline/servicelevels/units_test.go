@@ -45,6 +45,23 @@ var _ = Describe("Units", func() {
 			Entry("When 99.999999", 99.999999, "p100"),
 		)
 
+		DescribeTable("value construction",
+			func(value float64, name string) {
+				percentile, err := ParsePercentile(value)
+				Expect(err).To(BeNil())
+				Expect(percentile.AsValue()).To(Equal(name))
+			},
+			Entry("When 100", 100.0, "100%"),
+			Entry("When 9", float64(9), "9%"),
+			Entry("When 99", float64(99), "99%"),
+			Entry("When 99.9", 99.9, "99.9%"),
+			Entry("When 99.99", 99.99, "99.99%"),
+			Entry("When 99.999", 99.999, "99.999%"),
+			Entry("When 99.9999", 99.9999, "99.9999%"),
+			Entry("When 99.99999", 99.99999, "99.99999%"),
+			Entry("When 99.999999", 99.999999, "100%"),
+		)
+
 		DescribeTable("parse from value",
 			func(strValue string, percentValue float64, hasError bool) {
 				percentile, err := ParsePercentileFromValue(strValue)
