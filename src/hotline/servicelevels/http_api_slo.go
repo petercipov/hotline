@@ -35,7 +35,7 @@ type HttpLatencySLODefinition struct {
 
 type HttpStatusSLODefinition struct {
 	Expected        []string
-	BreachThreshold Percent
+	BreachThreshold Percentile
 	WindowDuration  time.Duration
 }
 

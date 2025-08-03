@@ -24,7 +24,7 @@ const expectedStateName = "expected"
 func NewStateSLO(
 	expectedStates []string,
 	unexpectedStates []string,
-	breachThreshold Percent,
+	breachThreshold Percentile,
 	windowDuration time.Duration,
 	namespace string,
 	tags map[string]string) *StateSLO {
@@ -47,7 +47,7 @@ func NewStateSLO(
 		return NewTagsHistogram(stateNames)
 	}, windowDuration, 1*time.Minute)
 
-	expectedBreachThreshold := roundTo(breachThreshold.Value(), 5)
+	expectedBreachThreshold := roundTo(breachThreshold.AsPercent(), 5)
 	unexpectedBreachThreshold := roundTo(100.0-expectedBreachThreshold, 5)
 	return &StateSLO{
 		window:                    window,

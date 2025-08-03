@@ -454,7 +454,7 @@ func (s *stateslosut) forSLO(expectedStates ...string) {
 }
 
 func (s *stateslosut) forSLOTRackingUnexpected(expectedStates []string, unexpectedStates []string) {
-	p, failure := servicelevels.ParsePercent(99.99)
+	p, failure := servicelevels.ParsePercentile(99.99)
 	Expect(failure).To(BeNil())
 
 	s.slo = servicelevels.NewStateSLO(expectedStates, unexpectedStates, p, 1*time.Hour, "test-namespace", nil)

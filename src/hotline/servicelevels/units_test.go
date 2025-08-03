@@ -44,28 +44,21 @@ var _ = Describe("Units", func() {
 			Entry("When 99.99999", 99.99999, "p99.99999"),
 			Entry("When 99.999999", 99.999999, "p100"),
 		)
-	})
 
-	Context("Percent", func() {
-		It("should not parse 0", func() {
-			_, failed := ParsePercent(0)
-			Expect(failed).To(HaveOccurred())
-		})
-
-		It("should not parse negative", func() {
-			_, failed := ParsePercent(-1)
-			Expect(failed).To(HaveOccurred())
-		})
-
-		It("should not parse over 100", func() {
-			_, failed := ParsePercent(100.1)
-			Expect(failed).To(HaveOccurred())
-		})
-
-		It("should parse valid value", func() {
-			p, failed := ParsePercent(100)
-			Expect(failed).NotTo(HaveOccurred())
-			Expect(p.Value()).To(Equal(float64(100)))
-		})
+		DescribeTable("parse from value",
+			func(strValue string, percentValue float64, hasError bool) {
+				percentile, err := ParsePercentileFromValue(strValue)
+				if hasError {
+					Expect(err).NotTo(BeNil())
+				} else {
+					Expect(err).To(BeNil())
+				}
+				Expect(percentile.AsPercent()).To(Equal(percentValue))
+			},
+			Entry("When 100", "100.0", float64(100), false),
+			Entry("When with %", "100.0%", float64(100), false),
+			Entry("When with %%", "100.0%%", float64(100), false),
+			Entry("When invalid", "100.0a%", float64(0), true),
+		)
 	})
 })

@@ -36,24 +36,15 @@ func (p *Percentile) Normalized() float64 {
 	return float64(*p)
 }
 
+func (p *Percentile) AsPercent() float64 {
+	return p.Normalized() * 100.0
+}
+
 func (p *Percentile) Name() string {
-	percentile := p.Normalized() * 100.0
+	percentile := p.AsPercent()
 
 	formattedStr := fmt.Sprintf("p%.5f", percentile)
 	return strings.TrimRight(strings.TrimRight(formattedStr, "0"), ".")
 }
 
 type LatencyMs int64
-
-type Percent float64
-
-func ParsePercent(value float64) (Percent, error) {
-	if value > 0 && value <= 100.0 {
-		return Percent(value), nil
-	}
-	return Percent(0), errors.New("value out of range")
-}
-
-func (p *Percent) Value() float64 {
-	return float64(*p)
-}

@@ -264,7 +264,7 @@ func defaultRouteDefinitionForMethod(method string, host string, pathPattern str
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{
-					Percentile: 99.9,
+					Percentile: 0.999,
 					Threshold:  2000,
 					Name:       "p99",
 				},
@@ -273,7 +273,7 @@ func defaultRouteDefinitionForMethod(method string, host string, pathPattern str
 		},
 		Status: servicelevels.HttpStatusSLODefinition{
 			Expected:        []string{"200", "201"},
-			BreachThreshold: 99.9,
+			BreachThreshold: 0.999,
 			WindowDuration:  1 * time.Hour,
 		},
 	}

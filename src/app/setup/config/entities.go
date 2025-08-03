@@ -13,10 +13,6 @@ func (d *Duration) toMs() int64 {
 	return time.Duration(*d).Milliseconds()
 }
 
-func (d *Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Duration(*d).String())
-}
-
 func (d *Duration) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err != nil {
@@ -63,10 +59,6 @@ func ParseServiceLevel(config ListDefinitions) (servicelevels.HttpApiSLODefiniti
 
 	for i, route := range config.Routes {
 		percentile := route.Definition.Status.BreachThreshold.Cast()
-		breachThreshold, breachErr := servicelevels.ParsePercent(percentile.Normalized() * 100)
-		if breachErr != nil {
-			return servicelevels.HttpApiSLODefinition{}, breachErr
-		}
 
 		defs, defsErr := parsePercentileDefinitions(route.Definition.Latency.Percentiles)
 		if defsErr != nil {
@@ -86,7 +78,7 @@ func ParseServiceLevel(config ListDefinitions) (servicelevels.HttpApiSLODefiniti
 			},
 			Status: servicelevels.HttpStatusSLODefinition{
 				Expected:        route.Definition.Status.Expected,
-				BreachThreshold: breachThreshold,
+				BreachThreshold: *percentile,
 				WindowDuration:  time.Duration(route.Definition.Status.WindowDuration),
 			},
 		}
