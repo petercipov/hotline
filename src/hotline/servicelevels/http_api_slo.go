@@ -33,13 +33,14 @@ func (d *HttpApiSLODefinition) Upsert(definition HttpRouteSLODefinition) {
 	d.Routes = append(d.Routes, definition)
 }
 
-func (d *HttpApiSLODefinition) DeleteRouteByKey(key string) {
+func (d *HttpApiSLODefinition) DeleteRouteByKey(key string) (hotlinehttp.Route, bool) {
 	for i, route := range d.Routes {
 		if route.Route.ID() == key {
 			d.Routes = append(d.Routes[:i], d.Routes[i+1:]...)
-			return
+			return route.Route, true
 		}
 	}
+	return hotlinehttp.Route{}, false
 }
 
 type HttpRouteSLODefinition struct {
@@ -95,6 +96,10 @@ func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
 func (s *HttpApiSLO) UpsertRoute(routeDefinition HttpRouteSLODefinition) {
 	slo := NewHttpPathSLO(routeDefinition)
 	s.mux.Upsert(slo.route, slo)
+}
+
+func (s *HttpApiSLO) DeleteRoute(route hotlinehttp.Route) {
+	s.mux.Delete(route)
 }
 
 var httpRangeBreakdown = NewHttpStateRangeBreakdown()

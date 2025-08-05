@@ -71,6 +71,15 @@ func (m *Mux[H]) Handlers() iter.Seq2[Route, H] {
 	}
 }
 
+func (m *Mux[H]) Delete(route Route) {
+	for index, entry := range m.entries {
+		if entry.route == route {
+			m.entries = append(m.entries[:index], m.entries[index+1:]...)
+			return
+		}
+	}
+}
+
 const AnyPort = 0
 const AnyMethod = ""
 const AnyHost = ""

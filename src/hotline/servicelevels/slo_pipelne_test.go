@@ -72,7 +72,7 @@ var _ = Describe("SLO Pipeline", func() {
 			Expect(nonEmptyReports).To(HaveLen(1))
 		})
 
-		It("should report nothing config was removed", func() {
+		It("should report nothing when config was removed", func() {
 			sut.forPipeline()
 			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
 			for i := 0; i < 10; i++ {
@@ -85,6 +85,27 @@ var _ = Describe("SLO Pipeline", func() {
 
 			for _, report := range reports {
 				Expect(report.Checks).To(BeEmpty())
+			}
+		})
+
+		It("should report nothing when config was emptied", func() {
+			sut.forPipeline()
+			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
+			for i := 0; i < 10; i++ {
+				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
+			}
+			sut.EmptyConfigPresent("known_integration_id", "2025-02-22T12:04:05Z")
+
+			reports := sut.Report("2025-02-22T12:05:05Z")
+			Expect(reports).To(HaveLen(sut.numberOfQueues))
+
+			for _, report := range reports {
+				if len(report.Checks) == 1 {
+					Expect(report.Checks[0].SLO).To(BeEmpty())
+					Expect(string(report.Checks[0].IntegrationID)).To(Equal("known_integration_id"))
+				} else {
+					Expect(report.Checks).To(BeEmpty())
+				}
 			}
 		})
 	})
@@ -119,6 +140,20 @@ func (s *sloPipelineSUT) forPipeline() {
 
 func (s *sloPipelineSUT) NoConfigPresent(id integrations.ID, timeStr string) {
 	s.sloRepository.NoConfig(id)
+
+	now := clock.ParseTime(timeStr)
+	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
+		ID:  id,
+		Now: now,
+
+		Route: http.Route{
+			PathPattern: "/",
+		},
+	})
+}
+
+func (s *sloPipelineSUT) EmptyConfigPresent(id integrations.ID, timeStr string) {
+	s.sloRepository.SetConfig(id, &servicelevels.HttpApiSLODefinition{})
 
 	now := clock.ParseTime(timeStr)
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{

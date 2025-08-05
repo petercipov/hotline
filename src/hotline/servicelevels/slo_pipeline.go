@@ -144,11 +144,19 @@ func (message *ModifyRouteMessage) Execute(ctx context.Context, scope *Integrati
 		return
 	}
 
+	var foundRouteConfig = false
+	var routeConfig HttpRouteSLODefinition
 	for _, slosConfig := range config.Routes {
 		if slosConfig.Route == message.Route {
-			slo.UpsertRoute(slosConfig)
+			foundRouteConfig = true
+			routeConfig = slosConfig
 			break
 		}
+	}
+	if foundRouteConfig {
+		slo.UpsertRoute(routeConfig)
+	} else {
+		slo.DeleteRoute(message.Route)
 	}
 }
 

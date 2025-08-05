@@ -315,4 +315,20 @@ var _ = Describe("Mux", func() {
 			}
 		})
 	})
+
+	Context("Delete", func() {
+		It("will delete handler for same route", func() {
+			mux := http.Mux[string]{}
+			handler1 := "handler1"
+			route1 := http.Route{Method: "GET", PathPattern: "/users", Host: "example.com", Port: 443}
+			mux.Upsert(route1, &handler1)
+			mux.Delete(route1)
+
+			count := 0
+			for range mux.Handlers() {
+				count++
+			}
+			Expect(count).To(Equal(0))
+		})
+	})
 })

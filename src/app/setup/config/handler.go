@@ -142,7 +142,12 @@ func (h *HttpHandler) DeleteSLOConfig(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	config.DeleteRouteByKey(key)
+	route, deleted := config.DeleteRouteByKey(key)
 	h.repository.SetConfig(integrationID, *config)
+
+	if deleted {
+		h.routeUpserted(integrationID, route)
+	}
+
 	writeResponse(ctx, writer, http.StatusNoContent, nil)
 }
