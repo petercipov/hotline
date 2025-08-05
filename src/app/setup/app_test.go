@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"hotline/clock"
 	"net/http"
 	"net/url"
@@ -89,8 +90,12 @@ func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, 
 	}
 
 	for _, routeRaw := range routeRaws {
+		input := strings.TrimSpace(routeRaw)
+		if len(input) == 0 {
+			continue
+		}
 		var reqObj config.UpsertSLOConfigJSONRequestBody
-		unmarshalErr := json.Unmarshal([]byte(strings.TrimSpace(routeRaw)), &reqObj)
+		unmarshalErr := json.Unmarshal([]byte(input), &reqObj)
 		if unmarshalErr != nil {
 			return ctx, unmarshalErr
 		}
@@ -102,6 +107,80 @@ func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, 
 		if responseErr != nil {
 			return ctx, responseErr
 		}
+	}
+
+	return ctx, nil
+}
+
+func (a *appSut) checkSLOConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
+	routeRaws := strings.Split(configRaw, "|||")
+	var routesExpected []string
+	for i, routeRaw := range routeRaws {
+		routeRaws[i] = strings.TrimSpace(routeRaw)
+		if len(routeRaws[i]) != 0 {
+			routesExpected = append(routesExpected, routeRaws[i])
+		}
+	}
+
+	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+
+	resp, responseErr := configClient.GetSLOConfigWithResponse(
+		ctx,
+		&config.GetSLOConfigParams{XIntegrationId: integrationID})
+
+	if responseErr != nil {
+		return ctx, responseErr
+	}
+
+	var routes []config.RouteSLODefinition
+	if resp.StatusCode() != 200 && resp.StatusCode() != 404 {
+		return ctx, errors.New(fmt.Sprint("unexpected status code: ", resp.StatusCode()))
+	}
+	if resp.JSON200 != nil {
+		routes = resp.JSON200.Routes
+	}
+
+	if len(routes) != len(routesExpected) {
+		return ctx, errors.New(fmt.Sprint("expected ", len(routesExpected), " routes, got ", len(routes)))
+	}
+
+	for i, routeExpected := range routesExpected {
+		var reqObj config.RouteSLODefinition
+		unmarshalErr := json.Unmarshal([]byte(routeExpected), &reqObj)
+		if unmarshalErr != nil {
+			return ctx, unmarshalErr
+		}
+
+		e := &errorT{}
+		assert.Equal(e, reqObj, routes[i], "request route at index ", i, " is not equal to expected route")
+		if e.err != nil {
+			return ctx, e.err
+		}
+	}
+
+	return ctx, nil
+}
+
+func (a *appSut) deleteSLOConfiguration(ctx context.Context, integrationID string, routeKey string) (context.Context, error) {
+	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+
+	resp, responseErr := configClient.DeleteSLOConfig(
+		ctx,
+		routeKey,
+		&config.DeleteSLOConfigParams{XIntegrationId: integrationID})
+
+	if responseErr != nil {
+		return ctx, responseErr
+	}
+
+	if resp.StatusCode != 204 {
+		return ctx, errors.New(fmt.Sprint("unexpected status code: ", resp.StatusCode))
 	}
 
 	return ctx, nil
@@ -215,16 +294,19 @@ func TestApp(t *testing.T) {
 			sctx.Given("Egress ingestion is enabled", sut.egressIngestionIsEnabled)
 			sctx.Given("slo reporter is pointing to collector", sut.sloReporterIsPointingToCollector)
 			sctx.Given("hotline is running", sut.startHotline)
-			sctx.Given(`slo configuration for "([^"]*)" is`, sut.setSLOConfiguration)
+			sctx.Given(`slo configuration for "([^"]*)" is set to`, sut.setSLOConfiguration)
 
 			sctx.When(`([^"]*) otel traffic is sent for ingestion for integration ID "([^"]*)"`, sut.sendOTELTraffic)
 			sctx.When("advance time by (\\d+)s", sut.advanceTime)
 			sctx.When(`egress traffic is sent for proxying for integration ID "([^"]*)"`, sut.sendEgressTraffic)
+			sctx.When(`slo configuration for "([^"]*)" and routeKey "([^"]*)" is deleted`, sut.deleteSLOConfiguration)
 
 			sctx.Then("slo metrics are received in collector", sut.sloMetricsAreReceivedInCollector)
+			sctx.Then(`slo configuration for "([^"]*)" is`, sut.checkSLOConfiguration)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",
+			Strict:   true,
 			Paths:    []string{"features"},
 			TestingT: t,
 		},

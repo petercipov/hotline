@@ -93,3 +93,43 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 	}
 	return result, nil
 }
+
+func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteSLODefinition {
+	var defs []RouteSLODefinition
+
+	for _, route := range routes {
+		defs = append(defs, RouteSLODefinition{
+			Definition: SLODefinition{
+				Latency: LatencySLODefinition{
+					Percentiles:    convertPercentiles(route.Latency.Percentiles),
+					WindowDuration: Duration(route.Latency.WindowDuration),
+				},
+				Status: StatusSLODefinition{
+					BreachThreshold: Percentile(route.Status.BreachThreshold),
+					Expected:        route.Status.Expected,
+					WindowDuration:  Duration(route.Status.WindowDuration),
+				},
+			},
+			Route: Route{
+				Host:   route.Route.Host,
+				Method: RouteMethod(route.Route.Method),
+				Path:   route.Route.PathPattern,
+				Port:   route.Route.Port,
+			},
+			RouteKey: route.Route.ID(),
+		})
+	}
+
+	return defs
+}
+
+func convertPercentiles(percentiles []servicelevels.PercentileDefinition) []PercentileThreshold {
+	var result []PercentileThreshold
+	for _, percentile := range percentiles {
+		result = append(result, PercentileThreshold{
+			BreachLatency: Duration(percentile.Threshold.AsDuration()),
+			Percentile:    Percentile(percentile.Percentile),
+		})
+	}
+	return result
+}

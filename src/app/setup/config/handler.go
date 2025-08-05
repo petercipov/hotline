@@ -29,7 +29,33 @@ func NewHttpHandler(repository *InMemorySLODefinitions, routeUpserted func(integ
 	}
 }
 
-func (h *HttpHandler) GetSLOConfig(_ http.ResponseWriter, _ *http.Request, _ GetSLOConfigParams) {
+func (h *HttpHandler) GetSLOConfig(writer http.ResponseWriter, req *http.Request, params GetSLOConfigParams) {
+	ctx := req.Context()
+	if len(params.XIntegrationId) == 0 {
+		slog.Error("Could not find X-Integration-Id header")
+		writeResponse(ctx, writer, http.StatusBadRequest, Error{
+			Code:    "invalid_request",
+			Message: "X-Integration-Id header is required",
+		})
+		return
+	}
+	integrationID := integrations.ID(params.XIntegrationId)
+	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
+
+	config := h.repository.GetConfig(ctx, integrationID)
+	if config == nil {
+		writeResponse(ctx, writer, http.StatusNotFound, Error{
+			Code:    "not_found",
+			Message: "SLO config not found",
+		})
+		return
+	}
+
+	resp := ListDefinitions{
+		Routes: convertRoutes(config.Routes),
+	}
+
+	writeResponse(ctx, writer, http.StatusOK, resp)
 }
 func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Request, params UpsertSLOConfigParams) {
 	ctx := req.Context()
@@ -83,6 +109,7 @@ func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Requ
 
 func writeResponse(ctx context.Context, writer http.ResponseWriter, status int, value any) {
 	integrationID := ctx.Value(valueIntegrationID{}).(integrations.ID)
+	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(status)
 	raw, errMarshalErr := json.Marshal(value)
 	if errMarshalErr != nil {
@@ -93,5 +120,29 @@ func writeResponse(ctx context.Context, writer http.ResponseWriter, status int, 
 		slog.Error("Could not write error", slog.String("integration-id", string(integrationID)), slog.Any("error", writeErr))
 	}
 }
-func (h *HttpHandler) DeleteSLOConfig(_ http.ResponseWriter, _ *http.Request, _ RouteKey, _ DeleteSLOConfigParams) {
+func (h *HttpHandler) DeleteSLOConfig(writer http.ResponseWriter, req *http.Request, key RouteKey, params DeleteSLOConfigParams) {
+	ctx := req.Context()
+	if len(params.XIntegrationId) == 0 {
+		slog.Error("Could not find X-Integration-Id header")
+		writeResponse(ctx, writer, http.StatusBadRequest, Error{
+			Code:    "invalid_request",
+			Message: "X-Integration-Id header is required",
+		})
+		return
+	}
+	integrationID := integrations.ID(params.XIntegrationId)
+	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
+
+	config := h.repository.GetConfig(ctx, integrationID)
+	if config == nil {
+		writeResponse(ctx, writer, http.StatusNotFound, Error{
+			Code:    "not_found",
+			Message: "SLO config not found",
+		})
+		return
+	}
+
+	config.DeleteRouteByKey(key)
+	h.repository.SetConfig(integrationID, *config)
+	writeResponse(ctx, writer, http.StatusNoContent, nil)
 }

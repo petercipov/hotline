@@ -7,7 +7,7 @@ Feature: Hotline should be able to
     Given Egress ingestion is enabled
     And slo reporter is pointing to collector
     And hotline is running
-    And slo configuration for "IN-dd0391f11aba" is:
+    And slo configuration for "IN-dd0391f11aba" is set to:
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },

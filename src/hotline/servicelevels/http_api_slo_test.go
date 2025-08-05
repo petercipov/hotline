@@ -245,6 +245,26 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(sloDef.Routes[0].Latency.WindowDuration).To(Equal(10 * time.Minute))
 
 	})
+
+	It("will delete default route definition", func() {
+		def := defaultRouteDefinition("iam.example.com", "/users")
+		sloDef := servicelevels.HttpApiSLODefinition{}
+		sloDef.Upsert(def)
+		Expect(sloDef.Routes).To(HaveLen(1))
+
+		sloDef.DeleteRouteByKey(":iam.example.com::/users")
+
+		Expect(sloDef.Routes).To(HaveLen(0))
+	})
+
+	It("will not delete for unknown key", func() {
+		def := defaultRouteDefinition("iam.example.com", "/users")
+		sloDef := servicelevels.HttpApiSLODefinition{}
+		sloDef.Upsert(def)
+		Expect(sloDef.Routes).To(HaveLen(1))
+		sloDef.DeleteRouteByKey(":uknown::")
+		Expect(sloDef.Routes).To(HaveLen(1))
+	})
 })
 
 type suthttpapislo struct {

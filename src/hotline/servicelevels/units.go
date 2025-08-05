@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var P50, _ = ParsePercentile(50)
@@ -55,3 +56,8 @@ func (p *Percentile) AsValue() string {
 }
 
 type LatencyMs int64
+
+func (l *LatencyMs) AsDuration() time.Duration {
+	ms := int64(*l)
+	return time.Duration(ms) * time.Millisecond
+}

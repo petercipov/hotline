@@ -3,6 +3,7 @@ package servicelevels
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"time"
 )
 
 var _ = Describe("Units", func() {
@@ -77,5 +78,12 @@ var _ = Describe("Units", func() {
 			Entry("When with %%", "100.0%%", float64(100), false),
 			Entry("When invalid", "100.0a%", float64(0), true),
 		)
+	})
+
+	Context("Latency Ms", func() {
+		It("convert to duration", func() {
+			ms := LatencyMs(2000)
+			Expect(ms.AsDuration()).To(Equal(2 * time.Second))
+		})
 	})
 })

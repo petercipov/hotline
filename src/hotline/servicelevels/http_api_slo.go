@@ -33,6 +33,15 @@ func (d *HttpApiSLODefinition) Upsert(definition HttpRouteSLODefinition) {
 	d.Routes = append(d.Routes, definition)
 }
 
+func (d *HttpApiSLODefinition) DeleteRouteByKey(key string) {
+	for i, route := range d.Routes {
+		if route.Route.ID() == key {
+			d.Routes = append(d.Routes[:i], d.Routes[i+1:]...)
+			return
+		}
+	}
+}
+
 type HttpRouteSLODefinition struct {
 	Route   hotlinehttp.Route
 	Latency HttpLatencySLODefinition
