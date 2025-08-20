@@ -51,7 +51,9 @@ func (s *EgressClient) SendGet(integrationID string, rand int32, targetURL strin
 	if respErr != nil {
 		return 0, respErr
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	return resp.StatusCode, nil
 }
 
@@ -73,7 +75,9 @@ func (s *EgressClient) SendPost(integrationID string, rand int32, targetURL stri
 	if respErr != nil {
 		return 0, respErr
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	return resp.StatusCode, nil
 }
 
@@ -93,6 +97,8 @@ func (s *EgressClient) SendDelete(integrationID string, rand int32, targetURL st
 	if respErr != nil {
 		return 0, respErr
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	return resp.StatusCode, nil
 }

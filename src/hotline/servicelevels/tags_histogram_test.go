@@ -1,9 +1,10 @@
 package servicelevels_test
 
 import (
+	"hotline/servicelevels"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"hotline/servicelevels"
 )
 
 var _ = Describe("Tags Histogram", func() {

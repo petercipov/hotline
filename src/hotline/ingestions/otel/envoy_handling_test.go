@@ -1,16 +1,17 @@
 package otel
 
 import (
+	"hotline/clock"
+	"hotline/ingestions"
+	"net/http/httptest"
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-	"hotline/clock"
-	"hotline/ingestions"
-	"net/http/httptest"
-	"strconv"
 )
 
 var _ = Describe("Envoy Ingestion of Traces", func() {

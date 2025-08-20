@@ -1,9 +1,10 @@
 package ingestions_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"testing"
 )
 
 func TestIngestions(t *testing.T) {

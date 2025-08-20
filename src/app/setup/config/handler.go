@@ -71,7 +71,9 @@ func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Requ
 	integrationID := integrations.ID(params.XIntegrationId)
 	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
 
-	defer req.Body.Close()
+	defer func() {
+		_ = req.Body.Close()
+	}()
 	buf, _ := io.ReadAll(req.Body)
 	var request UpsertSLORequest
 	unmarshalErr := json.Unmarshal(buf, &request)

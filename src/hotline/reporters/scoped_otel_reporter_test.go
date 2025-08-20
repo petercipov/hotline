@@ -2,8 +2,6 @@ package reporters_test
 
 import (
 	"context"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/reporters"
@@ -13,6 +11,9 @@ import (
 	"net/url"
 	"sync"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Scoped OTEL Reporter", func() {

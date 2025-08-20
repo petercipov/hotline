@@ -2,12 +2,13 @@ package servicelevels_test
 
 import (
 	"fmt"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"hotline/clock"
 	"hotline/servicelevels"
 	"math/rand"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("LatencyMs SLO", func() {

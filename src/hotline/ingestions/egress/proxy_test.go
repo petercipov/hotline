@@ -2,8 +2,6 @@ package egress_test
 
 import (
 	"errors"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"hotline/clock"
 	"hotline/ingestions"
 	"hotline/ingestions/egress"
@@ -13,6 +11,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Proxy", Ordered, func() {
@@ -207,7 +208,7 @@ func (s *proxySUT) Close() {
 		s.dedicatedServer.Close()
 	}
 	for _, req := range s.receivedRequests {
-		req.Body.Close()
+		_ = req.Body.Close()
 	}
 	s.receivedRequests = nil
 	s.ingestedRequests = nil

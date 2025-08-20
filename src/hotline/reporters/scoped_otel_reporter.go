@@ -4,13 +4,14 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"hotline/concurrency"
 	"hotline/servicelevels"
 	"io"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 )
 
 type ScopedOtelReporter struct {

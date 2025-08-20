@@ -1,11 +1,12 @@
 package otel
 
 import (
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
-	"google.golang.org/protobuf/proto"
 	"hotline/ingestions"
 	"io"
 	"net/http"
+
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 type MessageConverter interface {
@@ -26,7 +27,9 @@ func NewTracesHandler(ingestion ingestions.IngestHttpRequests, messageConverter 
 
 func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	raw, readErr := io.ReadAll(req.Body)
-	defer req.Body.Close()
+	defer func() {
+		_ = req.Body.Close()
+	}()
 	if readErr != nil {
 		http.Error(w, "could not read body", http.StatusInternalServerError)
 		return

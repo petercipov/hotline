@@ -1,8 +1,9 @@
 package otel
 
 import (
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"hotline/ingestions"
+
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 )
 
 type ProtoConverter struct {

@@ -5,12 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/cucumber/godog"
-	"github.com/stretchr/testify/assert"
-	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
-	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"math"
 	"net/http"
@@ -19,6 +13,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cucumber/godog"
+	"github.com/stretchr/testify/assert"
+	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeCollector struct {
@@ -32,7 +33,9 @@ func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	defer req.Body.Close()
+	defer func() {
+		_ = req.Body.Close()
+	}()
 
 	message := &colmetricspb.ExportMetricsServiceRequest{}
 	unmarshalErr := proto.Unmarshal(bodyBytes, message)

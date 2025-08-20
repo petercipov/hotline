@@ -5,12 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
-	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	"google.golang.org/protobuf/proto"
 	"hotline/clock"
 	"hotline/reporters"
 	"hotline/servicelevels"
@@ -19,6 +13,13 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 var _ = Describe("OTEL Reporter", func() {

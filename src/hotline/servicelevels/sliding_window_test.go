@@ -1,12 +1,13 @@
 package servicelevels_test
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"hotline/clock"
 	"hotline/servicelevels"
 	"slices"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("SlidingWindow", func() {

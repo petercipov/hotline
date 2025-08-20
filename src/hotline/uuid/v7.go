@@ -1,9 +1,10 @@
 package uuid
 
 import (
-	"github.com/gofrs/uuid/v5"
 	"io"
 	"time"
+
+	"github.com/gofrs/uuid/v5"
 )
 
 type V7StringGenerator func(time.Time) (string, error)

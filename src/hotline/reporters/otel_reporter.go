@@ -5,15 +5,16 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
-	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	"google.golang.org/protobuf/proto"
 	http2 "hotline/http"
 	"hotline/servicelevels"
 	"net/http"
 	"net/url"
 	"time"
+
+	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 type OtelUrl string
@@ -104,7 +105,9 @@ func (o *OtelReporter) ReportChecks(ctx context.Context, report *servicelevels.C
 	if respErr != nil {
 		return respErr
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if sc := response.StatusCode; sc >= 200 && sc <= 299 {
 		return nil

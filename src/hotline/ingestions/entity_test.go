@@ -1,11 +1,12 @@
 package ingestions
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"hotline/clock"
 	"hotline/servicelevels"
 	"net/url"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Entities", func() {

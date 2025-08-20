@@ -2,11 +2,12 @@ package otel
 
 import (
 	"fmt"
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"hotline/ingestions"
 	"hotline/integrations"
 	"net/url"
 	"time"
+
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 )
 
 type EnvoyAttributeNames struct {

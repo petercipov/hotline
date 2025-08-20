@@ -3,12 +3,13 @@ package http_test
 import (
 	"bytes"
 	"errors"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	http2 "hotline/http"
 	"io"
 	"net/http"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Retry Round Tripper", func() {

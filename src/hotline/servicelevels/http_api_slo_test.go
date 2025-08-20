@@ -1,13 +1,14 @@
 package servicelevels_test
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"hotline/clock"
 	"hotline/http"
 	"hotline/servicelevels"
 	"net/url"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Http Api Slo", func() {
