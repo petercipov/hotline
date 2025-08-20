@@ -294,7 +294,7 @@ func NewGetSLOConfigRequest(server string, params *GetSLOConfigParams) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/slo-definitions/")
+	operationPath := fmt.Sprintf("/slo-definitions")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -345,7 +345,7 @@ func NewUpsertSLOConfigRequestWithBody(server string, params *UpsertSLOConfigPar
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/slo-definitions/")
+	operationPath := fmt.Sprintf("/slo-definitions")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -710,10 +710,10 @@ func ParseDeleteSLOConfigResponse(rsp *http.Response) (*DeleteSLOConfigResponse,
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List SLO definitions
-	// (GET /slo-definitions/)
+	// (GET /slo-definitions)
 	GetSLOConfig(w http.ResponseWriter, r *http.Request, params GetSLOConfigParams)
 	// Upserts SLO definitions
-	// (POST /slo-definitions/)
+	// (POST /slo-definitions)
 	UpsertSLOConfig(w http.ResponseWriter, r *http.Request, params UpsertSLOConfigParams)
 	// Delete SLO definitions
 	// (DELETE /slo-definitions/{routekey})
@@ -825,7 +825,7 @@ func (siw *ServerInterfaceWrapper) DeleteSLOConfig(w http.ResponseWriter, r *htt
 	// ------------- Path parameter "routekey" -------------
 	var routekey RouteKey
 
-	err = runtime.BindStyledParameterWithOptions("simple", "routekey", r.PathValue("routekey"), &routekey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: false})
+	err = runtime.BindStyledParameterWithOptions("simple", "routekey", r.PathValue("routekey"), &routekey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "routekey", Err: err})
 		return
@@ -990,8 +990,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc("GET "+options.BaseURL+"/slo-definitions/", wrapper.GetSLOConfig)
-	m.HandleFunc("POST "+options.BaseURL+"/slo-definitions/", wrapper.UpsertSLOConfig)
+	m.HandleFunc("GET "+options.BaseURL+"/slo-definitions", wrapper.GetSLOConfig)
+	m.HandleFunc("POST "+options.BaseURL+"/slo-definitions", wrapper.UpsertSLOConfig)
 	m.HandleFunc("DELETE "+options.BaseURL+"/slo-definitions/{routekey}", wrapper.DeleteSLOConfig)
 
 	return m
