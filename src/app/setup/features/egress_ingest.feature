@@ -11,35 +11,29 @@ Feature: Hotline should be able to
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
-          "definition": {
-            "latency": {
-              "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s" }],
-              "windowDuration": "1m0s"
-            },
-            "status": { "expected": [ "200" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
-          }
+          "latency": {
+            "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s" }],
+            "windowDuration": "1m0s"
+          },
+          "status": { "expected": [ "200" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
         }
         |||
         {
           "route": { "method": "POST", "host": "127.0.0.1", "path": "/bookings" },
-          "definition": {
-            "latency": {
-              "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s"}],
-              "windowDuration": "1m0s"
-            },
-            "status": { "expected": [ "201" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
-          }
+          "latency": {
+            "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s"}],
+            "windowDuration": "1m0s"
+          },
+          "status": { "expected": [ "201" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
         }
         |||
         {
           "route": { "method": "DELETE", "host": "127.0.0.1", "path": "/bookings/{bookingId}" },
-          "definition": {
-            "latency": {
-              "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s" }],
-              "windowDuration": "1m0s"
-            },
-            "status": { "expected": [ "204" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
-          }
+          "latency": {
+            "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s" }],
+            "windowDuration": "1m0s"
+          },
+          "status": { "expected": [ "204" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
         }
       """
 

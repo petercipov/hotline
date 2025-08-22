@@ -85,15 +85,10 @@ type RouteKey = string
 
 // RouteSLODefinition defines model for RouteSLODefinition.
 type RouteSLODefinition struct {
-	Definition SLODefinition `json:"definition,omitempty"`
-	Route      Route         `json:"route,omitempty"`
-	RouteKey   RouteKey      `json:"routeKey,omitempty"`
-}
-
-// SLODefinition defines model for SLODefinition.
-type SLODefinition struct {
-	Latency LatencySLODefinition `json:"latency"`
-	Status  StatusSLODefinition  `json:"status"`
+	Latency  LatencySLODefinition `json:"latency"`
+	Route    Route                `json:"route,omitempty"`
+	RouteKey RouteKey             `json:"routeKey,omitempty"`
+	Status   StatusSLODefinition  `json:"status"`
 }
 
 // StatusSLODefinition defines model for StatusSLODefinition.
@@ -110,8 +105,9 @@ type StatusSLODefinition struct {
 
 // UpsertSLORequest defines model for UpsertSLORequest.
 type UpsertSLORequest struct {
-	Definition SLODefinition `json:"definition,omitempty"`
-	Route      Route         `json:"route,omitempty"`
+	Latency LatencySLODefinition `json:"latency"`
+	Route   Route                `json:"route,omitempty"`
+	Status  StatusSLODefinition  `json:"status"`
 }
 
 // UpsertSLOResponse defines model for UpsertSLOResponse.

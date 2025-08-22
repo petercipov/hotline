@@ -86,7 +86,7 @@ func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	routeDefinition, routeErr := ParseRoute(request.Definition, request.Route)
+	routeDefinition, routeErr := ParseRoute(request.Latency, request.Status, request.Route)
 	if routeErr != nil {
 		slog.Error("Could not parse route", slog.String("integration-id", string(integrationID)), slog.Any("error", routeErr))
 		writeResponse(ctx, writer, http.StatusBadRequest, Error{

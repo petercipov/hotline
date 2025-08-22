@@ -11,13 +11,11 @@ Feature: Hotline should be able to
       """
         {
           "route": { "path": "/" },
-          "definition": {
-            "latency": {
-              "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s" }],
-              "windowDuration": "1m0s"
-            },
-            "status": { "expected": [ "200", "201" ], "breachThreshold": "99.9%", "windowDuration": "1h" }
-          }
+          "latency": {
+            "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s" }],
+            "windowDuration": "1m0s"
+          },
+          "status": { "expected": [ "200", "201" ], "breachThreshold": "99.9%", "windowDuration": "1h" }
         }
       """
 

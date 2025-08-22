@@ -107,11 +107,16 @@ components:
 
     UpsertSLORequest:
       type: object
+      required:
+        - latency
+        - status
       properties:
         route:
           $ref: '#/components/schemas/Route'
-        definition:
-          $ref: '#/components/schemas/SLODefinition'
+        latency:
+          $ref: '#/components/schemas/LatencySLODefinition'
+        status:
+          $ref: '#/components/schemas/StatusSLODefinition'
 
     RouteKey:
       type: string
@@ -152,20 +157,14 @@ components:
 
     RouteSLODefinition:
       type: object
+      required:
+        - latency
+        - status
       properties:
         routeKey:
           $ref: '#/components/schemas/RouteKey'
         route:
           $ref: '#/components/schemas/Route'
-        definition:
-          $ref: '#/components/schemas/SLODefinition'
-
-    SLODefinition:
-      type: object
-      required:
-        - latency
-        - status
-      properties:
         latency:
           $ref: '#/components/schemas/LatencySLODefinition'
         status:

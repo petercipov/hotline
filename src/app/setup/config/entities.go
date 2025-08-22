@@ -53,10 +53,10 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 	return (*servicelevels.Percentile)(p)
 }
 
-func ParseRoute(definition SLODefinition, route Route) (servicelevels.HttpRouteSLODefinition, error) {
-	percentile := definition.Status.BreachThreshold.Cast()
+func ParseRoute(latencyDefinition LatencySLODefinition, statusDefinition StatusSLODefinition, route Route) (servicelevels.HttpRouteSLODefinition, error) {
+	percentile := statusDefinition.BreachThreshold.Cast()
 
-	defs, defsErr := parsePercentileDefinitions(definition.Latency.Percentiles)
+	defs, defsErr := parsePercentileDefinitions(latencyDefinition.Percentiles)
 	if defsErr != nil {
 		return servicelevels.HttpRouteSLODefinition{}, defsErr
 	}
@@ -70,12 +70,12 @@ func ParseRoute(definition SLODefinition, route Route) (servicelevels.HttpRouteS
 		},
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles:    defs,
-			WindowDuration: time.Duration(definition.Latency.WindowDuration),
+			WindowDuration: time.Duration(latencyDefinition.WindowDuration),
 		},
 		Status: servicelevels.HttpStatusSLODefinition{
-			Expected:        definition.Status.Expected,
+			Expected:        statusDefinition.Expected,
 			BreachThreshold: *percentile,
-			WindowDuration:  time.Duration(definition.Status.WindowDuration),
+			WindowDuration:  time.Duration(statusDefinition.WindowDuration),
 		},
 	}, nil
 }
@@ -96,19 +96,16 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 
 func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteSLODefinition {
 	var defs []RouteSLODefinition
-
 	for _, route := range routes {
 		defs = append(defs, RouteSLODefinition{
-			Definition: SLODefinition{
-				Latency: LatencySLODefinition{
-					Percentiles:    convertPercentiles(route.Latency.Percentiles),
-					WindowDuration: Duration(route.Latency.WindowDuration),
-				},
-				Status: StatusSLODefinition{
-					BreachThreshold: Percentile(route.Status.BreachThreshold),
-					Expected:        route.Status.Expected,
-					WindowDuration:  Duration(route.Status.WindowDuration),
-				},
+			Latency: LatencySLODefinition{
+				Percentiles:    convertPercentiles(route.Latency.Percentiles),
+				WindowDuration: Duration(route.Latency.WindowDuration),
+			},
+			Status: StatusSLODefinition{
+				BreachThreshold: Percentile(route.Status.BreachThreshold),
+				Expected:        route.Status.Expected,
+				WindowDuration:  Duration(route.Status.WindowDuration),
 			},
 			Route: Route{
 				Host:   route.Route.Host,
