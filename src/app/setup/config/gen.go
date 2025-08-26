@@ -14,8 +14,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/oapi-codegen/runtime"
+)
+
+const (
+	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
 // Defines values for RouteMethod.
@@ -31,7 +36,114 @@ const (
 	TRACE   RouteMethod = "TRACE"
 )
 
-// Error defines model for Error.
+// Defines values for StatusSLODefinitionExpected.
+const (
+	N100 StatusSLODefinitionExpected = "100"
+	N101 StatusSLODefinitionExpected = "101"
+	N102 StatusSLODefinitionExpected = "102"
+	N103 StatusSLODefinitionExpected = "103"
+	N200 StatusSLODefinitionExpected = "200"
+	N201 StatusSLODefinitionExpected = "201"
+	N202 StatusSLODefinitionExpected = "202"
+	N203 StatusSLODefinitionExpected = "203"
+	N204 StatusSLODefinitionExpected = "204"
+	N205 StatusSLODefinitionExpected = "205"
+	N206 StatusSLODefinitionExpected = "206"
+	N207 StatusSLODefinitionExpected = "207"
+	N208 StatusSLODefinitionExpected = "208"
+	N218 StatusSLODefinitionExpected = "218"
+	N226 StatusSLODefinitionExpected = "226"
+	N300 StatusSLODefinitionExpected = "300"
+	N301 StatusSLODefinitionExpected = "301"
+	N302 StatusSLODefinitionExpected = "302"
+	N303 StatusSLODefinitionExpected = "303"
+	N304 StatusSLODefinitionExpected = "304"
+	N305 StatusSLODefinitionExpected = "305"
+	N306 StatusSLODefinitionExpected = "306"
+	N307 StatusSLODefinitionExpected = "307"
+	N308 StatusSLODefinitionExpected = "308"
+	N400 StatusSLODefinitionExpected = "400"
+	N401 StatusSLODefinitionExpected = "401"
+	N402 StatusSLODefinitionExpected = "402"
+	N403 StatusSLODefinitionExpected = "403"
+	N404 StatusSLODefinitionExpected = "404"
+	N405 StatusSLODefinitionExpected = "405"
+	N406 StatusSLODefinitionExpected = "406"
+	N407 StatusSLODefinitionExpected = "407"
+	N408 StatusSLODefinitionExpected = "408"
+	N409 StatusSLODefinitionExpected = "409"
+	N410 StatusSLODefinitionExpected = "410"
+	N411 StatusSLODefinitionExpected = "411"
+	N412 StatusSLODefinitionExpected = "412"
+	N413 StatusSLODefinitionExpected = "413"
+	N414 StatusSLODefinitionExpected = "414"
+	N415 StatusSLODefinitionExpected = "415"
+	N416 StatusSLODefinitionExpected = "416"
+	N417 StatusSLODefinitionExpected = "417"
+	N418 StatusSLODefinitionExpected = "418"
+	N419 StatusSLODefinitionExpected = "419"
+	N420 StatusSLODefinitionExpected = "420"
+	N421 StatusSLODefinitionExpected = "421"
+	N422 StatusSLODefinitionExpected = "422"
+	N423 StatusSLODefinitionExpected = "423"
+	N424 StatusSLODefinitionExpected = "424"
+	N426 StatusSLODefinitionExpected = "426"
+	N428 StatusSLODefinitionExpected = "428"
+	N429 StatusSLODefinitionExpected = "429"
+	N430 StatusSLODefinitionExpected = "430"
+	N431 StatusSLODefinitionExpected = "431"
+	N440 StatusSLODefinitionExpected = "440"
+	N444 StatusSLODefinitionExpected = "444"
+	N449 StatusSLODefinitionExpected = "449"
+	N450 StatusSLODefinitionExpected = "450"
+	N451 StatusSLODefinitionExpected = "451"
+	N460 StatusSLODefinitionExpected = "460"
+	N463 StatusSLODefinitionExpected = "463"
+	N464 StatusSLODefinitionExpected = "464"
+	N494 StatusSLODefinitionExpected = "494"
+	N495 StatusSLODefinitionExpected = "495"
+	N496 StatusSLODefinitionExpected = "496"
+	N497 StatusSLODefinitionExpected = "497"
+	N498 StatusSLODefinitionExpected = "498"
+	N499 StatusSLODefinitionExpected = "499"
+	N500 StatusSLODefinitionExpected = "500"
+	N501 StatusSLODefinitionExpected = "501"
+	N502 StatusSLODefinitionExpected = "502"
+	N503 StatusSLODefinitionExpected = "503"
+	N504 StatusSLODefinitionExpected = "504"
+	N505 StatusSLODefinitionExpected = "505"
+	N506 StatusSLODefinitionExpected = "506"
+	N507 StatusSLODefinitionExpected = "507"
+	N508 StatusSLODefinitionExpected = "508"
+	N509 StatusSLODefinitionExpected = "509"
+	N510 StatusSLODefinitionExpected = "510"
+	N511 StatusSLODefinitionExpected = "511"
+	N520 StatusSLODefinitionExpected = "520"
+	N521 StatusSLODefinitionExpected = "521"
+	N522 StatusSLODefinitionExpected = "522"
+	N523 StatusSLODefinitionExpected = "523"
+	N524 StatusSLODefinitionExpected = "524"
+	N525 StatusSLODefinitionExpected = "525"
+	N526 StatusSLODefinitionExpected = "526"
+	N527 StatusSLODefinitionExpected = "527"
+	N529 StatusSLODefinitionExpected = "529"
+	N530 StatusSLODefinitionExpected = "530"
+	N540 StatusSLODefinitionExpected = "540"
+	N561 StatusSLODefinitionExpected = "561"
+	N598 StatusSLODefinitionExpected = "598"
+	N599 StatusSLODefinitionExpected = "599"
+)
+
+// ContentSchema defines model for ContentSchema.
+type ContentSchema struct {
+	// Schema https://json-schema.org/draft/2020-12/json-schema-core.html
+	Schema string `json:"schema"`
+}
+
+// DateTime https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
+type DateTime = time.Time
+
+// Error Detailed error response
 type Error struct {
 	// Code Error code
 	Code string `json:"code"`
@@ -39,6 +151,23 @@ type Error struct {
 	// Message Human-readable error message
 	Message string `json:"message"`
 }
+
+// GetRequestSchemaResponse defines model for GetRequestSchemaResponse.
+type GetRequestSchemaResponse struct {
+	Body   ContentSchema `json:"body,omitempty"`
+	Cookie ContentSchema `json:"cookie,omitempty"`
+	Header ContentSchema `json:"header,omitempty"`
+	Query  ContentSchema `json:"query,omitempty"`
+
+	// Title Schema title
+	Title string `json:"title,omitempty"`
+
+	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
+	UpdatedAt DateTime `json:"updatedAt"`
+}
+
+// IntegrationID defines model for IntegrationID.
+type IntegrationID = string
 
 // LatencySLODefinition defines model for LatencySLODefinition.
 type LatencySLODefinition struct {
@@ -49,10 +178,24 @@ type LatencySLODefinition struct {
 	WindowDuration Duration `json:"windowDuration"`
 }
 
-// ListDefinitions defines model for ListDefinitions.
+// ListDefinitions List of SLO definitions for an integration
 type ListDefinitions struct {
 	// Routes List of route-specific SLO configurations
 	Routes []RouteSLODefinition `json:"routes"`
+}
+
+// ListRequestSchemas defines model for ListRequestSchemas.
+type ListRequestSchemas struct {
+	// Schemas List of uploaded schemas
+	Schemas []struct {
+		SchemaID SchemaID `json:"schemaID"`
+
+		// Title Schema title
+		Title string `json:"title"`
+
+		// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
+		UpdatedAt DateTime `json:"updatedAt"`
+	} `json:"schemas"`
 }
 
 // PercentileThreshold defines model for PercentileThreshold.
@@ -74,7 +217,7 @@ type Route struct {
 
 	// Path URL path pattern
 	Path string `json:"path,omitempty"`
-	Port int    `json:"port,omitempty"`
+	Port int32  `json:"port,omitempty"`
 }
 
 // RouteMethod HTTP method (GET, POST, PUT, DELETE, etc.)
@@ -91,16 +234,41 @@ type RouteSLODefinition struct {
 	Status   StatusSLODefinition  `json:"status"`
 }
 
+// SchemaID defines model for SchemaID.
+type SchemaID = string
+
 // StatusSLODefinition defines model for StatusSLODefinition.
 type StatusSLODefinition struct {
 	// BreachThreshold Percentile value (0.0% to 100.0%)
 	BreachThreshold Percentile `json:"breachThreshold"`
 
 	// Expected List of expected HTTP status codes
-	Expected []string `json:"expected"`
+	Expected []StatusSLODefinitionExpected `json:"expected"`
 
 	// WindowDuration Duration string (e.g., "5m", "1h", "30s")
 	WindowDuration Duration `json:"windowDuration"`
+}
+
+// StatusSLODefinitionExpected defines model for StatusSLODefinition.Expected.
+type StatusSLODefinitionExpected string
+
+// UploadRequestSchemaRequest defines model for UploadRequestSchemaRequest.
+type UploadRequestSchemaRequest struct {
+	Body   ContentSchema `json:"body,omitempty"`
+	Cookie ContentSchema `json:"cookie,omitempty"`
+	Header ContentSchema `json:"header,omitempty"`
+	Query  ContentSchema `json:"query,omitempty"`
+
+	// Title Schema title
+	Title string `json:"title,omitempty"`
+}
+
+// UploadRequestSchemaResponse defines model for UploadRequestSchemaResponse.
+type UploadRequestSchemaResponse struct {
+	SchemaID SchemaID `json:"schemaID,omitempty"`
+
+	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
+	UpdatedAt DateTime `json:"updatedAt,omitempty"`
 }
 
 // UpsertSLORequest defines model for UpsertSLORequest.
@@ -115,17 +283,50 @@ type UpsertSLOResponse struct {
 	RouteKey RouteKey `json:"routeKey,omitempty"`
 }
 
-// IntegrationID defines model for IntegrationID.
-type IntegrationID = string
-
-// BadRequest defines model for BadRequest.
+// BadRequest Detailed error response
 type BadRequest = Error
 
-// InternalServerError defines model for InternalServerError.
+// InternalServerError Detailed error response
 type InternalServerError = Error
 
-// NotFound defines model for NotFound.
+// NotFound Detailed error response
 type NotFound = Error
+
+// TooManyRequests Detailed error response
+type TooManyRequests = Error
+
+// Unauthorized Detailed error response
+type Unauthorized = Error
+
+// ListSchemasParams defines parameters for ListSchemas.
+type ListSchemasParams struct {
+	// XIntegrationId Unique identifier of the SLO configuration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
+}
+
+// UploadSchemaParams defines parameters for UploadSchema.
+type UploadSchemaParams struct {
+	// XIntegrationId Unique identifier of the SLO configuration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
+}
+
+// DeleteSchemaParams defines parameters for DeleteSchema.
+type DeleteSchemaParams struct {
+	// XIntegrationId Unique identifier of the SLO configuration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
+}
+
+// GetSchemaParams defines parameters for GetSchema.
+type GetSchemaParams struct {
+	// XIntegrationId Unique identifier of the SLO configuration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
+}
+
+// UpdateSchemaParams defines parameters for UpdateSchema.
+type UpdateSchemaParams struct {
+	// XIntegrationId Unique identifier of the SLO configuration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
+}
 
 // GetSLOConfigParams defines parameters for GetSLOConfig.
 type GetSLOConfigParams struct {
@@ -144,6 +345,12 @@ type DeleteSLOConfigParams struct {
 	// XIntegrationId Unique identifier of the SLO configuration
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
+
+// UploadSchemaJSONRequestBody defines body for UploadSchema for application/json ContentType.
+type UploadSchemaJSONRequestBody = UploadRequestSchemaRequest
+
+// UpdateSchemaJSONRequestBody defines body for UpdateSchema for application/json ContentType.
+type UpdateSchemaJSONRequestBody = UploadRequestSchemaRequest
 
 // UpsertSLOConfigJSONRequestBody defines body for UpsertSLOConfig for application/json ContentType.
 type UpsertSLOConfigJSONRequestBody = UpsertSLORequest
@@ -221,6 +428,25 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// ListSchemas request
+	ListSchemas(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadSchemaWithBody request with any body
+	UploadSchemaWithBody(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UploadSchema(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSchema request
+	DeleteSchema(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSchema request
+	GetSchema(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSchemaWithBody request with any body
+	UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateSchema(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetSLOConfig request
 	GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -231,6 +457,90 @@ type ClientInterface interface {
 
 	// DeleteSLOConfig request
 	DeleteSLOConfig(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) ListSchemas(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSchemasRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadSchemaWithBody(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSchemaRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadSchema(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSchemaRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteSchema(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSchemaRequest(c.Server, schemaid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSchema(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSchemaRequest(c.Server, schemaid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSchemaRequestWithBody(c.Server, schemaid, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSchema(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSchemaRequest(c.Server, schemaid, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -279,6 +589,253 @@ func (c *Client) DeleteSLOConfig(ctx context.Context, routekey RouteKey, params 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListSchemasRequest generates requests for ListSchemas
+func NewListSchemasRequest(server string, params *ListSchemasParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/request-schemas")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewUploadSchemaRequest calls the generic UploadSchema builder with application/json body
+func NewUploadSchemaRequest(server string, params *UploadSchemaParams, body UploadSchemaJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUploadSchemaRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewUploadSchemaRequestWithBody generates requests for UploadSchema with any type of body
+func NewUploadSchemaRequestWithBody(server string, params *UploadSchemaParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/request-schemas")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewDeleteSchemaRequest generates requests for DeleteSchema
+func NewDeleteSchemaRequest(server string, schemaid SchemaID, params *DeleteSchemaParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "schemaid", runtime.ParamLocationPath, schemaid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/request-schemas/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewGetSchemaRequest generates requests for GetSchema
+func NewGetSchemaRequest(server string, schemaid SchemaID, params *GetSchemaParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "schemaid", runtime.ParamLocationPath, schemaid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/request-schemas/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewUpdateSchemaRequest calls the generic UpdateSchema builder with application/json body
+func NewUpdateSchemaRequest(server string, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSchemaRequestWithBody(server, schemaid, params, "application/json", bodyReader)
+}
+
+// NewUpdateSchemaRequestWithBody generates requests for UpdateSchema with any type of body
+func NewUpdateSchemaRequestWithBody(server string, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "schemaid", runtime.ParamLocationPath, schemaid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/request-schemas/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
 }
 
 // NewGetSLOConfigRequest generates requests for GetSLOConfig
@@ -464,6 +1021,25 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// ListSchemasWithResponse request
+	ListSchemasWithResponse(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*ListSchemasResponse, error)
+
+	// UploadSchemaWithBodyWithResponse request with any body
+	UploadSchemaWithBodyWithResponse(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
+
+	UploadSchemaWithResponse(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
+
+	// DeleteSchemaWithResponse request
+	DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error)
+
+	// GetSchemaWithResponse request
+	GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error)
+
+	// UpdateSchemaWithBodyWithResponse request with any body
+	UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
+
+	UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
+
 	// GetSLOConfigWithResponse request
 	GetSLOConfigWithResponse(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*GetSLOConfigResponse, error)
 
@@ -476,11 +1052,146 @@ type ClientWithResponsesInterface interface {
 	DeleteSLOConfigWithResponse(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*DeleteSLOConfigResponse, error)
 }
 
+type ListSchemasResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListRequestSchemas
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSchemasResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSchemasResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *UploadRequestSchemaResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadSchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadSchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GetRequestSchemaResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *UploadRequestSchemaResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetSLOConfigResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *ListDefinitions
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
 	JSON404      *NotFound
+	JSON429      *TooManyRequests
 	JSON500      *InternalServerError
 }
 
@@ -506,6 +1217,8 @@ type UpsertSLOConfigResponse struct {
 	JSON200      *UpsertSLOResponse
 	JSON201      *UpsertSLOResponse
 	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON429      *TooManyRequests
 	JSON500      *InternalServerError
 }
 
@@ -528,7 +1241,10 @@ func (r UpsertSLOConfigResponse) StatusCode() int {
 type DeleteSLOConfigResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
 	JSON404      *NotFound
+	JSON429      *TooManyRequests
 	JSON500      *InternalServerError
 }
 
@@ -546,6 +1262,67 @@ func (r DeleteSLOConfigResponse) StatusCode() int {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
+}
+
+// ListSchemasWithResponse request returning *ListSchemasResponse
+func (c *ClientWithResponses) ListSchemasWithResponse(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*ListSchemasResponse, error) {
+	rsp, err := c.ListSchemas(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSchemasResponse(rsp)
+}
+
+// UploadSchemaWithBodyWithResponse request with arbitrary body returning *UploadSchemaResponse
+func (c *ClientWithResponses) UploadSchemaWithBodyWithResponse(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
+	rsp, err := c.UploadSchemaWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadSchemaResponse(rsp)
+}
+
+func (c *ClientWithResponses) UploadSchemaWithResponse(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
+	rsp, err := c.UploadSchema(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadSchemaResponse(rsp)
+}
+
+// DeleteSchemaWithResponse request returning *DeleteSchemaResponse
+func (c *ClientWithResponses) DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error) {
+	rsp, err := c.DeleteSchema(ctx, schemaid, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSchemaResponse(rsp)
+}
+
+// GetSchemaWithResponse request returning *GetSchemaResponse
+func (c *ClientWithResponses) GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error) {
+	rsp, err := c.GetSchema(ctx, schemaid, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSchemaResponse(rsp)
+}
+
+// UpdateSchemaWithBodyWithResponse request with arbitrary body returning *UpdateSchemaResponse
+func (c *ClientWithResponses) UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
+	rsp, err := c.UpdateSchemaWithBody(ctx, schemaid, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSchemaResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
+	rsp, err := c.UpdateSchema(ctx, schemaid, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSchemaResponse(rsp)
 }
 
 // GetSLOConfigWithResponse request returning *GetSLOConfigResponse
@@ -583,6 +1360,290 @@ func (c *ClientWithResponses) DeleteSLOConfigWithResponse(ctx context.Context, r
 	return ParseDeleteSLOConfigResponse(rsp)
 }
 
+// ParseListSchemasResponse parses an HTTP response from a ListSchemasWithResponse call
+func ParseListSchemasResponse(rsp *http.Response) (*ListSchemasResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSchemasResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListRequestSchemas
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUploadSchemaResponse parses an HTTP response from a UploadSchemaWithResponse call
+func ParseUploadSchemaResponse(rsp *http.Response) (*UploadSchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadSchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UploadRequestSchemaResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSchemaResponse parses an HTTP response from a DeleteSchemaWithResponse call
+func ParseDeleteSchemaResponse(rsp *http.Response) (*DeleteSchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSchemaResponse parses an HTTP response from a GetSchemaWithResponse call
+func ParseGetSchemaResponse(rsp *http.Response) (*GetSchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetRequestSchemaResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSchemaResponse parses an HTTP response from a UpdateSchemaWithResponse call
+func ParseUpdateSchemaResponse(rsp *http.Response) (*UpdateSchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UploadRequestSchemaResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetSLOConfigResponse parses an HTTP response from a GetSLOConfigWithResponse call
 func ParseGetSLOConfigResponse(rsp *http.Response) (*GetSLOConfigResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -604,12 +1665,33 @@ func ParseGetSLOConfigResponse(rsp *http.Response) (*GetSLOConfigResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -658,6 +1740,20 @@ func ParseUpsertSLOConfigResponse(rsp *http.Response) (*UpsertSLOConfigResponse,
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -684,12 +1780,33 @@ func ParseDeleteSLOConfigResponse(rsp *http.Response) (*DeleteSLOConfigResponse,
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -705,6 +1822,21 @@ func ParseDeleteSLOConfigResponse(rsp *http.Response) (*DeleteSLOConfigResponse,
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List request schemas
+	// (GET /request-schemas)
+	ListSchemas(w http.ResponseWriter, r *http.Request, params ListSchemasParams)
+	// Create Schema
+	// (POST /request-schemas)
+	UploadSchema(w http.ResponseWriter, r *http.Request, params UploadSchemaParams)
+	// Delete Schema
+	// (DELETE /request-schemas/{schemaid})
+	DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params DeleteSchemaParams)
+	// Get Schema
+	// (GET /request-schemas/{schemaid})
+	GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params GetSchemaParams)
+	// Update Schema
+	// (PUT /request-schemas/{schemaid})
+	UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params UpdateSchemaParams)
 	// List SLO definitions
 	// (GET /slo-definitions)
 	GetSLOConfig(w http.ResponseWriter, r *http.Request, params GetSLOConfigParams)
@@ -725,10 +1857,293 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// ListSchemas operation middleware
+func (siw *ServerInterfaceWrapper) ListSchemas(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSchemasParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSchemas(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadSchema operation middleware
+func (siw *ServerInterfaceWrapper) UploadSchema(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UploadSchemaParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadSchema(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSchema operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSchema(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "schemaid" -------------
+	var schemaid SchemaID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "schemaid", r.PathValue("schemaid"), &schemaid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "schemaid", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteSchemaParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSchema(w, r, schemaid, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSchema operation middleware
+func (siw *ServerInterfaceWrapper) GetSchema(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "schemaid" -------------
+	var schemaid SchemaID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "schemaid", r.PathValue("schemaid"), &schemaid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "schemaid", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSchemaParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSchema(w, r, schemaid, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSchema operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSchema(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "schemaid" -------------
+	var schemaid SchemaID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "schemaid", r.PathValue("schemaid"), &schemaid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "schemaid", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateSchemaParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSchema(w, r, schemaid, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSLOConfig operation middleware
 func (siw *ServerInterfaceWrapper) GetSLOConfig(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetSLOConfigParams
@@ -773,6 +2188,12 @@ func (siw *ServerInterfaceWrapper) GetSLOConfig(w http.ResponseWriter, r *http.R
 func (siw *ServerInterfaceWrapper) UpsertSLOConfig(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params UpsertSLOConfigParams
@@ -826,6 +2247,12 @@ func (siw *ServerInterfaceWrapper) DeleteSLOConfig(w http.ResponseWriter, r *htt
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "routekey", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params DeleteSLOConfigParams
@@ -986,6 +2413,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/request-schemas", wrapper.ListSchemas)
+	m.HandleFunc("POST "+options.BaseURL+"/request-schemas", wrapper.UploadSchema)
+	m.HandleFunc("DELETE "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.DeleteSchema)
+	m.HandleFunc("GET "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.GetSchema)
+	m.HandleFunc("PUT "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.UpdateSchema)
 	m.HandleFunc("GET "+options.BaseURL+"/slo-definitions", wrapper.GetSLOConfig)
 	m.HandleFunc("POST "+options.BaseURL+"/slo-definitions", wrapper.UpsertSLOConfig)
 	m.HandleFunc("DELETE "+options.BaseURL+"/slo-definitions/{routekey}", wrapper.DeleteSLOConfig)

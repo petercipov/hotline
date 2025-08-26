@@ -18,6 +18,26 @@ type HttpHandler struct {
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
+func (h *HttpHandler) ListSchemas(w http.ResponseWriter, r *http.Request, params ListSchemasParams) {
+	panic("implement me")
+}
+
+func (h *HttpHandler) DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params DeleteSchemaParams) {
+	panic("implement me")
+}
+
+func (h *HttpHandler) GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params GetSchemaParams) {
+	panic("implement me")
+}
+
+func (h *HttpHandler) UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params UpdateSchemaParams) {
+	panic("implement me")
+}
+
+func (h *HttpHandler) UploadSchema(w http.ResponseWriter, r *http.Request, params UploadSchemaParams) {
+	panic("implement me")
+}
+
 type APIEvents interface {
 	RouteUpserted(integrationID integrations.ID, route hotlinehttp.Route)
 }

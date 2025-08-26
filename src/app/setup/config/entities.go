@@ -66,18 +66,34 @@ func ParseRoute(latencyDefinition LatencySLODefinition, statusDefinition StatusS
 			Method:      string(route.Method),
 			PathPattern: route.Path,
 			Host:        route.Host,
-			Port:        route.Port,
+			Port:        int(route.Port),
 		},
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles:    defs,
 			WindowDuration: time.Duration(latencyDefinition.WindowDuration),
 		},
 		Status: servicelevels.HttpStatusSLODefinition{
-			Expected:        statusDefinition.Expected,
+			Expected:        convertFromExpected(statusDefinition.Expected),
 			BreachThreshold: *percentile,
 			WindowDuration:  time.Duration(statusDefinition.WindowDuration),
 		},
 	}, nil
+}
+
+func convertFromExpected(expected []StatusSLODefinitionExpected) []string {
+	arr := make([]string, len(expected))
+	for i, e := range expected {
+		arr[i] = string(e)
+	}
+	return arr
+}
+
+func convertToExpected(expected []string) []StatusSLODefinitionExpected {
+	arr := make([]StatusSLODefinitionExpected, len(expected))
+	for i, e := range expected {
+		arr[i] = StatusSLODefinitionExpected(e)
+	}
+	return arr
 }
 
 func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelevels.PercentileDefinition, error) {
@@ -104,14 +120,14 @@ func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteSLODefi
 			},
 			Status: StatusSLODefinition{
 				BreachThreshold: Percentile(route.Status.BreachThreshold),
-				Expected:        route.Status.Expected,
+				Expected:        convertToExpected(route.Status.Expected),
 				WindowDuration:  Duration(route.Status.WindowDuration),
 			},
 			Route: Route{
 				Host:   route.Route.Host,
 				Method: RouteMethod(route.Route.Method),
 				Path:   route.Route.PathPattern,
-				Port:   route.Route.Port,
+				Port:   int32(route.Route.Port),
 			},
 			RouteKey: route.Route.ID(),
 		})

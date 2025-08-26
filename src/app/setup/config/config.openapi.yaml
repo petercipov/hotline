@@ -3,8 +3,160 @@ info:
   title: HTTP API Config API
   description: API for managing HTTP API service level objective definitions
   version: 1.0.0
+  license:
+    name: MIT
+    url: https://mit-license.org/
+  contact:
+    email: petercipov@gmail.com
+    name: Peter Cipov
+    url: https://www.petercipov.com/
+
+servers:
+  - url: /api/v1/config
+
+security:
+  - bearerAuth: []
 
 paths:
+  /request-schemas:
+    get:
+      summary: List request schemas
+      description: Retrieve list of request schemas
+      operationId: listSchemas
+      tags:
+        - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/IntegrationID'
+      responses:
+        '200':
+          description: List of defined SLOs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListRequestSchemas'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Create Schema
+      description: Upload schema for request validation
+      operationId: uploadSchema
+      tags:
+        - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/IntegrationID'
+      requestBody:
+        description: Schema definition
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadRequestSchemaRequest'
+      responses:
+        '201':
+          description: Created request schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadRequestSchemaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /request-schemas/{schemaid}:
+    put:
+      summary: Update Schema
+      description: Update request schema
+      operationId: updateSchema
+      tags:
+        - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/SchemaID'
+        - $ref: '#/components/parameters/IntegrationID'
+      requestBody:
+        description: Schema definition
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadRequestSchemaRequest'
+      responses:
+        '201':
+          description: Created request schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadRequestSchemaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      summary: Get Schema
+      description: Get request schema
+      operationId: getSchema
+      tags:
+        - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/SchemaID'
+        - $ref: '#/components/parameters/IntegrationID'
+      responses:
+        '200':
+          description: Get request schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRequestSchemaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete Schema
+      description: Delete request schema
+      operationId: deleteSchema
+      tags:
+        - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/SchemaID'
+        - $ref: '#/components/parameters/IntegrationID'
+      responses:
+        '204':
+          description: Request schema deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /slo-definitions:
     get:
       summary: List SLO definitions
@@ -21,8 +173,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListDefinitions'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
@@ -55,6 +213,10 @@ paths:
                 $ref: '#/components/schemas/UpsertSLOResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -71,8 +233,14 @@ paths:
       responses:
         '204':
           description: SLO configuration deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -92,13 +260,129 @@ components:
       required: true
       description: Unique identifier of the SLO configuration
       schema:
-        type: string
-        minLength: 32
-        maxLength: 32
-        pattern: "IN[A-Z0-9]+"
-        example: IN7AB56CD456OP98BN54CAUB43211OU7
+        $ref: '#/components/schemas/IntegrationID'
+
+    SchemaID:
+      name: schemaid
+      in: path
+      required: true
+      description: Unique identifier of the request schema
+      schema:
+        $ref: '#/components/schemas/SchemaID'
 
   schemas:
+    IntegrationID:
+      type: string
+      minLength: 32
+      maxLength: 32
+      pattern: "IN[A-Z0-9]+"
+      example: IN7AB56CD456OP98BN54CAUB43211OU7
+
+    SchemaID:
+      type: string
+      minLength: 32
+      maxLength: 32
+      pattern: "S[A-Z0-9]+"
+      example: S7AB56CD456OP98BN54CAUB43211OU78
+
+    ContentSchema:
+      type: object
+      required:
+        - schema
+      properties:
+        schema:
+          type: string
+          format: json-schema
+          example: "{}"
+          minLength: 2
+          maxLength: 355000
+          description: https://json-schema.org/draft/2020-12/json-schema-core.html
+
+    DateTime:
+      type: string
+      format: date-time
+      minLength: 20
+      maxLength: 20
+      description: https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
+      example: "2017-07-21T17:32:28Z"
+
+    UploadRequestSchemaRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          pattern: "[a-zA-Z0-9_\\- ]+"
+          minLength: 1
+          maxLength: 256
+          description: Schema title
+          example: "Request schema"
+        header:
+          $ref: '#/components/schemas/ContentSchema'
+        query:
+          $ref: '#/components/schemas/ContentSchema'
+        body:
+          $ref: '#/components/schemas/ContentSchema'
+        cookie:
+          $ref: '#/components/schemas/ContentSchema'
+
+    GetRequestSchemaResponse:
+      type: object
+      required:
+        - updatedAt
+      properties:
+        title:
+          type: string
+          pattern: "[a-zA-Z0-9_\\- ]+"
+          description: Schema title
+          maxLength: 256
+          minLength: 1
+          example: "Request schema"
+        updatedAt:
+          $ref: '#/components/schemas/DateTime'
+        header:
+          $ref: '#/components/schemas/ContentSchema'
+        query:
+          $ref: '#/components/schemas/ContentSchema'
+        body:
+          $ref: '#/components/schemas/ContentSchema'
+        cookie:
+          $ref: '#/components/schemas/ContentSchema'
+
+    UploadRequestSchemaResponse:
+      type: object
+      properties:
+        schemaID:
+          $ref: '#/components/schemas/SchemaID'
+        updatedAt:
+          $ref: '#/components/schemas/DateTime'
+
+    ListRequestSchemas:
+      type: object
+      required:
+        - schemas
+      properties:
+        schemas:
+          type: array
+          maxItems: 1024
+          items:
+            required:
+              - schemaID
+              - title
+              - updatedAt
+            properties:
+              schemaID:
+                $ref: '#/components/schemas/SchemaID'
+              title:
+                type: string
+                pattern: "[a-zA-Z0-9_\\- ]+"
+                description: Schema title
+                maxLength: 256
+                minLength: 1
+                example: "Request schema"
+              updatedAt:
+                $ref: '#/components/schemas/DateTime'
+          description: List of uploaded schemas
+
     UpsertSLOResponse:
       type: object
       properties:
@@ -120,16 +404,20 @@ components:
 
     RouteKey:
       type: string
+      format: uri
       minLength: 1
+      maxLength: 8196
       example: GET:api.example.com:8080:/api/users/{id}
 
     ListDefinitions:
       type: object
+      description: List of SLO definitions for an integration
       required:
         - routes
       properties:
         routes:
           type: array
+          maxItems: 1024
           items:
             $ref: '#/components/schemas/RouteSLODefinition'
           description: List of route-specific SLO configurations
@@ -144,14 +432,22 @@ components:
           example: "GET"
         host:
           type: string
+          format: uri
+          minLength: 1
+          maxLength: 65535
           description: Host name
           example: "api.example.com"
         port:
           type: integer
+          minimum: 1
+          maximum: 65535
+          format: int32
           example: 8080
         path:
           type: string
+          format: uri
           minLength: 1
+          maxLength: 8192
           description: URL path pattern
           example: "/api/users/{id}"
 
@@ -178,11 +474,15 @@ components:
       properties:
         percentiles:
           type: array
+          maxItems: 124
           items:
             $ref: '#/components/schemas/PercentileThreshold'
           description: Latency percentile definitions
         windowDuration:
           type: string
+          minLength: 1
+          maxLength: 10
+          pattern: "^\\d+(s|m|h|d)$"
           x-go-type: Duration
           description: Duration string (e.g., "5m", "1h", "30s")
           example: "5m"
@@ -196,17 +496,35 @@ components:
       properties:
         expected:
           type: array
+          maxItems: 128
           items:
             type: string
+            format: string
+            enum: [ "100", "101", "102", "103",
+                    "200", "201", "202", "203", "204", "205", "206", "207", "208", "218", "226",
+                    "300", "301", "302", "303", "304", "305", "306", "307", "308",
+                    "400", "401", "402", "403", "404", "405", "406", "407", "408", "409", "410",
+                    "411", "412", "413", "414", "415", "416", "417", "418", "419", "420", "421",
+                    "422", "423", "424", "426", "428", "429", "430", "431", "440", "444", "449",
+                    "450", "451", "460", "463", "464", "494", "495", "496", "497", "498", "499",
+                    "500", "501", "502", "503", "504", "505", "506", "507", "508", "509", "510", "511",
+                    "520", "521", "522", "523", "524", "525", "526", "527", "529", "530", "540", "561", "598", "599"
+            ]
           description: List of expected HTTP status codes
           example: ["200", "201", "204"]
         breachThreshold:
           type: string
+          minLength: 1
+          maxLength: 10
+          pattern: "^\\d+(\\.\\d+)?%$"
           description: Percentile value (0.0% to 100.0%)
           example: "99.9%"
           x-go-type: Percentile
         windowDuration:
           type: string
+          minLength: 1
+          maxLength: 10
+          pattern: "^\\d+(s|m|h|d)$"
           x-go-type: Duration
           description: Duration string (e.g., "5m", "1h", "30s")
           example: "1h"
@@ -219,26 +537,39 @@ components:
       properties:
         percentile:
           type: string
+          minLength: 1
+          maxLength: 10
+          pattern: "^\\d+(\\.\\d+)?%$"
           description: Percentile value (0.0% to 100.0%)
           example: "99.9%"
           x-go-type: Percentile
         breachLatency:
           type: string
+          minLength: 1
+          maxLength: 10
+          pattern: "^\\d+(s|m|h|d)$"
           x-go-type: Duration
           description: Latency threshold (e.g., "1s", "2500ms", "20s")
           example: "2s"
 
     Error:
       type: object
+      description: Detailed error response
       required:
         - code
         - message
       properties:
         code:
           type: string
+          format: string
+          minLength: 1
+          maxLength: 64
           description: Error code
         message:
           type: string
+          format: string
+          minLength: 1
+          maxLength: 1024
           description: Human-readable error message
 
   responses:
@@ -256,13 +587,35 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
 
+    Unauthorized:
+      description: Unauthorized request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    TooManyRequests:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
     InternalServerError:
       description: Internal server error
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: RFC8725 Compliant JWT
+      scheme: bearer
+      bearerFormat: JWT
 
 tags:
+  - name: Request Schemas
+    description: Operations for managing HTTP request schemas
   - name: SLO Definitions
     description: Operations for managing HTTP API SLO definitions
