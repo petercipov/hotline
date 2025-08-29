@@ -412,6 +412,7 @@ components:
     UpsertSLORequest:
       type: object
       required:
+        - route
         - latency
         - status
       properties:
@@ -421,6 +422,8 @@ components:
           $ref: '#/components/schemas/LatencySLODefinition'
         status:
           $ref: '#/components/schemas/StatusSLODefinition'
+        validation:
+          $ref: '#/components/schemas/ValidationSLODefinition'
 
     RouteKey:
       type: string
@@ -474,6 +477,8 @@ components:
     RouteSLODefinition:
       type: object
       required:
+        - routeKey
+        - route
         - latency
         - status
       properties:
@@ -485,6 +490,8 @@ components:
           $ref: '#/components/schemas/LatencySLODefinition'
         status:
           $ref: '#/components/schemas/StatusSLODefinition'
+        validation:
+          $ref: '#/components/schemas/ValidationSLODefinition'
 
     LatencySLODefinition:
       type: object
@@ -499,13 +506,21 @@ components:
             $ref: '#/components/schemas/PercentileThreshold'
           description: Latency percentile definitions
         windowDuration:
-          type: string
-          minLength: 1
-          maxLength: 10
-          pattern: "^\\d+(s|m|h|d)$"
-          x-go-type: Duration
-          description: Duration string (e.g., "5m", "1h", "30s")
-          example: "5m"
+          $ref: '#/components/schemas/WindowValue'
+
+    ValidationSLODefinition:
+      type: object
+      required:
+        - schemaId
+        - breachThreshold
+        - windowDuration
+      properties:
+        schemaId:
+          $ref: '#/components/schemas/SchemaID'
+        breachThreshold:
+          $ref: '#/components/schemas/PercentileValue'
+        windowDuration:
+          $ref: '#/components/schemas/WindowValue'
 
     StatusSLODefinition:
       type: object
@@ -533,21 +548,9 @@ components:
           description: List of expected HTTP status codes
           example: ["200", "201", "204"]
         breachThreshold:
-          type: string
-          minLength: 1
-          maxLength: 10
-          pattern: "^\\d+(\\.\\d+)?%$"
-          description: Percentile value (0.0% to 100.0%)
-          example: "99.9%"
-          x-go-type: Percentile
+          $ref: '#/components/schemas/PercentileValue'
         windowDuration:
-          type: string
-          minLength: 1
-          maxLength: 10
-          pattern: "^\\d+(s|m|h|d)$"
-          x-go-type: Duration
-          description: Duration string (e.g., "5m", "1h", "30s")
-          example: "1h"
+          $ref: '#/components/schemas/WindowValue'
 
     PercentileThreshold:
       type: object
@@ -556,21 +559,36 @@ components:
         - breachLatency
       properties:
         percentile:
-          type: string
-          minLength: 1
-          maxLength: 10
-          pattern: "^\\d+(\\.\\d+)?%$"
-          description: Percentile value (0.0% to 100.0%)
-          example: "99.9%"
-          x-go-type: Percentile
+          $ref: '#/components/schemas/PercentileValue'
         breachLatency:
-          type: string
-          minLength: 1
-          maxLength: 10
-          pattern: "^\\d+(s|m|h|d)$"
-          x-go-type: Duration
-          description: Latency threshold (e.g., "1s", "2500ms", "20s")
-          example: "2s"
+          $ref: '#/components/schemas/LatencyValue'
+
+    PercentileValue:
+      type: string
+      minLength: 1
+      maxLength: 10
+      pattern: "^\\d+(\\.\\d+)?%$"
+      description: Percentile value (0.0% to 100.0%)
+      example: "99.9%"
+      x-go-type: Percentile
+
+    WindowValue:
+      type: string
+      minLength: 1
+      maxLength: 10
+      pattern: "^\\d+(s|m|h|d)$"
+      x-go-type: Duration
+      description: Duration string (e.g., "5m", "1h", "30s")
+      example: "1h"
+
+    LatencyValue:
+      type: string
+      minLength: 1
+      maxLength: 10
+      pattern: "^\\d+(s|m|h|d)$"
+      x-go-type: Duration
+      description: Latency threshold (e.g., "1s", "2500ms", "20s")
+      example: "2s"
 
     Error:
       type: object

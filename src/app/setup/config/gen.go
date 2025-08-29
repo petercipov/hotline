@@ -154,13 +154,13 @@ type Error struct {
 
 // GetRequestSchemaResponse defines model for GetRequestSchemaResponse.
 type GetRequestSchemaResponse struct {
-	Body   ContentSchema `json:"body,omitempty"`
-	Cookie ContentSchema `json:"cookie,omitempty"`
-	Header ContentSchema `json:"header,omitempty"`
-	Query  ContentSchema `json:"query,omitempty"`
+	Body   *ContentSchema `json:"body,omitempty"`
+	Cookie *ContentSchema `json:"cookie,omitempty"`
+	Header *ContentSchema `json:"header,omitempty"`
+	Query  *ContentSchema `json:"query,omitempty"`
 
 	// Title Schema title
-	Title string `json:"title,omitempty"`
+	Title *string `json:"title,omitempty"`
 
 	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
 	UpdatedAt DateTime `json:"updatedAt"`
@@ -175,8 +175,11 @@ type LatencySLODefinition struct {
 	Percentiles []PercentileThreshold `json:"percentiles"`
 
 	// WindowDuration Duration string (e.g., "5m", "1h", "30s")
-	WindowDuration Duration `json:"windowDuration"`
+	WindowDuration WindowValue `json:"windowDuration"`
 }
+
+// LatencyValue Latency threshold (e.g., "1s", "2500ms", "20s")
+type LatencyValue = Duration
 
 // ListDefinitions List of SLO definitions for an integration
 type ListDefinitions struct {
@@ -201,23 +204,40 @@ type ListRequestSchemas struct {
 // PercentileThreshold defines model for PercentileThreshold.
 type PercentileThreshold struct {
 	// BreachLatency Latency threshold (e.g., "1s", "2500ms", "20s")
-	BreachLatency Duration `json:"breachLatency"`
+	BreachLatency LatencyValue `json:"breachLatency"`
 
 	// Percentile Percentile value (0.0% to 100.0%)
-	Percentile Percentile `json:"percentile"`
+	Percentile PercentileValue `json:"percentile"`
+}
+
+// PercentileValue Percentile value (0.0% to 100.0%)
+type PercentileValue = Percentile
+
+// RequestSchema defines model for RequestSchema.
+type RequestSchema struct {
+	Body   *ContentSchema `json:"body,omitempty"`
+	Cookie *ContentSchema `json:"cookie,omitempty"`
+	Header *ContentSchema `json:"header,omitempty"`
+	Query  *ContentSchema `json:"query,omitempty"`
+}
+
+// ResponseSchema defines model for ResponseSchema.
+type ResponseSchema struct {
+	Body   *ContentSchema `json:"body,omitempty"`
+	Header *ContentSchema `json:"header,omitempty"`
 }
 
 // Route defines model for Route.
 type Route struct {
 	// Host Host name
-	Host string `json:"host,omitempty"`
+	Host *string `json:"host,omitempty"`
 
 	// Method HTTP method (GET, POST, PUT, DELETE, etc.)
-	Method RouteMethod `json:"method,omitempty"`
+	Method *RouteMethod `json:"method,omitempty"`
 
 	// Path URL path pattern
-	Path string `json:"path,omitempty"`
-	Port int32  `json:"port,omitempty"`
+	Path *string `json:"path,omitempty"`
+	Port *int32  `json:"port,omitempty"`
 }
 
 // RouteMethod HTTP method (GET, POST, PUT, DELETE, etc.)
@@ -228,10 +248,11 @@ type RouteKey = string
 
 // RouteSLODefinition defines model for RouteSLODefinition.
 type RouteSLODefinition struct {
-	Latency  LatencySLODefinition `json:"latency"`
-	Route    Route                `json:"route,omitempty"`
-	RouteKey RouteKey             `json:"routeKey,omitempty"`
-	Status   StatusSLODefinition  `json:"status"`
+	Latency    LatencySLODefinition     `json:"latency"`
+	Route      Route                    `json:"route"`
+	RouteKey   RouteKey                 `json:"routeKey"`
+	Status     StatusSLODefinition      `json:"status"`
+	Validation *ValidationSLODefinition `json:"validation,omitempty"`
 }
 
 // SchemaID defines model for SchemaID.
@@ -240,13 +261,13 @@ type SchemaID = string
 // StatusSLODefinition defines model for StatusSLODefinition.
 type StatusSLODefinition struct {
 	// BreachThreshold Percentile value (0.0% to 100.0%)
-	BreachThreshold Percentile `json:"breachThreshold"`
+	BreachThreshold PercentileValue `json:"breachThreshold"`
 
 	// Expected List of expected HTTP status codes
 	Expected []StatusSLODefinitionExpected `json:"expected"`
 
 	// WindowDuration Duration string (e.g., "5m", "1h", "30s")
-	WindowDuration Duration `json:"windowDuration"`
+	WindowDuration WindowValue `json:"windowDuration"`
 }
 
 // StatusSLODefinitionExpected defines model for StatusSLODefinition.Expected.
@@ -254,34 +275,46 @@ type StatusSLODefinitionExpected string
 
 // UploadRequestSchemaRequest defines model for UploadRequestSchemaRequest.
 type UploadRequestSchemaRequest struct {
-	Body   ContentSchema `json:"body,omitempty"`
-	Cookie ContentSchema `json:"cookie,omitempty"`
-	Header ContentSchema `json:"header,omitempty"`
-	Query  ContentSchema `json:"query,omitempty"`
+	Request  RequestSchema  `json:"request"`
+	Response ResponseSchema `json:"response"`
 
 	// Title Schema title
-	Title string `json:"title,omitempty"`
+	Title string `json:"title"`
 }
 
 // UploadRequestSchemaResponse defines model for UploadRequestSchemaResponse.
 type UploadRequestSchemaResponse struct {
-	SchemaID SchemaID `json:"schemaID,omitempty"`
+	SchemaID *SchemaID `json:"schemaID,omitempty"`
 
 	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
-	UpdatedAt DateTime `json:"updatedAt,omitempty"`
+	UpdatedAt *DateTime `json:"updatedAt,omitempty"`
 }
 
 // UpsertSLORequest defines model for UpsertSLORequest.
 type UpsertSLORequest struct {
-	Latency LatencySLODefinition `json:"latency"`
-	Route   Route                `json:"route,omitempty"`
-	Status  StatusSLODefinition  `json:"status"`
+	Latency    LatencySLODefinition     `json:"latency"`
+	Route      Route                    `json:"route"`
+	Status     StatusSLODefinition      `json:"status"`
+	Validation *ValidationSLODefinition `json:"validation,omitempty"`
 }
 
 // UpsertSLOResponse defines model for UpsertSLOResponse.
 type UpsertSLOResponse struct {
-	RouteKey RouteKey `json:"routeKey,omitempty"`
+	RouteKey *RouteKey `json:"routeKey,omitempty"`
 }
+
+// ValidationSLODefinition defines model for ValidationSLODefinition.
+type ValidationSLODefinition struct {
+	// BreachThreshold Percentile value (0.0% to 100.0%)
+	BreachThreshold PercentileValue `json:"breachThreshold"`
+	SchemaId        SchemaID        `json:"schemaId"`
+
+	// WindowDuration Duration string (e.g., "5m", "1h", "30s")
+	WindowDuration WindowValue `json:"windowDuration"`
+}
+
+// WindowValue Duration string (e.g., "5m", "1h", "30s")
+type WindowValue = Duration
 
 // BadRequest Detailed error response
 type BadRequest = Error

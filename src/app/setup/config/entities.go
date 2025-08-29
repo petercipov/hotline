@@ -63,10 +63,10 @@ func ParseRoute(latencyDefinition LatencySLODefinition, statusDefinition StatusS
 
 	return servicelevels.HttpRouteSLODefinition{
 		Route: http.Route{
-			Method:      string(route.Method),
-			PathPattern: route.Path,
-			Host:        route.Host,
-			Port:        int(route.Port),
+			Method:      optString((*string)(route.Method), ""),
+			PathPattern: optString(route.Path, ""),
+			Host:        optString(route.Host, ""),
+			Port:        int(optInt32(route.Port, 0)),
 		},
 		Latency: servicelevels.HttpLatencySLODefinition{
 			Percentiles:    defs,
@@ -113,6 +113,7 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteSLODefinition {
 	var defs []RouteSLODefinition
 	for _, route := range routes {
+		method := RouteMethod(route.Route.Method)
 		defs = append(defs, RouteSLODefinition{
 			Latency: LatencySLODefinition{
 				Percentiles:    convertPercentiles(route.Latency.Percentiles),
@@ -124,10 +125,10 @@ func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteSLODefi
 				WindowDuration:  Duration(route.Status.WindowDuration),
 			},
 			Route: Route{
-				Host:   route.Route.Host,
-				Method: RouteMethod(route.Route.Method),
-				Path:   route.Route.PathPattern,
-				Port:   int32(route.Route.Port),
+				Host:   ptrString(route.Route.Host),
+				Method: &method,
+				Path:   ptrString(route.Route.PathPattern),
+				Port:   ptrInt32(int32(route.Route.Port)),
 			},
 			RouteKey: route.Route.ID(),
 		})
@@ -145,4 +146,32 @@ func convertPercentiles(percentiles []servicelevels.PercentileDefinition) []Perc
 		})
 	}
 	return result
+}
+
+func optString(val *string, def string) string {
+	if val == nil {
+		return def
+	}
+	return *val
+}
+
+func optInt32(val *int32, def int32) int32 {
+	if val == nil {
+		return def
+	}
+	return *val
+}
+
+func ptrString(val string) *string {
+	if val == "" {
+		return nil
+	}
+	return &val
+}
+
+func ptrInt32(val int32) *int32 {
+	if val == 0 {
+		return nil
+	}
+	return &val
 }

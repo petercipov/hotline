@@ -100,13 +100,16 @@ func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, 
 		if unmarshalErr != nil {
 			return ctx, unmarshalErr
 		}
-		_, responseErr := configClient.UpsertSLOConfig(
+		resp, responseErr := configClient.UpsertSLOConfig(
 			ctx,
 			&config.UpsertSLOConfigParams{XIntegrationId: integrationID},
 			reqObj)
 
 		if responseErr != nil {
 			return ctx, responseErr
+		}
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+			return ctx, fmt.Errorf("unexpected response for slo upsert: %d", resp.StatusCode)
 		}
 	}
 

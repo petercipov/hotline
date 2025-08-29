@@ -124,8 +124,9 @@ func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Requ
 
 	h.repository.SetConfig(integrationID, *definition)
 	h.routeUpserted(integrationID, routeDefinition.Route)
+	key := routeDefinition.Route.ID()
 	writeResponse(ctx, writer, http.StatusOK, UpsertSLOResponse{
-		RouteKey: routeDefinition.Route.ID(),
+		RouteKey: &key,
 	})
 }
 
