@@ -308,6 +308,10 @@ components:
 
     UploadRequestSchemaRequest:
       type: object
+      required:
+        - title
+        - request
+        - response
       properties:
         title:
           type: string
@@ -316,6 +320,14 @@ components:
           maxLength: 256
           description: Schema title
           example: "Request schema"
+        request:
+          $ref: '#/components/schemas/RequestSchema'
+        response:
+          $ref: '#/components/schemas/ResponseSchema'
+
+    RequestSchema:
+      type: object
+      properties:
         header:
           $ref: '#/components/schemas/ContentSchema'
         query:
@@ -323,6 +335,14 @@ components:
         body:
           $ref: '#/components/schemas/ContentSchema'
         cookie:
+          $ref: '#/components/schemas/ContentSchema'
+
+    ResponseSchema:
+      type: object
+      properties:
+        header:
+          $ref: '#/components/schemas/ContentSchema'
+        body:
           $ref: '#/components/schemas/ContentSchema'
 
     GetRequestSchemaResponse:
