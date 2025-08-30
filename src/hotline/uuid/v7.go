@@ -1,6 +1,7 @@
 package uuid
 
 import (
+	"encoding/base64"
 	"io"
 	"time"
 
@@ -19,6 +20,23 @@ func NewDeterministicV7(randReader io.Reader) V7StringGenerator {
 		if err != nil {
 			return "", err
 		}
-		return uuidV7.String(), nil
+		return base64.RawURLEncoding.EncodeToString(uuidV7.Bytes()), nil
 	}
+}
+
+type ConstantRandReader struct {
+}
+
+func (m *ConstantRandReader) Read(p []byte) (n int, err error) {
+	for i := 0; i < len(p); i++ {
+		p[i] = byte(1)
+	}
+	return len(p), nil
+}
+
+type ErrorRandReader struct {
+}
+
+func (m *ErrorRandReader) Read(_ []byte) (n int, err error) {
+	return 0, io.EOF
 }

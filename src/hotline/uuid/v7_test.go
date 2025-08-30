@@ -2,7 +2,6 @@ package uuid_test
 
 import (
 	"hotline/uuid"
-	"io"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -11,34 +10,17 @@ import (
 
 var _ = Describe("UUID", func() {
 	It("generates deterministic v7 UUID", func() {
-		v7 := uuid.NewDeterministicV7(&constantRandReader{})
+		v7 := uuid.NewDeterministicV7(&uuid.ConstantRandReader{})
 
 		v7uuid, err := v7(time.Time{})
 		Expect(err).To(BeNil())
-		Expect(v7uuid).To(Equal("c77cedd3-2800-7101-8101-010101010101"))
+		Expect(v7uuid).To(Equal("x3zt0ygAcQGBAQEBAQEBAQ"))
 	})
 
 	It("returns error when readin random fails", func() {
-		v7 := uuid.NewDeterministicV7(&errorRandReader{})
+		v7 := uuid.NewDeterministicV7(&uuid.ErrorRandReader{})
 
 		_, err := v7(time.Time{})
 		Expect(err).NotTo(BeNil())
 	})
 })
-
-type constantRandReader struct {
-}
-
-func (m *constantRandReader) Read(p []byte) (n int, err error) {
-	for i := 0; i < len(p); i++ {
-		p[i] = byte(1)
-	}
-	return len(p), nil
-}
-
-type errorRandReader struct {
-}
-
-func (m *errorRandReader) Read(p []byte) (n int, err error) {
-	return 0, io.EOF
-}

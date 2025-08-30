@@ -52,7 +52,7 @@ var _ = Describe("Proxy", Ordered, func() {
 			ErrorType:       "",
 			CorrelationID:   "request-id-123",
 		}))
-		Expect(len(ingestedRequest.ID)).To(Equal(36))
+		Expect(len(ingestedRequest.ID)).To(Equal(22))
 		Expect(ingestedRequest.URL.Path).To(Equal("/abcd"))
 		Expect(ingestedRequest.EndTime.After(ingestedRequest.StartTime)).To(BeTrue())
 	})

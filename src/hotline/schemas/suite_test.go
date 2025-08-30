@@ -1,4 +1,4 @@
-package uuid_test
+package schemas_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestUUIDs(t *testing.T) {
+func TestSchemas(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "UUID Suite")
+	RunSpecs(t, "schemas Suite")
 }
