@@ -1,11 +1,12 @@
 module hotline
 
-go 1.25.0
+go 1.25.1
 
 require (
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/onsi/ginkgo/v2 v2.25.2
 	github.com/onsi/gomega v1.38.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	go.opentelemetry.io/proto/otlp v1.7.1
 	google.golang.org/protobuf v1.36.8
 )

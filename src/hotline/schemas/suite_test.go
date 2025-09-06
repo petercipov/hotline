@@ -9,5 +9,5 @@ import (
 
 func TestSchemas(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "schemas Suite")
+	RunSpecs(t, "Schemas Suite")
 }

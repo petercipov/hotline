@@ -56,9 +56,33 @@ paths:
         description: Schema definition
         required: true
         content:
-          application/json:
+          multipart/form-data:
+            encoding:
+              request-headers:
+                contentType: application/schema+json
+              request-query:
+                contentType: application/schema+json
+              request-body:
+                contentType: application/schema+json
+              response-headers:
+                contentType: application/schema+json
+              response-body:
+                contentType: application/schema+json
             schema:
-              $ref: '#/components/schemas/UploadRequestSchemaRequest'
+              type: object
+              properties:
+                title:
+                  $ref: '#/components/schemas/SchemaTitle'
+                request-headers:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                request-query:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                request-body:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                response-headers:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                response-body:
+                  $ref: '#/components/schemas/SchemaFileContent'
       responses:
         '201':
           description: Created request schema
@@ -89,9 +113,33 @@ paths:
         description: Schema definition
         required: true
         content:
-          application/json:
+          multipart/form-data:
+            encoding:
+              request-headers:
+                contentType: application/schema+json
+              request-query:
+                contentType: application/schema+json
+              request-body:
+                contentType: application/schema+json
+              response-headers:
+                contentType: application/schema+json
+              response-body:
+                contentType: application/schema+json
             schema:
-              $ref: '#/components/schemas/UploadRequestSchemaRequest'
+              type: object
+              properties:
+                title:
+                  $ref: '#/components/schemas/SchemaTitle'
+                request-headers:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                request-query:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                request-body:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                response-headers:
+                  $ref: '#/components/schemas/SchemaFileContent'
+                response-body:
+                  $ref: '#/components/schemas/SchemaFileContent'
       responses:
         '201':
           description: Created request schema
@@ -157,6 +205,59 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+
+  /request-schemas/{schemaid}/file/{filename}:
+    get:
+      summary: Get Schema File
+      description: Get request schema file
+      operationId: getSchemaFile
+      tags:
+        - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/SchemaID'
+        - $ref: '#/components/parameters/IntegrationID'
+        - $ref: '#/components/parameters/FileName'
+      responses:
+        '200':
+          description: Get request schema file
+          content:
+            application/schema+json:
+              schema:
+                $ref: '#/components/schemas/SchemaFileContent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Delete Schema File
+      description: Delete request schema file
+      operationId: deleteSchemaFile
+      tags:
+        - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/SchemaID'
+        - $ref: '#/components/parameters/IntegrationID'
+        - $ref: '#/components/parameters/FileName'
+      responses:
+        '204':
+          description: Request schema file deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /slo-definitions:
     get:
       summary: List SLO definitions
@@ -270,6 +371,14 @@ components:
       schema:
         $ref: '#/components/schemas/SchemaID'
 
+    FileName:
+      name: filename
+      in: path
+      required: true
+      description: Unique identifier of the request schema file
+      schema:
+        $ref: '#/components/schemas/SchemaFileName'
+
   schemas:
     IntegrationID:
       type: string
@@ -285,18 +394,23 @@ components:
       pattern: "S[A-Z0-9]+"
       example: S7AB56CD456OP98BN54CAUB43211OU78
 
-    ContentSchema:
-      type: object
-      required:
-        - schema
-      properties:
-        schema:
-          type: string
-          format: json-schema
-          example: "{}"
-          minLength: 2
-          maxLength: 355000
-          description: https://json-schema.org/draft/2020-12/json-schema-core.html
+    SchemaFileContent:
+      type: string
+      format: binary
+      example: "{}"
+      minLength: 2
+      maxLength: 355000
+      description: https://json-schema.org/draft/2020-12/json-schema-core.html
+
+    SchemaFileName:
+      type: string
+      enum: [
+        "request-headers.json",
+        "request-query.json",
+        "request-body.json",
+        "response-headers.json",
+        "response-body.json"
+      ]
 
     DateTime:
       type: string
@@ -306,44 +420,13 @@ components:
       description: https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
       example: "2017-07-21T17:32:28Z"
 
-    UploadRequestSchemaRequest:
-      type: object
-      required:
-        - title
-        - request
-        - response
-      properties:
-        title:
-          type: string
-          pattern: "[a-zA-Z0-9_\\- ]+"
-          minLength: 1
-          maxLength: 256
-          description: Schema title
-          example: "Request schema"
-        request:
-          $ref: '#/components/schemas/RequestSchema'
-        response:
-          $ref: '#/components/schemas/ResponseSchema'
-
-    RequestSchema:
-      type: object
-      properties:
-        header:
-          $ref: '#/components/schemas/ContentSchema'
-        query:
-          $ref: '#/components/schemas/ContentSchema'
-        body:
-          $ref: '#/components/schemas/ContentSchema'
-        cookie:
-          $ref: '#/components/schemas/ContentSchema'
-
-    ResponseSchema:
-      type: object
-      properties:
-        header:
-          $ref: '#/components/schemas/ContentSchema'
-        body:
-          $ref: '#/components/schemas/ContentSchema'
+    SchemaTitle:
+      type: string
+      pattern: "[a-zA-Z0-9_\\- ]+"
+      description: Schema title
+      maxLength: 256
+      minLength: 1
+      example: "Request schema"
 
     GetRequestSchemaResponse:
       type: object
@@ -351,22 +434,9 @@ components:
         - updatedAt
       properties:
         title:
-          type: string
-          pattern: "[a-zA-Z0-9_\\- ]+"
-          description: Schema title
-          maxLength: 256
-          minLength: 1
-          example: "Request schema"
+          $ref: '#/components/schemas/SchemaTitle'
         updatedAt:
           $ref: '#/components/schemas/DateTime'
-        header:
-          $ref: '#/components/schemas/ContentSchema'
-        query:
-          $ref: '#/components/schemas/ContentSchema'
-        body:
-          $ref: '#/components/schemas/ContentSchema'
-        cookie:
-          $ref: '#/components/schemas/ContentSchema'
 
     UploadRequestSchemaResponse:
       type: object
@@ -393,12 +463,7 @@ components:
               schemaID:
                 $ref: '#/components/schemas/SchemaID'
               title:
-                type: string
-                pattern: "[a-zA-Z0-9_\\- ]+"
-                description: Schema title
-                maxLength: 256
-                minLength: 1
-                example: "Request schema"
+                $ref: '#/components/schemas/SchemaTitle'
               updatedAt:
                 $ref: '#/components/schemas/DateTime'
           description: List of uploaded schemas
