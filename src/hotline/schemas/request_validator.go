@@ -1,6 +1,7 @@
 package schemas
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -18,6 +19,8 @@ type RequestSchema struct {
 
 func NewRequestValidator(definitions RequestSchema) (*RequestValidator, error) {
 	c := jsonschema.NewCompiler()
+	c.DefaultDraft(jsonschema.Draft2020)
+	c.UseLoader(&nopLoader{})
 	validator := &RequestValidator{}
 	if definitions.Headers != nil {
 		url := fmt.Sprintf("https://local-server/config-api/request-schemas/%s/files/request-headers.json", definitions.ID)
@@ -61,4 +64,11 @@ func (v *RequestValidator) ValidateHeaders(headers map[string][]string) error {
 		}
 	}
 	return nil
+}
+
+type nopLoader struct {
+}
+
+func (l *nopLoader) Load(_ string) (any, error) {
+	return nil, errors.New("do not support loading schemas from remote sources")
 }

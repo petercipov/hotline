@@ -37,6 +37,20 @@ var _ = Describe("Request Validator", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
+		It("will fail to build schema with remote refs", func() {
+			err := sut.forValidatorWithInvalidSchema(`{
+			  "$schema": "https://json-schema.org/draft/2020-12/schema#",
+			  "type": "object",
+			  "properties": {
+				"address": {
+				  "$ref": "https://json-schema.org/custom/remote/schems.json"
+				}
+			  }
+			}`)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`failing loading "https://json-schema.org/custom/remote/schems.json": do not support loading schemas from remote sources`))
+		})
+
 		It("should validate headers with errors", func() {
 			sut.forValidatorWithHeadersSchema(`
 				{
