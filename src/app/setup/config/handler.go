@@ -18,6 +18,10 @@ type HttpHandler struct {
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
+func (h *HttpHandler) UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params UploadSchemaFileParams) {
+	panic("implement me")
+}
+
 func (h *HttpHandler) DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params DeleteSchemaFileParams) {
 	panic("implement me")
 }
