@@ -5,6 +5,8 @@ generate:
 
 test:
 	go clean -testcache
+	rm -f ./cover.out
+	rm -f ./cover.app.out
 	go test  ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...
 	go test  ./src/app/... -coverprofile=./cover.app.out -covermode=atomic -coverpkg=./src/app/...
 
