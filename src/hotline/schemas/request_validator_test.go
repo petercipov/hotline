@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Request Validator", func() {
+var _ = Describe("Request Validator", Ordered, func() {
 	Context("for empty validator", func() {
 		sut := validatorSut{}
 		It("should validate request", func() {

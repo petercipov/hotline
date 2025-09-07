@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Manual Clock", func() {
+var _ = Describe("Manual Clock", Ordered, func() {
 	sut := manualClockSUT{}
 
 	AfterEach(func() {
