@@ -20,7 +20,7 @@ var _ = Describe("Request Validator", func() {
 		})
 	})
 
-	Context("for defined validator", func() {
+	Context("for defined header validator", func() {
 		It("should validate headers", func() {
 			sut.forValidatorWithHeaders()
 			err := sut.validateRequest()
@@ -28,17 +28,17 @@ var _ = Describe("Request Validator", func() {
 		})
 
 		It("should fail to build validator for invalid json schema", func() {
-			err := sut.forValidatorWithInvalidSchema("invalid schema")
+			err := sut.forValidatorWithInvalidHeaderSchema("invalid schema")
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("should fail to build validator for valid json but invalid json schema", func() {
-			err := sut.forValidatorWithInvalidSchema(`{ "$schema": 1234 }`)
+			err := sut.forValidatorWithInvalidHeaderSchema(`{ "$schema": 1234 }`)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("will fail to build schema with remote refs", func() {
-			err := sut.forValidatorWithInvalidSchema(`{
+			err := sut.forValidatorWithInvalidHeaderSchema(`{
 			  "$schema": "https://json-schema.org/draft/2020-12/schema#",
 			  "type": "object",
 			  "properties": {
@@ -76,29 +76,117 @@ var _ = Describe("Request Validator", func() {
 - at '/User-Agent': maxItems: got 1, want 0`))
 		})
 	})
+
+	Context("for defined query validator", func() {
+		It("should validate query", func() {
+			sut.forValidatorWithQuery()
+			err := sut.validateRequest()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should fail for invalid query", func() {
+			sut.forValidatorWithQuerySchema(`{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"type": "object",
+			"properties": {
+				"productID": {
+					"type": "array",
+					"minItems": 1,
+					"maxItems": 1,
+					"items": {
+						"type": "string",
+						"pattern": "^A[0-9]{5}$"
+					}
+				}
+			},
+			"required": ["productID"]
+		}`)
+			err := sut.validateRequest()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`jsonschema validation failed with 'https://local-server/config-api/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-query.json#'
+- at '/productID/0': 'P12345' does not match pattern '^A[0-9]{5}$'`))
+		})
+
+		It("should fail to build validator for invalid json schema", func() {
+			err := sut.forValidatorWithInvalidQuerySchema("invalid schema")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should fail to build validator for valid json but invalid json schema", func() {
+			err := sut.forValidatorWithInvalidQuerySchema(`{ "$schema": 1234 }`)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("for defined body validator", func() {
+		It("should validate body", func() {
+			sut.forValidatorWithBody()
+			err := sut.validateRequest()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should validate body schema", func() {
+			sut.forValidatorWithBodySchema(`{
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"type": "object",
+				"properties": {
+					"productID": {
+						"type": "string",
+						"pattern": "^P[0-9]{5}$"
+					},
+					"currency": {
+						"type": "string",
+						"enum": ["EUR", "GBP"]
+					}
+				},
+				"required": ["productID"]
+			}`)
+			err := sut.validateRequest()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`jsonschema validation failed with 'https://local-server/config-api/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-body.json#'
+- at '/currency': value must be one of 'EUR', 'GBP'`))
+		})
+
+		It("should fail to build validator for invalid json schema", func() {
+			err := sut.forValidatorWithInvalidBodySchema("invalid schema")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should fail to build validator for valid json but invalid json schema", func() {
+			err := sut.forValidatorWithInvalidBodySchema(`{ "$schema": 1234 }`)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should validate invalid body", func() {
+			sut.forValidatorWithBody()
+			err := sut.validateInvalidJSONBodyRequest()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid character 'i' looking for beginning of value"))
+		})
+	})
 })
 
 type validatorSut struct {
-	validator   *schemas.RequestValidator
-	idGenerator schemas.IDGenerator
+	validator *schemas.RequestValidator
 }
 
 func (s *validatorSut) forEmptyValidator() {
-
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
-	s.idGenerator = idGenerator
-	id, idErr := idGenerator(time.Time{})
-	Expect(idErr).ToNot(HaveOccurred())
-
-	validator, err := schemas.NewRequestValidator(schemas.RequestSchema{
-		ID: id,
-	})
+	validator, err := buildValidator(schemas.RequestSchema{})
 	Expect(err).ToNot(HaveOccurred())
 	s.validator = validator
 }
 
 func (s *validatorSut) validateRequest() error {
-	// GET https://github.com/petercipov/hotline/deferred-metadata/main/go.work
+	return s.validateRequestWithBody(`
+	{
+		"productID": "P12345",
+		"title": "Hotline",
+		"price": 59.99,
+		"currency": "USD"
+	}`)
+}
+
+func (s *validatorSut) validateRequestWithBody(body string) error {
 	err := s.validator.ValidateHeaders(map[string][]string{
 		"User-Agent":              {"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0"},
 		"Accept":                  {"application/json"},
@@ -121,20 +209,36 @@ func (s *validatorSut) validateRequest() error {
 	if err != nil {
 		return err
 	}
+
+	err = s.validator.ValidateQuery(map[string][]string{
+		"productID": {"P12345"},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = s.validator.ValidateBody(strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (s *validatorSut) validateInvalidJSONBodyRequest() error {
+	return s.validateRequestWithBody("invalid json body")
 }
 
 func (s *validatorSut) forValidatorWithHeaders() {
 	s.forValidatorWithHeadersSchema(`{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
-
-			"type": "object",
-			"properties": {
+		"type": "object",
+		"properties": {
 			"User-Agent": {
 				"type": "array",
-					"minItems": 1,
-					"maxItems": 1,
-					"items": {
+				"minItems": 1,
+				"maxItems": 1,
+				"items": {
 					"type": "string"
 				}
 			}
@@ -144,29 +248,111 @@ func (s *validatorSut) forValidatorWithHeaders() {
 }
 
 func (s *validatorSut) forValidatorWithHeadersSchema(schema string) {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
-	s.idGenerator = idGenerator
-	id, idErr := idGenerator(time.Time{})
-	Expect(idErr).ToNot(HaveOccurred())
-
-	validator, err := schemas.NewRequestValidator(schemas.RequestSchema{
-		ID:      id,
+	validator, err := buildValidator(schemas.RequestSchema{
 		Headers: strings.NewReader(schema),
 	})
+
 	Expect(err).ToNot(HaveOccurred())
 	s.validator = validator
 }
 
-func (s *validatorSut) forValidatorWithInvalidSchema(schema string) error {
+func (s *validatorSut) forValidatorWithInvalidHeaderSchema(schema string) error {
+	validator, err := buildValidator(schemas.RequestSchema{
+		Headers: strings.NewReader(schema),
+	})
+
+	Expect(validator).To(BeNil())
+	return err
+}
+
+func (s *validatorSut) forValidatorWithInvalidQuerySchema(schema string) error {
+	validator, err := buildValidator(schemas.RequestSchema{
+		Query: strings.NewReader(schema),
+	})
+
+	Expect(validator).To(BeNil())
+	return err
+}
+
+func (s *validatorSut) forValidatorWithInvalidBodySchema(schema string) error {
+	validator, err := buildValidator(schemas.RequestSchema{
+		Body: strings.NewReader(schema),
+	})
+
+	Expect(validator).To(BeNil())
+	return err
+}
+
+func buildValidator(schema schemas.RequestSchema) (*schemas.RequestValidator, error) {
 	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
-	s.idGenerator = idGenerator
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
-	validator, err := schemas.NewRequestValidator(schemas.RequestSchema{
-		ID:      id,
-		Headers: strings.NewReader(schema),
+	schema.ID = id
+
+	return schemas.NewRequestValidator(schema)
+}
+
+func (s *validatorSut) forValidatorWithQuery() {
+	s.forValidatorWithQuerySchema(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"productID": {
+				"type": "array",
+				"minItems": 1,
+				"maxItems": 1,
+				"items": {
+					"type": "string",
+					"pattern": "^P[0-9]{5}$"
+				}
+			}
+		},
+		"required": ["productID"]
+	}`)
+}
+
+func (s *validatorSut) forValidatorWithQuerySchema(schema string) {
+	validator, err := buildValidator(schemas.RequestSchema{
+		Query: strings.NewReader(schema),
 	})
-	Expect(validator).To(BeNil())
-	return err
+
+	Expect(err).ToNot(HaveOccurred())
+	s.validator = validator
+}
+
+func (s *validatorSut) forValidatorWithBody() {
+	s.forValidatorWithBodySchema(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"productID": {
+				"type": "string",
+				"pattern": "^P[0-9]{5}$"
+			},
+			"title": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 100
+			},
+			"price": {
+				"type": "number",
+				"minimum": 0
+			},
+			"currency": {
+				"type": "string",
+				"enum": ["USD", "EUR", "GBP"]
+			}
+		},
+		"required": ["productID"]
+	}`)
+}
+
+func (s *validatorSut) forValidatorWithBodySchema(schema string) {
+	validator, err := buildValidator(schemas.RequestSchema{
+		Body: strings.NewReader(schema),
+	})
+
+	Expect(err).ToNot(HaveOccurred())
+	s.validator = validator
 }
