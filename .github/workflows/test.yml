@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  golangci:
+  test-ci:
     name: test
     runs-on: ubuntu-latest
     steps:
@@ -25,3 +25,10 @@ jobs:
         run: |
           make test
           make cover
+      - name: check test coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          profile: cover.out
+          threshold-total: 100
+          git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
+          git-branch: badges
