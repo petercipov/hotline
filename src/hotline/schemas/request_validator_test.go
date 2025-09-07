@@ -11,7 +11,7 @@ import (
 )
 
 var _ = Describe("Request Validator", Ordered, func() {
-	Context("for empty validator", Ordered, func() {
+	Context("for empty validator", func() {
 		sut := validatorSut{}
 		It("should validate request", func() {
 			sut.forEmptyValidator()
@@ -20,7 +20,7 @@ var _ = Describe("Request Validator", Ordered, func() {
 		})
 	})
 
-	Context("for defined header validator", Ordered, func() {
+	Context("for defined header validator", func() {
 		sut := validatorSut{}
 		It("should validate headers", func() {
 			sut.forValidatorWithHeaders()
@@ -78,7 +78,7 @@ var _ = Describe("Request Validator", Ordered, func() {
 		})
 	})
 
-	Context("for defined query validator", Ordered, func() {
+	Context("for defined query validator", func() {
 		sut := validatorSut{}
 		It("should validate query", func() {
 			sut.forValidatorWithQuery()
@@ -120,7 +120,7 @@ var _ = Describe("Request Validator", Ordered, func() {
 		})
 	})
 
-	Context("for defined body validator", Ordered, func() {
+	Context("for defined body validator", func() {
 		sut := validatorSut{}
 		It("should validate body", func() {
 			sut.forValidatorWithBody()
