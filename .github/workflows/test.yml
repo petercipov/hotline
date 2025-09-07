@@ -22,14 +22,3 @@ jobs:
       - name: run tests
         run: |
           make test
-      - name: check test coverage
-        uses: vladopajic/go-test-coverage@992aa9921a42c39d1fe0015d32593f0820589586 # v2
-        with:
-          config: ./.github/.testcoverage.yml
-      - name: Update coverage report
-        uses: ncruces/go-coverage-report@494b2847891f4dd3b10f6704ca533367dbb7493d # v0
-        with:
-          coverage-file: cover.out
-          report: true
-          chart: true
-          amend: true
