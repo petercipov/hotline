@@ -33,7 +33,7 @@ jobs:
           threshold-total: 100
           git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
           git-branch: badges
-          badge-file-name: hotline.svg
+          git-file-name: .badges/main/hotline.svg
       - name: check app test coverage
         uses: vladopajic/go-test-coverage@v2
         with:
@@ -42,4 +42,4 @@ jobs:
           threshold-total: 10
           git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
           git-branch: badges
-          badge-file-name: app.svg
+          git-file-name: .badges/main/app.svg
