@@ -25,7 +25,7 @@ jobs:
         run: |
           make test
           make cover
-      - name: check test coverage
+      - name: check hotline test coverage
         uses: vladopajic/go-test-coverage@v2
         with:
           profile: cover.out
@@ -33,4 +33,13 @@ jobs:
           threshold-total: 100
           git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
           git-branch: badges
-          debug: true
+          badge-file-name: hotline.svg
+      - name: check app test coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          profile: cover.app.out
+          source-dir: ./src/app
+          threshold-total: 10
+          git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
+          git-branch: badges
+          badge-file-name: app.svg
