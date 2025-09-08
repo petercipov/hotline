@@ -2,6 +2,7 @@ name: go-tests
 env:
   ACTIONS_STEP_DEBUG: true
   ACTIONS_RUNNER_DEBUG: true
+  RUNNER_DEBUG: true
 on:
   push:
     branches:
