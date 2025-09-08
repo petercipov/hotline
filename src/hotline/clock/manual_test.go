@@ -86,14 +86,7 @@ func (s *manualClockSUT) WithAutoAdvance() {
 }
 
 func (s *manualClockSUT) Sleep() time.Time {
-	duration := 1 * time.Millisecond
-	go func() {
-		if s.clock == nil {
-			return
-		}
-		s.Advance(duration)
-	}()
-	s.clock.Sleep(duration)
+	s.clock.Sleep(1 * time.Millisecond)
 	return s.clock.Now()
 }
 
@@ -133,14 +126,15 @@ func (s *manualClockSUT) TickPeriodicallyAndCancel(n int) []time.Time {
 	var w sync.WaitGroup
 	w.Add(n)
 
-	go func() {
-		s.clock.Advance(time.Duration(n) * time.Millisecond)
-	}()
-
 	cancel := s.clock.TickPeriodically(1*time.Millisecond, func(t time.Time) {
 		ticks = append(ticks, t)
 		w.Done()
 	})
+
+	go func() {
+		s.clock.Advance(time.Duration(n) * time.Millisecond)
+	}()
+
 	w.Wait()
 	cancel()
 	return ticks
