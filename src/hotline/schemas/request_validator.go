@@ -8,49 +8,49 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-type RequestValidator struct {
-	header *jsonschema.Schema
-	query  *jsonschema.Schema
-	body   *jsonschema.Schema
+type Validator struct {
+	requestHeaders *jsonschema.Schema
+	requestQuery   *jsonschema.Schema
+	requestBody    *jsonschema.Schema
 }
 
-type RequestSchema struct {
-	ID      ID
-	Headers io.Reader
-	Query   io.Reader
-	Body    io.Reader
+type Schema struct {
+	ID             ID
+	RequestHeaders io.Reader
+	RequestQuery   io.Reader
+	RequestBody    io.Reader
 }
 
-func NewRequestValidator(definitions RequestSchema) (*RequestValidator, error) {
+func NewRequestValidator(definitions Schema) (*Validator, error) {
 	c := jsonschema.NewCompiler()
 	c.DefaultDraft(jsonschema.Draft2020)
 	c.UseLoader(&nopLoader{})
-	validator := &RequestValidator{}
-	if definitions.Headers != nil {
+	validator := &Validator{}
+	if definitions.RequestHeaders != nil {
 		url := fmt.Sprintf("https://local-server/config-api/request-schemas/%s/files/request-headers.json", definitions.ID)
-		headerSchema, err := parse(c, url, definitions.Headers)
+		headerSchema, err := parse(c, url, definitions.RequestHeaders)
 		if err != nil {
 			return nil, err
 		}
-		validator.header = headerSchema
+		validator.requestHeaders = headerSchema
 	}
 
-	if definitions.Query != nil {
+	if definitions.RequestQuery != nil {
 		url := fmt.Sprintf("https://local-server/config-api/request-schemas/%s/files/request-query.json", definitions.ID)
-		querySchema, err := parse(c, url, definitions.Query)
+		querySchema, err := parse(c, url, definitions.RequestQuery)
 		if err != nil {
 			return nil, err
 		}
-		validator.query = querySchema
+		validator.requestQuery = querySchema
 	}
 
-	if definitions.Body != nil {
+	if definitions.RequestBody != nil {
 		url := fmt.Sprintf("https://local-server/config-api/request-schemas/%s/files/request-body.json", definitions.ID)
-		bodySchema, err := parse(c, url, definitions.Body)
+		bodySchema, err := parse(c, url, definitions.RequestBody)
 		if err != nil {
 			return nil, err
 		}
-		validator.body = bodySchema
+		validator.requestBody = bodySchema
 	}
 
 	return validator, nil
@@ -70,9 +70,9 @@ func parse(c *jsonschema.Compiler, url string, r io.Reader) (*jsonschema.Schema,
 	return compiledSchema, nil
 }
 
-func (v *RequestValidator) ValidateHeaders(headers map[string][]string) error {
-	if v.header != nil {
-		validationErr := v.header.Validate(castToAny(headers))
+func (v *Validator) ValidateHeaders(headers map[string][]string) error {
+	if v.requestHeaders != nil {
+		validationErr := v.requestHeaders.Validate(castToAny(headers))
 		if validationErr != nil {
 			return validationErr
 		}
@@ -92,9 +92,9 @@ func castToAny(headers map[string][]string) map[string]any {
 	return headersAny
 }
 
-func (v *RequestValidator) ValidateQuery(query map[string][]string) error {
-	if v.query != nil {
-		validationErr := v.query.Validate(castToAny(query))
+func (v *Validator) ValidateQuery(query map[string][]string) error {
+	if v.requestQuery != nil {
+		validationErr := v.requestQuery.Validate(castToAny(query))
 		if validationErr != nil {
 			return validationErr
 		}
@@ -102,14 +102,14 @@ func (v *RequestValidator) ValidateQuery(query map[string][]string) error {
 	return nil
 }
 
-func (v *RequestValidator) ValidateBody(bodyReader io.Reader) error {
-	if v.body != nil {
+func (v *Validator) ValidateBody(bodyReader io.Reader) error {
+	if v.requestBody != nil {
 		bodyMap, readErr := jsonschema.UnmarshalJSON(bodyReader)
 		if readErr != nil {
 			return readErr
 		}
 
-		validationErr := v.body.Validate(bodyMap)
+		validationErr := v.requestBody.Validate(bodyMap)
 		if validationErr != nil {
 			return validationErr
 		}
