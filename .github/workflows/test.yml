@@ -23,8 +23,10 @@ jobs:
             go.work.sum
       - name: run tests
         run: |
+          make clean-cache
           make test
           make cover
+          make clean-cache
       - name: check hotline test coverage
         uses: vladopajic/go-test-coverage@v2
         with:
