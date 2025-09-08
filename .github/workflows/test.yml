@@ -28,7 +28,6 @@ jobs:
             go.work.sum
       - name: run tests
         run: |
-          env
           make clean-cache
           make test
           make cover
