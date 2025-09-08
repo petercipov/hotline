@@ -1,4 +1,6 @@
 name: go-tests
+env:
+  ACTIONS_STEP_DEBUG: true
 on:
   push:
     branches:
