@@ -11,6 +11,6 @@ import (
 func TestClock(t *testing.T) {
 	RegisterFailHandler(Fail)
 	conf := types.NewDefaultSuiteConfig()
-	conf.MustPassRepeatedly = 100
+	conf.MustPassRepeatedly = 200
 	RunSpecs(t, "Clock Suite", conf)
 }

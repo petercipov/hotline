@@ -74,6 +74,9 @@ func (s *systemClockSUT) TickPeriodically(n int) []time.Time {
 	var w sync.WaitGroup
 	w.Add(n)
 	cancel := s.clock.TickPeriodically(1*time.Millisecond, func(t time.Time) {
+		if len(ticks) >= n {
+			return
+		}
 		ticks = append(ticks, t)
 		w.Done()
 	})
