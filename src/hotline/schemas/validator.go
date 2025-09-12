@@ -27,7 +27,7 @@ func NewRequestValidator(definitions Schema) (*Validator, error) {
 	c.UseLoader(&nopLoader{})
 	validator := &Validator{}
 	if definitions.RequestHeaders != nil {
-		url := fmt.Sprintf("https://local-server/config-api/request-schemas/%s/files/request-headers.json", definitions.ID)
+		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/request-headers.json", definitions.ID)
 		headerSchema, err := parse(c, url, definitions.RequestHeaders)
 		if err != nil {
 			return nil, err
@@ -36,7 +36,7 @@ func NewRequestValidator(definitions Schema) (*Validator, error) {
 	}
 
 	if definitions.RequestQuery != nil {
-		url := fmt.Sprintf("https://local-server/config-api/request-schemas/%s/files/request-query.json", definitions.ID)
+		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/request-query.json", definitions.ID)
 		querySchema, err := parse(c, url, definitions.RequestQuery)
 		if err != nil {
 			return nil, err
@@ -45,7 +45,7 @@ func NewRequestValidator(definitions Schema) (*Validator, error) {
 	}
 
 	if definitions.RequestBody != nil {
-		url := fmt.Sprintf("https://local-server/config-api/request-schemas/%s/files/request-body.json", definitions.ID)
+		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/request-body.json", definitions.ID)
 		bodySchema, err := parse(c, url, definitions.RequestBody)
 		if err != nil {
 			return nil, err

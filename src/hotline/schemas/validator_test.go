@@ -73,7 +73,7 @@ var _ = Describe("Request Validator", Ordered, func() {
 			err := sut.validateRequest()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(
-				`jsonschema validation failed with 'https://local-server/config-api/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-headers.json#'
+				`jsonschema validation failed with 'https://local-server/api/v1/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-headers.json#'
 - at '/User-Agent': maxItems: got 1, want 0`))
 		})
 	})
@@ -105,7 +105,7 @@ var _ = Describe("Request Validator", Ordered, func() {
 		}`)
 			err := sut.validateRequest()
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(`jsonschema validation failed with 'https://local-server/config-api/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-query.json#'
+			Expect(err.Error()).To(ContainSubstring(`jsonschema validation failed with 'https://local-server/api/v1/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-query.json#'
 - at '/productID/0': 'P12345' does not match pattern '^A[0-9]{5}$'`))
 		})
 
@@ -146,7 +146,7 @@ var _ = Describe("Request Validator", Ordered, func() {
 			}`)
 			err := sut.validateRequest()
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(`jsonschema validation failed with 'https://local-server/config-api/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-body.json#'
+			Expect(err.Error()).To(ContainSubstring(`jsonschema validation failed with 'https://local-server/api/v1/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/request-body.json#'
 - at '/currency': value must be one of 'EUR', 'GBP'`))
 		})
 

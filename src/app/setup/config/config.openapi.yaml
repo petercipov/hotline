@@ -12,7 +12,7 @@ info:
     url: https://www.petercipov.com/
 
 servers:
-  - url: /api/v1/config
+  - url: /api/v1/
 
 security:
   - bearerAuth: []
