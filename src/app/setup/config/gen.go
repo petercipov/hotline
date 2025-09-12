@@ -46,102 +46,102 @@ const (
 	ResponseHeadersJson SchemaFileName = "response-headers.json"
 )
 
-// Defines values for StatusSLODefinitionExpected.
+// Defines values for StatusServiceLevelsExpected.
 const (
-	N100 StatusSLODefinitionExpected = "100"
-	N101 StatusSLODefinitionExpected = "101"
-	N102 StatusSLODefinitionExpected = "102"
-	N103 StatusSLODefinitionExpected = "103"
-	N200 StatusSLODefinitionExpected = "200"
-	N201 StatusSLODefinitionExpected = "201"
-	N202 StatusSLODefinitionExpected = "202"
-	N203 StatusSLODefinitionExpected = "203"
-	N204 StatusSLODefinitionExpected = "204"
-	N205 StatusSLODefinitionExpected = "205"
-	N206 StatusSLODefinitionExpected = "206"
-	N207 StatusSLODefinitionExpected = "207"
-	N208 StatusSLODefinitionExpected = "208"
-	N218 StatusSLODefinitionExpected = "218"
-	N226 StatusSLODefinitionExpected = "226"
-	N300 StatusSLODefinitionExpected = "300"
-	N301 StatusSLODefinitionExpected = "301"
-	N302 StatusSLODefinitionExpected = "302"
-	N303 StatusSLODefinitionExpected = "303"
-	N304 StatusSLODefinitionExpected = "304"
-	N305 StatusSLODefinitionExpected = "305"
-	N306 StatusSLODefinitionExpected = "306"
-	N307 StatusSLODefinitionExpected = "307"
-	N308 StatusSLODefinitionExpected = "308"
-	N400 StatusSLODefinitionExpected = "400"
-	N401 StatusSLODefinitionExpected = "401"
-	N402 StatusSLODefinitionExpected = "402"
-	N403 StatusSLODefinitionExpected = "403"
-	N404 StatusSLODefinitionExpected = "404"
-	N405 StatusSLODefinitionExpected = "405"
-	N406 StatusSLODefinitionExpected = "406"
-	N407 StatusSLODefinitionExpected = "407"
-	N408 StatusSLODefinitionExpected = "408"
-	N409 StatusSLODefinitionExpected = "409"
-	N410 StatusSLODefinitionExpected = "410"
-	N411 StatusSLODefinitionExpected = "411"
-	N412 StatusSLODefinitionExpected = "412"
-	N413 StatusSLODefinitionExpected = "413"
-	N414 StatusSLODefinitionExpected = "414"
-	N415 StatusSLODefinitionExpected = "415"
-	N416 StatusSLODefinitionExpected = "416"
-	N417 StatusSLODefinitionExpected = "417"
-	N418 StatusSLODefinitionExpected = "418"
-	N419 StatusSLODefinitionExpected = "419"
-	N420 StatusSLODefinitionExpected = "420"
-	N421 StatusSLODefinitionExpected = "421"
-	N422 StatusSLODefinitionExpected = "422"
-	N423 StatusSLODefinitionExpected = "423"
-	N424 StatusSLODefinitionExpected = "424"
-	N426 StatusSLODefinitionExpected = "426"
-	N428 StatusSLODefinitionExpected = "428"
-	N429 StatusSLODefinitionExpected = "429"
-	N430 StatusSLODefinitionExpected = "430"
-	N431 StatusSLODefinitionExpected = "431"
-	N440 StatusSLODefinitionExpected = "440"
-	N444 StatusSLODefinitionExpected = "444"
-	N449 StatusSLODefinitionExpected = "449"
-	N450 StatusSLODefinitionExpected = "450"
-	N451 StatusSLODefinitionExpected = "451"
-	N460 StatusSLODefinitionExpected = "460"
-	N463 StatusSLODefinitionExpected = "463"
-	N464 StatusSLODefinitionExpected = "464"
-	N494 StatusSLODefinitionExpected = "494"
-	N495 StatusSLODefinitionExpected = "495"
-	N496 StatusSLODefinitionExpected = "496"
-	N497 StatusSLODefinitionExpected = "497"
-	N498 StatusSLODefinitionExpected = "498"
-	N499 StatusSLODefinitionExpected = "499"
-	N500 StatusSLODefinitionExpected = "500"
-	N501 StatusSLODefinitionExpected = "501"
-	N502 StatusSLODefinitionExpected = "502"
-	N503 StatusSLODefinitionExpected = "503"
-	N504 StatusSLODefinitionExpected = "504"
-	N505 StatusSLODefinitionExpected = "505"
-	N506 StatusSLODefinitionExpected = "506"
-	N507 StatusSLODefinitionExpected = "507"
-	N508 StatusSLODefinitionExpected = "508"
-	N509 StatusSLODefinitionExpected = "509"
-	N510 StatusSLODefinitionExpected = "510"
-	N511 StatusSLODefinitionExpected = "511"
-	N520 StatusSLODefinitionExpected = "520"
-	N521 StatusSLODefinitionExpected = "521"
-	N522 StatusSLODefinitionExpected = "522"
-	N523 StatusSLODefinitionExpected = "523"
-	N524 StatusSLODefinitionExpected = "524"
-	N525 StatusSLODefinitionExpected = "525"
-	N526 StatusSLODefinitionExpected = "526"
-	N527 StatusSLODefinitionExpected = "527"
-	N529 StatusSLODefinitionExpected = "529"
-	N530 StatusSLODefinitionExpected = "530"
-	N540 StatusSLODefinitionExpected = "540"
-	N561 StatusSLODefinitionExpected = "561"
-	N598 StatusSLODefinitionExpected = "598"
-	N599 StatusSLODefinitionExpected = "599"
+	N100 StatusServiceLevelsExpected = "100"
+	N101 StatusServiceLevelsExpected = "101"
+	N102 StatusServiceLevelsExpected = "102"
+	N103 StatusServiceLevelsExpected = "103"
+	N200 StatusServiceLevelsExpected = "200"
+	N201 StatusServiceLevelsExpected = "201"
+	N202 StatusServiceLevelsExpected = "202"
+	N203 StatusServiceLevelsExpected = "203"
+	N204 StatusServiceLevelsExpected = "204"
+	N205 StatusServiceLevelsExpected = "205"
+	N206 StatusServiceLevelsExpected = "206"
+	N207 StatusServiceLevelsExpected = "207"
+	N208 StatusServiceLevelsExpected = "208"
+	N218 StatusServiceLevelsExpected = "218"
+	N226 StatusServiceLevelsExpected = "226"
+	N300 StatusServiceLevelsExpected = "300"
+	N301 StatusServiceLevelsExpected = "301"
+	N302 StatusServiceLevelsExpected = "302"
+	N303 StatusServiceLevelsExpected = "303"
+	N304 StatusServiceLevelsExpected = "304"
+	N305 StatusServiceLevelsExpected = "305"
+	N306 StatusServiceLevelsExpected = "306"
+	N307 StatusServiceLevelsExpected = "307"
+	N308 StatusServiceLevelsExpected = "308"
+	N400 StatusServiceLevelsExpected = "400"
+	N401 StatusServiceLevelsExpected = "401"
+	N402 StatusServiceLevelsExpected = "402"
+	N403 StatusServiceLevelsExpected = "403"
+	N404 StatusServiceLevelsExpected = "404"
+	N405 StatusServiceLevelsExpected = "405"
+	N406 StatusServiceLevelsExpected = "406"
+	N407 StatusServiceLevelsExpected = "407"
+	N408 StatusServiceLevelsExpected = "408"
+	N409 StatusServiceLevelsExpected = "409"
+	N410 StatusServiceLevelsExpected = "410"
+	N411 StatusServiceLevelsExpected = "411"
+	N412 StatusServiceLevelsExpected = "412"
+	N413 StatusServiceLevelsExpected = "413"
+	N414 StatusServiceLevelsExpected = "414"
+	N415 StatusServiceLevelsExpected = "415"
+	N416 StatusServiceLevelsExpected = "416"
+	N417 StatusServiceLevelsExpected = "417"
+	N418 StatusServiceLevelsExpected = "418"
+	N419 StatusServiceLevelsExpected = "419"
+	N420 StatusServiceLevelsExpected = "420"
+	N421 StatusServiceLevelsExpected = "421"
+	N422 StatusServiceLevelsExpected = "422"
+	N423 StatusServiceLevelsExpected = "423"
+	N424 StatusServiceLevelsExpected = "424"
+	N426 StatusServiceLevelsExpected = "426"
+	N428 StatusServiceLevelsExpected = "428"
+	N429 StatusServiceLevelsExpected = "429"
+	N430 StatusServiceLevelsExpected = "430"
+	N431 StatusServiceLevelsExpected = "431"
+	N440 StatusServiceLevelsExpected = "440"
+	N444 StatusServiceLevelsExpected = "444"
+	N449 StatusServiceLevelsExpected = "449"
+	N450 StatusServiceLevelsExpected = "450"
+	N451 StatusServiceLevelsExpected = "451"
+	N460 StatusServiceLevelsExpected = "460"
+	N463 StatusServiceLevelsExpected = "463"
+	N464 StatusServiceLevelsExpected = "464"
+	N494 StatusServiceLevelsExpected = "494"
+	N495 StatusServiceLevelsExpected = "495"
+	N496 StatusServiceLevelsExpected = "496"
+	N497 StatusServiceLevelsExpected = "497"
+	N498 StatusServiceLevelsExpected = "498"
+	N499 StatusServiceLevelsExpected = "499"
+	N500 StatusServiceLevelsExpected = "500"
+	N501 StatusServiceLevelsExpected = "501"
+	N502 StatusServiceLevelsExpected = "502"
+	N503 StatusServiceLevelsExpected = "503"
+	N504 StatusServiceLevelsExpected = "504"
+	N505 StatusServiceLevelsExpected = "505"
+	N506 StatusServiceLevelsExpected = "506"
+	N507 StatusServiceLevelsExpected = "507"
+	N508 StatusServiceLevelsExpected = "508"
+	N509 StatusServiceLevelsExpected = "509"
+	N510 StatusServiceLevelsExpected = "510"
+	N511 StatusServiceLevelsExpected = "511"
+	N520 StatusServiceLevelsExpected = "520"
+	N521 StatusServiceLevelsExpected = "521"
+	N522 StatusServiceLevelsExpected = "522"
+	N523 StatusServiceLevelsExpected = "523"
+	N524 StatusServiceLevelsExpected = "524"
+	N525 StatusServiceLevelsExpected = "525"
+	N526 StatusServiceLevelsExpected = "526"
+	N527 StatusServiceLevelsExpected = "527"
+	N529 StatusServiceLevelsExpected = "529"
+	N530 StatusServiceLevelsExpected = "530"
+	N540 StatusServiceLevelsExpected = "540"
+	N561 StatusServiceLevelsExpected = "561"
+	N598 StatusServiceLevelsExpected = "598"
+	N599 StatusServiceLevelsExpected = "599"
 )
 
 // DateTime https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
@@ -173,9 +173,9 @@ type IntegrationID = string
 // JSONSchemaFileContent https://json-schema.org/draft/2020-12/json-schema-core.html
 type JSONSchemaFileContent = openapi_types.File
 
-// LatencySLODefinition defines model for LatencySLODefinition.
-type LatencySLODefinition struct {
-	// Percentiles Latency percentile definitions
+// LatencyServiceLevels defines model for LatencyServiceLevels.
+type LatencyServiceLevels struct {
+	// Percentiles Latency percentiles
 	Percentiles []PercentileThreshold `json:"percentiles"`
 
 	// WindowDuration Duration string (e.g., "5m", "1h", "30s")
@@ -184,12 +184,6 @@ type LatencySLODefinition struct {
 
 // LatencyValue Latency threshold (e.g., "1s", "2500ms", "20s")
 type LatencyValue = Duration
-
-// ListDefinitions List of SLO definitions for an integration
-type ListDefinitions struct {
-	// Routes List of route-specific SLO configurations
-	Routes []RouteSLODefinition `json:"routes"`
-}
 
 // ListRequestSchemas defines model for ListRequestSchemas.
 type ListRequestSchemas struct {
@@ -236,13 +230,13 @@ type RouteMethod string
 // RouteKey defines model for RouteKey.
 type RouteKey = string
 
-// RouteSLODefinition defines model for RouteSLODefinition.
-type RouteSLODefinition struct {
-	Latency    LatencySLODefinition     `json:"latency"`
+// RouteServiceLevels defines model for RouteServiceLevels.
+type RouteServiceLevels struct {
+	Latency    LatencyServiceLevels     `json:"latency"`
 	Route      Route                    `json:"route"`
 	RouteKey   RouteKey                 `json:"routeKey"`
-	Status     StatusSLODefinition      `json:"status"`
-	Validation *ValidationSLODefinition `json:"validation,omitempty"`
+	Status     StatusServiceLevels      `json:"status"`
+	Validation *ValidationServiceLevels `json:"validation,omitempty"`
 }
 
 // SchemaFileName defines model for SchemaFileName.
@@ -254,20 +248,26 @@ type SchemaID = string
 // SchemaTitle Schema title
 type SchemaTitle = string
 
-// StatusSLODefinition defines model for StatusSLODefinition.
-type StatusSLODefinition struct {
+// ServiceLevelsList List of Service Levels for an integration
+type ServiceLevelsList struct {
+	// Routes List of route-specific Service Levels
+	Routes []RouteServiceLevels `json:"routes"`
+}
+
+// StatusServiceLevels defines model for StatusServiceLevels.
+type StatusServiceLevels struct {
 	// BreachThreshold Percentile value (0.0% to 100.0%)
 	BreachThreshold PercentileValue `json:"breachThreshold"`
 
 	// Expected List of expected HTTP status codes
-	Expected []StatusSLODefinitionExpected `json:"expected"`
+	Expected []StatusServiceLevelsExpected `json:"expected"`
 
 	// WindowDuration Duration string (e.g., "5m", "1h", "30s")
 	WindowDuration WindowValue `json:"windowDuration"`
 }
 
-// StatusSLODefinitionExpected defines model for StatusSLODefinition.Expected.
-type StatusSLODefinitionExpected string
+// StatusServiceLevelsExpected defines model for StatusServiceLevels.Expected.
+type StatusServiceLevelsExpected string
 
 // UploadRequestSchemaResponse defines model for UploadRequestSchemaResponse.
 type UploadRequestSchemaResponse struct {
@@ -277,21 +277,21 @@ type UploadRequestSchemaResponse struct {
 	UpdatedAt *DateTime `json:"updatedAt,omitempty"`
 }
 
-// UpsertSLORequest defines model for UpsertSLORequest.
-type UpsertSLORequest struct {
-	Latency    LatencySLODefinition     `json:"latency"`
+// UpsertServiceLevelsRequest defines model for UpsertServiceLevelsRequest.
+type UpsertServiceLevelsRequest struct {
+	Latency    LatencyServiceLevels     `json:"latency"`
 	Route      Route                    `json:"route"`
-	Status     StatusSLODefinition      `json:"status"`
-	Validation *ValidationSLODefinition `json:"validation,omitempty"`
+	Status     StatusServiceLevels      `json:"status"`
+	Validation *ValidationServiceLevels `json:"validation,omitempty"`
 }
 
-// UpsertSLOResponse defines model for UpsertSLOResponse.
-type UpsertSLOResponse struct {
+// UpsertedServiceLevelsResponse defines model for UpsertedServiceLevelsResponse.
+type UpsertedServiceLevelsResponse struct {
 	RouteKey *RouteKey `json:"routeKey,omitempty"`
 }
 
-// ValidationSLODefinition defines model for ValidationSLODefinition.
-type ValidationSLODefinition struct {
+// ValidationServiceLevels defines model for ValidationServiceLevels.
+type ValidationServiceLevels struct {
 	// BreachThreshold Percentile value (0.0% to 100.0%)
 	BreachThreshold PercentileValue `json:"breachThreshold"`
 	SchemaId        SchemaID        `json:"schemaId"`
@@ -339,21 +339,21 @@ type UploadSchemaFileMultipartBody struct {
 	Jsonschema *JSONSchemaFileContent `json:"jsonschema,omitempty"`
 }
 
-// GetSLOConfigParams defines parameters for GetSLOConfig.
-type GetSLOConfigParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
+// GetServiceLevelsParams defines parameters for GetServiceLevels.
+type GetServiceLevelsParams struct {
+	// XIntegrationId Unique identifier of an integration
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
-// UpsertSLOConfigParams defines parameters for UpsertSLOConfig.
-type UpsertSLOConfigParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
+// UpsertServiceLevelsParams defines parameters for UpsertServiceLevels.
+type UpsertServiceLevelsParams struct {
+	// XIntegrationId Unique identifier of an integration
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
-// DeleteSLOConfigParams defines parameters for DeleteSLOConfig.
-type DeleteSLOConfigParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
+// DeleteServiceLevelsParams defines parameters for DeleteServiceLevels.
+type DeleteServiceLevelsParams struct {
+	// XIntegrationId Unique identifier of an integration
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
@@ -366,8 +366,8 @@ type UpdateSchemaJSONRequestBody UpdateSchemaJSONBody
 // UploadSchemaFileMultipartRequestBody defines body for UploadSchemaFile for multipart/form-data ContentType.
 type UploadSchemaFileMultipartRequestBody UploadSchemaFileMultipartBody
 
-// UpsertSLOConfigJSONRequestBody defines body for UpsertSLOConfig for application/json ContentType.
-type UpsertSLOConfigJSONRequestBody = UpsertSLORequest
+// UpsertServiceLevelsJSONRequestBody defines body for UpsertServiceLevels for application/json ContentType.
+type UpsertServiceLevelsJSONRequestBody = UpsertServiceLevelsRequest
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -470,16 +470,16 @@ type ClientInterface interface {
 	// UploadSchemaFileWithBody request with any body
 	UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetSLOConfig request
-	GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetServiceLevels request
+	GetServiceLevels(ctx context.Context, params *GetServiceLevelsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpsertSLOConfigWithBody request with any body
-	UpsertSLOConfigWithBody(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// UpsertServiceLevelsWithBody request with any body
+	UpsertServiceLevelsWithBody(ctx context.Context, params *UpsertServiceLevelsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	UpsertSLOConfig(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpsertServiceLevels(ctx context.Context, params *UpsertServiceLevelsParams, body UpsertServiceLevelsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteSLOConfig request
-	DeleteSLOConfig(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteServiceLevels request
+	DeleteServiceLevels(ctx context.Context, routekey RouteKey, params *DeleteServiceLevelsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -602,8 +602,8 @@ func (c *Client) UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSLOConfigRequest(c.Server, params)
+func (c *Client) GetServiceLevels(ctx context.Context, params *GetServiceLevelsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceLevelsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -614,8 +614,8 @@ func (c *Client) GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, r
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpsertSLOConfigWithBody(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpsertSLOConfigRequestWithBody(c.Server, params, contentType, body)
+func (c *Client) UpsertServiceLevelsWithBody(ctx context.Context, params *UpsertServiceLevelsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertServiceLevelsRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -626,8 +626,8 @@ func (c *Client) UpsertSLOConfigWithBody(ctx context.Context, params *UpsertSLOC
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpsertSLOConfig(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpsertSLOConfigRequest(c.Server, params, body)
+func (c *Client) UpsertServiceLevels(ctx context.Context, params *UpsertServiceLevelsParams, body UpsertServiceLevelsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertServiceLevelsRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -638,8 +638,8 @@ func (c *Client) UpsertSLOConfig(ctx context.Context, params *UpsertSLOConfigPar
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteSLOConfig(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSLOConfigRequest(c.Server, routekey, params)
+func (c *Client) DeleteServiceLevels(ctx context.Context, routekey RouteKey, params *DeleteServiceLevelsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteServiceLevelsRequest(c.Server, routekey, params)
 	if err != nil {
 		return nil, err
 	}
@@ -957,8 +957,8 @@ func NewUploadSchemaFileRequestWithBody(server string, schemaid SchemaID, filena
 	return req, nil
 }
 
-// NewGetSLOConfigRequest generates requests for GetSLOConfig
-func NewGetSLOConfigRequest(server string, params *GetSLOConfigParams) (*http.Request, error) {
+// NewGetServiceLevelsRequest generates requests for GetServiceLevels
+func NewGetServiceLevelsRequest(server string, params *GetServiceLevelsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -966,7 +966,7 @@ func NewGetSLOConfigRequest(server string, params *GetSLOConfigParams) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/slo-definitions")
+	operationPath := fmt.Sprintf("/service-levels")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -997,19 +997,19 @@ func NewGetSLOConfigRequest(server string, params *GetSLOConfigParams) (*http.Re
 	return req, nil
 }
 
-// NewUpsertSLOConfigRequest calls the generic UpsertSLOConfig builder with application/json body
-func NewUpsertSLOConfigRequest(server string, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody) (*http.Request, error) {
+// NewUpsertServiceLevelsRequest calls the generic UpsertServiceLevels builder with application/json body
+func NewUpsertServiceLevelsRequest(server string, params *UpsertServiceLevelsParams, body UpsertServiceLevelsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpsertSLOConfigRequestWithBody(server, params, "application/json", bodyReader)
+	return NewUpsertServiceLevelsRequestWithBody(server, params, "application/json", bodyReader)
 }
 
-// NewUpsertSLOConfigRequestWithBody generates requests for UpsertSLOConfig with any type of body
-func NewUpsertSLOConfigRequestWithBody(server string, params *UpsertSLOConfigParams, contentType string, body io.Reader) (*http.Request, error) {
+// NewUpsertServiceLevelsRequestWithBody generates requests for UpsertServiceLevels with any type of body
+func NewUpsertServiceLevelsRequestWithBody(server string, params *UpsertServiceLevelsParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1017,7 +1017,7 @@ func NewUpsertSLOConfigRequestWithBody(server string, params *UpsertSLOConfigPar
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/slo-definitions")
+	operationPath := fmt.Sprintf("/service-levels")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1050,8 +1050,8 @@ func NewUpsertSLOConfigRequestWithBody(server string, params *UpsertSLOConfigPar
 	return req, nil
 }
 
-// NewDeleteSLOConfigRequest generates requests for DeleteSLOConfig
-func NewDeleteSLOConfigRequest(server string, routekey RouteKey, params *DeleteSLOConfigParams) (*http.Request, error) {
+// NewDeleteServiceLevelsRequest generates requests for DeleteServiceLevels
+func NewDeleteServiceLevelsRequest(server string, routekey RouteKey, params *DeleteServiceLevelsParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1066,7 +1066,7 @@ func NewDeleteSLOConfigRequest(server string, routekey RouteKey, params *DeleteS
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/slo-definitions/%s", pathParam0)
+	operationPath := fmt.Sprintf("/service-levels/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1168,16 +1168,16 @@ type ClientWithResponsesInterface interface {
 	// UploadSchemaFileWithBodyWithResponse request with any body
 	UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error)
 
-	// GetSLOConfigWithResponse request
-	GetSLOConfigWithResponse(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*GetSLOConfigResponse, error)
+	// GetServiceLevelsWithResponse request
+	GetServiceLevelsWithResponse(ctx context.Context, params *GetServiceLevelsParams, reqEditors ...RequestEditorFn) (*GetServiceLevelsResponse, error)
 
-	// UpsertSLOConfigWithBodyWithResponse request with any body
-	UpsertSLOConfigWithBodyWithResponse(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error)
+	// UpsertServiceLevelsWithBodyWithResponse request with any body
+	UpsertServiceLevelsWithBodyWithResponse(ctx context.Context, params *UpsertServiceLevelsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertServiceLevelsResponse, error)
 
-	UpsertSLOConfigWithResponse(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error)
+	UpsertServiceLevelsWithResponse(ctx context.Context, params *UpsertServiceLevelsParams, body UpsertServiceLevelsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertServiceLevelsResponse, error)
 
-	// DeleteSLOConfigWithResponse request
-	DeleteSLOConfigWithResponse(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*DeleteSLOConfigResponse, error)
+	// DeleteServiceLevelsWithResponse request
+	DeleteServiceLevelsWithResponse(ctx context.Context, routekey RouteKey, params *DeleteServiceLevelsParams, reqEditors ...RequestEditorFn) (*DeleteServiceLevelsResponse, error)
 }
 
 type ListSchemasResponse struct {
@@ -1391,10 +1391,10 @@ func (r UploadSchemaFileResponse) StatusCode() int {
 	return 0
 }
 
-type GetSLOConfigResponse struct {
+type GetServiceLevelsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *ListDefinitions
+	JSON200      *ServiceLevelsList
 	JSON400      *BadRequest
 	JSON401      *Unauthorized
 	JSON404      *NotFound
@@ -1403,7 +1403,7 @@ type GetSLOConfigResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetSLOConfigResponse) Status() string {
+func (r GetServiceLevelsResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1411,18 +1411,18 @@ func (r GetSLOConfigResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetSLOConfigResponse) StatusCode() int {
+func (r GetServiceLevelsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type UpsertSLOConfigResponse struct {
+type UpsertServiceLevelsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *UpsertSLOResponse
-	JSON201      *UpsertSLOResponse
+	JSON200      *UpsertedServiceLevelsResponse
+	JSON201      *UpsertedServiceLevelsResponse
 	JSON400      *BadRequest
 	JSON401      *Unauthorized
 	JSON429      *TooManyRequests
@@ -1430,7 +1430,7 @@ type UpsertSLOConfigResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r UpsertSLOConfigResponse) Status() string {
+func (r UpsertServiceLevelsResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1438,14 +1438,14 @@ func (r UpsertSLOConfigResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r UpsertSLOConfigResponse) StatusCode() int {
+func (r UpsertServiceLevelsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteSLOConfigResponse struct {
+type DeleteServiceLevelsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
@@ -1456,7 +1456,7 @@ type DeleteSLOConfigResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteSLOConfigResponse) Status() string {
+func (r DeleteServiceLevelsResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1464,7 +1464,7 @@ func (r DeleteSLOConfigResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteSLOConfigResponse) StatusCode() int {
+func (r DeleteServiceLevelsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1559,39 +1559,39 @@ func (c *ClientWithResponses) UploadSchemaFileWithBodyWithResponse(ctx context.C
 	return ParseUploadSchemaFileResponse(rsp)
 }
 
-// GetSLOConfigWithResponse request returning *GetSLOConfigResponse
-func (c *ClientWithResponses) GetSLOConfigWithResponse(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*GetSLOConfigResponse, error) {
-	rsp, err := c.GetSLOConfig(ctx, params, reqEditors...)
+// GetServiceLevelsWithResponse request returning *GetServiceLevelsResponse
+func (c *ClientWithResponses) GetServiceLevelsWithResponse(ctx context.Context, params *GetServiceLevelsParams, reqEditors ...RequestEditorFn) (*GetServiceLevelsResponse, error) {
+	rsp, err := c.GetServiceLevels(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetSLOConfigResponse(rsp)
+	return ParseGetServiceLevelsResponse(rsp)
 }
 
-// UpsertSLOConfigWithBodyWithResponse request with arbitrary body returning *UpsertSLOConfigResponse
-func (c *ClientWithResponses) UpsertSLOConfigWithBodyWithResponse(ctx context.Context, params *UpsertSLOConfigParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error) {
-	rsp, err := c.UpsertSLOConfigWithBody(ctx, params, contentType, body, reqEditors...)
+// UpsertServiceLevelsWithBodyWithResponse request with arbitrary body returning *UpsertServiceLevelsResponse
+func (c *ClientWithResponses) UpsertServiceLevelsWithBodyWithResponse(ctx context.Context, params *UpsertServiceLevelsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertServiceLevelsResponse, error) {
+	rsp, err := c.UpsertServiceLevelsWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpsertSLOConfigResponse(rsp)
+	return ParseUpsertServiceLevelsResponse(rsp)
 }
 
-func (c *ClientWithResponses) UpsertSLOConfigWithResponse(ctx context.Context, params *UpsertSLOConfigParams, body UpsertSLOConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertSLOConfigResponse, error) {
-	rsp, err := c.UpsertSLOConfig(ctx, params, body, reqEditors...)
+func (c *ClientWithResponses) UpsertServiceLevelsWithResponse(ctx context.Context, params *UpsertServiceLevelsParams, body UpsertServiceLevelsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertServiceLevelsResponse, error) {
+	rsp, err := c.UpsertServiceLevels(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpsertSLOConfigResponse(rsp)
+	return ParseUpsertServiceLevelsResponse(rsp)
 }
 
-// DeleteSLOConfigWithResponse request returning *DeleteSLOConfigResponse
-func (c *ClientWithResponses) DeleteSLOConfigWithResponse(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*DeleteSLOConfigResponse, error) {
-	rsp, err := c.DeleteSLOConfig(ctx, routekey, params, reqEditors...)
+// DeleteServiceLevelsWithResponse request returning *DeleteServiceLevelsResponse
+func (c *ClientWithResponses) DeleteServiceLevelsWithResponse(ctx context.Context, routekey RouteKey, params *DeleteServiceLevelsParams, reqEditors ...RequestEditorFn) (*DeleteServiceLevelsResponse, error) {
+	rsp, err := c.DeleteServiceLevels(ctx, routekey, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteSLOConfigResponse(rsp)
+	return ParseDeleteServiceLevelsResponse(rsp)
 }
 
 // ParseListSchemasResponse parses an HTTP response from a ListSchemasWithResponse call
@@ -2047,22 +2047,22 @@ func ParseUploadSchemaFileResponse(rsp *http.Response) (*UploadSchemaFileRespons
 	return response, nil
 }
 
-// ParseGetSLOConfigResponse parses an HTTP response from a GetSLOConfigWithResponse call
-func ParseGetSLOConfigResponse(rsp *http.Response) (*GetSLOConfigResponse, error) {
+// ParseGetServiceLevelsResponse parses an HTTP response from a GetServiceLevelsWithResponse call
+func ParseGetServiceLevelsResponse(rsp *http.Response) (*GetServiceLevelsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetSLOConfigResponse{
+	response := &GetServiceLevelsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ListDefinitions
+		var dest ServiceLevelsList
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2108,29 +2108,29 @@ func ParseGetSLOConfigResponse(rsp *http.Response) (*GetSLOConfigResponse, error
 	return response, nil
 }
 
-// ParseUpsertSLOConfigResponse parses an HTTP response from a UpsertSLOConfigWithResponse call
-func ParseUpsertSLOConfigResponse(rsp *http.Response) (*UpsertSLOConfigResponse, error) {
+// ParseUpsertServiceLevelsResponse parses an HTTP response from a UpsertServiceLevelsWithResponse call
+func ParseUpsertServiceLevelsResponse(rsp *http.Response) (*UpsertServiceLevelsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &UpsertSLOConfigResponse{
+	response := &UpsertServiceLevelsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest UpsertSLOResponse
+		var dest UpsertedServiceLevelsResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest UpsertSLOResponse
+		var dest UpsertedServiceLevelsResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2169,15 +2169,15 @@ func ParseUpsertSLOConfigResponse(rsp *http.Response) (*UpsertSLOConfigResponse,
 	return response, nil
 }
 
-// ParseDeleteSLOConfigResponse parses an HTTP response from a DeleteSLOConfigWithResponse call
-func ParseDeleteSLOConfigResponse(rsp *http.Response) (*DeleteSLOConfigResponse, error) {
+// ParseDeleteServiceLevelsResponse parses an HTTP response from a DeleteServiceLevelsWithResponse call
+func ParseDeleteServiceLevelsResponse(rsp *http.Response) (*DeleteServiceLevelsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteSLOConfigResponse{
+	response := &DeleteServiceLevelsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2249,15 +2249,15 @@ type ServerInterface interface {
 	// Upload Schema File
 	// (PUT /request-schemas/{schemaid}/file/{filename})
 	UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName)
-	// List SLO definitions
-	// (GET /slo-definitions)
-	GetSLOConfig(w http.ResponseWriter, r *http.Request, params GetSLOConfigParams)
-	// Upserts SLO definitions
-	// (POST /slo-definitions)
-	UpsertSLOConfig(w http.ResponseWriter, r *http.Request, params UpsertSLOConfigParams)
-	// Delete SLO definitions
-	// (DELETE /slo-definitions/{routekey})
-	DeleteSLOConfig(w http.ResponseWriter, r *http.Request, routekey RouteKey, params DeleteSLOConfigParams)
+	// List Service Levels
+	// (GET /service-levels)
+	GetServiceLevels(w http.ResponseWriter, r *http.Request, params GetServiceLevelsParams)
+	// Upserts Service Levels
+	// (POST /service-levels)
+	UpsertServiceLevels(w http.ResponseWriter, r *http.Request, params UpsertServiceLevelsParams)
+	// Delete Service Levels
+	// (DELETE /service-levels/{routekey})
+	DeleteServiceLevels(w http.ResponseWriter, r *http.Request, routekey RouteKey, params DeleteServiceLevelsParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -2522,8 +2522,8 @@ func (siw *ServerInterfaceWrapper) UploadSchemaFile(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// GetSLOConfig operation middleware
-func (siw *ServerInterfaceWrapper) GetSLOConfig(w http.ResponseWriter, r *http.Request) {
+// GetServiceLevels operation middleware
+func (siw *ServerInterfaceWrapper) GetServiceLevels(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -2534,7 +2534,7 @@ func (siw *ServerInterfaceWrapper) GetSLOConfig(w http.ResponseWriter, r *http.R
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetSLOConfigParams
+	var params GetServiceLevelsParams
 
 	headers := r.Header
 
@@ -2562,7 +2562,7 @@ func (siw *ServerInterfaceWrapper) GetSLOConfig(w http.ResponseWriter, r *http.R
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSLOConfig(w, r, params)
+		siw.Handler.GetServiceLevels(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2572,8 +2572,8 @@ func (siw *ServerInterfaceWrapper) GetSLOConfig(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// UpsertSLOConfig operation middleware
-func (siw *ServerInterfaceWrapper) UpsertSLOConfig(w http.ResponseWriter, r *http.Request) {
+// UpsertServiceLevels operation middleware
+func (siw *ServerInterfaceWrapper) UpsertServiceLevels(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -2584,7 +2584,7 @@ func (siw *ServerInterfaceWrapper) UpsertSLOConfig(w http.ResponseWriter, r *htt
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params UpsertSLOConfigParams
+	var params UpsertServiceLevelsParams
 
 	headers := r.Header
 
@@ -2612,7 +2612,7 @@ func (siw *ServerInterfaceWrapper) UpsertSLOConfig(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpsertSLOConfig(w, r, params)
+		siw.Handler.UpsertServiceLevels(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2622,8 +2622,8 @@ func (siw *ServerInterfaceWrapper) UpsertSLOConfig(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteSLOConfig operation middleware
-func (siw *ServerInterfaceWrapper) DeleteSLOConfig(w http.ResponseWriter, r *http.Request) {
+// DeleteServiceLevels operation middleware
+func (siw *ServerInterfaceWrapper) DeleteServiceLevels(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -2643,7 +2643,7 @@ func (siw *ServerInterfaceWrapper) DeleteSLOConfig(w http.ResponseWriter, r *htt
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params DeleteSLOConfigParams
+	var params DeleteServiceLevelsParams
 
 	headers := r.Header
 
@@ -2671,7 +2671,7 @@ func (siw *ServerInterfaceWrapper) DeleteSLOConfig(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSLOConfig(w, r, routekey, params)
+		siw.Handler.DeleteServiceLevels(w, r, routekey, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2809,9 +2809,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("DELETE "+options.BaseURL+"/request-schemas/{schemaid}/file/{filename}", wrapper.DeleteSchemaFile)
 	m.HandleFunc("GET "+options.BaseURL+"/request-schemas/{schemaid}/file/{filename}", wrapper.GetSchemaFile)
 	m.HandleFunc("PUT "+options.BaseURL+"/request-schemas/{schemaid}/file/{filename}", wrapper.UploadSchemaFile)
-	m.HandleFunc("GET "+options.BaseURL+"/slo-definitions", wrapper.GetSLOConfig)
-	m.HandleFunc("POST "+options.BaseURL+"/slo-definitions", wrapper.UpsertSLOConfig)
-	m.HandleFunc("DELETE "+options.BaseURL+"/slo-definitions/{routekey}", wrapper.DeleteSLOConfig)
+	m.HandleFunc("GET "+options.BaseURL+"/service-levels", wrapper.GetServiceLevels)
+	m.HandleFunc("POST "+options.BaseURL+"/service-levels", wrapper.UpsertServiceLevels)
+	m.HandleFunc("DELETE "+options.BaseURL+"/service-levels/{routekey}", wrapper.DeleteServiceLevels)
 
 	return m
 }

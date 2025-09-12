@@ -61,7 +61,7 @@ func NewHttpHandler(repository *InMemorySLODefinitions, routeUpserted func(integ
 	}
 }
 
-func (h *HttpHandler) GetSLOConfig(writer http.ResponseWriter, req *http.Request, params GetSLOConfigParams) {
+func (h *HttpHandler) GetServiceLevels(writer http.ResponseWriter, req *http.Request, params GetServiceLevelsParams) {
 	ctx := req.Context()
 	if len(params.XIntegrationId) == 0 {
 		slog.Error("Could not find X-Integration-Id header")
@@ -83,13 +83,13 @@ func (h *HttpHandler) GetSLOConfig(writer http.ResponseWriter, req *http.Request
 		return
 	}
 
-	resp := ListDefinitions{
+	resp := ServiceLevelsList{
 		Routes: convertRoutes(config.Routes),
 	}
 
 	writeResponse(ctx, writer, http.StatusOK, resp)
 }
-func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Request, params UpsertSLOConfigParams) {
+func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.Request, params UpsertServiceLevelsParams) {
 	ctx := req.Context()
 	if len(params.XIntegrationId) == 0 {
 		slog.Error("Could not find X-Integration-Id header")
@@ -107,7 +107,7 @@ func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Requ
 		_ = req.Body.Close()
 	}()
 	buf, _ := io.ReadAll(req.Body)
-	var request UpsertSLORequest
+	var request UpsertServiceLevelsRequest
 	unmarshalErr := json.Unmarshal(buf, &request)
 	if unmarshalErr != nil {
 		slog.Error("Could not unmarshal request body", slog.String("integration-id", string(integrationID)), slog.Any("error", unmarshalErr))
@@ -137,7 +137,7 @@ func (h *HttpHandler) UpsertSLOConfig(writer http.ResponseWriter, req *http.Requ
 	h.repository.SetConfig(integrationID, *definition)
 	h.routeUpserted(integrationID, routeDefinition.Route)
 	key := routeDefinition.Route.ID()
-	writeResponse(ctx, writer, http.StatusOK, UpsertSLOResponse{
+	writeResponse(ctx, writer, http.StatusOK, UpsertedServiceLevelsResponse{
 		RouteKey: &key,
 	})
 }
@@ -155,7 +155,7 @@ func writeResponse(ctx context.Context, writer http.ResponseWriter, status int, 
 		slog.Error("Could not write error", slog.String("integration-id", string(integrationID)), slog.Any("error", writeErr))
 	}
 }
-func (h *HttpHandler) DeleteSLOConfig(writer http.ResponseWriter, req *http.Request, key RouteKey, params DeleteSLOConfigParams) {
+func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.Request, key RouteKey, params DeleteServiceLevelsParams) {
 	ctx := req.Context()
 	if len(params.XIntegrationId) == 0 {
 		slog.Error("Could not find X-Integration-Id header")

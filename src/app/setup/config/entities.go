@@ -53,7 +53,7 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 	return (*servicelevels.Percentile)(p)
 }
 
-func ParseRoute(latencyDefinition LatencySLODefinition, statusDefinition StatusSLODefinition, route Route) (servicelevels.HttpRouteSLODefinition, error) {
+func ParseRoute(latencyDefinition LatencyServiceLevels, statusDefinition StatusServiceLevels, route Route) (servicelevels.HttpRouteSLODefinition, error) {
 	percentile := statusDefinition.BreachThreshold.Cast()
 
 	defs, defsErr := parsePercentileDefinitions(latencyDefinition.Percentiles)
@@ -80,7 +80,7 @@ func ParseRoute(latencyDefinition LatencySLODefinition, statusDefinition StatusS
 	}, nil
 }
 
-func convertFromExpected(expected []StatusSLODefinitionExpected) []string {
+func convertFromExpected(expected []StatusServiceLevelsExpected) []string {
 	arr := make([]string, len(expected))
 	for i, e := range expected {
 		arr[i] = string(e)
@@ -88,10 +88,10 @@ func convertFromExpected(expected []StatusSLODefinitionExpected) []string {
 	return arr
 }
 
-func convertToExpected(expected []string) []StatusSLODefinitionExpected {
-	arr := make([]StatusSLODefinitionExpected, len(expected))
+func convertToExpected(expected []string) []StatusServiceLevelsExpected {
+	arr := make([]StatusServiceLevelsExpected, len(expected))
 	for i, e := range expected {
-		arr[i] = StatusSLODefinitionExpected(e)
+		arr[i] = StatusServiceLevelsExpected(e)
 	}
 	return arr
 }
@@ -110,16 +110,16 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 	return result, nil
 }
 
-func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteSLODefinition {
-	var defs []RouteSLODefinition
+func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteServiceLevels {
+	var defs []RouteServiceLevels
 	for _, route := range routes {
 		method := RouteMethod(route.Route.Method)
-		defs = append(defs, RouteSLODefinition{
-			Latency: LatencySLODefinition{
+		defs = append(defs, RouteServiceLevels{
+			Latency: LatencyServiceLevels{
 				Percentiles:    convertPercentiles(route.Latency.Percentiles),
 				WindowDuration: Duration(route.Latency.WindowDuration),
 			},
-			Status: StatusSLODefinition{
+			Status: StatusServiceLevels{
 				BreachThreshold: Percentile(route.Status.BreachThreshold),
 				Expected:        convertToExpected(route.Status.Expected),
 				WindowDuration:  Duration(route.Status.WindowDuration),

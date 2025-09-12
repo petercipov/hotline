@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: HTTP API Config API
-  description: API for managing HTTP API service level objective definitions
+  title: Config API
+  description: API for managing integration Service Levels
   version: 1.0.0
   license:
     name: Apache 2.0
@@ -27,7 +27,7 @@ paths:
         - Request Schemas
       responses:
         '200':
-          description: List of defined SLOs
+          description: List of Request Schemas
           content:
             application/json:
               schema:
@@ -240,22 +240,22 @@ paths:
           $ref: '#/components/responses/InternalServerError'
           
 
-  /slo-definitions:
+  /service-levels:
     get:
-      summary: List SLO definitions
-      description: Retrieve HTTP API SLO definitions
-      operationId: getSLOConfig
+      summary: List Service Levels
+      description: Retrieve HTTP API Service Levels
+      operationId: getServiceLevels
       tags:
-        - SLO Definitions
+        - Service Levels
       parameters:
         - $ref: '#/components/parameters/IntegrationID'
       responses:
         '200':
-          description: List of defined SLOs
+          description: List Service Levels
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ListDefinitions'
+                $ref: '#/components/schemas/ServiceLevelsList'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -267,33 +267,33 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
-      summary: Upserts SLO definitions
-      description: Upsert HTTP API SLO definition
-      operationId: upsertSLOConfig
+      summary: Upserts Service Levels
+      description: Upsert Service Levels
+      operationId: upsertServiceLevels
       tags:
-        - SLO Definitions
+        - Service Levels
       parameters:
         - $ref: '#/components/parameters/IntegrationID'
       requestBody:
-        description: SLO configuration details
+        description: Service Levels details
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpsertSLORequest'
+              $ref: '#/components/schemas/UpsertServiceLevelsRequest'
       responses:
         '200':
-          description: Updated slo configuration
+          description: Updated Service Levels
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpsertSLOResponse'
+                $ref: '#/components/schemas/UpsertedServiceLevelsResponse'
         '201':
-          description: Created slo configuration
+          description: Created Service Levels
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpsertSLOResponse'
+                $ref: '#/components/schemas/UpsertedServiceLevelsResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -303,19 +303,19 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /slo-definitions/{routekey}:
+  /service-levels/{routekey}:
     delete:
-      summary: Delete SLO definitions
-      description: Delete an existing HTTP API SLO configuration
-      operationId: deleteSLOConfig
+      summary: Delete Service Levels
+      description: Delete an existing Service Levels
+      operationId: deleteServiceLevels
       tags:
-        - SLO Definitions
+        - Service Levels
       parameters:
         - $ref: '#/components/parameters/RouteKey'
         - $ref: '#/components/parameters/IntegrationID'
       responses:
         '204':
-          description: SLO configuration deleted successfully
+          description: Service Level deleted successfully
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -341,7 +341,7 @@ components:
       name: x-integration-id
       in: header
       required: true
-      description: Unique identifier of the SLO configuration
+      description: Unique identifier of an integration
       schema:
         $ref: '#/components/schemas/IntegrationID'
 
@@ -458,13 +458,13 @@ components:
                 $ref: '#/components/schemas/DateTime'
           description: List of uploaded schemas
 
-    UpsertSLOResponse:
+    UpsertedServiceLevelsResponse:
       type: object
       properties:
         routeKey:
           $ref: '#/components/schemas/RouteKey'
 
-    UpsertSLORequest:
+    UpsertServiceLevelsRequest:
       type: object
       required:
         - route
@@ -474,11 +474,11 @@ components:
         route:
           $ref: '#/components/schemas/Route'
         latency:
-          $ref: '#/components/schemas/LatencySLODefinition'
+          $ref: '#/components/schemas/LatencyServiceLevels'
         status:
-          $ref: '#/components/schemas/StatusSLODefinition'
+          $ref: '#/components/schemas/StatusServiceLevels'
         validation:
-          $ref: '#/components/schemas/ValidationSLODefinition'
+          $ref: '#/components/schemas/ValidationServiceLevels'
 
     RouteKey:
       type: string
@@ -487,9 +487,9 @@ components:
       maxLength: 8196
       example: GET:api.example.com:8080:/api/users/{id}
 
-    ListDefinitions:
+    ServiceLevelsList:
       type: object
-      description: List of SLO definitions for an integration
+      description: List of Service Levels for an integration
       required:
         - routes
       properties:
@@ -497,8 +497,8 @@ components:
           type: array
           maxItems: 1024
           items:
-            $ref: '#/components/schemas/RouteSLODefinition'
-          description: List of route-specific SLO configurations
+            $ref: '#/components/schemas/RouteServiceLevels'
+          description: List of route-specific Service Levels
 
     Route:
       type: object
@@ -529,7 +529,7 @@ components:
           description: URL path pattern
           example: "/api/users/{id}"
 
-    RouteSLODefinition:
+    RouteServiceLevels:
       type: object
       required:
         - routeKey
@@ -542,13 +542,13 @@ components:
         route:
           $ref: '#/components/schemas/Route'
         latency:
-          $ref: '#/components/schemas/LatencySLODefinition'
+          $ref: '#/components/schemas/LatencyServiceLevels'
         status:
-          $ref: '#/components/schemas/StatusSLODefinition'
+          $ref: '#/components/schemas/StatusServiceLevels'
         validation:
-          $ref: '#/components/schemas/ValidationSLODefinition'
+          $ref: '#/components/schemas/ValidationServiceLevels'
 
-    LatencySLODefinition:
+    LatencyServiceLevels:
       type: object
       required:
         - percentiles
@@ -559,11 +559,11 @@ components:
           maxItems: 124
           items:
             $ref: '#/components/schemas/PercentileThreshold'
-          description: Latency percentile definitions
+          description: Latency percentiles
         windowDuration:
           $ref: '#/components/schemas/WindowValue'
 
-    ValidationSLODefinition:
+    ValidationServiceLevels:
       type: object
       required:
         - schemaId
@@ -577,7 +577,7 @@ components:
         windowDuration:
           $ref: '#/components/schemas/WindowValue'
 
-    StatusSLODefinition:
+    StatusServiceLevels:
       type: object
       required:
         - expected
@@ -710,5 +710,5 @@ components:
 tags:
   - name: Request Schemas
     description: Operations for managing HTTP request schemas
-  - name: SLO Definitions
-    description: Operations for managing HTTP API SLO definitions
+  - name: Service Levels
+    description: Operations for managing integration Service Levels

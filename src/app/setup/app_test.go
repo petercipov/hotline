@@ -95,14 +95,14 @@ func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, 
 		if len(input) == 0 {
 			continue
 		}
-		var reqObj config.UpsertSLOConfigJSONRequestBody
+		var reqObj config.UpsertServiceLevelsJSONRequestBody
 		unmarshalErr := json.Unmarshal([]byte(input), &reqObj)
 		if unmarshalErr != nil {
 			return ctx, unmarshalErr
 		}
-		resp, responseErr := configClient.UpsertSLOConfig(
+		resp, responseErr := configClient.UpsertServiceLevels(
 			ctx,
-			&config.UpsertSLOConfigParams{XIntegrationId: integrationID},
+			&config.UpsertServiceLevelsParams{XIntegrationId: integrationID},
 			reqObj)
 
 		if responseErr != nil {
@@ -131,15 +131,15 @@ func (a *appSut) checkSLOConfiguration(ctx context.Context, integrationID string
 		return ctx, createClientErr
 	}
 
-	resp, responseErr := configClient.GetSLOConfigWithResponse(
+	resp, responseErr := configClient.GetServiceLevelsWithResponse(
 		ctx,
-		&config.GetSLOConfigParams{XIntegrationId: integrationID})
+		&config.GetServiceLevelsParams{XIntegrationId: integrationID})
 
 	if responseErr != nil {
 		return ctx, responseErr
 	}
 
-	var routes []config.RouteSLODefinition
+	var routes []config.RouteServiceLevels
 	if resp.StatusCode() != 200 && resp.StatusCode() != 404 {
 		return ctx, errors.New(fmt.Sprint("unexpected status code: ", resp.StatusCode()))
 	}
@@ -152,7 +152,7 @@ func (a *appSut) checkSLOConfiguration(ctx context.Context, integrationID string
 	}
 
 	for i, routeExpected := range routesExpected {
-		var reqObj config.RouteSLODefinition
+		var reqObj config.RouteServiceLevels
 		unmarshalErr := json.Unmarshal([]byte(routeExpected), &reqObj)
 		if unmarshalErr != nil {
 			return ctx, unmarshalErr
@@ -174,10 +174,10 @@ func (a *appSut) deleteSLOConfiguration(ctx context.Context, integrationID strin
 		return ctx, createClientErr
 	}
 
-	resp, responseErr := configClient.DeleteSLOConfig(
+	resp, responseErr := configClient.DeleteServiceLevels(
 		ctx,
 		routeKey,
-		&config.DeleteSLOConfigParams{XIntegrationId: integrationID})
+		&config.DeleteServiceLevelsParams{XIntegrationId: integrationID})
 
 	if responseErr != nil {
 		return ctx, responseErr
