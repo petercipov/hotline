@@ -60,8 +60,8 @@ var _ = Describe("Retry Round Tripper", func() {
 
 	It("for network failure it will not retry", func() {
 		sut.forRetry(500)
-		_, respErr := sut.sendNetworkFailureRequest()
-		Expect(respErr).NotTo(BeNil())
+		respErr := sut.sendNetworkFailureRequest()
+		Expect(respErr).To(HaveOccurred())
 		retries := sut.getRetries()
 		Expect(retries).To(BeEmpty())
 	})
@@ -80,7 +80,7 @@ func (s *retrySUT) forEmpty() {
 
 	s.rountripper = http2.WrapWithRetries(
 		s.responder,
-		func(resp *http.Response, err error) bool {
+		func(_ int, _ error) bool {
 			return false
 		},
 		5,
@@ -118,12 +118,17 @@ func (s *retrySUT) sendSuceessRequest() (*http.Response, error) {
 	return s.rountripper.RoundTrip(req)
 }
 
-func (s *retrySUT) sendNetworkFailureRequest() (interface{}, interface{}) {
+func (s *retrySUT) sendNetworkFailureRequest() error {
 	req, reqErr := http.NewRequest("GET", "http://example.com", bytes.NewReader([]byte("some content")))
 	Expect(reqErr).NotTo(HaveOccurred())
 
 	s.responder.SendError(errors.New("network failure"))
-	return s.rountripper.RoundTrip(req)
+	resp, respErr := s.rountripper.RoundTrip(req)
+	if respErr == nil {
+		_ = resp.Body.Close()
+		return nil
+	}
+	return respErr
 }
 
 type fakeRetry struct {

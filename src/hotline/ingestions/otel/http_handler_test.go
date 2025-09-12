@@ -219,6 +219,7 @@ func sendTraces(url string, message *coltracepb.ExportTraceServiceRequest) {
 	resp, reqErr := http.DefaultClient.Do(req)
 	Expect(reqErr).ToNot(HaveOccurred())
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+	_ = resp.Body.Close()
 }
 
 func (s *otelSut) ingest() []*ingestions.HttpRequest {
@@ -326,7 +327,11 @@ func (s *otelSut) requestWithInvalidBody() int {
 	Expect(createErr).ToNot(HaveOccurred())
 	resp, reqErr := http.DefaultClient.Do(req)
 	Expect(reqErr).ToNot(HaveOccurred())
-	return resp.StatusCode
+	if resp != nil {
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+	return 0
 }
 
 func (s *otelSut) requestWithSimpleServerSpan() {

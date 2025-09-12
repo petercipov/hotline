@@ -17,22 +17,22 @@ type RetryRoundTripper struct {
 	sleep    func(t time.Duration)
 }
 
-func RetryStatusCodes(retryStatus ...int) func(resp *http.Response, err error) bool {
+func RetryStatusCodes(retryStatus ...int) func(statusCode int, err error) bool {
 	retryCodes := make(map[int]int, len(retryStatus))
 	for _, status := range retryStatus {
 		retryCodes[status] = 0
 	}
 
-	return func(resp *http.Response, err error) bool {
+	return func(statusCode int, err error) bool {
 		if err != nil {
 			return false
 		}
-		_, found := retryCodes[resp.StatusCode]
+		_, found := retryCodes[statusCode]
 		return found
 	}
 }
 
-func WrapWithRetries(origin http.RoundTripper, shouldRetry func(resp *http.Response, err error) bool, retryMax int, inSeconds float64, sleep func(t time.Duration)) *RetryRoundTripper {
+func WrapWithRetries(origin http.RoundTripper, shouldRetry func(statusCode int, err error) bool, retryMax int, inSeconds float64, sleep func(t time.Duration)) *RetryRoundTripper {
 	backoff := ExponentialBackoff{
 		Exponent: inSeconds,
 	}
@@ -46,7 +46,7 @@ func WrapWithRetries(origin http.RoundTripper, shouldRetry func(resp *http.Respo
 	}
 }
 
-type IsRetryableResponse func(resp *http.Response, err error) bool
+type IsRetryableResponse func(statusCode int, err error) bool
 type BackoffFunc func(retryCount int) time.Duration
 
 type ExponentialBackoff struct {
@@ -67,8 +67,12 @@ func (t *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 	response, responseErr := t.origin.RoundTrip(req)
 	retries := 0
-	for t.shouldRetry(response, responseErr) && retries < t.retryMax {
-		if response.Body != nil {
+	statusCode := 0
+	if response != nil {
+		statusCode = response.StatusCode
+	}
+	for t.shouldRetry(statusCode, responseErr) && retries < t.retryMax {
+		if response != nil && response.Body != nil {
 			_, _ = io.ReadAll(response.Body)
 			_ = response.Body.Close()
 		}
@@ -78,6 +82,9 @@ func (t *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 		response, responseErr = t.origin.RoundTrip(req)
+		if response != nil {
+			statusCode = response.StatusCode
+		}
 		retries++
 	}
 

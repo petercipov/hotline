@@ -108,6 +108,7 @@ func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, 
 		if responseErr != nil {
 			return ctx, responseErr
 		}
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 			return ctx, fmt.Errorf("unexpected response for slo upsert: %d", resp.StatusCode)
 		}
@@ -182,6 +183,8 @@ func (a *appSut) deleteSLOConfiguration(ctx context.Context, integrationID strin
 	if responseErr != nil {
 		return ctx, responseErr
 	}
+
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != 204 {
 		return ctx, errors.New(fmt.Sprint("unexpected status code: ", resp.StatusCode))

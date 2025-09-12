@@ -114,6 +114,7 @@ func sendTraces(url string, message *coltracepb.ExportTraceServiceRequest) (int,
 	if reqErr != nil {
 		return 0, reqErr
 	}
+	_ = resp.Body.Close()
 	return resp.StatusCode, nil
 }
 
