@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hotline/clock"
 	http2 "hotline/http"
 	"hotline/servicelevels"
 	"net/http"
@@ -142,7 +143,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 					DataPoints: []*metricspb.NumberDataPoint{
 						{
 							Attributes:   attributes,
-							TimeUnixNano: uint64(now.UnixNano()),
+							TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
 							Value: &metricspb.NumberDataPoint_AsDouble{
 								AsDouble: slo.Metric.Value,
 							},
@@ -158,7 +159,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 					DataPoints: []*metricspb.NumberDataPoint{
 						{
 							Attributes:   attributes,
-							TimeUnixNano: uint64(now.UnixNano()),
+							TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
 							Value: &metricspb.NumberDataPoint_AsInt{
 								AsInt: slo.Metric.EventsCount,
 							},
@@ -191,7 +192,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 						DataPoints: []*metricspb.NumberDataPoint{
 							{
 								Attributes:   attributes,
-								TimeUnixNano: uint64(now.UnixNano()),
+								TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
 								Value: &metricspb.NumberDataPoint_AsDouble{
 									AsDouble: breakdown.Value,
 								},
@@ -207,7 +208,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 						DataPoints: []*metricspb.NumberDataPoint{
 							{
 								Attributes:   attributes,
-								TimeUnixNano: uint64(now.UnixNano()),
+								TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
 								Value: &metricspb.NumberDataPoint_AsInt{
 									AsInt: breakdown.EventsCount,
 								},

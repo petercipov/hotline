@@ -2,10 +2,10 @@ package otel
 
 import (
 	"fmt"
+	"hotline/clock"
 	"hotline/ingestions"
 	"hotline/integrations"
 	"net/url"
-	"time"
 
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -89,8 +89,8 @@ func (h *StandardMapping) ConvertMessageToHttp(reqProto *coltracepb.ExportTraceS
 					Method:          method,
 					StatusCode:      statusCode,
 					URL:             fullUrl,
-					StartTime:       time.Unix(0, int64(span.StartTimeUnixNano)).UTC(),
-					EndTime:         time.Unix(0, int64(span.EndTimeUnixNano)).UTC(),
+					StartTime:       clock.TimeFromUint64OrZero(span.StartTimeUnixNano),
+					EndTime:         clock.TimeFromUint64OrZero(span.EndTimeUnixNano),
 					ErrorType:       errorType,
 					CorrelationID:   correlationID,
 				})

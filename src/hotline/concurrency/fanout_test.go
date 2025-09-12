@@ -33,7 +33,7 @@ var _ = Describe("Fan Out", func() {
 
 	It("will pass multiple message to multiple queues", func() {
 		sut.forFanOut(8)
-		for i := 0; i < 100000; i++ {
+		for i := range 100000 {
 			sut.sendMessageWithId(fmt.Sprintf("message id %d", i))
 		}
 		messages := sut.expectMessageReceived(100000)
@@ -48,7 +48,7 @@ var _ = Describe("Fan Out", func() {
 
 	It("will broadcast same sage to multiple queues", func() {
 		sut.forFanOut(8)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			sut.broadcastMessageWithId(fmt.Sprintf("message id %d", i))
 		}
 		received := sut.expectMessageReceived(8 * 100)
@@ -81,7 +81,7 @@ func (f *fanOutSut) forSingleFanOut() {
 
 func (f *fanOutSut) forFanOut(numberOfQueues int) {
 	var queueNames []string
-	for i := 0; i < numberOfQueues; i++ {
+	for i := range numberOfQueues {
 		queueNames = append(queueNames, fmt.Sprintf("fan%d", i))
 	}
 

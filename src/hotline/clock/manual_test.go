@@ -49,7 +49,7 @@ var _ = Describe("Manual Clock", Ordered, func() {
 		ticks := sut.TickPeriodicallyAndResetOnce(10, starTime)
 		Expect(ticks).To(HaveLen(20))
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			Expect(ticks[i]).To(Equal(ticks[i+10]))
 		}
 	})

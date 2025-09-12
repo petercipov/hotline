@@ -136,7 +136,7 @@ func (s *sutlatencyhistogram) fillLatencies(latencies ...float64) {
 }
 
 func (s *sutlatencyhistogram) repeatLatencies(repeat int, latencies ...float64) {
-	for i := 0; i < repeat; i++ {
+	for range repeat {
 		s.fillLatencies(latencies...)
 	}
 }
@@ -147,7 +147,7 @@ func (s *sutlatencyhistogram) repeatIncreasingLatencies(count int, repeat int) [
 		latencies = append(latencies, float64(latency))
 	}
 
-	for i := 0; i < repeat; i++ {
+	for range repeat {
 		s.fillLatencies(latencies...)
 	}
 	return latencies

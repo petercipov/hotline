@@ -33,7 +33,7 @@ var _ = Describe("Scope Workers", func() {
 
 	It("should execute multiple for in multiple workers", func() {
 		sut.forWorker(10)
-		for i := 0; i < 10000; i++ {
+		for range 10000 {
 			sut.execute()
 		}
 		executed := sut.ExpectExecuted(10000)
@@ -85,7 +85,7 @@ func (s *workersSUT) Close() {
 func (s *workersSUT) forWorker(count int) {
 	var workerIDs []string
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		workerIDs = append(workerIDs, strconv.Itoa(i))
 	}
 

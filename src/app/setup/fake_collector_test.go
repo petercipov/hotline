@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hotline/clock"
 	"io"
 	"math"
 	"net/http"
@@ -76,7 +77,7 @@ func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 							Unit:      metric.Unit,
 							Type:      "Gauge",
 							Value:     roundTo(val.AsDouble, 3),
-							Timestamp: time.Unix(0, int64(dp.TimeUnixNano)).UTC().Format(time.RFC3339),
+							Timestamp: clock.TimeFromUint64OrZero(dp.TimeUnixNano).Format(time.RFC3339),
 							KeyVals:   atts.Sorted(),
 						})
 					}
@@ -108,7 +109,7 @@ func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 							Unit:      metric.Unit,
 							Type:      "Sum",
 							Value:     roundTo(float64(val.AsInt), 3),
-							Timestamp: time.Unix(0, int64(dp.TimeUnixNano)).UTC().Format(time.RFC3339),
+							Timestamp: clock.TimeFromUint64OrZero(dp.TimeUnixNano).Format(time.RFC3339),
 							KeyVals:   atts.Sorted(),
 						})
 					}
@@ -135,9 +136,14 @@ func (c *fakeCollector) GetMetrics() []ExpectedMetric {
 func uncompressedGzip(reader io.Reader) ([]byte, error) {
 	decompressor, _ := gzip.NewReader(reader)
 	var uncompressed bytes.Buffer
-	_, err := io.Copy(&uncompressed, decompressor)
-	if err != nil {
-		return nil, err
+	for {
+		_, err := io.CopyN(&uncompressed, decompressor, 1024)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
 	}
 	_ = decompressor.Close()
 	return uncompressed.Bytes(), nil

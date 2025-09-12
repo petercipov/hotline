@@ -423,10 +423,16 @@ func (t *failingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 func uncompressGzip(reader io.Reader) ([]byte, error) {
 	decompressor, _ := gzip.NewReader(reader)
 	var uncompressed bytes.Buffer
-	_, err := io.Copy(&uncompressed, decompressor)
-	if err != nil {
-		return nil, err
+	for {
+		_, err := io.CopyN(&uncompressed, decompressor, 1024)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
 	}
+
 	_ = decompressor.Close()
 	return uncompressed.Bytes(), nil
 }

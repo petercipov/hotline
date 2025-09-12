@@ -22,7 +22,7 @@ var _ = Describe("Scoped OTEL Reporter", func() {
 
 	It("reports messages concurrently", func() {
 		sut.forConcurrentReporter()
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			sut.sendCommand()
 		}
 		reported := sut.expectReportedMetrics(1000)
@@ -37,7 +37,7 @@ var _ = Describe("Scoped OTEL Reporter", func() {
 	It("swallows reporting failed from server", func() {
 		sut.forConcurrentReporter()
 		sut.backendRespondsError()
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			sut.sendCommand()
 		}
 		reported := sut.expectReportedMetrics(10)

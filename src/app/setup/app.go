@@ -178,7 +178,7 @@ func (a *App) GetCfgAPIUrl() string {
 
 func createIds(prefix string, count int) []string {
 	var queueIDs []string
-	for i := 0; i < count; i++ {
+	for i := range count {
 		queueIDs = append(queueIDs, fmt.Sprintf("%s%d", prefix, i))
 	}
 	return queueIDs

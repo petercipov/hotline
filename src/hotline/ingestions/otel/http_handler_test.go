@@ -245,9 +245,9 @@ func (s *otelSut) requestWitMultiResourceMultipleSpans(resourceCount int, traceC
 func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount int, traceCount int, modifier func(span *tracepb.Span)) {
 
 	var resourceSpans []*tracepb.ResourceSpans
-	for ri := 0; ri < resourceCount; ri++ {
+	for ri := range resourceCount {
 		var spans []*tracepb.Span
-		for ti := 0; ti < traceCount; ti++ {
+		for ti := range traceCount {
 			span := &tracepb.Span{
 				TraceId:           []byte("5B8EFFF798038103D269B633813FC60C" + strconv.Itoa(ri)),
 				SpanId:            []byte("EEE19B7EC3C1B174" + strconv.Itoa(ti)),

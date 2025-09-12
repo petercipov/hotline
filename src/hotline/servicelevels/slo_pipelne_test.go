@@ -21,7 +21,7 @@ var _ = Describe("SLO Pipeline", func() {
 	It("should report no metrics if configuration not available", func() {
 		sut.forPipeline()
 
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			id := integrations.ID("unknown_integration_id-" + strconv.Itoa(i))
 			sut.NoConfigPresent(id, "2025-02-22T12:04:00Z")
 			sut.IngestOKRequest(id, "2025-02-22T12:04:05Z")
@@ -36,7 +36,7 @@ var _ = Describe("SLO Pipeline", func() {
 	It("should report metrics if configuration available", func() {
 		sut.forPipeline()
 		sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
 		}
 		reports := sut.Report("2025-02-22T12:04:55Z")
@@ -55,7 +55,7 @@ var _ = Describe("SLO Pipeline", func() {
 		It("should report different config if route was changed", func() {
 			sut.forPipeline()
 			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
-			for i := 0; i < 1000; i++ {
+			for range 1000 {
 				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
 			}
 
@@ -76,7 +76,7 @@ var _ = Describe("SLO Pipeline", func() {
 		It("should report nothing when config was removed", func() {
 			sut.forPipeline()
 			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
 			}
 			sut.NoConfigPresent("known_integration_id", "2025-02-22T12:04:05Z")
@@ -92,7 +92,7 @@ var _ = Describe("SLO Pipeline", func() {
 		It("should report nothing when config was emptied", func() {
 			sut.forPipeline()
 			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
 			}
 			sut.EmptyConfigPresent("known_integration_id", "2025-02-22T12:04:05Z")
@@ -122,7 +122,7 @@ type sloPipelineSUT struct {
 func (s *sloPipelineSUT) forPipeline() {
 	s.numberOfQueues = 8
 	var queueIDs []string
-	for i := 0; i < s.numberOfQueues; i++ {
+	for i := range s.numberOfQueues {
 		queueIDs = append(queueIDs, fmt.Sprintf("queue-%d", i))
 	}
 

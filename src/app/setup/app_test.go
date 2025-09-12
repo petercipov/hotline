@@ -75,7 +75,7 @@ func (a *appSut) sloReporterIsPointingToCollector() {
 func (a *appSut) sendEgressTraffic(ctx context.Context, integrationID string) (context.Context, error) {
 	now := a.managedClock.Now()
 	targetURL := "http://" + a.egressTargetServer.Host()
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		a.managedClock.Reset(now)
 		_, sendErr := a.egressClient.SendTraffic(integrationID, targetURL)
 		if sendErr != nil {

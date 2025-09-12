@@ -141,7 +141,7 @@ func (s *sutslidingwindow) windowContains(window *metrics.Window[float64], value
 func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolledWindows {
 	now := clock.ParseTime(nowStr)
 	var windows []*metrics.Window[float64]
-	for i := 0; i < count; i++ {
+	for i := range count {
 		tNow := now.Add(s.slidingWindow.GracePeriod * time.Duration(i))
 		window := s.slidingWindow.GetActiveWindow(tNow)
 		windows = append(windows, window)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"hotline/http"
 	"hotline/servicelevels"
+	"math"
 	"time"
 )
 
@@ -128,7 +129,7 @@ func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteService
 				Host:   ptrString(route.Route.Host),
 				Method: &method,
 				Path:   ptrString(route.Route.PathPattern),
-				Port:   ptrInt32(int32(route.Route.Port)),
+				Port:   ptrInt32(route.Route.Port),
 			},
 			RouteKey: route.Route.ID(),
 		})
@@ -169,9 +170,14 @@ func ptrString(val string) *string {
 	return &val
 }
 
-func ptrInt32(val int32) *int32 {
-	if val == 0 {
+func ptrInt32(val int) *int32 {
+	if val <= 0 {
 		return nil
 	}
-	return &val
+
+	if val > math.MaxInt32 {
+		return nil
+	}
+	val32 := int32(val)
+	return &val32
 }

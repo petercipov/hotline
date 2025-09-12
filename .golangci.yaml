@@ -26,7 +26,15 @@ linters:
     - errchkjson
     - errname
     - errorlint
+    - fatcontext
+    - godox
+    - gosec
+    - iface
+    - intrange
   settings:
+    gosec:
+      excludes:
+        - G404
     revive:
       rules:
         - name: package-comments

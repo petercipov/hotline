@@ -1,6 +1,7 @@
 package setup_test
 
 import (
+	"hotline/clock"
 	"hotline/ingestions/otel"
 	"math/rand"
 	"strconv"
@@ -28,8 +29,8 @@ func (s *EnvoyClient) SendSomeTraffic(now time.Time, integrationID string) (int,
 		startTime := now
 		endTime := startTime.Add(time.Duration(r.Intn(10000)) * time.Millisecond)
 
-		span.EndTimeUnixNano = uint64(endTime.UnixNano())
-		span.StartTimeUnixNano = uint64(startTime.UnixNano())
+		span.EndTimeUnixNano = clock.TimeToUint64NanoOrZero(endTime)
+		span.StartTimeUnixNano = clock.TimeToUint64NanoOrZero(startTime)
 
 		statusCode := statusCodes[r.Intn(len(statusCodes))]
 		names := otel.DefaultEnvoyMappingNames()
@@ -43,9 +44,9 @@ func (s *EnvoyClient) SendSomeTraffic(now time.Time, integrationID string) (int,
 func (s *EnvoyClient) sendTraffic(integrationID string, resourceCount int, traceCount int, modifier func(span *tracepb.Span)) (int, error) {
 	var resourceSpans []*tracepb.ResourceSpans
 	names := otel.DefaultEnvoyMappingNames()
-	for ri := 0; ri < resourceCount; ri++ {
+	for ri := range resourceCount {
 		var spans []*tracepb.Span
-		for ti := 0; ti < traceCount; ti++ {
+		for ti := range traceCount {
 			span := &tracepb.Span{
 				TraceId:           []byte("5B8EFFF798038103D269B633813FC60C" + strconv.Itoa(ri)),
 				SpanId:            []byte("EEE19B7EC3C1B174" + strconv.Itoa(ti)),
