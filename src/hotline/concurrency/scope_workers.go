@@ -14,23 +14,24 @@ type scopedWorker[S any, W any] struct {
 
 func NewScopeWorkers[W any, S any, M any](
 	scopes *Scopes[S],
-	workerCreator func(cxt context.Context, scope *S) *W,
-	executor func(ctx context.Context, scope *S, worker *W, message *M),
+	workerCreator func(id string, scope *S) *W,
+	executor func(ctx context.Context, id string, scope *S, worker *W, message *M),
 	inputChannelLength int,
 ) *ScopeWorkers[S, W, M] {
 	inputChannel := make(chan *M, inputChannelLength)
 	workers := make(map[string]*scopedWorker[S, W], scopes.Len())
 	for scopeID, scope := range scopes.ForEachScope() {
-		worker := workerCreator(scope.Ctx, scope.Value)
+		worker := workerCreator(scopeID, scope.Value)
 		workers[scopeID] = &scopedWorker[S, W]{
 			worker: worker,
 			scope:  scope,
 		}
-		go func(scope *Scope[S], worker *W) {
+		go func(id string, scope *Scope[S], worker *W) {
+			runContext := context.Background()
 			for msg := range inputChannel {
-				executor(scope.Ctx, scope.Value, worker, msg)
+				executor(runContext, id, scope.Value, worker, msg)
 			}
-		}(scope, worker)
+		}(scopeID, scope, worker)
 	}
 	return &ScopeWorkers[S, W, M]{
 		workers:      workers,

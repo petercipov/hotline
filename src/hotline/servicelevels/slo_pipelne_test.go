@@ -131,7 +131,7 @@ func (s *sloPipelineSUT) forPipeline() {
 	}
 	s.sloReporter = &fakeSLOReporter{}
 
-	scopes := concurrency.NewScopes(queueIDs, func(_ context.Context) *servicelevels.IntegrationsScope {
+	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.IntegrationsScope {
 		return servicelevels.NewEmptyIntegrationsScope(s.sloRepository, s.sloReporter)
 	})
 	s.pipeline = servicelevels.NewSLOPipeline(

@@ -23,7 +23,7 @@ type OtelReporterScope struct {
 	gzip   *gzip.Writer
 }
 
-func NewEmptyOtelReporterScope(_ context.Context) *OtelReporterScope {
+func NewEmptyOtelReporterScope() *OtelReporterScope {
 	return &OtelReporterScope{}
 }
 
@@ -35,17 +35,17 @@ func NewScopedOtelReporter(
 ) *ScopedOtelReporter {
 	workers := concurrency.NewScopeWorkers(
 		scopes,
-		func(cxt context.Context, scope *OtelReporterScope) *OtelReporter {
+		func(queueID string, scope *OtelReporterScope) *OtelReporter {
 			scope.client = DefaultOtelHttpClient(sleep)
 			scope.gzip = gzip.NewWriter(io.Discard)
 
-			userAgent := fmt.Sprintf("%s-%s", cfg.UserAgent, concurrency.GetScopeIDFromContext(cxt))
+			userAgent := fmt.Sprintf("%s-%s", cfg.UserAgent, queueID)
 			scopedConfig := *cfg
 			scopedConfig.UserAgent = userAgent
 
 			return NewOtelReporter(&scopedConfig, scope.client, scope.gzip, proto.Marshal)
 		},
-		func(ctx context.Context, _ *OtelReporterScope, worker *OtelReporter, message *servicelevels.CheckReport) {
+		func(ctx context.Context, _ string, _ *OtelReporterScope, worker *OtelReporter, message *servicelevels.CheckReport) {
 			reportErr := worker.ReportChecks(ctx, message)
 			if reportErr != nil {
 				slog.ErrorContext(ctx, "Failed to report SLO checks ", slog.Any("error", reportErr))

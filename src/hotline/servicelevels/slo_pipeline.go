@@ -77,7 +77,7 @@ type CheckMessage struct {
 	Now time.Time
 }
 
-func (message *CheckMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+func (message *CheckMessage) Execute(ctx context.Context, _ string, scope *IntegrationsScope) {
 	scope.AdvanceTime(message.Now)
 
 	var checks []Check
@@ -106,7 +106,7 @@ func (message *IngestRequestsMessage) GetMessageID() []byte {
 	return []byte(message.ID)
 }
 
-func (message *IngestRequestsMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, scope *IntegrationsScope) {
 	scope.AdvanceTime(message.Now)
 
 	slo, found := scope.Integrations[message.ID]
@@ -130,7 +130,7 @@ type ModifyRouteMessage struct {
 	Route http.Route
 }
 
-func (message *ModifyRouteMessage) Execute(ctx context.Context, scope *IntegrationsScope) {
+func (message *ModifyRouteMessage) Execute(ctx context.Context, _ string, scope *IntegrationsScope) {
 	scope.AdvanceTime(message.Now)
 
 	slo, found := scope.Integrations[message.ID]

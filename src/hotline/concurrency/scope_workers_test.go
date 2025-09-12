@@ -89,16 +89,16 @@ func (s *workersSUT) forWorker(count int) {
 		workerIDs = append(workerIDs, strconv.Itoa(i))
 	}
 
-	s.scopes = concurrency.NewScopes(workerIDs, func(_ context.Context) *workerSUTScope {
+	s.scopes = concurrency.NewScopes(workerIDs, func() *workerSUTScope {
 		return &workerSUTScope{}
 	})
 	s.workers = concurrency.NewScopeWorkers(
 		s.scopes,
-		func(cxt context.Context, scope *workerSUTScope) *workerSUTWorker {
+		func(_ string, scope *workerSUTScope) *workerSUTWorker {
 			return &workerSUTWorker{}
 		},
-		func(ctx context.Context, scope *workerSUTScope, worker *workerSUTWorker, message *workerSUTMessage) {
-			message.workerID = concurrency.GetScopeIDFromContext(ctx)
+		func(ctx context.Context, queueID string, scope *workerSUTScope, worker *workerSUTWorker, message *workerSUTMessage) {
+			message.workerID = queueID
 			scope.messages = append(scope.messages, message)
 			time.Sleep(1 * time.Microsecond)
 		},

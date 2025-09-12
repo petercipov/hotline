@@ -18,6 +18,8 @@ linters:
     - revive
     - bidichk
     - bodyclose
+    - canonicalheader
+    - containedctx
   settings:
     revive:
       rules:

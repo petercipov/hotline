@@ -1,23 +1,13 @@
 package concurrency
 
 import (
-	"context"
 	"iter"
 	"maps"
 )
 
-type contextQueueID string
-
-const contextQueueIDName = contextQueueID("contextQueueIDName")
-
-func GetScopeIDFromContext(ctx context.Context) string {
-	name, _ := ctx.Value(contextQueueIDName).(string)
-	return name
-}
-
 type Scope[S any] struct {
-	Ctx   context.Context
 	Value *S
+	name  string
 }
 
 type Scopes[S any] struct {
@@ -25,13 +15,12 @@ type Scopes[S any] struct {
 	scopes map[string]*Scope[S]
 }
 
-func NewScopes[S any](names []string, createScope func(ctx context.Context) *S) *Scopes[S] {
+func NewScopes[S any](names []string, createScope func() *S) *Scopes[S] {
 	scopes := make(map[string]*Scope[S], len(names))
 	for _, name := range names {
-		ctx := context.WithValue(context.Background(), contextQueueIDName, name)
 		scopes[name] = &Scope[S]{
-			Ctx:   ctx,
-			Value: createScope(ctx),
+			Value: createScope(),
+			name:  name,
 		}
 	}
 	return &Scopes[S]{

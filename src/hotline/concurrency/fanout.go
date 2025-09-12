@@ -10,7 +10,7 @@ type FanOut[M any, S any] struct {
 	scopes   *Scopes[S]
 }
 
-func NewFanOut[M any, S any](scopes *Scopes[S], queueProcessor func(ctx context.Context, m M, scope *S)) *FanOut[M, S] {
+func NewFanOut[M any, S any](scopes *Scopes[S], queueProcessor func(ctx context.Context, scopeID string, m M, scope *S)) *FanOut[M, S] {
 	channels := make([]chan M, scopes.Len())
 	for i := range channels {
 		channels[i] = make(chan M)
@@ -18,11 +18,12 @@ func NewFanOut[M any, S any](scopes *Scopes[S], queueProcessor func(ctx context.
 
 	i := 0
 	for queueID, scope := range scopes.ForEachScope() {
-		go func(ctx context.Context, messages chan M, _ string, queueScope *S) {
+		go func(messages chan M, id string, queueScope *S) {
+			runContext := context.Background()
 			for message := range messages {
-				queueProcessor(ctx, message, queueScope)
+				queueProcessor(runContext, id, message, queueScope)
 			}
-		}(scope.Ctx, channels[i], queueID, scope.Value)
+		}(channels[i], queueID, scope.Value)
 		i++
 	}
 
@@ -61,11 +62,11 @@ func (f *FanOut[M, S]) Close() {
 }
 
 type ScopedAction[S any] interface {
-	Execute(ctx context.Context, scope *S)
+	Execute(ctx context.Context, scopeID string, scope *S)
 }
 
 func NewActionFanOut[S any](scopes *Scopes[S]) *FanOut[ScopedAction[S], S] {
-	return NewFanOut(scopes, func(ctx context.Context, action ScopedAction[S], scope *S) {
-		action.Execute(ctx, scope)
+	return NewFanOut(scopes, func(ctx context.Context, queueID string, action ScopedAction[S], scope *S) {
+		action.Execute(ctx, queueID, scope)
 	})
 }

@@ -2,7 +2,6 @@ package setup
 
 import (
 	"app/setup/config"
-	"context"
 	"crypto/rand"
 	"fmt"
 	"hotline/clock"
@@ -72,7 +71,7 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 
 	sloPipelineScopes := concurrency.NewScopes(
 		createIds("slo-queue-", 8),
-		func(_ context.Context) *servicelevels.IntegrationsScope {
+		func() *servicelevels.IntegrationsScope {
 			return servicelevels.NewEmptyIntegrationsScope(sloConfigRepository, reporter)
 		},
 	)

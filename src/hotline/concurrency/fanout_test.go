@@ -85,7 +85,7 @@ func (f *fanOutSut) forFanOut(numberOfQueues int) {
 		queueNames = append(queueNames, fmt.Sprintf("fan%d", i))
 	}
 
-	f.scopes = concurrency.NewScopes(queueNames, func(ctx context.Context) *singleWriterScope {
+	f.scopes = concurrency.NewScopes(queueNames, func() *singleWriterScope {
 		return &singleWriterScope{}
 	})
 	f.fanOut = concurrency.NewActionFanOut(f.scopes)
@@ -134,8 +134,7 @@ type sutMessage struct {
 	processId string
 }
 
-func (m *sutMessage) Execute(ctx context.Context, scope *singleWriterScope) {
-	name := concurrency.GetScopeIDFromContext(ctx)
-	m.processId = name
+func (m *sutMessage) Execute(_ context.Context, scopeID string, scope *singleWriterScope) {
+	m.processId = scopeID
 	scope.messages = append(scope.messages, *m)
 }
