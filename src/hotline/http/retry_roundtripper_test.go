@@ -18,7 +18,7 @@ var _ = Describe("Retry Round Tripper", func() {
 	It("does not retry for empty list status codes and failed request", func() {
 		sut.forEmpty()
 		resp, respErr := sut.sendFailedRequest()
-		Expect(respErr).To(BeNil())
+		Expect(respErr).ToNot(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 		retries := sut.getRetries()
 		Expect(retries).To(BeEmpty())
@@ -27,7 +27,7 @@ var _ = Describe("Retry Round Tripper", func() {
 	It("will retry 500 3 times and exponentially", func() {
 		sut.forRetry(500)
 		resp, respErr := sut.sendFailedRequest()
-		Expect(respErr).To(BeNil())
+		Expect(respErr).ToNot(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 		retries := sut.getRetries()
 		Expect(retries).To(Equal([]fakeRetry{
@@ -52,7 +52,7 @@ var _ = Describe("Retry Round Tripper", func() {
 	It("for success request it will not retry", func() {
 		sut.forRetry(500)
 		resp, respErr := sut.sendSuceessRequest()
-		Expect(respErr).To(BeNil())
+		Expect(respErr).ToNot(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		retries := sut.getRetries()
 		Expect(retries).To(BeEmpty())

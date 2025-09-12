@@ -42,7 +42,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		s.forHttpIngestion()
 		s.requestWithEmptyTraces()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("ingests request from simple trace", func() {
@@ -89,7 +89,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		s.forHttpIngestion()
 		s.requestWithSimpleServerSpan()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("ingest trace without status code but error type", func() {
@@ -141,35 +141,35 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		s.forHttpIngestion()
 		s.requestWithoutHttpMethod()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("skips trace if no full url not present", func() {
 		s.forHttpIngestion()
 		s.requestWithoutFullUrl()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("skips trace if full url not parseable", func() {
 		s.forHttpIngestion()
 		s.requestWithUnparseableFullUrl()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("skips trace if integration id is empty", func() {
 		s.forHttpIngestion()
 		s.requestWithIntegrationIDEmpty()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("skips trace if no status and no error type", func() {
 		s.forHttpIngestion()
 		s.requestWithNoStatusNoErrorType()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 })
 

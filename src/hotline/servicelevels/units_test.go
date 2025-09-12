@@ -33,7 +33,7 @@ var _ = Describe("Units", func() {
 		DescribeTable("name construction",
 			func(value float64, name string) {
 				percentile, err := ParsePercentile(value)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(percentile.Name()).To(Equal(name))
 			},
 			Entry("When 100", 100.0, "p100"),
@@ -50,7 +50,7 @@ var _ = Describe("Units", func() {
 		DescribeTable("value construction",
 			func(value float64, name string) {
 				percentile, err := ParsePercentile(value)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(percentile.AsValue()).To(Equal(name))
 			},
 			Entry("When 100", 100.0, "100%"),
@@ -68,9 +68,9 @@ var _ = Describe("Units", func() {
 			func(strValue string, percentValue float64, hasError bool) {
 				percentile, err := ParsePercentileFromValue(strValue)
 				if hasError {
-					Expect(err).NotTo(BeNil())
+					Expect(err).To(HaveOccurred())
 				} else {
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 				}
 				Expect(percentile.AsPercent()).To(Equal(percentValue))
 			},

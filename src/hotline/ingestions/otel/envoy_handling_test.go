@@ -39,28 +39,28 @@ var _ = Describe("Envoy Ingestion of Traces", func() {
 		s.forHttpIngestion()
 		s.requestWithoutHttpMethod()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("skips trace if status code not present", func() {
 		s.forHttpIngestion()
 		s.requestWithoutStatusCode()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("skips trace if url not present", func() {
 		s.forHttpIngestion()
 		s.requestWithoutFullUrl()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 
 	It("skips trace if url not present", func() {
 		s.forHttpIngestion()
 		s.requestWithUnparseableFullUrl()
 		requests := s.ingest()
-		Expect(requests).To(HaveLen(0))
+		Expect(requests).To(BeEmpty())
 	})
 })
 

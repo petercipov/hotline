@@ -31,7 +31,7 @@ var _ = Describe("Scoped OTEL Reporter", func() {
 		for _, metric := range reported {
 			groupByAgent[metric.userAgent]++
 		}
-		Expect(len(groupByAgent)).To(Equal(8))
+		Expect(groupByAgent).To(HaveLen(8))
 	})
 
 	It("swallows reporting failed from server", func() {

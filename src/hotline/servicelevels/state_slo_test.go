@@ -15,7 +15,7 @@ var _ = Describe("State SLO", func() {
 		It("should return no metrics", func() {
 			sut.forEmptySLO()
 			metrics := sut.getMetrics()
-			Expect(metrics).To(HaveLen(0))
+			Expect(metrics).To(BeEmpty())
 		})
 	})
 
@@ -456,7 +456,7 @@ func (s *stateslosut) forSLO(expectedStates ...string) {
 
 func (s *stateslosut) forSLOTRackingUnexpected(expectedStates []string, unexpectedStates []string) {
 	p, failure := servicelevels.ParsePercentile(99.99)
-	Expect(failure).To(BeNil())
+	Expect(failure).ToNot(HaveOccurred())
 
 	s.slo = servicelevels.NewStateSLO(expectedStates, unexpectedStates, p, 1*time.Hour, "test-namespace", nil)
 }

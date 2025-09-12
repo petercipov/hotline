@@ -30,7 +30,7 @@ var _ = Describe("System Clock", func() {
 		sut.ForSystemClock()
 		now := sut.Now()
 		ticks := sut.TickPeriodically(10)
-		Expect(len(ticks)).To(Equal(10))
+		Expect(ticks).To(HaveLen(10))
 
 		for _, tick := range ticks {
 			Expect(tick.After(now)).To(BeTrue())

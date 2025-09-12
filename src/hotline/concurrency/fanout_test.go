@@ -21,7 +21,7 @@ var _ = Describe("Fan Out", func() {
 		sut.forEmptyFanOut()
 		sut.scheduleMessage()
 		messages := sut.expectMessageReceived(0)
-		Expect(messages).To(HaveLen(0))
+		Expect(messages).To(BeEmpty())
 	})
 
 	It("will pass message", func() {

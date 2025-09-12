@@ -12,7 +12,7 @@ import (
 var _ = Describe("Entities", func() {
 	It("should transform empty array", func() {
 		slos := ToSLORequestMessage(nil, clock.ParseTime("2018-12-13T14:51:00Z"))
-		Expect(slos).To(HaveLen(0))
+		Expect(slos).To(BeEmpty())
 	})
 
 	It("should ingested single request", func() {

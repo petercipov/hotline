@@ -34,10 +34,10 @@ var _ = Describe("Proxy", Ordered, func() {
 		Expect(resp.Header.Get("content-type")).To(Equal("text/plain"))
 
 		bodyBytes, readErr := io.ReadAll(resp.Body)
-		Expect(readErr).To(BeNil())
+		Expect(readErr).ToNot(HaveOccurred())
 		Expect(string(bodyBytes)).To(Equal("OK"))
 		ingested := sut.IngestedRequests()
-		Expect(len(ingested)).To(Equal(1))
+		Expect(ingested).To(HaveLen(1))
 		ingestedRequest := ingested[0]
 
 		Expect(ingestedRequest).To(Equal(&ingestions.HttpRequest{
@@ -52,7 +52,7 @@ var _ = Describe("Proxy", Ordered, func() {
 			ErrorType:       "",
 			CorrelationID:   "request-id-123",
 		}))
-		Expect(len(ingestedRequest.ID)).To(Equal(22))
+		Expect(ingestedRequest.ID).To(HaveLen(22))
 		Expect(ingestedRequest.URL.Path).To(Equal("/abcd"))
 		Expect(ingestedRequest.EndTime.After(ingestedRequest.StartTime)).To(BeTrue())
 	})
@@ -64,7 +64,7 @@ var _ = Describe("Proxy", Ordered, func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusGatewayTimeout))
 
 		ingested := sut.IngestedRequests()
-		Expect(len(ingested)).To(Equal(1))
+		Expect(ingested).To(HaveLen(1))
 		ingestedRequest := ingested[0]
 		Expect(ingestedRequest.ErrorType).To(Equal("timeout"))
 	})
@@ -75,7 +75,7 @@ var _ = Describe("Proxy", Ordered, func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 
 		ingested := sut.IngestedRequests()
-		Expect(len(ingested)).To(Equal(1))
+		Expect(ingested).To(HaveLen(1))
 		ingestedRequest := ingested[0]
 		Expect(ingestedRequest.ErrorType).To(Equal("unknown"))
 	})
@@ -86,7 +86,7 @@ var _ = Describe("Proxy", Ordered, func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 
 		ingested := sut.IngestedRequests()
-		Expect(len(ingested)).To(Equal(1))
+		Expect(ingested).To(HaveLen(1))
 		ingestedRequest := ingested[0]
 		Expect(ingestedRequest.ErrorType).To(Equal("proxy_copy_err"))
 	})
@@ -96,7 +96,7 @@ var _ = Describe("Proxy", Ordered, func() {
 		sut.ForDedicatedServer()
 		resp := sut.WhenRequestIsSend()
 		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-		Expect(len(sut.IngestedRequests())).To(Equal(0))
+		Expect(sut.IngestedRequests()).To(BeEmpty())
 	})
 
 	It("return bad gateway for missing integration id", func() {
@@ -195,7 +195,7 @@ func (s *proxySUT) WhenRequestIsSend() *http.Response {
 	req.Header.Add(s.semantics.RequestIDName, "request-id-123")
 	req.Header.Add(s.semantics.IntegrationIDName, s.integrationID)
 	resp, respErr := s.proxyClient.RoundTrip(req)
-	Expect(respErr).To(BeNil())
+	Expect(respErr).ToNot(HaveOccurred())
 	return resp
 }
 

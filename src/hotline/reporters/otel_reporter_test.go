@@ -30,13 +30,13 @@ var _ = Describe("OTEL Reporter", func() {
 		sut.forReporter()
 		sut.sendEmptyMetrics()
 		messages := sut.receivedOtelMessages()
-		Expect(messages).To(HaveLen(0))
+		Expect(messages).To(BeEmpty())
 	})
 
 	It("should send a message for SLO check", func() {
 		sut.forReporter()
 		err := sut.sendSloCheck()
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		messages := sut.receivedOtelMessages()
 		Expect(messages).To(HaveLen(1))
 		Expect(messages[0].ResourceMetrics).To(HaveLen(1))
@@ -225,19 +225,19 @@ var _ = Describe("OTEL Reporter", func() {
 var _ = Describe("OTELUrl", func() {
 	It("should return a valid unsecure URL", func() {
 		otel, parseErr := reporters.NewOtelUrl(false, "localhost:4318")
-		Expect(parseErr).To(BeNil())
+		Expect(parseErr).ToNot(HaveOccurred())
 		Expect(otel.String()).To(Equal("http://localhost:4318/v1/metrics"))
 	})
 
 	It("should return a valid secure URL", func() {
 		otel, parseErr := reporters.NewOtelUrl(true, "localhost:4318")
-		Expect(parseErr).To(BeNil())
+		Expect(parseErr).ToNot(HaveOccurred())
 		Expect(otel.String()).To(Equal("https://localhost:4318/v1/metrics"))
 	})
 
 	It("should fail if host invalid", func() {
 		_, parseErr := reporters.NewOtelUrl(true, "[::")
-		Expect(parseErr).NotTo(BeNil())
+		Expect(parseErr).To(HaveOccurred())
 	})
 })
 
@@ -259,7 +259,7 @@ func (r *otelReporterSUT) forReporter() {
 	r.testServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 
 		bodyBytes, bodyReadErr := uncompressGzip(request.Body)
-		Expect(bodyReadErr).To(BeNil())
+		Expect(bodyReadErr).ToNot(HaveOccurred())
 
 		message := &colmetricspb.ExportMetricsServiceRequest{}
 		unmarshalErr := proto.Unmarshal(bodyBytes, message)
@@ -397,7 +397,7 @@ func (r *otelReporterSUT) sendMesaageWithWrongMethod() error {
 	return reportErr
 }
 
-func (r *otelReporterSUT) sendMessageWithNetworkFailure() interface{} {
+func (r *otelReporterSUT) sendMessageWithNetworkFailure() error {
 	failing := &failingTransport{}
 	previous := r.httpClient.Transport
 	r.httpClient.Transport = failing

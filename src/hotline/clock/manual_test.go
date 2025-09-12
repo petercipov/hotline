@@ -34,7 +34,7 @@ var _ = Describe("Manual Clock", Ordered, func() {
 		sut.ForManualClock()
 		now := sut.Now()
 		ticks := sut.TickPeriodicallyAndCancel(10)
-		Expect(len(ticks)).To(Equal(10))
+		Expect(ticks).To(HaveLen(10))
 
 		for _, tick := range ticks {
 			Expect(tick.After(now)).To(BeTrue())
@@ -47,7 +47,7 @@ var _ = Describe("Manual Clock", Ordered, func() {
 		starTime := sut.Now()
 
 		ticks := sut.TickPeriodicallyAndResetOnce(10, starTime)
-		Expect(len(ticks)).To(Equal(20))
+		Expect(ticks).To(HaveLen(20))
 
 		for i := 0; i < 10; i++ {
 			Expect(ticks[i]).To(Equal(ticks[i+10]))

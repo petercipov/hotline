@@ -18,7 +18,7 @@ var _ = Describe("LatencyMs SLO", func() {
 		It("should return return no current metric", func() {
 			sut.forEmptySLO()
 			metric := sut.getMetrics()
-			Expect(metric).To(HaveLen(0))
+			Expect(metric).To(BeEmpty())
 		})
 	})
 

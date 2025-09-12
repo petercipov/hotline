@@ -14,7 +14,7 @@ var _ = Describe("Schema ID", func() {
 		idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
 
 		id, err := idGenerator(time.Time{})
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(id).To(Equal(schemas.ID("SCx3zt0ygAcQGBAQEBAQEBAQ")))
 	})
 
@@ -22,6 +22,6 @@ var _ = Describe("Schema ID", func() {
 		idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ErrorRandReader{}))
 
 		_, err := idGenerator(time.Time{})
-		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 })

@@ -13,7 +13,7 @@ var _ = Describe("UUID", func() {
 		v7 := uuid.NewDeterministicV7(&uuid.ConstantRandReader{})
 
 		v7uuid, err := v7(time.Time{})
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(v7uuid).To(Equal("x3zt0ygAcQGBAQEBAQEBAQ"))
 	})
 
@@ -21,6 +21,6 @@ var _ = Describe("UUID", func() {
 		v7 := uuid.NewDeterministicV7(&uuid.ErrorRandReader{})
 
 		_, err := v7(time.Time{})
-		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 })

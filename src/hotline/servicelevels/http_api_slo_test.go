@@ -29,7 +29,7 @@ var _ = Describe("Http Api Slo", func() {
 			URL:     newUrl("/"),
 		})
 		metrics := s.Check()
-		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_latency",
 			Metric: servicelevels.Metric{
@@ -76,7 +76,7 @@ var _ = Describe("Http Api Slo", func() {
 			URL:     newUrl("https://iam.example.com/users"),
 		})
 		metrics := s.Check()
-		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_latency",
 			Metric: servicelevels.Metric{
@@ -129,7 +129,7 @@ var _ = Describe("Http Api Slo", func() {
 			URL:     newUrl("https://iam.example.com/users"),
 		})
 		metrics := s.Check()
-		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_status",
 			Metric: servicelevels.Metric{
@@ -173,7 +173,7 @@ var _ = Describe("Http Api Slo", func() {
 			URL:     newUrl("https://iam.example.com/users"),
 		})
 		metrics := s.Check()
-		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_status",
 			Metric: servicelevels.Metric{
@@ -212,7 +212,7 @@ var _ = Describe("Http Api Slo", func() {
 		})
 
 		metrics := s.Check()
-		Expect(len(metrics)).To(Equal(2))
+		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
 			Namespace: "http_route_latency",
 			Metric: servicelevels.Metric{
@@ -255,7 +255,7 @@ var _ = Describe("Http Api Slo", func() {
 
 		sloDef.DeleteRouteByKey(":iam.example.com::/users")
 
-		Expect(sloDef.Routes).To(HaveLen(0))
+		Expect(sloDef.Routes).To(BeEmpty())
 	})
 
 	It("will not delete for unknown key", func() {
@@ -328,6 +328,6 @@ func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteSLO
 
 func newUrl(urlString string) *url.URL {
 	u, err := url.Parse(urlString)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	return u
 }
