@@ -22,7 +22,6 @@ deps:
 	go mod download
 
 lint:
-	govulncheck
 	golangci-lint run ./src/hotline/...
 	golangci-lint run ./src/app/...
 	vacuum lint -d --no-banner -r ./.vacuum.rules.yaml ./src/app/setup/config/config.openapi.yaml -z

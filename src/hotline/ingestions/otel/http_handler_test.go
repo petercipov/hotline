@@ -2,6 +2,7 @@ package otel
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"hotline/clock"
 	"hotline/ingestions"
@@ -212,7 +213,7 @@ func sendTraces(url string, message *coltracepb.ExportTraceServiceRequest) {
 	raw, marshalErr := proto.Marshal(message)
 	Expect(marshalErr).ToNot(HaveOccurred())
 	// https://github.com/open-telemetry/opentelemetry-collector/blob/432d92d8b366f6831323a928783f1ed867c42050/exporter/otlphttpexporter/otlp.go#L185
-	req, createErr := http.NewRequest(http.MethodPost, url, bytes.NewReader(raw))
+	req, createErr := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(raw))
 	Expect(createErr).ToNot(HaveOccurred())
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "remote-service-otel-exporter")
@@ -313,7 +314,7 @@ func (s *otelSut) requestWithSimpleTraceWithIntegrationID(integrationID string) 
 }
 
 func (s *otelSut) requestWithMalformedIO() int {
-	req, createErr := http.NewRequest(http.MethodPost, s.server.URL, fakeErrReader(1))
+	req, createErr := http.NewRequestWithContext(context.Background(), http.MethodPost, s.server.URL, fakeErrReader(1))
 	Expect(createErr).ToNot(HaveOccurred())
 
 	recorder := httptest.NewRecorder()
@@ -323,7 +324,7 @@ func (s *otelSut) requestWithMalformedIO() int {
 }
 
 func (s *otelSut) requestWithInvalidBody() int {
-	req, createErr := http.NewRequest(http.MethodPost, s.server.URL, bytes.NewReader([]byte("invalid json body")))
+	req, createErr := http.NewRequestWithContext(context.Background(), http.MethodPost, s.server.URL, bytes.NewReader([]byte("invalid json body")))
 	Expect(createErr).ToNot(HaveOccurred())
 	resp, reqErr := http.DefaultClient.Do(req)
 	Expect(reqErr).ToNot(HaveOccurred())

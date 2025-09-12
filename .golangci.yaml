@@ -31,6 +31,10 @@ linters:
     - gosec
     - iface
     - intrange
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
   settings:
     gosec:
       excludes:

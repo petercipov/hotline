@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	http2 "hotline/http"
 	"io"
@@ -103,7 +104,7 @@ func (s *retrySUT) forRetry(code ...int) {
 }
 
 func (s *retrySUT) sendFailedRequest() (*http.Response, error) {
-	req, reqErr := http.NewRequest("GET", "http://example.com", bytes.NewReader([]byte("some content")))
+	req, reqErr := http.NewRequestWithContext(context.Background(), "GET", "http://example.com", bytes.NewReader([]byte("some content")))
 	Expect(reqErr).NotTo(HaveOccurred())
 
 	s.responder.SendNext(http.StatusInternalServerError)
@@ -111,7 +112,7 @@ func (s *retrySUT) sendFailedRequest() (*http.Response, error) {
 }
 
 func (s *retrySUT) sendSuceessRequest() (*http.Response, error) {
-	req, reqErr := http.NewRequest("GET", "http://example.com", bytes.NewReader([]byte("some content")))
+	req, reqErr := http.NewRequestWithContext(context.Background(), "GET", "http://example.com", bytes.NewReader([]byte("some content")))
 	Expect(reqErr).NotTo(HaveOccurred())
 
 	s.responder.SendNext(http.StatusOK)
@@ -121,7 +122,7 @@ func (s *retrySUT) sendSuceessRequest() (*http.Response, error) {
 var errNetwork = errors.New("network failure")
 
 func (s *retrySUT) sendNetworkFailureRequest() error {
-	req, reqErr := http.NewRequest("GET", "http://example.com", bytes.NewReader([]byte("some content")))
+	req, reqErr := http.NewRequestWithContext(context.Background(), "GET", "http://example.com", bytes.NewReader([]byte("some content")))
 	Expect(reqErr).NotTo(HaveOccurred())
 
 	s.responder.SendError(errNetwork)

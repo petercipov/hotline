@@ -1,6 +1,7 @@
 package egress_test
 
 import (
+	"context"
 	"errors"
 	"hotline/clock"
 	"hotline/ingestions"
@@ -191,7 +192,7 @@ func (s *proxySUT) WhenRequestIsSend() *http.Response {
 		serverURL = s.dedicatedServer.URL + "/abcd"
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, serverURL, nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, serverURL, nil)
 	req.Header.Add(s.semantics.RequestIDName, "request-id-123")
 	req.Header.Add(s.semantics.IntegrationIDName, s.integrationID)
 	resp, respErr := s.proxyClient.RoundTrip(req)

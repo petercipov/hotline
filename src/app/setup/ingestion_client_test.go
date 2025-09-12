@@ -2,6 +2,7 @@ package setup_test
 
 import (
 	"bytes"
+	"context"
 	"hotline/clock"
 	"hotline/ingestions/otel"
 	"math/rand"
@@ -105,7 +106,7 @@ func sendTraces(url string, message *coltracepb.ExportTraceServiceRequest) (int,
 		return 0, marshalErr
 	}
 	// https://github.com/open-telemetry/opentelemetry-collector/blob/432d92d8b366f6831323a928783f1ed867c42050/exporter/otlphttpexporter/otlp.go#L185
-	req, createErr := http.NewRequest(http.MethodPost, url, bytes.NewReader(raw))
+	req, createErr := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(raw))
 	if createErr != nil {
 		return 0, createErr
 	}

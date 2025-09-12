@@ -2,6 +2,7 @@ package setup_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -42,7 +43,7 @@ func (s *EgressClient) SendTraffic(integrationID string, targetURL string) (int,
 }
 
 func (s *EgressClient) SendGet(integrationID string, rand int32, targetURL string) (int, error) {
-	req, createErr := http.NewRequest("GET", fmt.Sprintf("%s/bookings?page=0&limit=50&country=uk", targetURL), nil)
+	req, createErr := http.NewRequestWithContext(context.Background(), "GET", fmt.Sprintf("%s/bookings?page=0&limit=50&country=uk", targetURL), nil)
 	if createErr != nil {
 		return 0, createErr
 	}
@@ -66,7 +67,7 @@ func (s *EgressClient) SendPost(integrationID string, rand int32, targetURL stri
 		"tripId": "4f4e4e1-c824-4d63-b37a-d8d698862f1d",
 		"passengerName": "John Doe"
 	}'`
-	req, createErr := http.NewRequest("POST", fmt.Sprintf("%s/bookings", targetURL), bytes.NewBuffer([]byte(body)))
+	req, createErr := http.NewRequestWithContext(context.Background(), "POST", fmt.Sprintf("%s/bookings", targetURL), bytes.NewBuffer([]byte(body)))
 	if createErr != nil {
 		return 0, createErr
 	}
@@ -85,7 +86,8 @@ func (s *EgressClient) SendPost(integrationID string, rand int32, targetURL stri
 }
 
 func (s *EgressClient) SendDelete(integrationID string, rand int32, targetURL string) (int, error) {
-	req, createErr := http.NewRequest(
+	req, createErr := http.NewRequestWithContext(
+		context.Background(),
 		"DELETE",
 		fmt.Sprintf("%s/bookings/%s", targetURL, "4f4e4e1-c824-4d63-b37a-d8d698862f1d"),
 		nil)
