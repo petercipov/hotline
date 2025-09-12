@@ -1,4 +1,4 @@
-package servicelevels
+package metrics
 
 import (
 	"maps"
@@ -19,6 +19,12 @@ type bucketCounter struct {
 }
 type bucketedCounters struct {
 	buckets map[bucketIndex]*bucketCounter
+}
+
+func newBucketedCounters() *bucketedCounters {
+	return &bucketedCounters{
+		buckets: make(map[bucketIndex]*bucketCounter),
+	}
 }
 
 func (c *bucketedCounters) Add(key bucketIndex, latency float64) {
@@ -74,12 +80,6 @@ func (c *bucketedCounters) GetSortedIndexes() []bucketIndex {
 	return slices.SortedFunc(maps.Keys(c.buckets), func(index bucketIndex, index2 bucketIndex) int {
 		return int(index) - int(index2)
 	})
-}
-
-func newBucketedCounters() *bucketedCounters {
-	return &bucketedCounters{
-		buckets: make(map[bucketIndex]*bucketCounter),
-	}
 }
 
 func (b *bucketCounter) Inc(latency float64) {

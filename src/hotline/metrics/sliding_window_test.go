@@ -1,8 +1,8 @@
-package servicelevels_test
+package metrics_test
 
 import (
 	"hotline/clock"
-	"hotline/servicelevels"
+	"hotline/metrics"
 	"slices"
 	"time"
 
@@ -107,11 +107,11 @@ var _ = Describe("SlidingWindow", func() {
 })
 
 type sutslidingwindow struct {
-	slidingWindow *servicelevels.SlidingWindow[float64]
+	slidingWindow *metrics.SlidingWindow[float64]
 }
 
 func (s *sutslidingwindow) forEmptySlidingWindow() {
-	s.slidingWindow = servicelevels.NewSlidingWindow(
+	s.slidingWindow = metrics.NewSlidingWindow(
 		newArrAccumulator,
 		1*time.Minute,
 		10*time.Second,
@@ -123,7 +123,7 @@ func parseTimePtr(nowString string) *time.Time {
 	return &now
 }
 
-func (s *sutslidingwindow) getActiveWindow(nowString string) *servicelevels.Window[float64] {
+func (s *sutslidingwindow) getActiveWindow(nowString string) *metrics.Window[float64] {
 	now := clock.ParseTime(nowString)
 	return s.slidingWindow.GetActiveWindow(now)
 }
@@ -133,14 +133,14 @@ func (s *sutslidingwindow) addValue(latency float64, nowString string) {
 	s.slidingWindow.AddValue(now, latency)
 }
 
-func (s *sutslidingwindow) windowContains(window *servicelevels.Window[float64], value float64) bool {
+func (s *sutslidingwindow) windowContains(window *metrics.Window[float64], value float64) bool {
 	acc := window.Accumulator.(*arrAccumulator)
 	return slices.Contains(acc.values, value)
 }
 
 func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolledWindows {
 	now := clock.ParseTime(nowStr)
-	var windows []*servicelevels.Window[float64]
+	var windows []*metrics.Window[float64]
 	for i := 0; i < count; i++ {
 		tNow := now.Add(s.slidingWindow.GracePeriod * time.Duration(i))
 		window := s.slidingWindow.GetActiveWindow(tNow)
@@ -149,7 +149,7 @@ func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolle
 	return windows
 }
 
-type scrolledWindows []*servicelevels.Window[float64]
+type scrolledWindows []*metrics.Window[float64]
 
 func (s *scrolledWindows) StartTimes() []*time.Time {
 	if s == nil {
@@ -172,7 +172,7 @@ type arrAccumulator struct {
 	values []float64
 }
 
-func newArrAccumulator() servicelevels.Accumulator[float64] {
+func newArrAccumulator() metrics.Accumulator[float64] {
 	return &arrAccumulator{}
 }
 

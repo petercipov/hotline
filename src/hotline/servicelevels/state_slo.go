@@ -1,13 +1,14 @@
 package servicelevels
 
 import (
+	"hotline/metrics"
 	"math"
 	"strings"
 	"time"
 )
 
 type StateSLO struct {
-	window                    *SlidingWindow[string]
+	window                    *metrics.SlidingWindow[string]
 	expectedStates            []string
 	expectedStatesMap         map[string]int
 	unexpectedStates          []string
@@ -43,8 +44,8 @@ func NewStateSLO(
 
 	stateNames := append([]string{}, expectedStates...)
 	stateNames = append(stateNames, unexpectedStates...)
-	window := NewSlidingWindow(func() Accumulator[string] {
-		return NewTagsHistogram(stateNames)
+	window := metrics.NewSlidingWindow(func() metrics.Accumulator[string] {
+		return metrics.NewTagsHistogram(stateNames)
 	}, windowDuration, 1*time.Minute)
 
 	expectedBreachThreshold := roundTo(breachThreshold.AsPercent(), 5)
@@ -89,7 +90,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 	if activeWindow == nil {
 		return nil
 	}
-	histogram := activeWindow.Accumulator.(*TagHistogram)
+	histogram := activeWindow.Accumulator.(*metrics.TagHistogram)
 
 	expectedBreach, expectedMetric, expectedEventsCount, expectedBreakdown := s.checkExpectedBreach(histogram)
 	unexpectedBreach, unexpectedMetric, unexpectedEventsCount, unexpectedBreakdown := s.checkUnexpectedBreach(histogram)
@@ -130,7 +131,7 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 
 }
 
-func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, int64, []Metric) {
+func (s *StateSLO) checkUnexpectedBreach(histogram *metrics.TagHistogram) (*SLOBreach, float64, int64, []Metric) {
 	breakDown := make([]Metric, len(s.unexpectedStatesMap))
 	breakDown = breakDown[:0]
 	unexpectedSum := float64(0)
@@ -163,7 +164,7 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *TagHistogram) (*SLOBreach, f
 	return breach, unexpectedSum, eventsSum, breakDown
 }
 
-func (s *StateSLO) checkExpectedBreach(histogram *TagHistogram) (*SLOBreach, float64, int64, []Metric) {
+func (s *StateSLO) checkExpectedBreach(histogram *metrics.TagHistogram) (*SLOBreach, float64, int64, []Metric) {
 	breakDown := make([]Metric, len(s.expectedStates))
 	breakDown = breakDown[:0]
 	expectedSum := float64(0)

@@ -1,7 +1,7 @@
-package servicelevels_test
+package metrics_test
 
 import (
-	"hotline/servicelevels"
+	"hotline/metrics"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -21,6 +21,13 @@ var _ = Describe("Tags Histogram", func() {
 		s.forEmptyHistogram()
 		s.Add("success")
 		percentiles := s.getPercentile("success")
+		Expect(percentiles).To(BeNil())
+	})
+
+	It("returns 0 for unused tag", func() {
+		s.forHistogram("else", "unused")
+		s.Add("else")
+		percentiles := s.getPercentile("unused")
 		Expect(percentiles).To(BeNil())
 	})
 
@@ -45,7 +52,7 @@ var _ = Describe("Tags Histogram", func() {
 })
 
 type suttagshistogram struct {
-	histogram *servicelevels.TagHistogram
+	histogram *metrics.TagHistogram
 }
 
 func (s *suttagshistogram) forEmptyHistogram() {
@@ -58,7 +65,7 @@ func (s *suttagshistogram) getPercentile(tag string) *float64 {
 }
 
 func (s *suttagshistogram) forHistogram(tags ...string) {
-	s.histogram = servicelevels.NewTagsHistogram(tags)
+	s.histogram = metrics.NewTagsHistogram(tags)
 }
 
 func (s *suttagshistogram) Add(tag string) {

@@ -1,11 +1,12 @@
 package servicelevels
 
 import (
+	"hotline/metrics"
 	"time"
 )
 
 type LatencySLO struct {
-	window      *SlidingWindow[float64]
+	window      *metrics.SlidingWindow[float64]
 	percentiles []PercentileDefinition
 	namespace   string
 	tags        map[string]string
@@ -22,8 +23,8 @@ func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Durat
 	for i := range percentiles {
 		splitLatencies = append(splitLatencies, float64(percentiles[i].Threshold))
 	}
-	window := NewSlidingWindow(func() Accumulator[float64] {
-		return NewLatencyHistogram(splitLatencies)
+	window := metrics.NewSlidingWindow(func() metrics.Accumulator[float64] {
+		return metrics.NewLatencyHistogram(splitLatencies)
 	}, windowDuration, 10*time.Second)
 
 	return &LatencySLO{
@@ -40,7 +41,7 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 		return nil
 	}
 
-	histogram := activeWindow.Accumulator.(*LatencyHistogram)
+	histogram := activeWindow.Accumulator.(*metrics.LatencyHistogram)
 	metrics := make([]SLOCheck, len(s.percentiles))
 	for i, definition := range s.percentiles {
 		bucket, eventsCount := histogram.ComputePercentile(definition.Percentile.Normalized())

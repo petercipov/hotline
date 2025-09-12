@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 )
 
 var _ = Describe("LatencyMs SLO", func() {
@@ -131,4 +132,11 @@ func (s *latencySLOSUT) WithRandomValues(count int, max float64) {
 		value := r.Float64() * max
 		s.slo.AddLatency(now, servicelevels.LatencyMs(value))
 	}
+}
+
+func BeInInterval(start float64, end float64) types.GomegaMatcher {
+	return And(
+		BeNumerically(">=", start),
+		BeNumerically("<=", end),
+	)
 }

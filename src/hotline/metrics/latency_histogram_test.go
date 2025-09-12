@@ -1,7 +1,7 @@
-package servicelevels_test
+package metrics_test
 
 import (
-	"hotline/servicelevels"
+	"hotline/metrics"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,6 +59,14 @@ var _ = Describe("LatencyMs Histogram", func() {
 			Expect(bucket.To).Should(BeNumerically("==", 1000))
 		})
 
+		It("computes median more precise if split buckets by exact threshold. near thresholds share same bucket", func() {
+			s.forEmptyHistogramWithSplit(1000, 1050)
+			s.fillLatencies(500, 1000, 1000, 1000, 1000, 1900)
+			bucket := s.computeP50()
+			Expect(bucket.From).Should(BeInInterval(942, 943))
+			Expect(bucket.To).Should(BeNumerically("==", 1000))
+		})
+
 		It("computes median less precise if split buckets without exact threshold", func() {
 			s.forEmptyHistogram()
 			s.fillLatencies(500, 1000, 1000, 1000, 1000, 1900)
@@ -109,14 +117,14 @@ var _ = Describe("LatencyMs Histogram", func() {
 })
 
 type sutlatencyhistogram struct {
-	h *servicelevels.LatencyHistogram
+	h *metrics.LatencyHistogram
 }
 
 func (s *sutlatencyhistogram) forEmptyHistogram() {
-	s.h = servicelevels.NewLatencyHistogram(nil)
+	s.h = metrics.NewLatencyHistogram(nil)
 }
 
-func (s *sutlatencyhistogram) computeP50() servicelevels.Bucket {
+func (s *sutlatencyhistogram) computeP50() metrics.Bucket {
 	b, _ := s.h.ComputePercentile(0.5)
 	return b
 }
@@ -146,10 +154,10 @@ func (s *sutlatencyhistogram) repeatIncreasingLatencies(count int, repeat int) [
 }
 
 func (s *sutlatencyhistogram) forEmptyHistogramWithSplit(splitLatency ...float64) {
-	s.h = servicelevels.NewLatencyHistogram(splitLatency)
+	s.h = metrics.NewLatencyHistogram(splitLatency)
 }
 
-func (s *sutlatencyhistogram) computeP99() servicelevels.Bucket {
+func (s *sutlatencyhistogram) computeP99() metrics.Bucket {
 	p, _ := s.h.ComputePercentile(0.99)
 	return p
 }

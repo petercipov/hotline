@@ -1,4 +1,4 @@
-package servicelevels
+package metrics
 
 import "time"
 
