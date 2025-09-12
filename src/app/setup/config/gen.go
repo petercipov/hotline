@@ -321,34 +321,10 @@ type TooManyRequests = Error
 // Unauthorized Detailed error response
 type Unauthorized = Error
 
-// ListSchemasParams defines parameters for ListSchemas.
-type ListSchemasParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
-}
-
 // UploadSchemaJSONBody defines parameters for UploadSchema.
 type UploadSchemaJSONBody struct {
 	// Title Schema title
 	Title *SchemaTitle `json:"title,omitempty"`
-}
-
-// UploadSchemaParams defines parameters for UploadSchema.
-type UploadSchemaParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
-}
-
-// DeleteSchemaParams defines parameters for DeleteSchema.
-type DeleteSchemaParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
-}
-
-// GetSchemaParams defines parameters for GetSchema.
-type GetSchemaParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
 // UpdateSchemaJSONBody defines parameters for UpdateSchema.
@@ -357,34 +333,10 @@ type UpdateSchemaJSONBody struct {
 	Title *SchemaTitle `json:"title,omitempty"`
 }
 
-// UpdateSchemaParams defines parameters for UpdateSchema.
-type UpdateSchemaParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
-}
-
-// DeleteSchemaFileParams defines parameters for DeleteSchemaFile.
-type DeleteSchemaFileParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
-}
-
-// GetSchemaFileParams defines parameters for GetSchemaFile.
-type GetSchemaFileParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
-}
-
 // UploadSchemaFileMultipartBody defines parameters for UploadSchemaFile.
 type UploadSchemaFileMultipartBody struct {
 	// Jsonschema https://json-schema.org/draft/2020-12/json-schema-core.html
 	Jsonschema *JSONSchemaFileContent `json:"jsonschema,omitempty"`
-}
-
-// UploadSchemaFileParams defines parameters for UploadSchemaFile.
-type UploadSchemaFileParams struct {
-	// XIntegrationId Unique identifier of the SLO configuration
-	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
 // GetSLOConfigParams defines parameters for GetSLOConfig.
@@ -491,32 +443,32 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// ListSchemas request
-	ListSchemas(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadSchemaWithBody request with any body
-	UploadSchemaWithBody(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UploadSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	UploadSchema(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UploadSchema(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSchema request
-	DeleteSchema(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSchema request
-	GetSchema(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSchemaWithBody request with any body
-	UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	UpdateSchema(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateSchema(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSchemaFile request
-	DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, params *DeleteSchemaFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSchemaFile request
-	GetSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, params *GetSchemaFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadSchemaFileWithBody request with any body
-	UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, filename FileName, params *UploadSchemaFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSLOConfig request
 	GetSLOConfig(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -530,8 +482,8 @@ type ClientInterface interface {
 	DeleteSLOConfig(ctx context.Context, routekey RouteKey, params *DeleteSLOConfigParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) ListSchemas(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListSchemasRequest(c.Server, params)
+func (c *Client) ListSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSchemasRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -542,8 +494,8 @@ func (c *Client) ListSchemas(ctx context.Context, params *ListSchemasParams, req
 	return c.Client.Do(req)
 }
 
-func (c *Client) UploadSchemaWithBody(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadSchemaRequestWithBody(c.Server, params, contentType, body)
+func (c *Client) UploadSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSchemaRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -554,8 +506,8 @@ func (c *Client) UploadSchemaWithBody(ctx context.Context, params *UploadSchemaP
 	return c.Client.Do(req)
 }
 
-func (c *Client) UploadSchema(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadSchemaRequest(c.Server, params, body)
+func (c *Client) UploadSchema(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSchemaRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -566,8 +518,8 @@ func (c *Client) UploadSchema(ctx context.Context, params *UploadSchemaParams, b
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteSchema(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSchemaRequest(c.Server, schemaid, params)
+func (c *Client) DeleteSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSchemaRequest(c.Server, schemaid)
 	if err != nil {
 		return nil, err
 	}
@@ -578,8 +530,8 @@ func (c *Client) DeleteSchema(ctx context.Context, schemaid SchemaID, params *De
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSchema(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSchemaRequest(c.Server, schemaid, params)
+func (c *Client) GetSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSchemaRequest(c.Server, schemaid)
 	if err != nil {
 		return nil, err
 	}
@@ -590,8 +542,8 @@ func (c *Client) GetSchema(ctx context.Context, schemaid SchemaID, params *GetSc
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSchemaRequestWithBody(c.Server, schemaid, params, contentType, body)
+func (c *Client) UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSchemaRequestWithBody(c.Server, schemaid, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -602,8 +554,8 @@ func (c *Client) UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, pa
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateSchema(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSchemaRequest(c.Server, schemaid, params, body)
+func (c *Client) UpdateSchema(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSchemaRequest(c.Server, schemaid, body)
 	if err != nil {
 		return nil, err
 	}
@@ -614,8 +566,8 @@ func (c *Client) UpdateSchema(ctx context.Context, schemaid SchemaID, params *Up
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, params *DeleteSchemaFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSchemaFileRequest(c.Server, schemaid, filename, params)
+func (c *Client) DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSchemaFileRequest(c.Server, schemaid, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -626,8 +578,8 @@ func (c *Client) DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filena
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, params *GetSchemaFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSchemaFileRequest(c.Server, schemaid, filename, params)
+func (c *Client) GetSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSchemaFileRequest(c.Server, schemaid, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -638,8 +590,8 @@ func (c *Client) GetSchemaFile(ctx context.Context, schemaid SchemaID, filename 
 	return c.Client.Do(req)
 }
 
-func (c *Client) UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, filename FileName, params *UploadSchemaFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadSchemaFileRequestWithBody(c.Server, schemaid, filename, params, contentType, body)
+func (c *Client) UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSchemaFileRequestWithBody(c.Server, schemaid, filename, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -699,7 +651,7 @@ func (c *Client) DeleteSLOConfig(ctx context.Context, routekey RouteKey, params 
 }
 
 // NewListSchemasRequest generates requests for ListSchemas
-func NewListSchemasRequest(server string, params *ListSchemasParams) (*http.Request, error) {
+func NewListSchemasRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -722,35 +674,22 @@ func NewListSchemasRequest(server string, params *ListSchemasParams) (*http.Requ
 		return nil, err
 	}
 
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
-	}
-
 	return req, nil
 }
 
 // NewUploadSchemaRequest calls the generic UploadSchema builder with application/json body
-func NewUploadSchemaRequest(server string, params *UploadSchemaParams, body UploadSchemaJSONRequestBody) (*http.Request, error) {
+func NewUploadSchemaRequest(server string, body UploadSchemaJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUploadSchemaRequestWithBody(server, params, "application/json", bodyReader)
+	return NewUploadSchemaRequestWithBody(server, "application/json", bodyReader)
 }
 
 // NewUploadSchemaRequestWithBody generates requests for UploadSchema with any type of body
-func NewUploadSchemaRequestWithBody(server string, params *UploadSchemaParams, contentType string, body io.Reader) (*http.Request, error) {
+func NewUploadSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -775,24 +714,11 @@ func NewUploadSchemaRequestWithBody(server string, params *UploadSchemaParams, c
 
 	req.Header.Add("Content-Type", contentType)
 
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
-	}
-
 	return req, nil
 }
 
 // NewDeleteSchemaRequest generates requests for DeleteSchema
-func NewDeleteSchemaRequest(server string, schemaid SchemaID, params *DeleteSchemaParams) (*http.Request, error) {
+func NewDeleteSchemaRequest(server string, schemaid SchemaID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -820,26 +746,13 @@ func NewDeleteSchemaRequest(server string, schemaid SchemaID, params *DeleteSche
 	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
-	}
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
 	}
 
 	return req, nil
 }
 
 // NewGetSchemaRequest generates requests for GetSchema
-func NewGetSchemaRequest(server string, schemaid SchemaID, params *GetSchemaParams) (*http.Request, error) {
+func NewGetSchemaRequest(server string, schemaid SchemaID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -869,35 +782,22 @@ func NewGetSchemaRequest(server string, schemaid SchemaID, params *GetSchemaPara
 		return nil, err
 	}
 
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
-	}
-
 	return req, nil
 }
 
 // NewUpdateSchemaRequest calls the generic UpdateSchema builder with application/json body
-func NewUpdateSchemaRequest(server string, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody) (*http.Request, error) {
+func NewUpdateSchemaRequest(server string, schemaid SchemaID, body UpdateSchemaJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateSchemaRequestWithBody(server, schemaid, params, "application/json", bodyReader)
+	return NewUpdateSchemaRequestWithBody(server, schemaid, "application/json", bodyReader)
 }
 
 // NewUpdateSchemaRequestWithBody generates requests for UpdateSchema with any type of body
-func NewUpdateSchemaRequestWithBody(server string, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateSchemaRequestWithBody(server string, schemaid SchemaID, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -929,24 +829,11 @@ func NewUpdateSchemaRequestWithBody(server string, schemaid SchemaID, params *Up
 
 	req.Header.Add("Content-Type", contentType)
 
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
-	}
-
 	return req, nil
 }
 
 // NewDeleteSchemaFileRequest generates requests for DeleteSchemaFile
-func NewDeleteSchemaFileRequest(server string, schemaid SchemaID, filename FileName, params *DeleteSchemaFileParams) (*http.Request, error) {
+func NewDeleteSchemaFileRequest(server string, schemaid SchemaID, filename FileName) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -983,24 +870,11 @@ func NewDeleteSchemaFileRequest(server string, schemaid SchemaID, filename FileN
 		return nil, err
 	}
 
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
-	}
-
 	return req, nil
 }
 
 // NewGetSchemaFileRequest generates requests for GetSchemaFile
-func NewGetSchemaFileRequest(server string, schemaid SchemaID, filename FileName, params *GetSchemaFileParams) (*http.Request, error) {
+func NewGetSchemaFileRequest(server string, schemaid SchemaID, filename FileName) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1037,24 +911,11 @@ func NewGetSchemaFileRequest(server string, schemaid SchemaID, filename FileName
 		return nil, err
 	}
 
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
-	}
-
 	return req, nil
 }
 
 // NewUploadSchemaFileRequestWithBody generates requests for UploadSchemaFile with any type of body
-func NewUploadSchemaFileRequestWithBody(server string, schemaid SchemaID, filename FileName, params *UploadSchemaFileParams, contentType string, body io.Reader) (*http.Request, error) {
+func NewUploadSchemaFileRequestWithBody(server string, schemaid SchemaID, filename FileName, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1092,19 +953,6 @@ func NewUploadSchemaFileRequestWithBody(server string, schemaid SchemaID, filena
 	}
 
 	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("x-integration-id", headerParam0)
-
-	}
 
 	return req, nil
 }
@@ -1293,32 +1141,32 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// ListSchemasWithResponse request
-	ListSchemasWithResponse(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*ListSchemasResponse, error)
+	ListSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSchemasResponse, error)
 
 	// UploadSchemaWithBodyWithResponse request with any body
-	UploadSchemaWithBodyWithResponse(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
+	UploadSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
 
-	UploadSchemaWithResponse(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
+	UploadSchemaWithResponse(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
 
 	// DeleteSchemaWithResponse request
-	DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error)
+	DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error)
 
 	// GetSchemaWithResponse request
-	GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error)
+	GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error)
 
 	// UpdateSchemaWithBodyWithResponse request with any body
-	UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
+	UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
 
-	UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
+	UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
 
 	// DeleteSchemaFileWithResponse request
-	DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, params *DeleteSchemaFileParams, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error)
+	DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error)
 
 	// GetSchemaFileWithResponse request
-	GetSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, params *GetSchemaFileParams, reqEditors ...RequestEditorFn) (*GetSchemaFileResponse, error)
+	GetSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*GetSchemaFileResponse, error)
 
 	// UploadSchemaFileWithBodyWithResponse request with any body
-	UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, params *UploadSchemaFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error)
+	UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error)
 
 	// GetSLOConfigWithResponse request
 	GetSLOConfigWithResponse(ctx context.Context, params *GetSLOConfigParams, reqEditors ...RequestEditorFn) (*GetSLOConfigResponse, error)
@@ -1624,8 +1472,8 @@ func (r DeleteSLOConfigResponse) StatusCode() int {
 }
 
 // ListSchemasWithResponse request returning *ListSchemasResponse
-func (c *ClientWithResponses) ListSchemasWithResponse(ctx context.Context, params *ListSchemasParams, reqEditors ...RequestEditorFn) (*ListSchemasResponse, error) {
-	rsp, err := c.ListSchemas(ctx, params, reqEditors...)
+func (c *ClientWithResponses) ListSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSchemasResponse, error) {
+	rsp, err := c.ListSchemas(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1633,16 +1481,16 @@ func (c *ClientWithResponses) ListSchemasWithResponse(ctx context.Context, param
 }
 
 // UploadSchemaWithBodyWithResponse request with arbitrary body returning *UploadSchemaResponse
-func (c *ClientWithResponses) UploadSchemaWithBodyWithResponse(ctx context.Context, params *UploadSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
-	rsp, err := c.UploadSchemaWithBody(ctx, params, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UploadSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
+	rsp, err := c.UploadSchemaWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseUploadSchemaResponse(rsp)
 }
 
-func (c *ClientWithResponses) UploadSchemaWithResponse(ctx context.Context, params *UploadSchemaParams, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
-	rsp, err := c.UploadSchema(ctx, params, body, reqEditors...)
+func (c *ClientWithResponses) UploadSchemaWithResponse(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
+	rsp, err := c.UploadSchema(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1650,8 +1498,8 @@ func (c *ClientWithResponses) UploadSchemaWithResponse(ctx context.Context, para
 }
 
 // DeleteSchemaWithResponse request returning *DeleteSchemaResponse
-func (c *ClientWithResponses) DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *DeleteSchemaParams, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error) {
-	rsp, err := c.DeleteSchema(ctx, schemaid, params, reqEditors...)
+func (c *ClientWithResponses) DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error) {
+	rsp, err := c.DeleteSchema(ctx, schemaid, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1659,8 +1507,8 @@ func (c *ClientWithResponses) DeleteSchemaWithResponse(ctx context.Context, sche
 }
 
 // GetSchemaWithResponse request returning *GetSchemaResponse
-func (c *ClientWithResponses) GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *GetSchemaParams, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error) {
-	rsp, err := c.GetSchema(ctx, schemaid, params, reqEditors...)
+func (c *ClientWithResponses) GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error) {
+	rsp, err := c.GetSchema(ctx, schemaid, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1668,16 +1516,16 @@ func (c *ClientWithResponses) GetSchemaWithResponse(ctx context.Context, schemai
 }
 
 // UpdateSchemaWithBodyWithResponse request with arbitrary body returning *UpdateSchemaResponse
-func (c *ClientWithResponses) UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
-	rsp, err := c.UpdateSchemaWithBody(ctx, schemaid, params, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
+	rsp, err := c.UpdateSchemaWithBody(ctx, schemaid, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseUpdateSchemaResponse(rsp)
 }
 
-func (c *ClientWithResponses) UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, params *UpdateSchemaParams, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
-	rsp, err := c.UpdateSchema(ctx, schemaid, params, body, reqEditors...)
+func (c *ClientWithResponses) UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
+	rsp, err := c.UpdateSchema(ctx, schemaid, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1685,8 +1533,8 @@ func (c *ClientWithResponses) UpdateSchemaWithResponse(ctx context.Context, sche
 }
 
 // DeleteSchemaFileWithResponse request returning *DeleteSchemaFileResponse
-func (c *ClientWithResponses) DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, params *DeleteSchemaFileParams, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error) {
-	rsp, err := c.DeleteSchemaFile(ctx, schemaid, filename, params, reqEditors...)
+func (c *ClientWithResponses) DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error) {
+	rsp, err := c.DeleteSchemaFile(ctx, schemaid, filename, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1694,8 +1542,8 @@ func (c *ClientWithResponses) DeleteSchemaFileWithResponse(ctx context.Context, 
 }
 
 // GetSchemaFileWithResponse request returning *GetSchemaFileResponse
-func (c *ClientWithResponses) GetSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, params *GetSchemaFileParams, reqEditors ...RequestEditorFn) (*GetSchemaFileResponse, error) {
-	rsp, err := c.GetSchemaFile(ctx, schemaid, filename, params, reqEditors...)
+func (c *ClientWithResponses) GetSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*GetSchemaFileResponse, error) {
+	rsp, err := c.GetSchemaFile(ctx, schemaid, filename, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1703,8 +1551,8 @@ func (c *ClientWithResponses) GetSchemaFileWithResponse(ctx context.Context, sch
 }
 
 // UploadSchemaFileWithBodyWithResponse request with arbitrary body returning *UploadSchemaFileResponse
-func (c *ClientWithResponses) UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, params *UploadSchemaFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error) {
-	rsp, err := c.UploadSchemaFileWithBody(ctx, schemaid, filename, params, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error) {
+	rsp, err := c.UploadSchemaFileWithBody(ctx, schemaid, filename, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2379,28 +2227,28 @@ func ParseDeleteSLOConfigResponse(rsp *http.Response) (*DeleteSLOConfigResponse,
 type ServerInterface interface {
 	// List request schemas
 	// (GET /request-schemas)
-	ListSchemas(w http.ResponseWriter, r *http.Request, params ListSchemasParams)
+	ListSchemas(w http.ResponseWriter, r *http.Request)
 	// Create Schema
 	// (POST /request-schemas)
-	UploadSchema(w http.ResponseWriter, r *http.Request, params UploadSchemaParams)
+	UploadSchema(w http.ResponseWriter, r *http.Request)
 	// Delete Schema
 	// (DELETE /request-schemas/{schemaid})
-	DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params DeleteSchemaParams)
+	DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
 	// Get Schema
 	// (GET /request-schemas/{schemaid})
-	GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params GetSchemaParams)
+	GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
 	// Update Schema
 	// (PUT /request-schemas/{schemaid})
-	UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params UpdateSchemaParams)
+	UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
 	// Delete Schema File
 	// (DELETE /request-schemas/{schemaid}/file/{filename})
-	DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params DeleteSchemaFileParams)
+	DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName)
 	// Get Schema File
 	// (GET /request-schemas/{schemaid}/file/{filename})
-	GetSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params GetSchemaFileParams)
+	GetSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName)
 	// Upload Schema File
 	// (PUT /request-schemas/{schemaid}/file/{filename})
-	UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params UploadSchemaFileParams)
+	UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName)
 	// List SLO definitions
 	// (GET /slo-definitions)
 	GetSLOConfig(w http.ResponseWriter, r *http.Request, params GetSLOConfigParams)
@@ -2424,44 +2272,14 @@ type MiddlewareFunc func(http.Handler) http.Handler
 // ListSchemas operation middleware
 func (siw *ServerInterfaceWrapper) ListSchemas(w http.ResponseWriter, r *http.Request) {
 
-	var err error
-
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListSchemasParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListSchemas(w, r, params)
+		siw.Handler.ListSchemas(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2474,44 +2292,14 @@ func (siw *ServerInterfaceWrapper) ListSchemas(w http.ResponseWriter, r *http.Re
 // UploadSchema operation middleware
 func (siw *ServerInterfaceWrapper) UploadSchema(w http.ResponseWriter, r *http.Request) {
 
-	var err error
-
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params UploadSchemaParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UploadSchema(w, r, params)
+		siw.Handler.UploadSchema(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2541,36 +2329,8 @@ func (siw *ServerInterfaceWrapper) DeleteSchema(w http.ResponseWriter, r *http.R
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params DeleteSchemaParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSchema(w, r, schemaid, params)
+		siw.Handler.DeleteSchema(w, r, schemaid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2600,36 +2360,8 @@ func (siw *ServerInterfaceWrapper) GetSchema(w http.ResponseWriter, r *http.Requ
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetSchemaParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSchema(w, r, schemaid, params)
+		siw.Handler.GetSchema(w, r, schemaid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2659,36 +2391,8 @@ func (siw *ServerInterfaceWrapper) UpdateSchema(w http.ResponseWriter, r *http.R
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params UpdateSchemaParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateSchema(w, r, schemaid, params)
+		siw.Handler.UpdateSchema(w, r, schemaid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2727,36 +2431,8 @@ func (siw *ServerInterfaceWrapper) DeleteSchemaFile(w http.ResponseWriter, r *ht
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params DeleteSchemaFileParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSchemaFile(w, r, schemaid, filename, params)
+		siw.Handler.DeleteSchemaFile(w, r, schemaid, filename)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2795,36 +2471,8 @@ func (siw *ServerInterfaceWrapper) GetSchemaFile(w http.ResponseWriter, r *http.
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetSchemaFileParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSchemaFile(w, r, schemaid, filename, params)
+		siw.Handler.GetSchemaFile(w, r, schemaid, filename)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2863,36 +2511,8 @@ func (siw *ServerInterfaceWrapper) UploadSchemaFile(w http.ResponseWriter, r *ht
 
 	r = r.WithContext(ctx)
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params UploadSchemaFileParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "x-integration-id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
-		var XIntegrationId IntegrationID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
-			return
-		}
-
-		params.XIntegrationId = XIntegrationId
-
-	} else {
-		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UploadSchemaFile(w, r, schemaid, filename, params)
+		siw.Handler.UploadSchemaFile(w, r, schemaid, filename)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

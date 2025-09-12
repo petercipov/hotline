@@ -18,35 +18,35 @@ type HttpHandler struct {
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func (h *HttpHandler) UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params UploadSchemaFileParams) {
+func (h *HttpHandler) ListSchemas(w http.ResponseWriter, r *http.Request) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params DeleteSchemaFileParams) {
+func (h *HttpHandler) UploadSchema(w http.ResponseWriter, r *http.Request) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) GetSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName, params GetSchemaFileParams) {
+func (h *HttpHandler) DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) ListSchemas(w http.ResponseWriter, r *http.Request, params ListSchemasParams) {
+func (h *HttpHandler) GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params DeleteSchemaParams) {
+func (h *HttpHandler) UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params GetSchemaParams) {
+func (h *HttpHandler) DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params UpdateSchemaParams) {
+func (h *HttpHandler) GetSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) UploadSchema(w http.ResponseWriter, r *http.Request, params UploadSchemaParams) {
+func (h *HttpHandler) UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName) {
 	panic("implement me")
 }
 

@@ -12,6 +12,9 @@ type Validator struct {
 	requestHeaders *jsonschema.Schema
 	requestQuery   *jsonschema.Schema
 	requestBody    *jsonschema.Schema
+
+	responseHeaders *jsonschema.Schema
+	responseBody    *jsonschema.Schema
 }
 
 type Schema struct {
@@ -19,6 +22,9 @@ type Schema struct {
 	RequestHeaders io.Reader
 	RequestQuery   io.Reader
 	RequestBody    io.Reader
+
+	ResponseHeaders io.Reader
+	ResponseBody    io.Reader
 }
 
 func NewRequestValidator(definitions Schema) (*Validator, error) {
@@ -51,6 +57,24 @@ func NewRequestValidator(definitions Schema) (*Validator, error) {
 			return nil, err
 		}
 		validator.requestBody = bodySchema
+	}
+
+	if definitions.ResponseHeaders != nil {
+		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/response-headers.json", definitions.ID)
+		headersSchema, err := parse(c, url, definitions.ResponseHeaders)
+		if err != nil {
+			return nil, err
+		}
+		validator.responseHeaders = headersSchema
+	}
+
+	if definitions.ResponseBody != nil {
+		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/response-body.json", definitions.ID)
+		bodySchema, err := parse(c, url, definitions.ResponseBody)
+		if err != nil {
+			return nil, err
+		}
+		validator.responseBody = bodySchema
 	}
 
 	return validator, nil
@@ -110,6 +134,31 @@ func (v *Validator) ValidateBody(bodyReader io.Reader) error {
 		}
 
 		validationErr := v.requestBody.Validate(bodyMap)
+		if validationErr != nil {
+			return validationErr
+		}
+	}
+	return nil
+}
+
+func (v *Validator) ValidateResponseHeaders(headers map[string][]string) error {
+	if v.responseHeaders != nil {
+		validationErr := v.responseHeaders.Validate(castToAny(headers))
+		if validationErr != nil {
+			return validationErr
+		}
+	}
+	return nil
+}
+
+func (v *Validator) ValidateResponseBody(bodyReader io.Reader) error {
+	if v.responseBody != nil {
+		bodyMap, readErr := jsonschema.UnmarshalJSON(bodyReader)
+		if readErr != nil {
+			return readErr
+		}
+
+		validationErr := v.responseBody.Validate(bodyMap)
 		if validationErr != nil {
 			return validationErr
 		}

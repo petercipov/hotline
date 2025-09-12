@@ -12,7 +12,7 @@ info:
     url: https://www.petercipov.com/
 
 servers:
-  - url: /api/v1/
+  - url: /api/v1
 
 security:
   - bearerAuth: []
@@ -25,8 +25,6 @@ paths:
       operationId: listSchemas
       tags:
         - Request Schemas
-      parameters:
-        - $ref: '#/components/parameters/IntegrationID'
       responses:
         '200':
           description: List of defined SLOs
@@ -50,8 +48,6 @@ paths:
       operationId: uploadSchema
       tags:
         - Request Schemas
-      parameters:
-        - $ref: '#/components/parameters/IntegrationID'
       requestBody:
         description: Schema definition
         required: true
@@ -87,7 +83,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/IntegrationID'
       requestBody:
         description: Schema definition
         required: true
@@ -121,7 +116,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/IntegrationID'
 
       responses:
         '200':
@@ -149,7 +143,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/IntegrationID'
       responses:
         '204':
           description: Request schema deleted successfully
@@ -173,7 +166,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/IntegrationID'
         - $ref: '#/components/parameters/FileName'
       responses:
         '200':
@@ -200,7 +192,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/IntegrationID'
         - $ref: '#/components/parameters/FileName'
       responses:
         '204':
@@ -223,7 +214,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/IntegrationID'
         - $ref: '#/components/parameters/FileName'
       requestBody:
         description: Schema definition

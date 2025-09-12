@@ -167,6 +167,94 @@ var _ = Describe("Request Validator", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("invalid character 'i' looking for beginning of value"))
 		})
 	})
+
+	Context("for defined response header validator", func() {
+		sut := validatorSut{}
+		It("should validate headers", func() {
+			sut.forValidatorWithResponseHeaders()
+			err := sut.validateResponse()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should fail to build validator for invalid json schema", func() {
+			err := sut.forValidatorWithInvalidHeaderResponseSchema("invalid schema")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should validate headers with errors", func() {
+			sut.forValidatorWithHeadersResponseSchema(`
+				{
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"type": "object",
+					"properties": {
+						"Required-Header": {
+							"type": "array",
+							"minItems": 0,
+							"maxItems": 0,
+							"items": {
+								"type": "string"
+							}
+						}
+					},
+					"required": ["Required-Header"]
+				}
+			`)
+			err := sut.validateResponse()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(
+				`jsonschema validation failed with 'https://local-server/api/v1/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/response-headers.json#'
+- at '': missing property 'Required-Header'`))
+		})
+
+	})
+
+	Context("for defined response body validator", func() {
+		sut := validatorSut{}
+		It("should validate body", func() {
+			sut.forValidatorWithResponseBody()
+			err := sut.validateResponse()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should validate body schema", func() {
+			sut.forValidatorWithReponseBodySchema(`{
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"type": "object",
+				"properties": {
+					"productID": {
+						"type": "string",
+						"pattern": "^P[0-9]{5}$"
+					},
+					"currency": {
+						"type": "string",
+						"enum": ["EUR", "GBP"]
+					}
+				},
+				"required": ["productID"]
+			}`)
+			err := sut.validateResponse()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`jsonschema validation failed with 'https://local-server/api/v1/request-schemas/SCx3zt0ygAcQGBAQEBAQEBAQ/files/response-body.json#'
+- at '/currency': value must be one of 'EUR', 'GBP'`))
+		})
+
+		It("should fail to build validator for invalid json schema", func() {
+			err := sut.forValidatorWithInvalidResponseBodySchema("invalid schema")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should fail to build validator for valid json but invalid json schema", func() {
+			err := sut.forValidatorWithInvalidResponseBodySchema(`{ "$schema": 1234 }`)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should validate invalid body", func() {
+			sut.forValidatorWithResponseBody()
+			err := sut.validateInvalidJSONBodyResponse()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid character 'i' looking for beginning of value"))
+		})
+	})
 })
 
 type validatorSut struct {
@@ -358,4 +446,125 @@ func (s *validatorSut) forValidatorWithBodySchema(schema string) {
 
 	Expect(err).ToNot(HaveOccurred())
 	s.validator = validator
+}
+
+func (s *validatorSut) forValidatorWithResponseHeaders() {
+	s.forValidatorWithHeadersResponseSchema(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"Content-Type": {
+				"type": "array",
+				"minItems": 1,
+				"maxItems": 1,
+				"items": {
+					"type": "string"
+				}
+			}
+		},
+		"required": ["Content-Type"]
+	}`)
+}
+
+func (s *validatorSut) forValidatorWithHeadersResponseSchema(schema string) {
+	validator, err := buildValidator(schemas.Schema{
+		ResponseHeaders: strings.NewReader(schema),
+	})
+
+	Expect(err).ToNot(HaveOccurred())
+	s.validator = validator
+}
+
+func (s *validatorSut) validateResponse() error {
+	headerErr := s.validator.ValidateResponseHeaders(map[string][]string{
+		"Content-Type": {"application/json"},
+	})
+	if headerErr != nil {
+		return headerErr
+	}
+
+	respErr := s.validator.ValidateResponseBody(strings.NewReader(`{
+		"productID": "P12345",
+		"title": "Hotline",
+		"price": 59.99,
+		"currency": "USD"
+	}`))
+	if respErr != nil {
+		return respErr
+	}
+	return nil
+}
+
+func (s *validatorSut) forValidatorWithInvalidHeaderResponseSchema(schema string) error {
+	_, err := buildValidator(schemas.Schema{
+		ResponseHeaders: strings.NewReader(schema),
+	})
+
+	Expect(err).To(HaveOccurred())
+	return err
+}
+
+func (s *validatorSut) forValidatorWithResponseBody() {
+	s.forValidatorWithReponseBodySchema(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"productID": {
+				"type": "string",
+				"pattern": "^P[0-9]{5}$"
+			},
+			"title": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 100
+			},
+			"price": {
+				"type": "number",
+				"minimum": 0
+			},
+			"currency": {
+				"type": "string",
+				"enum": ["USD", "EUR", "GBP"]
+			}
+		},
+		"required": ["productID"]
+	}`)
+}
+
+func (s *validatorSut) forValidatorWithReponseBodySchema(schema string) {
+	validator, err := buildValidator(schemas.Schema{
+		ResponseBody: strings.NewReader(schema),
+	})
+
+	Expect(err).NotTo(HaveOccurred())
+	Expect(validator).NotTo(BeNil())
+	s.validator = validator
+}
+
+func (s *validatorSut) forValidatorWithInvalidResponseBodySchema(schema string) error {
+	_, err := buildValidator(schemas.Schema{
+		ResponseBody: strings.NewReader(schema),
+	})
+
+	Expect(err).To(HaveOccurred())
+	return err
+}
+
+func (s *validatorSut) validateInvalidJSONBodyResponse() error {
+	return s.validateResponseWithBody("invalid json body")
+}
+
+func (s *validatorSut) validateResponseWithBody(bodyString string) error {
+	headerErr := s.validator.ValidateResponseHeaders(map[string][]string{
+		"Content-Type": {"application/json"},
+	})
+	if headerErr != nil {
+		return headerErr
+	}
+
+	bodyErr := s.validator.ValidateResponseBody(strings.NewReader(bodyString))
+	if bodyErr != nil {
+		return bodyErr
+	}
+	return nil
 }
