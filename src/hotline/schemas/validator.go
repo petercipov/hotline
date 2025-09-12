@@ -169,6 +169,8 @@ func (v *Validator) ValidateResponseBody(bodyReader io.Reader) error {
 type nopLoader struct {
 }
 
+var ErrRemoteSchemaNotSupported = errors.New("do not support loading schemas from remote sources")
+
 func (l *nopLoader) Load(_ string) (any, error) {
-	return nil, errors.New("do not support loading schemas from remote sources")
+	return nil, ErrRemoteSchemaNotSupported
 }

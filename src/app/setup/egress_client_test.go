@@ -2,6 +2,7 @@ package setup_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -25,6 +26,8 @@ func NewEgressClient(proxyURl *url.URL, seed int64) *EgressClient {
 	}
 }
 
+var errInvalidRequest = errors.New("invalid request")
+
 func (s *EgressClient) SendTraffic(integrationID string, targetURL string) (int, error) {
 	switch s.rand.Intn(3) {
 	case 0:
@@ -34,7 +37,7 @@ func (s *EgressClient) SendTraffic(integrationID string, targetURL string) (int,
 	case 2:
 		return s.SendDelete(integrationID, s.rand.Int31(), targetURL)
 	default:
-		return 0, fmt.Errorf("invalid request")
+		return 0, errInvalidRequest
 	}
 }
 

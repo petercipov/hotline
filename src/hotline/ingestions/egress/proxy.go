@@ -121,9 +121,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.ingestion(ingestedRequest)
 }
 
+var errIntegrationNotFound = errors.New("integration id not found")
+
 func parseIntegrationID(headerValue string) (integrations.ID, error) {
 	if len(headerValue) == 0 {
-		return "", errors.New("integration id not found")
+		return "", errIntegrationNotFound
 	}
 	return integrations.ID(headerValue), nil
 }

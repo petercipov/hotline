@@ -16,11 +16,13 @@ const P999 = Percentile(0.999)
 
 type Percentile float64
 
+var ErrPercentileOutOfRange = errors.New("value out of range >0 and <=100")
+
 func ParsePercentile(value float64) (Percentile, error) {
 	if value > 0 && value <= 100.0 {
 		return Percentile(value / 100.0), nil
 	}
-	return Percentile(0), errors.New("value out of range >0 and <=100")
+	return Percentile(0), ErrPercentileOutOfRange
 }
 
 func ParsePercentileFromValue(value string) (Percentile, error) {

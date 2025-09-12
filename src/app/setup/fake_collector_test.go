@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -141,7 +143,9 @@ func uncompressedGzip(reader io.Reader) ([]byte, error) {
 	return uncompressed.Bytes(), nil
 }
 
-func (c *fakeCollector) ExpectCollectorMetrics(ctx context.Context, expectedTable *godog.Table) (context.Context, error) {
+var errMetricsNotEqual = errors.New("metrics are not equal")
+
+func (c *fakeCollector) ExpectCollectorMetrics(ctx context.Context, t *testing.T, expectedTable *godog.Table) (context.Context, error) {
 	header := make(map[string]int)
 	for i, headerCell := range expectedTable.Rows[0].Cells {
 		header[headerCell.Value] = i
@@ -196,8 +200,6 @@ func (c *fakeCollector) ExpectCollectorMetrics(ctx context.Context, expectedTabl
 		if count < 100 {
 			time.Sleep(5 * time.Millisecond)
 		} else {
-			e := &errorT{}
-
 			slices.SortFunc(receivedMettrics, func(a, b ExpectedMetric) int {
 				typeCmp := strings.Compare(a.Type, b.Type)
 				if typeCmp == 0 {
@@ -214,18 +216,12 @@ func (c *fakeCollector) ExpectCollectorMetrics(ctx context.Context, expectedTabl
 			// 	 fmt.Printf("# %s %s %s %.3f %s %s\n", metric.Timestamp, metric.Name, metric.Type, metric.Value, metric.Unit, metric.KeyVals.String())
 			// }
 
-			assert.Equal(e, expectedMetrics, receivedMettrics, "Metrics are not equal")
-			return ctx, e.err
+			if !assert.Equal(t, expectedMetrics, receivedMettrics, "Metrics are not equal") {
+				return ctx, errMetricsNotEqual
+			}
+			return ctx, nil
 		}
 	}
-}
-
-type errorT struct {
-	err error
-}
-
-func (e *errorT) Errorf(format string, args ...interface{}) {
-	e.err = fmt.Errorf(format, args...)
 }
 
 type ExpectedMetric struct {

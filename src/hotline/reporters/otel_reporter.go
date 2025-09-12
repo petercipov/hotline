@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	http2 "hotline/http"
 	"hotline/servicelevels"
@@ -57,6 +58,8 @@ func NewOtelReporter(cfg *OtelReporterConfig, client *http.Client, gzipWriter *g
 		gzipWriter:   gzipWriter,
 	}
 }
+
+var ErrOtelUnexpectedStatus = errors.New("otel server returned unexpected status code")
 
 func (o *OtelReporter) ReportChecks(ctx context.Context, report *servicelevels.CheckReport) error {
 	var allMetrics []*metricspb.Metric
@@ -112,7 +115,7 @@ func (o *OtelReporter) ReportChecks(ctx context.Context, report *servicelevels.C
 	if sc := response.StatusCode; sc >= 200 && sc <= 299 {
 		return nil
 	}
-	return fmt.Errorf("received unexpected status code: %d for req %s %s", response.StatusCode, postReq.Method, postReq.URL.String())
+	return fmt.Errorf("%w code: %d for req %s %s", ErrOtelUnexpectedStatus, response.StatusCode, postReq.Method, postReq.URL.String())
 }
 
 func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {

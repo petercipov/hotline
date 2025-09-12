@@ -118,11 +118,13 @@ func (s *retrySUT) sendSuceessRequest() (*http.Response, error) {
 	return s.rountripper.RoundTrip(req)
 }
 
+var errNetwork = errors.New("network failure")
+
 func (s *retrySUT) sendNetworkFailureRequest() error {
 	req, reqErr := http.NewRequest("GET", "http://example.com", bytes.NewReader([]byte("some content")))
 	Expect(reqErr).NotTo(HaveOccurred())
 
-	s.responder.SendError(errors.New("network failure"))
+	s.responder.SendError(errNetwork)
 	resp, respErr := s.rountripper.RoundTrip(req)
 	if respErr == nil {
 		_ = resp.Body.Close()

@@ -235,8 +235,10 @@ func (t *failingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 
 type failingReader struct{}
 
+var errSome = errors.New("some error")
+
 func (r *failingReader) Read(_ []byte) (int, error) {
-	return 0, errors.New("some error")
+	return 0, errSome
 }
 
 type constantRandReader struct {

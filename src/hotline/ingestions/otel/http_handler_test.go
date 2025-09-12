@@ -439,8 +439,10 @@ func newUrl(s string) *url.URL {
 
 type fakeErrReader int
 
+var errTest = errors.New("test error")
+
 func (fakeErrReader) Read(_ []byte) (n int, err error) {
-	return 0, errors.New("test error")
+	return 0, errTest
 }
 
 func remove(l []*commonpb.KeyValue, name string) []*commonpb.KeyValue {

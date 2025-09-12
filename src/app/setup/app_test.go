@@ -20,6 +20,8 @@ import (
 )
 
 type appSut struct {
+	t *testing.T
+
 	cfg          setup.Config
 	app          *setup.App
 	managedClock *clock.ManualClock
@@ -37,7 +39,7 @@ type appSut struct {
 	fakeSLOConfigRepository *config.InMemorySLODefinitions
 }
 
-func newAppSut() *appSut {
+func newAppSut(t *testing.T) *appSut {
 	manualClock := clock.NewManualClock(
 		clock.ParseTime("2025-02-22T12:02:10Z"),
 		500*time.Microsecond)
@@ -45,6 +47,7 @@ func newAppSut() *appSut {
 	target := newFakeEgressTarget(manualClock, 1234)
 	fakeSLOConfigRepository := config.NewInMemorySLODefinitions()
 	return &appSut{
+		t:                       t,
 		fakeCollector:           collector,
 		fakeEgressTarget:        target,
 		fakeSLOConfigRepository: fakeSLOConfigRepository,
@@ -82,6 +85,8 @@ func (a *appSut) sendEgressTraffic(ctx context.Context, integrationID string) (c
 	return ctx, nil
 }
 
+var errUnexpectedResponse = errors.New("unexpected response")
+
 func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
 	routeRaws := strings.Split(configRaw, "|||")
 
@@ -110,12 +115,14 @@ func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, 
 		}
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-			return ctx, fmt.Errorf("unexpected response for slo upsert: %d", resp.StatusCode)
+			return ctx, fmt.Errorf("%w slo upsert: %d", errUnexpectedResponse, resp.StatusCode)
 		}
 	}
 
 	return ctx, nil
 }
+
+var errConfigDoNotMatch = errors.New("configs do not match")
 
 func (a *appSut) checkSLOConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
 	routeRaws := strings.Split(configRaw, "|||")
@@ -142,14 +149,14 @@ func (a *appSut) checkSLOConfiguration(ctx context.Context, integrationID string
 
 	var routes []config.RouteServiceLevels
 	if resp.StatusCode() != 200 && resp.StatusCode() != 404 {
-		return ctx, errors.New(fmt.Sprint("unexpected status code: ", resp.StatusCode()))
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, resp.StatusCode())
 	}
 	if resp.JSON200 != nil {
 		routes = resp.JSON200.Routes
 	}
 
 	if len(routes) != len(routesExpected) {
-		return ctx, errors.New(fmt.Sprint("expected ", len(routesExpected), " routes, got ", len(routes)))
+		return ctx, fmt.Errorf("%w expected %d  routes, got %d", errUnexpectedResponse, len(routesExpected), len(routes))
 	}
 
 	for i, routeExpected := range routesExpected {
@@ -159,10 +166,8 @@ func (a *appSut) checkSLOConfiguration(ctx context.Context, integrationID string
 			return ctx, unmarshalErr
 		}
 
-		e := &errorT{}
-		assert.Equal(e, reqObj, routes[i], "request route at index ", i, " is not equal to expected route")
-		if e.err != nil {
-			return ctx, e.err
+		if !assert.Equal(a.t, reqObj, routes[i], "request route at index ", i, " is not equal to expected route") {
+			return ctx, errConfigDoNotMatch
 		}
 	}
 
@@ -187,7 +192,7 @@ func (a *appSut) deleteSLOConfiguration(ctx context.Context, integrationID strin
 	_ = resp.Body.Close()
 
 	if resp.StatusCode != 204 {
-		return ctx, errors.New(fmt.Sprint("unexpected status code: ", resp.StatusCode))
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, resp.StatusCode)
 	}
 
 	return ctx, nil
@@ -210,7 +215,7 @@ func (a *appSut) sendOTELTraffic(ctx context.Context, flavour string, integratio
 	}
 
 	if statusCode != http.StatusCreated {
-		return ctx, errors.New(fmt.Sprint("unexpected status code: ", statusCode))
+		return ctx, fmt.Errorf("%w unexpected status code: %d", errUnexpectedResponse, statusCode)
 	}
 
 	nowString := now.UTC().String()
@@ -282,13 +287,13 @@ func (a *appSut) shutdownHotline() error {
 }
 
 func (a *appSut) sloMetricsAreReceivedInCollector(ctx context.Context, metrics *godog.Table) (context.Context, error) {
-	return a.fakeCollector.ExpectCollectorMetrics(ctx, metrics)
+	return a.fakeCollector.ExpectCollectorMetrics(ctx, a.t, metrics)
 }
 
 func TestApp(t *testing.T) {
 	suite := godog.TestSuite{
 		ScenarioInitializer: func(sctx *godog.ScenarioContext) {
-			sut := newAppSut()
+			sut := newAppSut(t)
 			sctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 				closeErr := sut.shutdownHotline()
 				if closeErr != nil {

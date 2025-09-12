@@ -18,8 +18,14 @@ linters:
     - revive
     - bidichk
     - bodyclose
-    - canonicalheader
     - containedctx
+    - copyloopvar
+    - errorlint
+    - errname
+    - err113
+    - errchkjson
+    - errname
+    - errorlint
   settings:
     revive:
       rules:

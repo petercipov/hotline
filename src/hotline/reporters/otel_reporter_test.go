@@ -372,9 +372,11 @@ func simpleSLOCheck() []servicelevels.Check {
 	}
 }
 
+var errUnexpected = errors.New("unexpected")
+
 func (r *otelReporterSUT) sendUnmarshalableMessage() error {
 	r.marshalFunc = func(message proto.Message) ([]byte, error) {
-		return nil, errors.New("unexpected")
+		return nil, errUnexpected
 	}
 
 	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
@@ -409,11 +411,13 @@ func (r *otelReporterSUT) sendMessageWithNetworkFailure() error {
 	return reportErr
 }
 
+var errOtelNetwork = errors.New("failing due to network")
+
 type failingTransport struct {
 }
 
-func (t *failingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return nil, errors.New("failing due to network")
+func (t *failingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
+	return nil, errOtelNetwork
 }
 
 func uncompressGzip(reader io.Reader) ([]byte, error) {
