@@ -132,7 +132,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 			attributes = append(attributes, StringAttribute(key, val))
 		}
 
-		metricID := fmt.Sprintf("service_levels_%s", slo.Namespace)
+		metricID := "service_levels_" + slo.Namespace
 		metricIDEvents := metricID + "_events"
 
 		metrics = append(metrics, &metricspb.Metric{

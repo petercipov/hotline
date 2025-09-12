@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
-	"fmt"
 	"hotline/clock"
 	"io"
 	"math"
@@ -62,7 +61,7 @@ func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 							if isBool {
 								atts = append(atts, KeyVal{
 									Key:   att.Key,
-									Value: fmt.Sprintf("%t", att.Value.GetBoolValue()),
+									Value: strconv.FormatBool(att.Value.GetBoolValue()),
 								})
 							} else {
 								atts = append(atts, KeyVal{
@@ -94,7 +93,7 @@ func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 							if isBool {
 								atts = append(atts, KeyVal{
 									Key:   att.Key,
-									Value: fmt.Sprintf("%t", att.Value.GetBoolValue()),
+									Value: strconv.FormatBool(att.Value.GetBoolValue()),
 								})
 							} else {
 								atts = append(atts, KeyVal{

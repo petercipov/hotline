@@ -35,6 +35,7 @@ linters:
     - nilnesserr
     - nilnil
     - noctx
+    - perfsprint
   settings:
     gosec:
       excludes:

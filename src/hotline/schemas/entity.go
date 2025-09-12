@@ -1,7 +1,6 @@
 package schemas
 
 import (
-	"fmt"
 	"hotline/uuid"
 	"time"
 )
@@ -16,6 +15,6 @@ func NewIDGenerator(generator uuid.V7StringGenerator) IDGenerator {
 		if err != nil {
 			return "", err
 		}
-		return ID(fmt.Sprintf("SC%s", v7Str)), nil
+		return ID("SC" + v7Str), nil
 	}
 }
