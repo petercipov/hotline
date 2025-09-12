@@ -19,8 +19,8 @@ type Metric struct {
 
 type Operation string
 
-var OperationGE Operation = ">="
-var OperationL Operation = "<"
+const OperationGE = Operation(">=")
+const OperationL = Operation("<")
 
 type SLOBreach struct {
 	ThresholdValue float64

@@ -177,10 +177,12 @@ type otelSut struct {
 	server   *httptest.Server
 	handler  *TracesHandler
 	requests []*ingestions.HttpRequest
+	names    AttributeNames
 }
 
 func (s *otelSut) forHttpIngestion() {
 	s.requests = nil
+	s.names = StandardMappingNames()
 	converter := NewProtoConverter()
 	s.handler = NewTracesHandler(func(requests []*ingestions.HttpRequest) {
 		s.requests = append(s.requests, requests...)
@@ -240,6 +242,7 @@ func (s *otelSut) requestWitMultiResourceMultipleSpans(resourceCount int, traceC
 }
 
 func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount int, traceCount int, modifier func(span *tracepb.Span)) {
+
 	var resourceSpans []*tracepb.ResourceSpans
 	for ri := 0; ri < resourceCount; ri++ {
 		var spans []*tracepb.Span
@@ -255,19 +258,19 @@ func (s *otelSut) requestWitMultiResourceMultipleSpansWithModifier(resourceCount
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []*commonpb.KeyValue{
 					{
-						Key:   StandardMappingNames.HttpRequestMethod,
+						Key:   s.names.HttpRequestMethod,
 						Value: stringValue("POST"),
 					},
 					{
-						Key:   StandardMappingNames.NetworkProtocolVersion,
+						Key:   s.names.NetworkProtocolVersion,
 						Value: stringValue("1.1"),
 					},
 					{
-						Key:   StandardMappingNames.UrlFull,
+						Key:   s.names.UrlFull,
 						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key:   StandardMappingNames.HttpStatusCode,
+						Key:   s.names.HttpStatusCode,
 						Value: stringValue("200"),
 					},
 				},
@@ -302,7 +305,7 @@ func stringValue(value string) *commonpb.AnyValue {
 func (s *otelSut) requestWithSimpleTraceWithIntegrationID(integrationID string) {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   StandardMappingNames.IntegrationID,
+			Key:   s.names.IntegrationID,
 			Value: stringValue(integrationID),
 		})
 	})
@@ -334,9 +337,9 @@ func (s *otelSut) requestWithSimpleServerSpan() {
 
 func (s *otelSut) requestWithErrorType(errorType string) {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, StandardMappingNames.HttpStatusCode)
+		span.Attributes = remove(span.Attributes, s.names.HttpStatusCode)
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   StandardMappingNames.ErrorType,
+			Key:   s.names.ErrorType,
 			Value: stringValue(errorType),
 		})
 	})
@@ -347,19 +350,19 @@ func (s *otelSut) requestWithMinimalTrace() {
 		span.Kind = tracepb.Span_SPAN_KIND_CLIENT
 		span.Attributes = []*commonpb.KeyValue{
 			{
-				Key:   StandardMappingNames.HttpRequestMethod,
+				Key:   s.names.HttpRequestMethod,
 				Value: stringValue("GET"),
 			},
 			{
-				Key:   StandardMappingNames.HttpStatusCode,
+				Key:   s.names.HttpStatusCode,
 				Value: stringValue("200"),
 			},
 			{
-				Key:   StandardMappingNames.UrlFull,
+				Key:   s.names.UrlFull,
 				Value: stringValue("https://integration.com/order/123?param1=value1"),
 			},
 			{
-				Key:   StandardMappingNames.CorrelationID,
+				Key:   s.names.CorrelationID,
 				Value: stringValue("req-id-value"),
 			},
 		}
@@ -369,15 +372,15 @@ func (s *otelSut) requestWithMinimalTrace() {
 		span.Kind = tracepb.Span_SPAN_KIND_CLIENT
 		span.Attributes = []*commonpb.KeyValue{
 			{
-				Key:   StandardMappingNames.HttpRequestMethod,
+				Key:   s.names.HttpRequestMethod,
 				Value: stringValue("POST"),
 			},
 			{
-				Key:   StandardMappingNames.ErrorType,
+				Key:   s.names.ErrorType,
 				Value: stringValue("timeout"),
 			},
 			{
-				Key:   StandardMappingNames.UrlFull,
+				Key:   s.names.UrlFull,
 				Value: stringValue("https://integration.com/order/123?param1=value1"),
 			},
 		}
@@ -386,21 +389,21 @@ func (s *otelSut) requestWithMinimalTrace() {
 
 func (s *otelSut) requestWithoutHttpMethod() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, StandardMappingNames.HttpRequestMethod)
+		span.Attributes = remove(span.Attributes, s.names.HttpRequestMethod)
 	})
 }
 
 func (s *otelSut) requestWithoutFullUrl() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, StandardMappingNames.UrlFull)
+		span.Attributes = remove(span.Attributes, s.names.UrlFull)
 	})
 }
 
 func (s *otelSut) requestWithUnparseableFullUrl() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, StandardMappingNames.UrlFull)
+		span.Attributes = remove(span.Attributes, s.names.UrlFull)
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   StandardMappingNames.UrlFull,
+			Key:   s.names.UrlFull,
 			Value: stringValue("%a"),
 		})
 	})
@@ -408,9 +411,9 @@ func (s *otelSut) requestWithUnparseableFullUrl() {
 
 func (s *otelSut) requestWithIntegrationIDEmpty() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, StandardMappingNames.IntegrationID)
+		span.Attributes = remove(span.Attributes, s.names.IntegrationID)
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   StandardMappingNames.IntegrationID,
+			Key:   s.names.IntegrationID,
 			Value: stringValue(""),
 		})
 	})
@@ -418,8 +421,8 @@ func (s *otelSut) requestWithIntegrationIDEmpty() {
 
 func (s *otelSut) requestWithNoStatusNoErrorType() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, StandardMappingNames.HttpStatusCode)
-		span.Attributes = remove(span.Attributes, StandardMappingNames.ErrorType)
+		span.Attributes = remove(span.Attributes, s.names.HttpStatusCode)
+		span.Attributes = remove(span.Attributes, s.names.ErrorType)
 	})
 }
 

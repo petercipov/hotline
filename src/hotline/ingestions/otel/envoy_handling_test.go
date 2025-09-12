@@ -68,6 +68,7 @@ type envoySut struct {
 	server   *httptest.Server
 	handler  *TracesHandler
 	requests []*ingestions.HttpRequest
+	names    EnvoyAttributeNames
 }
 
 func (s *envoySut) forHttpIngestion() {
@@ -77,6 +78,7 @@ func (s *envoySut) forHttpIngestion() {
 		s.requests = append(s.requests, requests...)
 	}, converter)
 	s.server = httptest.NewServer(s.handler)
+	s.names = DefaultEnvoyMappingNames()
 }
 
 func (s *envoySut) ingest() []*ingestions.HttpRequest {
@@ -89,27 +91,27 @@ func (s *envoySut) requestWithSimpleTrace() {
 
 func (s *envoySut) requestWithoutStatusCode() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, EnvoyMappingNames.HttpStatusCode)
+		span.Attributes = remove(span.Attributes, s.names.HttpStatusCode)
 	})
 }
 
 func (s *envoySut) requestWithoutHttpMethod() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, EnvoyMappingNames.HttpRequestMethod)
+		span.Attributes = remove(span.Attributes, s.names.HttpRequestMethod)
 	})
 }
 
 func (s *envoySut) requestWithoutFullUrl() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, EnvoyMappingNames.UrlFull)
+		span.Attributes = remove(span.Attributes, s.names.UrlFull)
 	})
 }
 
 func (s *envoySut) requestWithUnparseableFullUrl() {
 	s.requestWitMultiResourceMultipleSpansWithModifier(1, 1, func(span *tracepb.Span) {
-		span.Attributes = remove(span.Attributes, EnvoyMappingNames.UrlFull)
+		span.Attributes = remove(span.Attributes, s.names.UrlFull)
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   EnvoyMappingNames.UrlFull,
+			Key:   s.names.UrlFull,
 			Value: stringValue("%a"),
 		})
 	})
@@ -131,27 +133,27 @@ func (s *envoySut) requestWitMultiResourceMultipleSpansWithModifier(resourceCoun
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []*commonpb.KeyValue{
 					{
-						Key:   EnvoyMappingNames.HttpRequestMethod,
+						Key:   s.names.HttpRequestMethod,
 						Value: stringValue("POST"),
 					},
 					{
-						Key:   EnvoyMappingNames.NetworkProtocolVersion,
+						Key:   s.names.NetworkProtocolVersion,
 						Value: stringValue("1.1"),
 					},
 					{
-						Key:   EnvoyMappingNames.UrlFull,
+						Key:   s.names.UrlFull,
 						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key:   EnvoyMappingNames.HttpStatusCode,
+						Key:   s.names.HttpStatusCode,
 						Value: stringValue("200"),
 					},
 					{
-						Key:   EnvoyMappingNames.CorrelationID,
+						Key:   s.names.CorrelationID,
 						Value: stringValue("req-id-value"),
 					},
 					{
-						Key:   EnvoyMappingNames.IntegrationID,
+						Key:   s.names.IntegrationID,
 						Value: stringValue("integration_id"),
 					},
 				},

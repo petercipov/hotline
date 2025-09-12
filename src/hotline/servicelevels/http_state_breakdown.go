@@ -8,22 +8,22 @@ const httpRange5xx = "5xx"
 
 const httpRangeUnknown = "unknown"
 
-var httpRanges = []string{
-	httpRange1xx,
-	httpRange2xx,
-	httpRange3xx,
-	httpRange4xx,
-	httpRange5xx,
-	httpRangeUnknown,
-}
-
 type HttpStateRangeBreakdown struct {
 	states map[string]string
+	ranges []string
 }
 
 func NewHttpStateRangeBreakdown() *HttpStateRangeBreakdown {
+	ranges := []string{
+		httpRange1xx,
+		httpRange2xx,
+		httpRange3xx,
+		httpRange4xx,
+		httpRange5xx,
+		httpRangeUnknown,
+	}
 	return &HttpStateRangeBreakdown{
-		map[string]string{
+		states: map[string]string{
 			"100": httpRange1xx,
 			"101": httpRange1xx,
 			"102": httpRange1xx,
@@ -92,11 +92,12 @@ func NewHttpStateRangeBreakdown() *HttpStateRangeBreakdown {
 			"510": httpRange5xx,
 			"511": httpRange5xx,
 		},
+		ranges: ranges,
 	}
 }
 
 func (b *HttpStateRangeBreakdown) GetRanges() []string {
-	return httpRanges
+	return b.ranges
 }
 
 func (b *HttpStateRangeBreakdown) GetRange(state string) *string {

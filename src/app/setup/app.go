@@ -91,6 +91,7 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 	egressTransport := &http.Transport{}
 	uuidGenerator := uuid.NewDeterministicV7(rand.Reader)
 
+	defaultSemantics := egress.DefaultRequestSemantics()
 	egressHandler := egress.New(
 		egressTransport,
 		func(req *ingestions.HttpRequest) {
@@ -100,7 +101,7 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 		managedTime,
 		60*time.Second,
 		uuidGenerator,
-		&egress.DefaultRequestSemantics,
+		&defaultSemantics,
 	)
 
 	egressIngestionServer := createServer(cfg.EgressHttpIngestion.Host, egressHandler)

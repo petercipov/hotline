@@ -25,6 +25,8 @@ func (s *OTELClient) SendSomeTraffic(now time.Time, integrationID string) (int, 
 		"200", "201", "403", "500", "503",
 	}
 
+	names := otel.StandardMappingNames()
+
 	return s.sendTraffic(integrationID, 10, 1000, func(span *tracepb.Span) {
 
 		startTime := now
@@ -35,7 +37,7 @@ func (s *OTELClient) SendSomeTraffic(now time.Time, integrationID string) (int, 
 
 		statusCode := statusCodes[r.Intn(len(statusCodes))]
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   otel.StandardMappingNames.HttpStatusCode,
+			Key:   names.HttpStatusCode,
 			Value: stringValue(statusCode),
 		})
 	})
@@ -43,6 +45,7 @@ func (s *OTELClient) SendSomeTraffic(now time.Time, integrationID string) (int, 
 
 func (s *OTELClient) sendTraffic(integrationID string, resourceCount int, traceCount int, modifier func(span *tracepb.Span)) (int, error) {
 	var resourceSpans []*tracepb.ResourceSpans
+	names := otel.StandardMappingNames()
 	for ri := 0; ri < resourceCount; ri++ {
 		var spans []*tracepb.Span
 		for ti := 0; ti < traceCount; ti++ {
@@ -57,19 +60,19 @@ func (s *OTELClient) sendTraffic(integrationID string, resourceCount int, traceC
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []*commonpb.KeyValue{
 					{
-						Key:   otel.StandardMappingNames.HttpRequestMethod,
+						Key:   names.HttpRequestMethod,
 						Value: stringValue("POST"),
 					},
 					{
-						Key:   otel.StandardMappingNames.NetworkProtocolVersion,
+						Key:   names.NetworkProtocolVersion,
 						Value: stringValue("1.1"),
 					},
 					{
-						Key:   otel.StandardMappingNames.UrlFull,
+						Key:   names.UrlFull,
 						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key:   otel.StandardMappingNames.IntegrationID,
+						Key:   names.IntegrationID,
 						Value: stringValue(integrationID),
 					},
 				},

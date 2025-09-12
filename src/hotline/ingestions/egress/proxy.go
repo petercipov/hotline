@@ -20,9 +20,11 @@ type RequestSemantics struct {
 	RequestIDName     string
 }
 
-var DefaultRequestSemantics = RequestSemantics{
-	IntegrationIDName: "User-Agent", // required
-	RequestIDName:     "x-request-id",
+func DefaultRequestSemantics() RequestSemantics {
+	return RequestSemantics{
+		IntegrationIDName: "User-Agent", // required
+		RequestIDName:     "x-request-id",
+	}
 }
 
 type Proxy struct {

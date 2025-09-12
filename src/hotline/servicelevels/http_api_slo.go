@@ -102,13 +102,12 @@ func (s *HttpApiSLO) DeleteRoute(route hotlinehttp.Route) {
 	s.mux.Delete(route)
 }
 
-var httpRangeBreakdown = NewHttpStateRangeBreakdown()
-
 type HttpRouteSLO struct {
 	route      hotlinehttp.Route
 	stateSLO   *StateSLO
 	latencySLO *LatencySLO
 	expected   map[string]bool
+	breakdown  *HttpStateRangeBreakdown
 }
 
 func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
@@ -119,12 +118,13 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 	for _, status := range slo.Status.Expected {
 		expected[status] = true
 	}
+	breakdown := NewHttpStateRangeBreakdown()
 
 	return &HttpRouteSLO{
 		route: slo.Route,
 		stateSLO: NewStateSLO(
 			slo.Status.Expected,
-			httpRangeBreakdown.GetRanges(),
+			breakdown.GetRanges(),
 			slo.Status.BreachThreshold,
 			slo.Status.WindowDuration,
 			"http_route_status",
@@ -136,7 +136,8 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 			"http_route_latency",
 			tags,
 		),
-		expected: expected,
+		expected:  expected,
+		breakdown: breakdown,
 	}
 }
 
@@ -149,7 +150,7 @@ func (s *HttpRouteSLO) AddRequest(now time.Time, req *HttpRequest) {
 		return
 	}
 
-	httpRange := httpRangeBreakdown.GetRange(req.State)
+	httpRange := s.breakdown.GetRange(req.State)
 	if httpRange != nil {
 		s.stateSLO.AddState(now, *httpRange)
 		return

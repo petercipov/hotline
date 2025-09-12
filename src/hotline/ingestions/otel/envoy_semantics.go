@@ -19,13 +19,15 @@ type EnvoyAttributeNames struct {
 	CorrelationID          string // optional
 }
 
-var EnvoyMappingNames = EnvoyAttributeNames{
-	HttpRequestMethod:      "http.method",
-	HttpStatusCode:         "http.status_code",
-	UrlFull:                "http.url",
-	NetworkProtocolVersion: "http.protocol",
-	IntegrationID:          "user_agent",
-	CorrelationID:          "guid:x-request-id",
+func DefaultEnvoyMappingNames() EnvoyAttributeNames {
+	return EnvoyAttributeNames{
+		HttpRequestMethod:      "http.method",
+		HttpStatusCode:         "http.status_code",
+		UrlFull:                "http.url",
+		NetworkProtocolVersion: "http.protocol",
+		IntegrationID:          "user_agent",
+		CorrelationID:          "guid:x-request-id",
+	}
 }
 
 type EnvoyMapping struct {
@@ -33,7 +35,8 @@ type EnvoyMapping struct {
 }
 
 func NewEnvoyMapping() *EnvoyMapping {
-	return &EnvoyMapping{attNames: EnvoyMappingNames}
+	names := DefaultEnvoyMappingNames()
+	return &EnvoyMapping{attNames: names}
 }
 
 func (h *EnvoyMapping) ConvertMessageToHttp(reqProto *coltracepb.ExportTraceServiceRequest) []*ingestions.HttpRequest {

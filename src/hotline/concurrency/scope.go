@@ -6,9 +6,9 @@ import (
 	"maps"
 )
 
-type contextQueueID struct{}
+type contextQueueID string
 
-var contextQueueIDName = contextQueueID{}
+const contextQueueIDName = contextQueueID("contextQueueIDName")
 
 func GetScopeIDFromContext(ctx context.Context) string {
 	name, _ := ctx.Value(contextQueueIDName).(string)

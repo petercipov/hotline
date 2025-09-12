@@ -3,3 +3,14 @@ formatters:
   enable:
     - gofmt
     - goimports
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gochecknoglobals
+    - gochecknoinits
+    - gocritic

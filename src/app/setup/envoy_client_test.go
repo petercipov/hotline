@@ -32,8 +32,9 @@ func (s *EnvoyClient) SendSomeTraffic(now time.Time, integrationID string) (int,
 		span.StartTimeUnixNano = uint64(startTime.UnixNano())
 
 		statusCode := statusCodes[r.Intn(len(statusCodes))]
+		names := otel.DefaultEnvoyMappingNames()
 		span.Attributes = append(span.Attributes, &commonpb.KeyValue{
-			Key:   otel.EnvoyMappingNames.HttpStatusCode,
+			Key:   names.HttpStatusCode,
 			Value: stringValue(statusCode),
 		})
 	})
@@ -41,6 +42,7 @@ func (s *EnvoyClient) SendSomeTraffic(now time.Time, integrationID string) (int,
 
 func (s *EnvoyClient) sendTraffic(integrationID string, resourceCount int, traceCount int, modifier func(span *tracepb.Span)) (int, error) {
 	var resourceSpans []*tracepb.ResourceSpans
+	names := otel.DefaultEnvoyMappingNames()
 	for ri := 0; ri < resourceCount; ri++ {
 		var spans []*tracepb.Span
 		for ti := 0; ti < traceCount; ti++ {
@@ -55,19 +57,19 @@ func (s *EnvoyClient) sendTraffic(integrationID string, resourceCount int, trace
 				// https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 				Attributes: []*commonpb.KeyValue{
 					{
-						Key:   otel.EnvoyMappingNames.HttpRequestMethod,
+						Key:   names.HttpRequestMethod,
 						Value: stringValue("POST"),
 					},
 					{
-						Key:   otel.EnvoyMappingNames.NetworkProtocolVersion,
+						Key:   names.NetworkProtocolVersion,
 						Value: stringValue("1.1"),
 					},
 					{
-						Key:   otel.EnvoyMappingNames.UrlFull,
+						Key:   names.UrlFull,
 						Value: stringValue("https://integration.com/order/123?param1=value1"),
 					},
 					{
-						Key:   otel.EnvoyMappingNames.IntegrationID,
+						Key:   names.IntegrationID,
 						Value: stringValue(integrationID),
 					},
 					{

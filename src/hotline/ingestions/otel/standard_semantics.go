@@ -22,13 +22,15 @@ type AttributeNames struct {
 	CorrelationID          string // required
 }
 
-var StandardMappingNames = AttributeNames{
-	HttpRequestMethod:      "http.request.method",
-	HttpStatusCode:         "http.response.status_code",
-	UrlFull:                "url.full",
-	NetworkProtocolVersion: "network.protocol.version",
-	IntegrationID:          "user_agent.original",
-	ErrorType:              "error.type",
+func StandardMappingNames() AttributeNames {
+	return AttributeNames{
+		HttpRequestMethod:      "http.request.method",
+		HttpStatusCode:         "http.response.status_code",
+		UrlFull:                "url.full",
+		NetworkProtocolVersion: "network.protocol.version",
+		IntegrationID:          "user_agent.original",
+		ErrorType:              "error.type",
+	}
 }
 
 type StandardMapping struct {
@@ -36,7 +38,7 @@ type StandardMapping struct {
 }
 
 func NewStandardMapping() *StandardMapping {
-	return &StandardMapping{attNames: StandardMappingNames}
+	return &StandardMapping{attNames: StandardMappingNames()}
 }
 
 // https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client

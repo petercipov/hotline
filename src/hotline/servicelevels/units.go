@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-var P50, _ = ParsePercentile(50)
-var P70, _ = ParsePercentile(70)
-var P90, _ = ParsePercentile(90)
-var P99, _ = ParsePercentile(99)
-var P999, _ = ParsePercentile(99.9)
+const P50 = Percentile(0.5)
+const P70 = Percentile(0.7)
+const P90 = Percentile(0.9)
+const P99 = Percentile(0.99)
+const P999 = Percentile(0.999)
 
 type Percentile float64
 
