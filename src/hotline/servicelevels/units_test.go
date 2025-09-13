@@ -1,6 +1,7 @@
-package servicelevels
+package servicelevels_test
 
 import (
+	"hotline/servicelevels"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -10,29 +11,29 @@ import (
 var _ = Describe("Units", func() {
 	Context("Percentile", func() {
 		It("should not parse 0", func() {
-			_, failed := ParsePercentile(0)
+			_, failed := servicelevels.ParsePercentile(0)
 			Expect(failed).To(HaveOccurred())
 		})
 
 		It("should not parse negative", func() {
-			_, failed := ParsePercentile(-1)
+			_, failed := servicelevels.ParsePercentile(-1)
 			Expect(failed).To(HaveOccurred())
 		})
 
 		It("should not parse over 100", func() {
-			_, failed := ParsePercentile(100.1)
+			_, failed := servicelevels.ParsePercentile(100.1)
 			Expect(failed).To(HaveOccurred())
 		})
 
 		It("should parse valid value", func() {
-			p, failed := ParsePercentile(100)
+			p, failed := servicelevels.ParsePercentile(100)
 			Expect(failed).NotTo(HaveOccurred())
 			Expect(p.Normalized()).To(Equal(float64(1)))
 		})
 
 		DescribeTable("name construction",
 			func(value float64, name string) {
-				percentile, err := ParsePercentile(value)
+				percentile, err := servicelevels.ParsePercentile(value)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(percentile.Name()).To(Equal(name))
 			},
@@ -49,7 +50,7 @@ var _ = Describe("Units", func() {
 
 		DescribeTable("value construction",
 			func(value float64, name string) {
-				percentile, err := ParsePercentile(value)
+				percentile, err := servicelevels.ParsePercentile(value)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(percentile.AsValue()).To(Equal(name))
 			},
@@ -66,7 +67,7 @@ var _ = Describe("Units", func() {
 
 		DescribeTable("parse from value",
 			func(strValue string, percentValue float64, hasError bool) {
-				percentile, err := ParsePercentileFromValue(strValue)
+				percentile, err := servicelevels.ParsePercentileFromValue(strValue)
 				if hasError {
 					Expect(err).To(HaveOccurred())
 				} else {
@@ -83,7 +84,7 @@ var _ = Describe("Units", func() {
 
 	Context("Latency Ms", func() {
 		It("convert to duration", func() {
-			ms := LatencyMs(2000)
+			ms := servicelevels.LatencyMs(2000)
 			Expect(ms.AsDuration()).To(Equal(2 * time.Second))
 		})
 	})

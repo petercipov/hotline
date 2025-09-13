@@ -25,21 +25,21 @@ func (c *fakeEgressTarget) ServeHTTP(writer http.ResponseWriter, req *http.Reque
 	isFailure := c.rand.Int63n(2) == 0
 
 	switch req.Method {
-	case "GET":
+	case http.MethodGet:
 		if isFailure {
 			writer.WriteHeader(http.StatusInternalServerError)
 		} else {
 			writer.WriteHeader(http.StatusOK)
 		}
 		return
-	case "POST":
+	case http.MethodPost:
 		if isFailure {
 			writer.WriteHeader(http.StatusInternalServerError)
 		} else {
 			writer.WriteHeader(http.StatusCreated)
 		}
 		return
-	case "DELETE":
+	case http.MethodDelete:
 		writer.WriteHeader(http.StatusNoContent)
 		return
 	default:

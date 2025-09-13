@@ -191,7 +191,7 @@ func (a *appSut) deleteSLOConfiguration(ctx context.Context, integrationID strin
 
 	_ = resp.Body.Close()
 
-	if resp.StatusCode != 204 {
+	if resp.StatusCode != http.StatusNoContent {
 		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, resp.StatusCode)
 	}
 

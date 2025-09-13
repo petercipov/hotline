@@ -1,8 +1,9 @@
-package otel
+package otel_test
 
 import (
 	"hotline/clock"
 	"hotline/ingestions"
+	"hotline/ingestions/otel"
 	"net/http/httptest"
 	"strconv"
 
@@ -66,19 +67,19 @@ var _ = Describe("Envoy Ingestion of Traces", func() {
 
 type envoySut struct {
 	server   *httptest.Server
-	handler  *TracesHandler
+	handler  *otel.TracesHandler
 	requests []*ingestions.HttpRequest
-	names    EnvoyAttributeNames
+	names    otel.EnvoyAttributeNames
 }
 
 func (s *envoySut) forHttpIngestion() {
 	s.requests = nil
-	converter := NewProtoConverter()
-	s.handler = NewTracesHandler(func(requests []*ingestions.HttpRequest) {
+	converter := otel.NewProtoConverter()
+	s.handler = otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
 		s.requests = append(s.requests, requests...)
 	}, converter)
 	s.server = httptest.NewServer(s.handler)
-	s.names = DefaultEnvoyMappingNames()
+	s.names = otel.DefaultEnvoyMappingNames()
 }
 
 func (s *envoySut) ingest() []*ingestions.HttpRequest {

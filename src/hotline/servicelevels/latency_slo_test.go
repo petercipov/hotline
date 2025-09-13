@@ -125,11 +125,11 @@ func (s *latencySLOSUT) forSLO(percentiles []servicelevels.PercentileDefinition,
 	s.slo = servicelevels.NewLatencySLO(percentiles, duration, "test-namespace", nil)
 }
 
-func (s *latencySLOSUT) WithRandomValues(count int, max float64) {
+func (s *latencySLOSUT) WithRandomValues(count int, maxValue float64) {
 	now := clock.ParseTime("2025-02-22T12:04:05Z")
 	r := rand.New(rand.NewSource(10000))
 	for range count {
-		value := r.Float64() * max
+		value := r.Float64() * maxValue
 		s.slo.AddLatency(now, servicelevels.LatencyMs(value))
 	}
 }

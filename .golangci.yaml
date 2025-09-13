@@ -36,6 +36,16 @@ linters:
     - nilnil
     - noctx
     - perfsprint
+    - predeclared
+    - reassign
+    - sloglint
+    - spancheck
+    - tagalign
+    - tagliatelle
+    - testifylint
+    - testpackage
+    - unconvert
+    - usestdlibvars
   settings:
     gosec:
       excludes:

@@ -1,4 +1,4 @@
-package otel
+package otel_test
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"hotline/clock"
 	"hotline/ingestions"
+	"hotline/ingestions/otel"
 	"hotline/integrations"
 	"net/http"
 	"net/http/httptest"
@@ -176,16 +177,16 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 
 type otelSut struct {
 	server   *httptest.Server
-	handler  *TracesHandler
+	handler  *otel.TracesHandler
 	requests []*ingestions.HttpRequest
-	names    AttributeNames
+	names    otel.AttributeNames
 }
 
 func (s *otelSut) forHttpIngestion() {
 	s.requests = nil
-	s.names = StandardMappingNames()
-	converter := NewProtoConverter()
-	s.handler = NewTracesHandler(func(requests []*ingestions.HttpRequest) {
+	s.names = otel.StandardMappingNames()
+	converter := otel.NewProtoConverter()
+	s.handler = otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
 		s.requests = append(s.requests, requests...)
 	}, converter)
 	s.server = httptest.NewServer(s.handler)

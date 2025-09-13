@@ -229,7 +229,7 @@ type failingTransport struct {
 
 func (t *failingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return &http.Response{
-		StatusCode: 500,
+		StatusCode: http.StatusInternalServerError,
 		Body:       io.NopCloser(&failingReader{}),
 	}, nil
 }
