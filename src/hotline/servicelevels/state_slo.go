@@ -9,9 +9,7 @@ import (
 
 type StateSLO struct {
 	window                    *metrics.SlidingWindow[string]
-	expectedStates            []string
 	expectedStatesMap         map[string]int
-	unexpectedStates          []string
 	unexpectedStatesMap       map[string]int
 	breachThreshold           float64
 	unexpectedBreachThreshold float64
@@ -52,9 +50,7 @@ func NewStateSLO(
 	unexpectedBreachThreshold := roundTo(100.0-expectedBreachThreshold, 5)
 	return &StateSLO{
 		window:                    window,
-		expectedStates:            expectedStates,
 		expectedStatesMap:         statesMap,
-		unexpectedStates:          unexpectedStates,
 		unexpectedStatesMap:       unexpectedStatesMap,
 		breachThreshold:           expectedBreachThreshold,
 		unexpectedBreachThreshold: unexpectedBreachThreshold,
@@ -137,7 +133,7 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *metrics.TagHistogram) (*SLOB
 	unexpectedSum := float64(0)
 	eventsSum := int64(0)
 
-	for _, state := range s.unexpectedStates {
+	for state := range s.unexpectedStatesMap {
 		metric, count := histogram.ComputePercentile(state)
 		eventsSum += count
 		if metric != nil {
@@ -165,12 +161,12 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *metrics.TagHistogram) (*SLOB
 }
 
 func (s *StateSLO) checkExpectedBreach(histogram *metrics.TagHistogram) (*SLOBreach, float64, int64, []Metric) {
-	breakDown := make([]Metric, len(s.expectedStates))
+	breakDown := make([]Metric, len(s.expectedStatesMap))
 	breakDown = breakDown[:0]
 	expectedSum := float64(0)
 	eventsSum := int64(0)
 
-	for _, state := range s.expectedStates {
+	for state := range s.expectedStatesMap {
 		metric, count := histogram.ComputePercentile(state)
 		eventsSum += count
 		if metric != nil {
