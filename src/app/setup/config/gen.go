@@ -232,10 +232,10 @@ type RouteKey = string
 
 // RouteServiceLevels defines model for RouteServiceLevels.
 type RouteServiceLevels struct {
-	Latency    LatencyServiceLevels     `json:"latency"`
+	Latency    *LatencyServiceLevels    `json:"latency,omitempty"`
 	Route      Route                    `json:"route"`
 	RouteKey   RouteKey                 `json:"routeKey"`
-	Status     StatusServiceLevels      `json:"status"`
+	Status     *StatusServiceLevels     `json:"status,omitempty"`
 	Validation *ValidationServiceLevels `json:"validation,omitempty"`
 }
 
@@ -279,9 +279,9 @@ type UploadRequestSchemaResponse struct {
 
 // UpsertServiceLevelsRequest defines model for UpsertServiceLevelsRequest.
 type UpsertServiceLevelsRequest struct {
-	Latency    LatencyServiceLevels     `json:"latency"`
+	Latency    *LatencyServiceLevels    `json:"latency,omitempty"`
 	Route      Route                    `json:"route"`
-	Status     StatusServiceLevels      `json:"status"`
+	Status     *StatusServiceLevels     `json:"status,omitempty"`
 	Validation *ValidationServiceLevels `json:"validation,omitempty"`
 }
 

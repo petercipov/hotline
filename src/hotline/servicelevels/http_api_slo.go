@@ -2,6 +2,7 @@ package servicelevels
 
 import (
 	"net/url"
+	"slices"
 	"time"
 
 	hotlinehttp "hotline/http"
@@ -45,8 +46,8 @@ func (d *HttpApiSLODefinition) DeleteRouteByKey(key string) (hotlinehttp.Route, 
 
 type HttpRouteSLODefinition struct {
 	Route   hotlinehttp.Route
-	Latency HttpLatencySLODefinition
-	Status  HttpStatusSLODefinition
+	Latency *HttpLatencySLODefinition
+	Status  *HttpStatusSLODefinition
 }
 type HttpLatencySLODefinition struct {
 	Percentiles    []PercentileDefinition
@@ -114,59 +115,76 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 	tags := map[string]string{
 		"http_route": slo.Route.ID(),
 	}
-	expected := make(map[string]bool)
-	for _, status := range slo.Status.Expected {
-		expected[status] = true
-	}
+
 	breakdown := NewHttpStateRangeBreakdown()
 
-	return &HttpRouteSLO{
-		route: slo.Route,
-		stateSLO: NewStateSLO(
+	expected := make(map[string]bool)
+	var stateSLO *StateSLO
+	if slo.Status != nil {
+		for _, status := range slo.Status.Expected {
+			expected[status] = true
+		}
+		stateSLO = NewStateSLO(
 			slo.Status.Expected,
 			breakdown.GetRanges(),
 			slo.Status.BreachThreshold,
 			slo.Status.WindowDuration,
 			"http_route_status",
 			tags,
-		),
-		latencySLO: NewLatencySLO(
+		)
+	}
+
+	var latencySLO *LatencySLO
+	if slo.Latency != nil {
+		latencySLO = NewLatencySLO(
 			slo.Latency.Percentiles,
 			slo.Latency.WindowDuration,
 			"http_route_latency",
 			tags,
-		),
-		expected:  expected,
-		breakdown: breakdown,
+		)
+	}
+
+	return &HttpRouteSLO{
+		route:      slo.Route,
+		stateSLO:   stateSLO,
+		latencySLO: latencySLO,
+		expected:   expected,
+		breakdown:  breakdown,
 	}
 }
 
 func (s *HttpRouteSLO) AddRequest(now time.Time, req *HttpRequest) {
-	s.latencySLO.AddLatency(now, req.Latency)
-
-	_, isExpected := s.expected[req.State]
-	if isExpected {
-		s.stateSLO.AddState(now, req.State)
-		return
+	if s.latencySLO != nil {
+		s.latencySLO.AddLatency(now, req.Latency)
 	}
 
-	httpRange := s.breakdown.GetRange(req.State)
-	if httpRange != nil {
-		s.stateSLO.AddState(now, *httpRange)
-		return
-	}
+	if s.stateSLO != nil {
+		_, isExpected := s.expected[req.State]
+		if isExpected {
+			s.stateSLO.AddState(now, req.State)
+			return
+		}
 
-	s.stateSLO.AddState(now, "unknown")
+		httpRange := s.breakdown.GetRange(req.State)
+		if httpRange != nil {
+			s.stateSLO.AddState(now, *httpRange)
+			return
+		}
+
+		s.stateSLO.AddState(now, "unknown")
+	}
 }
 
 func (s *HttpRouteSLO) Check(now time.Time) []SLOCheck {
-	latencyCheck := s.latencySLO.Check(now)
-	stateCheck := s.stateSLO.Check(now)
+	var latencyCheck []SLOCheck
+	if s.latencySLO != nil {
+		latencyCheck = s.latencySLO.Check(now)
+	}
 
-	checks := make([]SLOCheck, len(latencyCheck)+len(stateCheck))
-	checks = checks[:0]
-	checks = append(checks, latencyCheck...)
-	checks = append(checks, stateCheck...)
+	var stateCheck []SLOCheck
+	if s.stateSLO != nil {
+		stateCheck = s.stateSLO.Check(now)
+	}
 
-	return checks
+	return slices.Concat(latencyCheck, stateCheck)
 }

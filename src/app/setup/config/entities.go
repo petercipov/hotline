@@ -54,12 +54,29 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 	return (*servicelevels.Percentile)(p)
 }
 
-func ParseRoute(latencyDefinition LatencyServiceLevels, statusDefinition StatusServiceLevels, route Route) (servicelevels.HttpRouteSLODefinition, error) {
-	percentile := statusDefinition.BreachThreshold.Cast()
+func ParseRoute(latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.HttpRouteSLODefinition, error) {
+	var status servicelevels.HttpStatusSLODefinition
+	var latency servicelevels.HttpLatencySLODefinition
+	if statusDefinition != nil {
+		percentile := statusDefinition.BreachThreshold.Cast()
 
-	defs, defsErr := parsePercentileDefinitions(latencyDefinition.Percentiles)
-	if defsErr != nil {
-		return servicelevels.HttpRouteSLODefinition{}, defsErr
+		status = servicelevels.HttpStatusSLODefinition{
+			Expected:        convertFromExpected(statusDefinition.Expected),
+			BreachThreshold: *percentile,
+			WindowDuration:  time.Duration(statusDefinition.WindowDuration),
+		}
+	}
+
+	if latencyDefinition != nil {
+		defs, defsErr := parsePercentileDefinitions(latencyDefinition.Percentiles)
+		if defsErr != nil {
+			return servicelevels.HttpRouteSLODefinition{}, defsErr
+		}
+
+		latency = servicelevels.HttpLatencySLODefinition{
+			Percentiles:    defs,
+			WindowDuration: time.Duration(latencyDefinition.WindowDuration),
+		}
 	}
 
 	return servicelevels.HttpRouteSLODefinition{
@@ -69,15 +86,8 @@ func ParseRoute(latencyDefinition LatencyServiceLevels, statusDefinition StatusS
 			Host:        optString(route.Host, ""),
 			Port:        int(optInt32(route.Port, 0)),
 		},
-		Latency: servicelevels.HttpLatencySLODefinition{
-			Percentiles:    defs,
-			WindowDuration: time.Duration(latencyDefinition.WindowDuration),
-		},
-		Status: servicelevels.HttpStatusSLODefinition{
-			Expected:        convertFromExpected(statusDefinition.Expected),
-			BreachThreshold: *percentile,
-			WindowDuration:  time.Duration(statusDefinition.WindowDuration),
-		},
+		Latency: &latency,
+		Status:  &status,
 	}, nil
 }
 
@@ -115,16 +125,27 @@ func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteService
 	var defs []RouteServiceLevels
 	for _, route := range routes {
 		method := RouteMethod(route.Route.Method)
-		defs = append(defs, RouteServiceLevels{
-			Latency: LatencyServiceLevels{
+		var latencyLevels LatencyServiceLevels
+		var statusLevels StatusServiceLevels
+
+		if route.Latency != nil {
+			latencyLevels = LatencyServiceLevels{
 				Percentiles:    convertPercentiles(route.Latency.Percentiles),
 				WindowDuration: Duration(route.Latency.WindowDuration),
-			},
-			Status: StatusServiceLevels{
+			}
+		}
+
+		if route.Status != nil {
+			statusLevels = StatusServiceLevels{
 				BreachThreshold: Percentile(route.Status.BreachThreshold),
 				Expected:        convertToExpected(route.Status.Expected),
 				WindowDuration:  Duration(route.Status.WindowDuration),
-			},
+			}
+		}
+
+		defs = append(defs, RouteServiceLevels{
+			Latency: &latencyLevels,
+			Status:  &statusLevels,
 			Route: Route{
 				Host:   ptrString(route.Route.Host),
 				Method: &method,

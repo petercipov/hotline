@@ -20,6 +20,24 @@ var _ = Describe("Http Api Slo", func() {
 		Expect(s.slo).ShouldNot(BeNil())
 	})
 
+	It("if no service levels defined, no checks are done", func() {
+		s.forRouteSetupWithDefault(servicelevels.HttpRouteSLODefinition{
+			Route: http.Route{
+				Method:      "GET",
+				Host:        "iam.example.com",
+				PathPattern: "/users",
+			},
+		})
+		s.AddRequest(&servicelevels.HttpRequest{
+			Latency: 1000,
+			State:   "200",
+			Method:  "GET",
+			URL:     newUrl("https://iam.example.com/users"),
+		})
+		metrics := s.Check()
+		Expect(metrics).To(BeEmpty())
+	})
+
 	It("check default path service levels when no definition is set", func() {
 		s.forRouteSetupWithDefault()
 		s.AddRequest(&servicelevels.HttpRequest{
@@ -304,7 +322,7 @@ func defaultRouteDefinitionForMethod(method string, host string, pathPattern str
 			PathPattern: pathPattern,
 			Host:        host,
 		},
-		Latency: servicelevels.HttpLatencySLODefinition{
+		Latency: &servicelevels.HttpLatencySLODefinition{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{
 					Percentile: 0.999,
@@ -314,7 +332,7 @@ func defaultRouteDefinitionForMethod(method string, host string, pathPattern str
 			},
 			WindowDuration: 1 * time.Minute,
 		},
-		Status: servicelevels.HttpStatusSLODefinition{
+		Status: &servicelevels.HttpStatusSLODefinition{
 			Expected:        []string{"200", "201"},
 			BreachThreshold: 0.999,
 			WindowDuration:  1 * time.Hour,

@@ -468,8 +468,6 @@ components:
       type: object
       required:
         - route
-        - latency
-        - status
       properties:
         route:
           $ref: '#/components/schemas/Route'
@@ -534,8 +532,6 @@ components:
       required:
         - routeKey
         - route
-        - latency
-        - status
       properties:
         routeKey:
           $ref: '#/components/schemas/RouteKey'
