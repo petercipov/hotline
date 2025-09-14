@@ -1,12 +1,10 @@
 package setup_test
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
 	"hotline/clock"
-	"io"
+	hotlineHttp "hotline/http"
 	"math"
 	"net/http"
 	"slices"
@@ -30,7 +28,7 @@ type fakeCollector struct {
 }
 
 func (c *fakeCollector) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
-	bodyBytes, bodyReadErr := uncompressedGzip(req.Body)
+	bodyBytes, bodyReadErr := hotlineHttp.UncompressGzip(req.Body, 8*1024)
 	if bodyReadErr != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
@@ -130,22 +128,6 @@ func (c *fakeCollector) GetMetrics() []ExpectedMetric {
 	c.sync.Unlock()
 
 	return metrics
-}
-
-func uncompressedGzip(reader io.Reader) ([]byte, error) {
-	decompressor, _ := gzip.NewReader(reader)
-	var uncompressed bytes.Buffer
-	for {
-		_, err := io.CopyN(&uncompressed, decompressor, 1024)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, err
-		}
-	}
-	_ = decompressor.Close()
-	return uncompressed.Bytes(), nil
 }
 
 var errMetricsNotEqual = errors.New("metrics are not equal")

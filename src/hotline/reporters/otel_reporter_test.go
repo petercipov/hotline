@@ -1,11 +1,11 @@
 package reporters_test
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
 	"hotline/clock"
+	hotlinehttp "hotline/http"
 	"hotline/reporters"
 	"hotline/servicelevels"
 	"io"
@@ -258,7 +258,7 @@ func (r *otelReporterSUT) forReporter() {
 	r.statusCode = http.StatusOK
 	r.testServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 
-		bodyBytes, bodyReadErr := uncompressGzip(request.Body)
+		bodyBytes, bodyReadErr := hotlinehttp.UncompressGzip(request.Body, 8*1024)
 		Expect(bodyReadErr).ToNot(HaveOccurred())
 
 		message := &colmetricspb.ExportMetricsServiceRequest{}
@@ -418,21 +418,4 @@ type failingTransport struct {
 
 func (t *failingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return nil, errOtelNetwork
-}
-
-func uncompressGzip(reader io.Reader) ([]byte, error) {
-	decompressor, _ := gzip.NewReader(reader)
-	var uncompressed bytes.Buffer
-	for {
-		_, err := io.CopyN(&uncompressed, decompressor, 1024)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, err
-		}
-	}
-
-	_ = decompressor.Close()
-	return uncompressed.Bytes(), nil
 }
