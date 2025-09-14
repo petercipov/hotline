@@ -105,10 +105,8 @@ func (s *HttpApiSLO) DeleteRoute(route hotlinehttp.Route) {
 
 type HttpRouteSLO struct {
 	route      hotlinehttp.Route
-	stateSLO   *StateSLO
+	stateSLO   *HttpStatusSLO
 	latencySLO *LatencySLO
-	expected   map[string]bool
-	breakdown  *HttpStateRangeBreakdown
 }
 
 func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
@@ -116,20 +114,12 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 		"http_route": slo.Route.ID(),
 	}
 
-	breakdown := NewHttpStateRangeBreakdown()
-
-	expected := make(map[string]bool)
-	var stateSLO *StateSLO
+	var stateSLO *HttpStatusSLO
 	if slo.Status != nil {
-		for _, status := range slo.Status.Expected {
-			expected[status] = true
-		}
-		stateSLO = NewStateSLO(
+		stateSLO = NewHttpStatusSLO(
 			slo.Status.Expected,
-			breakdown.GetRanges(),
 			slo.Status.BreachThreshold,
 			slo.Status.WindowDuration,
-			"http_route_status",
 			tags,
 		)
 	}
@@ -148,8 +138,6 @@ func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
 		route:      slo.Route,
 		stateSLO:   stateSLO,
 		latencySLO: latencySLO,
-		expected:   expected,
-		breakdown:  breakdown,
 	}
 }
 
@@ -159,19 +147,7 @@ func (s *HttpRouteSLO) AddRequest(now time.Time, req *HttpRequest) {
 	}
 
 	if s.stateSLO != nil {
-		_, isExpected := s.expected[req.State]
-		if isExpected {
-			s.stateSLO.AddState(now, req.State)
-			return
-		}
-
-		httpRange := s.breakdown.GetRange(req.State)
-		if httpRange != nil {
-			s.stateSLO.AddState(now, *httpRange)
-			return
-		}
-
-		s.stateSLO.AddState(now, "unknown")
+		s.stateSLO.AddHttpState(now, req.State)
 	}
 }
 
