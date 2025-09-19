@@ -126,8 +126,8 @@ func NewRoutePattern(route Route) *RoutePattern {
 
 type pathPart struct {
 	valueLower string
-	isWildcard bool
 	name       string // name of the wildcard (e.g., "user-id" for {user-id})
+	isWildcard bool
 }
 
 const urlDelimiter = "/"
