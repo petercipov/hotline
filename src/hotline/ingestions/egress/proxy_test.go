@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"hotline/clock"
+	hotlineHttp "hotline/http"
 	"hotline/ingestions"
 	"hotline/ingestions/egress"
 	"hotline/uuid"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -22,6 +24,25 @@ var _ = Describe("Proxy", Ordered, func() {
 
 	AfterEach(func() {
 		sut.Close()
+	})
+
+	Context("Gzipped content", func() {
+		It("can proxy request to dedicated server", func() {
+			sut.ForRunningProxy()
+			sut.ForDedicatedServer()
+			resp := sut.WhenGzipRequestIsSend()
+			reqs := sut.RequestsAreProxiedToDedicatedServer()
+			Expect(reqs).To(HaveLen(1))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Header.Get("server")).To(Equal("dedicated"))
+			Expect(resp.Header.Get("content-type")).To(Equal("text/plain"))
+		})
+	})
+
+	It("can will not handle invalid gzip request", func() {
+		sut.ForRunningProxy()
+		resp := sut.WhenWrongGzipRequestIsSend()
+		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 	})
 
 	It("proxy request to dedicated server", func() {
@@ -195,6 +216,50 @@ func (s *proxySUT) WhenRequestIsSend() *http.Response {
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, serverURL, nil)
 	req.Header.Add(s.semantics.RequestIDName, "request-id-123")
 	req.Header.Add(s.semantics.IntegrationIDName, s.integrationID)
+	resp, respErr := s.proxyClient.RoundTrip(req)
+	Expect(respErr).ToNot(HaveOccurred())
+	return resp
+}
+
+func (s *proxySUT) WhenWrongGzipRequestIsSend() *http.Response {
+	serverURL := "http://unknown/bookings"
+	if s.dedicatedServer != nil {
+		serverURL = s.dedicatedServer.URL + "/bookings"
+	}
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, serverURL, nil)
+	req.Header.Add(s.semantics.RequestIDName, "request-id-123")
+	req.Header.Add(s.semantics.IntegrationIDName, s.integrationID)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Body = io.NopCloser(strings.NewReader("wrong gzip content"))
+	resp, respErr := s.proxyClient.RoundTrip(req)
+	Expect(respErr).ToNot(HaveOccurred())
+	return resp
+}
+
+func (s *proxySUT) WhenGzipRequestIsSend() *http.Response {
+	serverURL := "http://unknown/bookings"
+	if s.dedicatedServer != nil {
+		serverURL = s.dedicatedServer.URL + "/bookings"
+	}
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, serverURL, nil)
+	req.Header.Add(s.semantics.RequestIDName, "request-id-123")
+	req.Header.Add(s.semantics.IntegrationIDName, s.integrationID)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+
+	contentBytes, contentErr := hotlineHttp.CompressGzip(strings.NewReader(`
+		{
+		  "trip_id": "4f4e4e1-c824-4d63-b37a-d8d698862f1d",
+		  "passenger_name": "John Doe",
+		  "has_bicycle": true,
+		  "has_dog": true
+		}
+	`))
+	Expect(contentErr).ToNot(HaveOccurred())
+	req.Body = io.NopCloser(strings.NewReader(string(contentBytes)))
 	resp, respErr := s.proxyClient.RoundTrip(req)
 	Expect(respErr).ToNot(HaveOccurred())
 	return resp

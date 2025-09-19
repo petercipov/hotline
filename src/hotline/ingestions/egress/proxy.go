@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"hotline/clock"
+	hotlineHttp "hotline/http"
 	"hotline/ingestions"
 	"hotline/integrations"
 	"hotline/uuid"
@@ -61,6 +62,17 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	teeBody, bodyReadErr := hotlineHttp.NewBodyTeeBuffer(req.Body, req.Header.Get("Content-Encoding"), 1024*1024)
+	if bodyReadErr != nil {
+		log.Printf("Error reading body: %s", bodyReadErr.Error())
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	req.Body = teeBody
+	defer func() {
+		_ = req.Body.Close()
+	}()
 
 	integrationID, parseErr := parseIntegrationID(req.Header.Get(p.semantics.IntegrationIDName))
 	if parseErr != nil {
