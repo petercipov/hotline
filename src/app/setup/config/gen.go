@@ -37,15 +37,6 @@ const (
 	TRACE   RouteMethod = "TRACE"
 )
 
-// Defines values for SchemaFileName.
-const (
-	RequestBodyJson     SchemaFileName = "request-body.json"
-	RequestHeadersJson  SchemaFileName = "request-headers.json"
-	RequestQueryJson    SchemaFileName = "request-query.json"
-	ResponseBodyJson    SchemaFileName = "response-body.json"
-	ResponseHeadersJson SchemaFileName = "response-headers.json"
-)
-
 // Defines values for StatusServiceLevelsExpected.
 const (
 	N100 StatusServiceLevelsExpected = "100"
@@ -156,17 +147,6 @@ type Error struct {
 	Message string `json:"message"`
 }
 
-// GetRequestSchemaResponse defines model for GetRequestSchemaResponse.
-type GetRequestSchemaResponse struct {
-	Files interface{} `json:"files,omitempty"`
-
-	// Title Schema title
-	Title *SchemaTitle `json:"title,omitempty"`
-
-	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
-	UpdatedAt DateTime `json:"updatedAt"`
-}
-
 // IntegrationID defines model for IntegrationID.
 type IntegrationID = string
 
@@ -191,9 +171,6 @@ type ListRequestSchemas struct {
 	Schemas []struct {
 		SchemaID SchemaID `json:"schemaID"`
 
-		// Title Schema title
-		Title SchemaTitle `json:"title"`
-
 		// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
 		UpdatedAt DateTime `json:"updatedAt"`
 	} `json:"schemas"`
@@ -210,6 +187,25 @@ type PercentileThreshold struct {
 
 // PercentileValue Percentile value (0.0% to 100.0%)
 type PercentileValue = Percentile
+
+// RequestValidationList List of Request Validations for an integration
+type RequestValidationList struct {
+	// Routes List of route-specific Request Validations
+	Routes []RouteRequestValidation `json:"routes"`
+}
+
+// RequestValidationSchema defines model for RequestValidationSchema.
+type RequestValidationSchema struct {
+	BodySchema   *SchemaID `json:"bodySchema,omitempty"`
+	HeaderSchema *SchemaID `json:"headerSchema,omitempty"`
+	QuerySchema  *SchemaID `json:"querySchema,omitempty"`
+}
+
+// ResponseValidationSchema defines model for ResponseValidationSchema.
+type ResponseValidationSchema struct {
+	BodySchema   *SchemaID `json:"bodySchema,omitempty"`
+	HeaderSchema *SchemaID `json:"headerSchema,omitempty"`
+}
 
 // Route defines model for Route.
 type Route struct {
@@ -230,6 +226,14 @@ type RouteMethod string
 // RouteKey defines model for RouteKey.
 type RouteKey = string
 
+// RouteRequestValidation defines model for RouteRequestValidation.
+type RouteRequestValidation struct {
+	RequestSchema  *RequestValidationSchema  `json:"requestSchema,omitempty"`
+	ResponseSchema *ResponseValidationSchema `json:"responseSchema,omitempty"`
+	Route          Route                     `json:"route"`
+	RouteKey       RouteKey                  `json:"routeKey"`
+}
+
 // RouteServiceLevels defines model for RouteServiceLevels.
 type RouteServiceLevels struct {
 	Latency    *LatencyServiceLevels    `json:"latency,omitempty"`
@@ -239,14 +243,8 @@ type RouteServiceLevels struct {
 	Validation *ValidationServiceLevels `json:"validation,omitempty"`
 }
 
-// SchemaFileName defines model for SchemaFileName.
-type SchemaFileName string
-
 // SchemaID defines model for SchemaID.
 type SchemaID = string
-
-// SchemaTitle Schema title
-type SchemaTitle = string
 
 // ServiceLevelsList List of Service Levels for an integration
 type ServiceLevelsList struct {
@@ -277,12 +275,24 @@ type UploadRequestSchemaResponse struct {
 	UpdatedAt *DateTime `json:"updatedAt,omitempty"`
 }
 
+// UpsertRequestValidationRequest defines model for UpsertRequestValidationRequest.
+type UpsertRequestValidationRequest struct {
+	RequestSchema  *RequestValidationSchema  `json:"requestSchema,omitempty"`
+	ResponseSchema *ResponseValidationSchema `json:"responseSchema,omitempty"`
+	Route          Route                     `json:"route"`
+}
+
 // UpsertServiceLevelsRequest defines model for UpsertServiceLevelsRequest.
 type UpsertServiceLevelsRequest struct {
 	Latency    *LatencyServiceLevels    `json:"latency,omitempty"`
 	Route      Route                    `json:"route"`
 	Status     *StatusServiceLevels     `json:"status,omitempty"`
 	Validation *ValidationServiceLevels `json:"validation,omitempty"`
+}
+
+// UpsertedRequestValidationResponse defines model for UpsertedRequestValidationResponse.
+type UpsertedRequestValidationResponse struct {
+	RouteKey *RouteKey `json:"routeKey,omitempty"`
 }
 
 // UpsertedServiceLevelsResponse defines model for UpsertedServiceLevelsResponse.
@@ -294,7 +304,6 @@ type UpsertedServiceLevelsResponse struct {
 type ValidationServiceLevels struct {
 	// BreachThreshold Percentile value (0.0% to 100.0%)
 	BreachThreshold PercentileValue `json:"breachThreshold"`
-	SchemaId        SchemaID        `json:"schemaId"`
 
 	// WindowDuration Duration string (e.g., "5m", "1h", "30s")
 	WindowDuration WindowValue `json:"windowDuration"`
@@ -302,9 +311,6 @@ type ValidationServiceLevels struct {
 
 // WindowValue Duration string (e.g., "5m", "1h", "30s")
 type WindowValue = Duration
-
-// FileName defines model for FileName.
-type FileName = SchemaFileName
 
 // BadRequest Detailed error response
 type BadRequest = Error
@@ -321,22 +327,34 @@ type TooManyRequests = Error
 // Unauthorized Detailed error response
 type Unauthorized = Error
 
-// UploadSchemaJSONBody defines parameters for UploadSchema.
-type UploadSchemaJSONBody struct {
-	// Title Schema title
-	Title *SchemaTitle `json:"title,omitempty"`
-}
-
-// UpdateSchemaJSONBody defines parameters for UpdateSchema.
-type UpdateSchemaJSONBody struct {
-	// Title Schema title
-	Title *SchemaTitle `json:"title,omitempty"`
+// UploadSchemaMultipartBody defines parameters for UploadSchema.
+type UploadSchemaMultipartBody struct {
+	// Jsonschema https://json-schema.org/draft/2020-12/json-schema-core.html
+	Jsonschema *JSONSchemaFileContent `json:"jsonschema,omitempty"`
 }
 
 // UploadSchemaFileMultipartBody defines parameters for UploadSchemaFile.
 type UploadSchemaFileMultipartBody struct {
 	// Jsonschema https://json-schema.org/draft/2020-12/json-schema-core.html
 	Jsonschema *JSONSchemaFileContent `json:"jsonschema,omitempty"`
+}
+
+// GetRequestValidationsParams defines parameters for GetRequestValidations.
+type GetRequestValidationsParams struct {
+	// XIntegrationId Unique identifier of an integration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
+}
+
+// UpsertRequestValidationsParams defines parameters for UpsertRequestValidations.
+type UpsertRequestValidationsParams struct {
+	// XIntegrationId Unique identifier of an integration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
+}
+
+// DeleteRequestValidationParams defines parameters for DeleteRequestValidation.
+type DeleteRequestValidationParams struct {
+	// XIntegrationId Unique identifier of an integration
+	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
 // GetServiceLevelsParams defines parameters for GetServiceLevels.
@@ -357,14 +375,14 @@ type DeleteServiceLevelsParams struct {
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
 
-// UploadSchemaJSONRequestBody defines body for UploadSchema for application/json ContentType.
-type UploadSchemaJSONRequestBody UploadSchemaJSONBody
-
-// UpdateSchemaJSONRequestBody defines body for UpdateSchema for application/json ContentType.
-type UpdateSchemaJSONRequestBody UpdateSchemaJSONBody
+// UploadSchemaMultipartRequestBody defines body for UploadSchema for multipart/form-data ContentType.
+type UploadSchemaMultipartRequestBody UploadSchemaMultipartBody
 
 // UploadSchemaFileMultipartRequestBody defines body for UploadSchemaFile for multipart/form-data ContentType.
 type UploadSchemaFileMultipartRequestBody UploadSchemaFileMultipartBody
+
+// UpsertRequestValidationsJSONRequestBody defines body for UpsertRequestValidations for application/json ContentType.
+type UpsertRequestValidationsJSONRequestBody = UpsertRequestValidationRequest
 
 // UpsertServiceLevelsJSONRequestBody defines body for UpsertServiceLevels for application/json ContentType.
 type UpsertServiceLevelsJSONRequestBody = UpsertServiceLevelsRequest
@@ -448,27 +466,25 @@ type ClientInterface interface {
 	// UploadSchemaWithBody request with any body
 	UploadSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	UploadSchema(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteSchema request
-	DeleteSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteSchemaFile request
+	DeleteSchemaFile(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSchema request
 	GetSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateSchemaWithBody request with any body
-	UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	UpdateSchema(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteSchemaFile request
-	DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetSchemaFile request
-	GetSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// UploadSchemaFileWithBody request with any body
-	UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRequestValidations request
+	GetRequestValidations(ctx context.Context, params *GetRequestValidationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpsertRequestValidationsWithBody request with any body
+	UpsertRequestValidationsWithBody(ctx context.Context, params *UpsertRequestValidationsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpsertRequestValidations(ctx context.Context, params *UpsertRequestValidationsParams, body UpsertRequestValidationsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteRequestValidation request
+	DeleteRequestValidation(ctx context.Context, routekey RouteKey, params *DeleteRequestValidationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetServiceLevels request
 	GetServiceLevels(ctx context.Context, params *GetServiceLevelsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -506,20 +522,8 @@ func (c *Client) UploadSchemaWithBody(ctx context.Context, contentType string, b
 	return c.Client.Do(req)
 }
 
-func (c *Client) UploadSchema(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadSchemaRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSchemaRequest(c.Server, schemaid)
+func (c *Client) DeleteSchemaFile(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSchemaFileRequest(c.Server, schemaid)
 	if err != nil {
 		return nil, err
 	}
@@ -542,8 +546,8 @@ func (c *Client) GetSchema(ctx context.Context, schemaid SchemaID, reqEditors ..
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSchemaRequestWithBody(c.Server, schemaid, contentType, body)
+func (c *Client) UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSchemaFileRequestWithBody(c.Server, schemaid, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -554,8 +558,8 @@ func (c *Client) UpdateSchemaWithBody(ctx context.Context, schemaid SchemaID, co
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateSchema(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSchemaRequest(c.Server, schemaid, body)
+func (c *Client) GetRequestValidations(ctx context.Context, params *GetRequestValidationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRequestValidationsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -566,8 +570,8 @@ func (c *Client) UpdateSchema(ctx context.Context, schemaid SchemaID, body Updat
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSchemaFileRequest(c.Server, schemaid, filename)
+func (c *Client) UpsertRequestValidationsWithBody(ctx context.Context, params *UpsertRequestValidationsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertRequestValidationsRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -578,8 +582,8 @@ func (c *Client) DeleteSchemaFile(ctx context.Context, schemaid SchemaID, filena
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSchemaFile(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSchemaFileRequest(c.Server, schemaid, filename)
+func (c *Client) UpsertRequestValidations(ctx context.Context, params *UpsertRequestValidationsParams, body UpsertRequestValidationsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertRequestValidationsRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -590,8 +594,8 @@ func (c *Client) GetSchemaFile(ctx context.Context, schemaid SchemaID, filename 
 	return c.Client.Do(req)
 }
 
-func (c *Client) UploadSchemaFileWithBody(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadSchemaFileRequestWithBody(c.Server, schemaid, filename, contentType, body)
+func (c *Client) DeleteRequestValidation(ctx context.Context, routekey RouteKey, params *DeleteRequestValidationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteRequestValidationRequest(c.Server, routekey, params)
 	if err != nil {
 		return nil, err
 	}
@@ -677,17 +681,6 @@ func NewListSchemasRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewUploadSchemaRequest calls the generic UploadSchema builder with application/json body
-func NewUploadSchemaRequest(server string, body UploadSchemaJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUploadSchemaRequestWithBody(server, "application/json", bodyReader)
-}
-
 // NewUploadSchemaRequestWithBody generates requests for UploadSchema with any type of body
 func NewUploadSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -717,8 +710,8 @@ func NewUploadSchemaRequestWithBody(server string, contentType string, body io.R
 	return req, nil
 }
 
-// NewDeleteSchemaRequest generates requests for DeleteSchema
-func NewDeleteSchemaRequest(server string, schemaid SchemaID) (*http.Request, error) {
+// NewDeleteSchemaFileRequest generates requests for DeleteSchemaFile
+func NewDeleteSchemaFileRequest(server string, schemaid SchemaID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -785,19 +778,8 @@ func NewGetSchemaRequest(server string, schemaid SchemaID) (*http.Request, error
 	return req, nil
 }
 
-// NewUpdateSchemaRequest calls the generic UpdateSchema builder with application/json body
-func NewUpdateSchemaRequest(server string, schemaid SchemaID, body UpdateSchemaJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateSchemaRequestWithBody(server, schemaid, "application/json", bodyReader)
-}
-
-// NewUpdateSchemaRequestWithBody generates requests for UpdateSchema with any type of body
-func NewUpdateSchemaRequestWithBody(server string, schemaid SchemaID, contentType string, body io.Reader) (*http.Request, error) {
+// NewUploadSchemaFileRequestWithBody generates requests for UploadSchemaFile with any type of body
+func NewUploadSchemaFileRequestWithBody(server string, schemaid SchemaID, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -832,71 +814,16 @@ func NewUpdateSchemaRequestWithBody(server string, schemaid SchemaID, contentTyp
 	return req, nil
 }
 
-// NewDeleteSchemaFileRequest generates requests for DeleteSchemaFile
-func NewDeleteSchemaFileRequest(server string, schemaid SchemaID, filename FileName) (*http.Request, error) {
+// NewGetRequestValidationsRequest generates requests for GetRequestValidations
+func NewGetRequestValidationsRequest(server string, params *GetRequestValidationsParams) (*http.Request, error) {
 	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "schemaid", runtime.ParamLocationPath, schemaid)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "filename", runtime.ParamLocationPath, filename)
-	if err != nil {
-		return nil, err
-	}
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/request-schemas/%s/file/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetSchemaFileRequest generates requests for GetSchemaFile
-func NewGetSchemaFileRequest(server string, schemaid SchemaID, filename FileName) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "schemaid", runtime.ParamLocationPath, schemaid)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "filename", runtime.ParamLocationPath, filename)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/request-schemas/%s/file/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/request-validations")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -911,33 +838,43 @@ func NewGetSchemaFileRequest(server string, schemaid SchemaID, filename FileName
 		return nil, err
 	}
 
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
 	return req, nil
 }
 
-// NewUploadSchemaFileRequestWithBody generates requests for UploadSchemaFile with any type of body
-func NewUploadSchemaFileRequestWithBody(server string, schemaid SchemaID, filename FileName, contentType string, body io.Reader) (*http.Request, error) {
+// NewUpsertRequestValidationsRequest calls the generic UpsertRequestValidations builder with application/json body
+func NewUpsertRequestValidationsRequest(server string, params *UpsertRequestValidationsParams, body UpsertRequestValidationsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpsertRequestValidationsRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewUpsertRequestValidationsRequestWithBody generates requests for UpsertRequestValidations with any type of body
+func NewUpsertRequestValidationsRequestWithBody(server string, params *UpsertRequestValidationsParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "schemaid", runtime.ParamLocationPath, schemaid)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "filename", runtime.ParamLocationPath, filename)
-	if err != nil {
-		return nil, err
-	}
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/request-schemas/%s/file/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/request-validations")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -947,12 +884,72 @@ func NewUploadSchemaFileRequestWithBody(server string, schemaid SchemaID, filena
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewDeleteRequestValidationRequest generates requests for DeleteRequestValidation
+func NewDeleteRequestValidationRequest(server string, routekey RouteKey, params *DeleteRequestValidationParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "routekey", runtime.ParamLocationPath, routekey)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/request-validations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "x-integration-id", runtime.ParamLocationHeader, params.XIntegrationId)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("x-integration-id", headerParam0)
+
+	}
 
 	return req, nil
 }
@@ -1146,27 +1143,25 @@ type ClientWithResponsesInterface interface {
 	// UploadSchemaWithBodyWithResponse request with any body
 	UploadSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
 
-	UploadSchemaWithResponse(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
-
-	// DeleteSchemaWithResponse request
-	DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error)
+	// DeleteSchemaFileWithResponse request
+	DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error)
 
 	// GetSchemaWithResponse request
 	GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error)
 
-	// UpdateSchemaWithBodyWithResponse request with any body
-	UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
-
-	UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error)
-
-	// DeleteSchemaFileWithResponse request
-	DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error)
-
-	// GetSchemaFileWithResponse request
-	GetSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*GetSchemaFileResponse, error)
-
 	// UploadSchemaFileWithBodyWithResponse request with any body
-	UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error)
+	UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error)
+
+	// GetRequestValidationsWithResponse request
+	GetRequestValidationsWithResponse(ctx context.Context, params *GetRequestValidationsParams, reqEditors ...RequestEditorFn) (*GetRequestValidationsResponse, error)
+
+	// UpsertRequestValidationsWithBodyWithResponse request with any body
+	UpsertRequestValidationsWithBodyWithResponse(ctx context.Context, params *UpsertRequestValidationsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertRequestValidationsResponse, error)
+
+	UpsertRequestValidationsWithResponse(ctx context.Context, params *UpsertRequestValidationsParams, body UpsertRequestValidationsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertRequestValidationsResponse, error)
+
+	// DeleteRequestValidationWithResponse request
+	DeleteRequestValidationWithResponse(ctx context.Context, routekey RouteKey, params *DeleteRequestValidationParams, reqEditors ...RequestEditorFn) (*DeleteRequestValidationResponse, error)
 
 	// GetServiceLevelsWithResponse request
 	GetServiceLevelsWithResponse(ctx context.Context, params *GetServiceLevelsParams, reqEditors ...RequestEditorFn) (*GetServiceLevelsResponse, error)
@@ -1233,85 +1228,6 @@ func (r UploadSchemaResponse) StatusCode() int {
 	return 0
 }
 
-type DeleteSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON400      *BadRequest
-	JSON401      *Unauthorized
-	JSON404      *NotFound
-	JSON429      *TooManyRequests
-	JSON500      *InternalServerError
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *GetRequestSchemaResponse
-	JSON400      *BadRequest
-	JSON401      *Unauthorized
-	JSON404      *NotFound
-	JSON429      *TooManyRequests
-	JSON500      *InternalServerError
-}
-
-// Status returns HTTPResponse.Status
-func (r GetSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type UpdateSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON201      *UploadRequestSchemaResponse
-	JSON400      *BadRequest
-	JSON401      *Unauthorized
-	JSON429      *TooManyRequests
-	JSON500      *InternalServerError
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdateSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdateSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type DeleteSchemaFileResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1338,19 +1254,19 @@ func (r DeleteSchemaFileResponse) StatusCode() int {
 	return 0
 }
 
-type GetSchemaFileResponse struct {
-	Body                     []byte
-	HTTPResponse             *http.Response
-	ApplicationschemaJSON200 *JSONSchemaFileContent
-	JSON400                  *BadRequest
-	JSON401                  *Unauthorized
-	JSON404                  *NotFound
-	JSON429                  *TooManyRequests
-	JSON500                  *InternalServerError
+type GetSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *JSONSchemaFileContent
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
 }
 
 // Status returns HTTPResponse.Status
-func (r GetSchemaFileResponse) Status() string {
+func (r GetSchemaResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1358,7 +1274,7 @@ func (r GetSchemaFileResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetSchemaFileResponse) StatusCode() int {
+func (r GetSchemaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1385,6 +1301,86 @@ func (r UploadSchemaFileResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UploadSchemaFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetRequestValidationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RequestValidationList
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRequestValidationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRequestValidationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpsertRequestValidationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *UpsertedRequestValidationResponse
+	JSON201      *UpsertedRequestValidationResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpsertRequestValidationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpsertRequestValidationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteRequestValidationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON429      *TooManyRequests
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteRequestValidationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteRequestValidationResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1489,21 +1485,13 @@ func (c *ClientWithResponses) UploadSchemaWithBodyWithResponse(ctx context.Conte
 	return ParseUploadSchemaResponse(rsp)
 }
 
-func (c *ClientWithResponses) UploadSchemaWithResponse(ctx context.Context, body UploadSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
-	rsp, err := c.UploadSchema(ctx, body, reqEditors...)
+// DeleteSchemaFileWithResponse request returning *DeleteSchemaFileResponse
+func (c *ClientWithResponses) DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error) {
+	rsp, err := c.DeleteSchemaFile(ctx, schemaid, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUploadSchemaResponse(rsp)
-}
-
-// DeleteSchemaWithResponse request returning *DeleteSchemaResponse
-func (c *ClientWithResponses) DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error) {
-	rsp, err := c.DeleteSchema(ctx, schemaid, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteSchemaResponse(rsp)
+	return ParseDeleteSchemaFileResponse(rsp)
 }
 
 // GetSchemaWithResponse request returning *GetSchemaResponse
@@ -1515,48 +1503,48 @@ func (c *ClientWithResponses) GetSchemaWithResponse(ctx context.Context, schemai
 	return ParseGetSchemaResponse(rsp)
 }
 
-// UpdateSchemaWithBodyWithResponse request with arbitrary body returning *UpdateSchemaResponse
-func (c *ClientWithResponses) UpdateSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
-	rsp, err := c.UpdateSchemaWithBody(ctx, schemaid, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateSchemaResponse(rsp)
-}
-
-func (c *ClientWithResponses) UpdateSchemaWithResponse(ctx context.Context, schemaid SchemaID, body UpdateSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSchemaResponse, error) {
-	rsp, err := c.UpdateSchema(ctx, schemaid, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateSchemaResponse(rsp)
-}
-
-// DeleteSchemaFileWithResponse request returning *DeleteSchemaFileResponse
-func (c *ClientWithResponses) DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error) {
-	rsp, err := c.DeleteSchemaFile(ctx, schemaid, filename, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteSchemaFileResponse(rsp)
-}
-
-// GetSchemaFileWithResponse request returning *GetSchemaFileResponse
-func (c *ClientWithResponses) GetSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, reqEditors ...RequestEditorFn) (*GetSchemaFileResponse, error) {
-	rsp, err := c.GetSchemaFile(ctx, schemaid, filename, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetSchemaFileResponse(rsp)
-}
-
 // UploadSchemaFileWithBodyWithResponse request with arbitrary body returning *UploadSchemaFileResponse
-func (c *ClientWithResponses) UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, filename FileName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error) {
-	rsp, err := c.UploadSchemaFileWithBody(ctx, schemaid, filename, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UploadSchemaFileWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaFileResponse, error) {
+	rsp, err := c.UploadSchemaFileWithBody(ctx, schemaid, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseUploadSchemaFileResponse(rsp)
+}
+
+// GetRequestValidationsWithResponse request returning *GetRequestValidationsResponse
+func (c *ClientWithResponses) GetRequestValidationsWithResponse(ctx context.Context, params *GetRequestValidationsParams, reqEditors ...RequestEditorFn) (*GetRequestValidationsResponse, error) {
+	rsp, err := c.GetRequestValidations(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRequestValidationsResponse(rsp)
+}
+
+// UpsertRequestValidationsWithBodyWithResponse request with arbitrary body returning *UpsertRequestValidationsResponse
+func (c *ClientWithResponses) UpsertRequestValidationsWithBodyWithResponse(ctx context.Context, params *UpsertRequestValidationsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertRequestValidationsResponse, error) {
+	rsp, err := c.UpsertRequestValidationsWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertRequestValidationsResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpsertRequestValidationsWithResponse(ctx context.Context, params *UpsertRequestValidationsParams, body UpsertRequestValidationsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertRequestValidationsResponse, error) {
+	rsp, err := c.UpsertRequestValidations(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertRequestValidationsResponse(rsp)
+}
+
+// DeleteRequestValidationWithResponse request returning *DeleteRequestValidationResponse
+func (c *ClientWithResponses) DeleteRequestValidationWithResponse(ctx context.Context, routekey RouteKey, params *DeleteRequestValidationParams, reqEditors ...RequestEditorFn) (*DeleteRequestValidationResponse, error) {
+	rsp, err := c.DeleteRequestValidation(ctx, routekey, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteRequestValidationResponse(rsp)
 }
 
 // GetServiceLevelsWithResponse request returning *GetServiceLevelsResponse
@@ -1709,15 +1697,15 @@ func ParseUploadSchemaResponse(rsp *http.Response) (*UploadSchemaResponse, error
 	return response, nil
 }
 
-// ParseDeleteSchemaResponse parses an HTTP response from a DeleteSchemaWithResponse call
-func ParseDeleteSchemaResponse(rsp *http.Response) (*DeleteSchemaResponse, error) {
+// ParseDeleteSchemaFileResponse parses an HTTP response from a DeleteSchemaFileWithResponse call
+func ParseDeleteSchemaFileResponse(rsp *http.Response) (*DeleteSchemaFileResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteSchemaResponse{
+	response := &DeleteSchemaFileResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1778,180 +1766,11 @@ func ParseGetSchemaResponse(rsp *http.Response) (*GetSchemaResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest GetRequestSchemaResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest InternalServerError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseUpdateSchemaResponse parses an HTTP response from a UpdateSchemaWithResponse call
-func ParseUpdateSchemaResponse(rsp *http.Response) (*UpdateSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpdateSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest UploadRequestSchemaResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest InternalServerError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseDeleteSchemaFileResponse parses an HTTP response from a DeleteSchemaFileWithResponse call
-func ParseDeleteSchemaFileResponse(rsp *http.Response) (*DeleteSchemaFileResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteSchemaFileResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest InternalServerError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetSchemaFileResponse parses an HTTP response from a GetSchemaFileWithResponse call
-func ParseGetSchemaFileResponse(rsp *http.Response) (*GetSchemaFileResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetSchemaFileResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest JSONSchemaFileContent
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationschemaJSON200 = &dest
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest
@@ -2002,6 +1821,182 @@ func ParseUploadSchemaFileResponse(rsp *http.Response) (*UploadSchemaFileRespons
 	}
 
 	response := &UploadSchemaFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRequestValidationsResponse parses an HTTP response from a GetRequestValidationsWithResponse call
+func ParseGetRequestValidationsResponse(rsp *http.Response) (*GetRequestValidationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRequestValidationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RequestValidationList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpsertRequestValidationsResponse parses an HTTP response from a UpsertRequestValidationsWithResponse call
+func ParseUpsertRequestValidationsResponse(rsp *http.Response) (*UpsertRequestValidationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpsertRequestValidationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpsertedRequestValidationResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UpsertedRequestValidationResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteRequestValidationResponse parses an HTTP response from a DeleteRequestValidationWithResponse call
+func ParseDeleteRequestValidationResponse(rsp *http.Response) (*DeleteRequestValidationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteRequestValidationResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -2231,24 +2226,24 @@ type ServerInterface interface {
 	// Create Schema
 	// (POST /request-schemas)
 	UploadSchema(w http.ResponseWriter, r *http.Request)
-	// Delete Schema
+	// Delete Schema File
 	// (DELETE /request-schemas/{schemaid})
-	DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
-	// Get Schema
+	DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
+	// Get request schemas
 	// (GET /request-schemas/{schemaid})
 	GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
-	// Update Schema
-	// (PUT /request-schemas/{schemaid})
-	UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
-	// Delete Schema File
-	// (DELETE /request-schemas/{schemaid}/file/{filename})
-	DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName)
-	// Get Schema File
-	// (GET /request-schemas/{schemaid}/file/{filename})
-	GetSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName)
 	// Upload Schema File
-	// (PUT /request-schemas/{schemaid}/file/{filename})
-	UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName)
+	// (PUT /request-schemas/{schemaid})
+	UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
+	// List Request Validations
+	// (GET /request-validations)
+	GetRequestValidations(w http.ResponseWriter, r *http.Request, params GetRequestValidationsParams)
+	// Upserts Request Validations
+	// (POST /request-validations)
+	UpsertRequestValidations(w http.ResponseWriter, r *http.Request, params UpsertRequestValidationsParams)
+	// Delete Request Validation
+	// (DELETE /request-validations/{routekey})
+	DeleteRequestValidation(w http.ResponseWriter, r *http.Request, routekey RouteKey, params DeleteRequestValidationParams)
 	// List Service Levels
 	// (GET /service-levels)
 	GetServiceLevels(w http.ResponseWriter, r *http.Request, params GetServiceLevelsParams)
@@ -2309,8 +2304,8 @@ func (siw *ServerInterfaceWrapper) UploadSchema(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteSchema operation middleware
-func (siw *ServerInterfaceWrapper) DeleteSchema(w http.ResponseWriter, r *http.Request) {
+// DeleteSchemaFile operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSchemaFile(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -2330,7 +2325,7 @@ func (siw *ServerInterfaceWrapper) DeleteSchema(w http.ResponseWriter, r *http.R
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSchema(w, r, schemaid)
+		siw.Handler.DeleteSchemaFile(w, r, schemaid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2371,117 +2366,6 @@ func (siw *ServerInterfaceWrapper) GetSchema(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateSchema operation middleware
-func (siw *ServerInterfaceWrapper) UpdateSchema(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "schemaid" -------------
-	var schemaid SchemaID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "schemaid", r.PathValue("schemaid"), &schemaid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "schemaid", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateSchema(w, r, schemaid)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteSchemaFile operation middleware
-func (siw *ServerInterfaceWrapper) DeleteSchemaFile(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "schemaid" -------------
-	var schemaid SchemaID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "schemaid", r.PathValue("schemaid"), &schemaid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "schemaid", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "filename" -------------
-	var filename FileName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "filename", r.PathValue("filename"), &filename, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filename", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSchemaFile(w, r, schemaid, filename)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetSchemaFile operation middleware
-func (siw *ServerInterfaceWrapper) GetSchemaFile(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "schemaid" -------------
-	var schemaid SchemaID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "schemaid", r.PathValue("schemaid"), &schemaid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "schemaid", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "filename" -------------
-	var filename FileName
-
-	err = runtime.BindStyledParameterWithOptions("simple", "filename", r.PathValue("filename"), &filename, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filename", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSchemaFile(w, r, schemaid, filename)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // UploadSchemaFile operation middleware
 func (siw *ServerInterfaceWrapper) UploadSchemaFile(w http.ResponseWriter, r *http.Request) {
 
@@ -2496,12 +2380,134 @@ func (siw *ServerInterfaceWrapper) UploadSchemaFile(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// ------------- Path parameter "filename" -------------
-	var filename FileName
+	ctx := r.Context()
 
-	err = runtime.BindStyledParameterWithOptions("simple", "filename", r.PathValue("filename"), &filename, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadSchemaFile(w, r, schemaid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRequestValidations operation middleware
+func (siw *ServerInterfaceWrapper) GetRequestValidations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRequestValidationsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRequestValidations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpsertRequestValidations operation middleware
+func (siw *ServerInterfaceWrapper) UpsertRequestValidations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpsertRequestValidationsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpsertRequestValidations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteRequestValidation operation middleware
+func (siw *ServerInterfaceWrapper) DeleteRequestValidation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "routekey" -------------
+	var routekey RouteKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "routekey", r.PathValue("routekey"), &routekey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filename", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "routekey", Err: err})
 		return
 	}
 
@@ -2511,8 +2517,36 @@ func (siw *ServerInterfaceWrapper) UploadSchemaFile(w http.ResponseWriter, r *ht
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteRequestValidationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "x-integration-id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("x-integration-id")]; found {
+		var XIntegrationId IntegrationID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "x-integration-id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "x-integration-id", valueList[0], &XIntegrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "x-integration-id", Err: err})
+			return
+		}
+
+		params.XIntegrationId = XIntegrationId
+
+	} else {
+		err := fmt.Errorf("Header parameter x-integration-id is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "x-integration-id", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UploadSchemaFile(w, r, schemaid, filename)
+		siw.Handler.DeleteRequestValidation(w, r, routekey, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2803,12 +2837,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc("GET "+options.BaseURL+"/request-schemas", wrapper.ListSchemas)
 	m.HandleFunc("POST "+options.BaseURL+"/request-schemas", wrapper.UploadSchema)
-	m.HandleFunc("DELETE "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.DeleteSchema)
+	m.HandleFunc("DELETE "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.DeleteSchemaFile)
 	m.HandleFunc("GET "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.GetSchema)
-	m.HandleFunc("PUT "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.UpdateSchema)
-	m.HandleFunc("DELETE "+options.BaseURL+"/request-schemas/{schemaid}/file/{filename}", wrapper.DeleteSchemaFile)
-	m.HandleFunc("GET "+options.BaseURL+"/request-schemas/{schemaid}/file/{filename}", wrapper.GetSchemaFile)
-	m.HandleFunc("PUT "+options.BaseURL+"/request-schemas/{schemaid}/file/{filename}", wrapper.UploadSchemaFile)
+	m.HandleFunc("PUT "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.UploadSchemaFile)
+	m.HandleFunc("GET "+options.BaseURL+"/request-validations", wrapper.GetRequestValidations)
+	m.HandleFunc("POST "+options.BaseURL+"/request-validations", wrapper.UpsertRequestValidations)
+	m.HandleFunc("DELETE "+options.BaseURL+"/request-validations/{routekey}", wrapper.DeleteRequestValidation)
 	m.HandleFunc("GET "+options.BaseURL+"/service-levels", wrapper.GetServiceLevels)
 	m.HandleFunc("POST "+options.BaseURL+"/service-levels", wrapper.UpsertServiceLevels)
 	m.HandleFunc("DELETE "+options.BaseURL+"/service-levels/{routekey}", wrapper.DeleteServiceLevels)

@@ -18,6 +18,93 @@ security:
   - bearerAuth: []
 
 paths:
+  /request-validations:
+    get:
+      summary: List Request Validations
+      description: Retrieve Request Validations
+      operationId: getRequestValidations
+      tags:
+        - Request Validations
+      parameters:
+        - $ref: '#/components/parameters/IntegrationID'
+      responses:
+        '200':
+          description: List Request Validations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestValidationList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Upserts Request Validations
+      description: Upsert Request Validation
+      operationId: upsertRequestValidations
+      tags:
+        - Request Validations
+      parameters:
+        - $ref: '#/components/parameters/IntegrationID'
+      requestBody:
+        description: Request Validation Details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertRequestValidationRequest'
+      responses:
+        '200':
+          description: Updated Service Levels
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpsertedRequestValidationResponse'
+        '201':
+          description: Created Service Levels
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpsertedRequestValidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /request-validations/{routekey}:
+    delete:
+      summary: Delete Request Validation
+      description: Delete an existing Request Validation
+      operationId: deleteRequestValidation
+      tags:
+        - Request Validations
+      parameters:
+        - $ref: '#/components/parameters/RouteKey'
+        - $ref: '#/components/parameters/IntegrationID'
+      responses:
+        '204':
+          description: Request Validation deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /request-schemas:
     get:
       summary: List request schemas
@@ -52,12 +139,12 @@ paths:
         description: Schema definition
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
-                title:
-                  $ref: '#/components/schemas/SchemaTitle'
+                jsonschema:
+                  $ref: '#/components/schemas/JSONSchemaFileContent'
       responses:
         '201':
           description: Created request schema
@@ -75,103 +162,19 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
   /request-schemas/{schemaid}:
-    put:
-      summary: Update Schema
-      description: Update request schema
-      operationId: updateSchema
-      tags:
-        - Request Schemas
-      parameters:
-        - $ref: '#/components/parameters/SchemaID'
-      requestBody:
-        description: Schema definition
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                title:
-                  $ref: '#/components/schemas/SchemaTitle'
-      responses:
-        '201':
-          description: Udated request schema
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UploadRequestSchemaResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
     get:
-      summary: Get Schema
-      description: Get request schema
+      summary: Get request schemas
+      description: Retrieve request schema
       operationId: getSchema
       tags:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-
       responses:
         '200':
-          description: Get request schema
+          description: Get Schema File Content
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/GetRequestSchemaResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    delete:
-      summary: Delete Schema
-      description: Delete request schema
-      operationId: deleteSchema
-      tags:
-        - Request Schemas
-      parameters:
-        - $ref: '#/components/parameters/SchemaID'
-      responses:
-        '204':
-          description: Request schema deleted successfully
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-  /request-schemas/{schemaid}/file/{filename}:
-    get:
-      summary: Get Schema File
-      description: Get request schema file
-      operationId: getSchemaFile
-      tags:
-        - Request Schemas
-      parameters:
-        - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/FileName'
-      responses:
-        '200':
-          description: Get request schema file
-          content:
-            application/schema+json:
               schema:
                 $ref: '#/components/schemas/JSONSchemaFileContent'
         '400':
@@ -192,7 +195,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/FileName'
       responses:
         '204':
           description: Request schema file deleted successfully
@@ -214,7 +216,6 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
-        - $ref: '#/components/parameters/FileName'
       requestBody:
         description: Schema definition
         required: true
@@ -353,28 +354,20 @@ components:
       schema:
         $ref: '#/components/schemas/SchemaID'
 
-    FileName:
-      name: filename
-      in: path
-      required: true
-      description: Unique identifier of the request schema file
-      schema:
-        $ref: '#/components/schemas/SchemaFileName'
-
   schemas:
     IntegrationID:
       type: string
-      minLength: 32
-      maxLength: 32
-      pattern: "IN[A-Z0-9]+"
-      example: IN7AB56CD456OP98BN54CAUB43211OU7
+      minLength: 24
+      maxLength: 24
+      pattern: "IN[A-Za-z0-9_\\-]+"
+      example: INx3zt0ygAcQGBAQEBAQEBAQ
 
     SchemaID:
       type: string
-      minLength: 32
-      maxLength: 32
-      pattern: "S[A-Z0-9]+"
-      example: S7AB56CD456OP98BN54CAUB43211OU78
+      minLength: 24
+      maxLength: 24
+      pattern: "SC[A-Za-z0-9_\\-]+"
+      example: SCx3zt0ygAcQGBAQEBAQEBAQ
 
     JSONSchemaFileContent:
       type: string
@@ -384,16 +377,6 @@ components:
       maxLength: 355000
       description: https://json-schema.org/draft/2020-12/json-schema-core.html
 
-    SchemaFileName:
-      type: string
-      enum: [
-        "request-headers.json",
-        "request-query.json",
-        "request-body.json",
-        "response-headers.json",
-        "response-body.json"
-      ]
-
     DateTime:
       type: string
       format: date-time
@@ -401,32 +384,6 @@ components:
       maxLength: 20
       description: https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
       example: "2017-07-21T17:32:28Z"
-
-    SchemaTitle:
-      type: string
-      pattern: "[a-zA-Z0-9_\\- ]+"
-      description: Schema title
-      maxLength: 256
-      minLength: 1
-      example: "Request schema"
-
-    GetRequestSchemaResponse:
-      type: object
-      required:
-        - updatedAt
-      properties:
-        title:
-          $ref: '#/components/schemas/SchemaTitle'
-        files:
-          items:
-            type: object
-            properties:
-              name:
-                $ref: '#/components/schemas/SchemaFileName'
-              updatedAt:
-                $ref: '#/components/schemas/DateTime'
-        updatedAt:
-          $ref: '#/components/schemas/DateTime'
 
     UploadRequestSchemaResponse:
       type: object
@@ -452,13 +409,17 @@ components:
             properties:
               schemaID:
                 $ref: '#/components/schemas/SchemaID'
-              title:
-                $ref: '#/components/schemas/SchemaTitle'
               updatedAt:
                 $ref: '#/components/schemas/DateTime'
           description: List of uploaded schemas
 
     UpsertedServiceLevelsResponse:
+      type: object
+      properties:
+        routeKey:
+          $ref: '#/components/schemas/RouteKey'
+
+    UpsertedRequestValidationResponse:
       type: object
       properties:
         routeKey:
@@ -477,6 +438,36 @@ components:
           $ref: '#/components/schemas/StatusServiceLevels'
         validation:
           $ref: '#/components/schemas/ValidationServiceLevels'
+
+    UpsertRequestValidationRequest:
+      type: object
+      required:
+        - route
+      properties:
+        route:
+          $ref: '#/components/schemas/Route'
+        requestSchema:
+          $ref: '#/components/schemas/RequestValidationSchema'
+        responseSchema:
+          $ref: '#/components/schemas/ResponseValidationSchema'
+    
+    RequestValidationSchema:
+      type: object
+      properties:
+        headerSchema:
+          $ref: '#/components/schemas/SchemaID'
+        querySchema:
+          $ref: '#/components/schemas/SchemaID'
+        bodySchema:
+          $ref: '#/components/schemas/SchemaID'
+
+    ResponseValidationSchema:
+      type: object
+      properties:
+        headerSchema:
+          $ref: '#/components/schemas/SchemaID'
+        bodySchema:
+          $ref: '#/components/schemas/SchemaID'
 
     RouteKey:
       type: string
@@ -497,6 +488,34 @@ components:
           items:
             $ref: '#/components/schemas/RouteServiceLevels'
           description: List of route-specific Service Levels
+
+    RequestValidationList:
+      type: object
+      description: List of Request Validations for an integration
+      required:
+        - routes
+      properties:
+        routes:
+          type: array
+          maxItems: 1024
+          items:
+            $ref: '#/components/schemas/RouteRequestValidation'
+          description: List of route-specific Request Validations
+
+    RouteRequestValidation:
+      type: object
+      required:
+        - routeKey
+        - route
+      properties:
+        routeKey:
+          $ref: '#/components/schemas/RouteKey'
+        route:
+          $ref: '#/components/schemas/Route'
+        requestSchema:
+          $ref: '#/components/schemas/RequestValidationSchema'
+        responseSchema:
+          $ref: '#/components/schemas/ResponseValidationSchema'
 
     Route:
       type: object
@@ -562,12 +581,9 @@ components:
     ValidationServiceLevels:
       type: object
       required:
-        - schemaId
         - breachThreshold
         - windowDuration
       properties:
-        schemaId:
-          $ref: '#/components/schemas/SchemaID'
         breachThreshold:
           $ref: '#/components/schemas/PercentileValue'
         windowDuration:
@@ -706,5 +722,7 @@ components:
 tags:
   - name: Request Schemas
     description: Operations for managing HTTP request schemas
+  - name: Request Validations
+    description: Operations for managing HTTP request validations
   - name: Service Levels
     description: Operations for managing integration Service Levels

@@ -18,35 +18,35 @@ type HttpHandler struct {
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func (h *HttpHandler) ListSchemas(w http.ResponseWriter, r *http.Request) {
+func (h *HttpHandler) ListSchemas(_ http.ResponseWriter, _ *http.Request) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) UploadSchema(w http.ResponseWriter, r *http.Request) {
+func (h *HttpHandler) UploadSchema(_ http.ResponseWriter, _ *http.Request) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID) {
+func (h *HttpHandler) DeleteSchemaFile(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID) {
+func (h *HttpHandler) GetSchema(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) UpdateSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID) {
+func (h *HttpHandler) UploadSchemaFile(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName) {
+func (h *HttpHandler) GetRequestValidations(_ http.ResponseWriter, _ *http.Request, _ GetRequestValidationsParams) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) GetSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName) {
+func (h *HttpHandler) UpsertRequestValidations(_ http.ResponseWriter, _ *http.Request, _ UpsertRequestValidationsParams) {
 	panic("implement me")
 }
 
-func (h *HttpHandler) UploadSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID, filename FileName) {
+func (h *HttpHandler) DeleteRequestValidation(_ http.ResponseWriter, _ *http.Request, _ RouteKey, _ DeleteRequestValidationParams) {
 	panic("implement me")
 }
 
