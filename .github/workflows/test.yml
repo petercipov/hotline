@@ -33,7 +33,7 @@ jobs:
           make cover
           make clean-cache
       - name: check hotline test coverage
-        uses: vladopajic/go-test-coverage@v2
+        uses: vladopajic/go-test-coverage@cc5012c2cfa84542e02b079141958a885861d326 # v2
         with:
           profile: cover.out
           source-dir: ./src/hotline
