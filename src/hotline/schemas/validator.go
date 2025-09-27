@@ -8,75 +8,133 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
+var ErrNoContent = errors.New("no content provided")
+
 type Validator struct {
-	requestHeaders *jsonschema.Schema
-	requestQuery   *jsonschema.Schema
-	requestBody    *jsonschema.Schema
+	requestHeaders *jsonSchemaValidator
+	requestQuery   *jsonSchemaValidator
+	requestBody    *jsonSchemaValidator
 
-	responseHeaders *jsonschema.Schema
-	responseBody    *jsonschema.Schema
+	responseHeaders *jsonSchemaValidator
+	responseBody    *jsonSchemaValidator
 }
 
-type Schema struct {
-	ID             ID
-	RequestHeaders io.Reader
-	RequestQuery   io.Reader
-	RequestBody    io.Reader
+type RequestSchema struct {
+	RequestHeaders *SchemaDefinition
+	RequestQuery   *SchemaDefinition
+	RequestBody    *SchemaDefinition
 
-	ResponseHeaders io.Reader
-	ResponseBody    io.Reader
+	ResponseHeaders *SchemaDefinition
+	ResponseBody    *SchemaDefinition
 }
 
-func NewRequestValidator(definitions Schema) (*Validator, error) {
+type SchemaDefinition struct {
+	ID      ID
+	Content io.Reader
+}
+
+type jsonSchemaValidator struct {
+	schemaID ID
+	schema   *jsonschema.Schema
+}
+
+func (j *jsonSchemaValidator) ValidateMap(headers map[string][]string) (*ID, *ValidationError) {
+	if j == nil {
+		return nil, nil
+	}
+	validationErr := j.schema.Validate(castToAny(headers))
+	if validationErr != nil {
+		return &j.schemaID, &ValidationError{
+			SchemaID: j.schemaID,
+			Err:      validationErr,
+		}
+	}
+	return &j.schemaID, nil
+}
+
+func (j *jsonSchemaValidator) ValidateInput(content io.Reader) (*ID, *ValidationError) {
+	if j == nil {
+		return nil, nil
+	}
+
+	if content == nil {
+		return &j.schemaID, &ValidationError{
+			SchemaID: j.schemaID,
+			Err:      ErrNoContent,
+		}
+	}
+
+	contentMap, readErr := jsonschema.UnmarshalJSON(content)
+	if readErr != nil {
+		return &j.schemaID, &ValidationError{
+			SchemaID: j.schemaID,
+			Err:      readErr,
+		}
+	}
+
+	validationErr := j.schema.Validate(contentMap)
+	if validationErr != nil {
+		return &j.schemaID, &ValidationError{
+			SchemaID: j.schemaID,
+			Err:      validationErr,
+		}
+	}
+	return &j.schemaID, nil
+}
+
+func newJsonSchemaValidator(definition SchemaDefinition, name string, c *jsonschema.Compiler) (*jsonSchemaValidator, error) {
+	url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/%s.json", definition.ID, name)
+	schema, err := parse(c, url, definition.Content)
+	if err != nil {
+		return nil, err
+	}
+	return &jsonSchemaValidator{
+		schemaID: definition.ID,
+		schema:   schema,
+	}, nil
+}
+
+func NewRequestValidator(definitions RequestSchema) (*Validator, error) {
 	c := jsonschema.NewCompiler()
 	c.DefaultDraft(jsonschema.Draft2020)
 	c.UseLoader(&nopLoader{})
 	validator := &Validator{}
+
+	var parseErr error
 	if definitions.RequestHeaders != nil {
-		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/request-headers.json", definitions.ID)
-		headerSchema, err := parse(c, url, definitions.RequestHeaders)
-		if err != nil {
-			return nil, err
+		validator.requestHeaders, parseErr = newJsonSchemaValidator(*definitions.RequestHeaders, "request-headers", c)
+		if parseErr != nil {
+			return nil, parseErr
 		}
-		validator.requestHeaders = headerSchema
 	}
 
 	if definitions.RequestQuery != nil {
-		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/request-query.json", definitions.ID)
-		querySchema, err := parse(c, url, definitions.RequestQuery)
-		if err != nil {
-			return nil, err
+		validator.requestQuery, parseErr = newJsonSchemaValidator(*definitions.RequestQuery, "request-query", c)
+		if parseErr != nil {
+			return nil, parseErr
 		}
-		validator.requestQuery = querySchema
 	}
 
 	if definitions.RequestBody != nil {
-		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/request-body.json", definitions.ID)
-		bodySchema, err := parse(c, url, definitions.RequestBody)
-		if err != nil {
-			return nil, err
+		validator.requestBody, parseErr = newJsonSchemaValidator(*definitions.RequestBody, "request-body", c)
+		if parseErr != nil {
+			return nil, parseErr
 		}
-		validator.requestBody = bodySchema
 	}
 
 	if definitions.ResponseHeaders != nil {
-		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/response-headers.json", definitions.ID)
-		headersSchema, err := parse(c, url, definitions.ResponseHeaders)
-		if err != nil {
-			return nil, err
+		validator.responseHeaders, parseErr = newJsonSchemaValidator(*definitions.ResponseHeaders, "response-headers", c)
+		if parseErr != nil {
+			return nil, parseErr
 		}
-		validator.responseHeaders = headersSchema
 	}
 
 	if definitions.ResponseBody != nil {
-		url := fmt.Sprintf("https://local-server/api/v1/request-schemas/%s/files/response-body.json", definitions.ID)
-		bodySchema, err := parse(c, url, definitions.ResponseBody)
-		if err != nil {
-			return nil, err
+		validator.responseBody, parseErr = newJsonSchemaValidator(*definitions.ResponseBody, "response-body", c)
+		if parseErr != nil {
+			return nil, parseErr
 		}
-		validator.responseBody = bodySchema
 	}
-
 	return validator, nil
 }
 
@@ -94,14 +152,24 @@ func parse(c *jsonschema.Compiler, url string, r io.Reader) (*jsonschema.Schema,
 	return compiledSchema, nil
 }
 
-func (v *Validator) ValidateHeaders(headers map[string][]string) error {
-	if v.requestHeaders != nil {
-		validationErr := v.requestHeaders.Validate(castToAny(headers))
-		if validationErr != nil {
-			return validationErr
-		}
-	}
-	return nil
+func (v *Validator) ValidateHeaders(headers map[string][]string) (*ID, *ValidationError) {
+	return v.requestHeaders.ValidateMap(headers)
+}
+
+func (v *Validator) ValidateQuery(query map[string][]string) (*ID, *ValidationError) {
+	return v.requestQuery.ValidateMap(query)
+}
+
+func (v *Validator) ValidateBody(bodyReader io.Reader) (*ID, *ValidationError) {
+	return v.requestBody.ValidateInput(bodyReader)
+}
+
+func (v *Validator) ValidateResponseHeaders(headers map[string][]string) (*ID, *ValidationError) {
+	return v.responseHeaders.ValidateMap(headers)
+}
+
+func (v *Validator) ValidateResponseBody(bodyReader io.Reader) (*ID, *ValidationError) {
+	return v.responseBody.ValidateInput(bodyReader)
 }
 
 func castToAny(headers map[string][]string) map[string]any {
@@ -114,56 +182,6 @@ func castToAny(headers map[string][]string) map[string]any {
 		headersAny[mapKey] = valSlice
 	}
 	return headersAny
-}
-
-func (v *Validator) ValidateQuery(query map[string][]string) error {
-	if v.requestQuery != nil {
-		validationErr := v.requestQuery.Validate(castToAny(query))
-		if validationErr != nil {
-			return validationErr
-		}
-	}
-	return nil
-}
-
-func (v *Validator) ValidateBody(bodyReader io.Reader) error {
-	if v.requestBody != nil {
-		bodyMap, readErr := jsonschema.UnmarshalJSON(bodyReader)
-		if readErr != nil {
-			return readErr
-		}
-
-		validationErr := v.requestBody.Validate(bodyMap)
-		if validationErr != nil {
-			return validationErr
-		}
-	}
-	return nil
-}
-
-func (v *Validator) ValidateResponseHeaders(headers map[string][]string) error {
-	if v.responseHeaders != nil {
-		validationErr := v.responseHeaders.Validate(castToAny(headers))
-		if validationErr != nil {
-			return validationErr
-		}
-	}
-	return nil
-}
-
-func (v *Validator) ValidateResponseBody(bodyReader io.Reader) error {
-	if v.responseBody != nil {
-		bodyMap, readErr := jsonschema.UnmarshalJSON(bodyReader)
-		if readErr != nil {
-			return readErr
-		}
-
-		validationErr := v.responseBody.Validate(bodyMap)
-		if validationErr != nil {
-			return validationErr
-		}
-	}
-	return nil
 }
 
 type nopLoader struct {

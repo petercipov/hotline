@@ -454,19 +454,19 @@ components:
     RequestValidationSchema:
       type: object
       properties:
-        headerSchema:
+        headerSchemaID:
           $ref: '#/components/schemas/SchemaID'
-        querySchema:
+        querySchemaID:
           $ref: '#/components/schemas/SchemaID'
-        bodySchema:
+        bodySchemaID:
           $ref: '#/components/schemas/SchemaID'
 
     ResponseValidationSchema:
       type: object
       properties:
-        headerSchema:
+        headerSchemaID:
           $ref: '#/components/schemas/SchemaID'
-        bodySchema:
+        bodySchemaID:
           $ref: '#/components/schemas/SchemaID'
 
     RouteKey:

@@ -3,7 +3,6 @@ package concurrency_test
 import (
 	"context"
 	"hotline/concurrency"
-	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -83,13 +82,7 @@ func (s *workersSUT) Close() {
 }
 
 func (s *workersSUT) forWorker(count int) {
-	var workerIDs []string
-
-	for i := range count {
-		workerIDs = append(workerIDs, strconv.Itoa(i))
-	}
-
-	s.scopes = concurrency.NewScopes(workerIDs, func() *workerSUTScope {
+	s.scopes = concurrency.NewScopes(concurrency.GenerateScopeIds("worker", count), func() *workerSUTScope {
 		return &workerSUTScope{}
 	})
 	s.workers = concurrency.NewScopeWorkers(

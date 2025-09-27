@@ -80,12 +80,7 @@ func (f *fanOutSut) forSingleFanOut() {
 }
 
 func (f *fanOutSut) forFanOut(numberOfQueues int) {
-	var queueNames []string
-	for i := range numberOfQueues {
-		queueNames = append(queueNames, fmt.Sprintf("fan%d", i))
-	}
-
-	f.scopes = concurrency.NewScopes(queueNames, func() *singleWriterScope {
+	f.scopes = concurrency.NewScopes(concurrency.GenerateScopeIds("fan", numberOfQueues), func() *singleWriterScope {
 		return &singleWriterScope{}
 	})
 	f.fanOut = concurrency.NewActionFanOut(f.scopes)

@@ -3,6 +3,7 @@ package otel
 import (
 	"fmt"
 	"hotline/clock"
+	"hotline/http"
 	"hotline/ingestions"
 	"hotline/integrations"
 	"net/url"
@@ -73,7 +74,7 @@ func (h *EnvoyMapping) ConvertMessageToHttp(reqProto *coltracepb.ExportTraceServ
 				}
 
 				requests = append(requests, &ingestions.HttpRequest{
-					ID:              id,
+					ID:              http.RequestID(id),
 					IntegrationID:   integrations.ID(integrationID),
 					ProtocolVersion: protocolVersion,
 					Method:          method,

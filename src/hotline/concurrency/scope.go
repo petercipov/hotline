@@ -1,6 +1,7 @@
 package concurrency
 
 import (
+	"fmt"
 	"iter"
 	"maps"
 )
@@ -13,6 +14,14 @@ type Scope[S any] struct {
 type Scopes[S any] struct {
 	names  []string
 	scopes map[string]*Scope[S]
+}
+
+func GenerateScopeIds(prefix string, n int) []string {
+	var scopeIDs []string
+	for i := range n {
+		scopeIDs = append(scopeIDs, fmt.Sprintf("%s-%d", prefix, i))
+	}
+	return scopeIDs
 }
 
 func NewScopes[S any](names []string, createScope func() *S) *Scopes[S] {

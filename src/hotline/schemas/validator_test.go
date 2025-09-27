@@ -166,6 +166,13 @@ var _ = Describe("Request Validator", Ordered, func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid character 'i' looking for beginning of value"))
 		})
+
+		It("should validate missing content", func() {
+			sut.forValidatorWithBody()
+			err := sut.validateMissingContent()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no content provided"))
+		})
 	})
 
 	Context("for defined response header validator", func() {
@@ -262,7 +269,7 @@ type validatorSut struct {
 }
 
 func (s *validatorSut) forEmptyValidator() {
-	validator, err := buildValidator(schemas.Schema{})
+	validator, err := buildValidator(schemas.RequestSchema{})
 	Expect(err).ToNot(HaveOccurred())
 	s.validator = validator
 }
@@ -278,7 +285,7 @@ func (s *validatorSut) validateRequest() error {
 }
 
 func (s *validatorSut) validateRequestWithBody(body string) error {
-	err := s.validator.ValidateHeaders(map[string][]string{
+	_, err := s.validator.ValidateHeaders(map[string][]string{
 		"User-Agent":              {"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0"},
 		"Accept":                  {"application/json"},
 		"Accept-Language":         {"en-US,en;q=0.5"},
@@ -301,14 +308,14 @@ func (s *validatorSut) validateRequestWithBody(body string) error {
 		return err
 	}
 
-	err = s.validator.ValidateQuery(map[string][]string{
+	_, err = s.validator.ValidateQuery(map[string][]string{
 		"productID": {"P12345"},
 	})
 	if err != nil {
 		return err
 	}
 
-	err = s.validator.ValidateBody(strings.NewReader(body))
+	_, err = s.validator.ValidateBody(strings.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -339,8 +346,15 @@ func (s *validatorSut) forValidatorWithHeaders() {
 }
 
 func (s *validatorSut) forValidatorWithHeadersSchema(schema string) {
-	validator, err := buildValidator(schemas.Schema{
-		RequestHeaders: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		RequestHeaders: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(err).ToNot(HaveOccurred())
@@ -348,8 +362,15 @@ func (s *validatorSut) forValidatorWithHeadersSchema(schema string) {
 }
 
 func (s *validatorSut) forValidatorWithInvalidHeaderSchema(schema string) error {
-	validator, err := buildValidator(schemas.Schema{
-		RequestHeaders: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		RequestHeaders: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(validator).To(BeNil())
@@ -357,8 +378,15 @@ func (s *validatorSut) forValidatorWithInvalidHeaderSchema(schema string) error 
 }
 
 func (s *validatorSut) forValidatorWithInvalidQuerySchema(schema string) error {
-	validator, err := buildValidator(schemas.Schema{
-		RequestQuery: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		RequestQuery: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(validator).To(BeNil())
@@ -366,21 +394,22 @@ func (s *validatorSut) forValidatorWithInvalidQuerySchema(schema string) error {
 }
 
 func (s *validatorSut) forValidatorWithInvalidBodySchema(schema string) error {
-	validator, err := buildValidator(schemas.Schema{
-		RequestBody: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		RequestBody: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(validator).To(BeNil())
 	return err
 }
 
-func buildValidator(schema schemas.Schema) (*schemas.Validator, error) {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
-	id, idErr := idGenerator(time.Time{})
-	Expect(idErr).ToNot(HaveOccurred())
-
-	schema.ID = id
-
+func buildValidator(schema schemas.RequestSchema) (*schemas.Validator, error) {
 	return schemas.NewRequestValidator(schema)
 }
 
@@ -404,8 +433,15 @@ func (s *validatorSut) forValidatorWithQuery() {
 }
 
 func (s *validatorSut) forValidatorWithQuerySchema(schema string) {
-	validator, err := buildValidator(schemas.Schema{
-		RequestQuery: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		RequestQuery: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(err).ToNot(HaveOccurred())
@@ -440,8 +476,15 @@ func (s *validatorSut) forValidatorWithBody() {
 }
 
 func (s *validatorSut) forValidatorWithBodySchema(schema string) {
-	validator, err := buildValidator(schemas.Schema{
-		RequestBody: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		RequestBody: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(err).ToNot(HaveOccurred())
@@ -467,8 +510,15 @@ func (s *validatorSut) forValidatorWithResponseHeaders() {
 }
 
 func (s *validatorSut) forValidatorWithHeadersResponseSchema(schema string) {
-	validator, err := buildValidator(schemas.Schema{
-		ResponseHeaders: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		ResponseHeaders: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(err).ToNot(HaveOccurred())
@@ -476,14 +526,14 @@ func (s *validatorSut) forValidatorWithHeadersResponseSchema(schema string) {
 }
 
 func (s *validatorSut) validateResponse() error {
-	headerErr := s.validator.ValidateResponseHeaders(map[string][]string{
+	_, headerErr := s.validator.ValidateResponseHeaders(map[string][]string{
 		"Content-Type": {"application/json"},
 	})
 	if headerErr != nil {
 		return headerErr
 	}
 
-	respErr := s.validator.ValidateResponseBody(strings.NewReader(`{
+	_, respErr := s.validator.ValidateResponseBody(strings.NewReader(`{
 		"productID": "P12345",
 		"title": "Hotline",
 		"price": 59.99,
@@ -496,8 +546,15 @@ func (s *validatorSut) validateResponse() error {
 }
 
 func (s *validatorSut) forValidatorWithInvalidHeaderResponseSchema(schema string) error {
-	_, err := buildValidator(schemas.Schema{
-		ResponseHeaders: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	_, err := buildValidator(schemas.RequestSchema{
+		ResponseHeaders: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(err).To(HaveOccurred())
@@ -532,8 +589,15 @@ func (s *validatorSut) forValidatorWithResponseBody() {
 }
 
 func (s *validatorSut) forValidatorWithReponseBodySchema(schema string) {
-	validator, err := buildValidator(schemas.Schema{
-		ResponseBody: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	validator, err := buildValidator(schemas.RequestSchema{
+		ResponseBody: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(err).NotTo(HaveOccurred())
@@ -542,8 +606,15 @@ func (s *validatorSut) forValidatorWithReponseBodySchema(schema string) {
 }
 
 func (s *validatorSut) forValidatorWithInvalidResponseBodySchema(schema string) error {
-	_, err := buildValidator(schemas.Schema{
-		ResponseBody: strings.NewReader(schema),
+	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	id, idErr := idGenerator(time.Time{})
+	Expect(idErr).ToNot(HaveOccurred())
+
+	_, err := buildValidator(schemas.RequestSchema{
+		ResponseBody: &schemas.SchemaDefinition{
+			Content: strings.NewReader(schema),
+			ID:      id,
+		},
 	})
 
 	Expect(err).To(HaveOccurred())
@@ -555,16 +626,24 @@ func (s *validatorSut) validateInvalidJSONBodyResponse() error {
 }
 
 func (s *validatorSut) validateResponseWithBody(bodyString string) error {
-	headerErr := s.validator.ValidateResponseHeaders(map[string][]string{
+	_, headerErr := s.validator.ValidateResponseHeaders(map[string][]string{
 		"Content-Type": {"application/json"},
 	})
 	if headerErr != nil {
 		return headerErr
 	}
 
-	bodyErr := s.validator.ValidateResponseBody(strings.NewReader(bodyString))
+	_, bodyErr := s.validator.ValidateResponseBody(strings.NewReader(bodyString))
 	if bodyErr != nil {
 		return bodyErr
+	}
+	return nil
+}
+
+func (s *validatorSut) validateMissingContent() error {
+	_, err := s.validator.ValidateBody(nil)
+	if err != nil {
+		return err
 	}
 	return nil
 }

@@ -196,15 +196,15 @@ type RequestValidationList struct {
 
 // RequestValidationSchema defines model for RequestValidationSchema.
 type RequestValidationSchema struct {
-	BodySchema   *SchemaID `json:"bodySchema,omitempty"`
-	HeaderSchema *SchemaID `json:"headerSchema,omitempty"`
-	QuerySchema  *SchemaID `json:"querySchema,omitempty"`
+	BodySchemaID   *SchemaID `json:"bodySchemaID,omitempty"`
+	HeaderSchemaID *SchemaID `json:"headerSchemaID,omitempty"`
+	QuerySchemaID  *SchemaID `json:"querySchemaID,omitempty"`
 }
 
 // ResponseValidationSchema defines model for ResponseValidationSchema.
 type ResponseValidationSchema struct {
-	BodySchema   *SchemaID `json:"bodySchema,omitempty"`
-	HeaderSchema *SchemaID `json:"headerSchema,omitempty"`
+	BodySchemaID   *SchemaID `json:"bodySchemaID,omitempty"`
+	HeaderSchemaID *SchemaID `json:"headerSchemaID,omitempty"`
 }
 
 // Route defines model for Route.

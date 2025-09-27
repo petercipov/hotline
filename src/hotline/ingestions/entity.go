@@ -1,6 +1,7 @@
 package ingestions
 
 import (
+	"hotline/http"
 	"hotline/integrations"
 	"hotline/servicelevels"
 	"net/url"
@@ -10,7 +11,7 @@ import (
 type IngestHttpRequests func(req []*HttpRequest)
 
 type HttpRequest struct {
-	ID              string
+	ID              http.RequestID
 	IntegrationID   integrations.ID
 	ProtocolVersion string
 	Method          string

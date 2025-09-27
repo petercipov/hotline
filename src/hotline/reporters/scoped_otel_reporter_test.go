@@ -66,7 +66,7 @@ func (r *scopedReporterSUT) forConcurrentReporter() {
 	}))
 
 	otelReporterScopes := concurrency.NewScopes(
-		[]string{"1", "2", "3", "4", "5", "6", "7", "8"},
+		concurrency.GenerateScopeIds("scope", 8),
 		reporters.NewEmptyOtelReporterScope)
 	testServerUrl, parseErr := url.Parse(r.testServer.URL)
 	Expect(parseErr).NotTo(HaveOccurred())

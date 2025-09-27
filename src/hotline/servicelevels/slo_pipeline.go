@@ -17,10 +17,10 @@ type ChecksReporter interface {
 }
 
 type SLOPipeline struct {
-	fanOut *concurrency.FanOut[concurrency.ScopedAction[IntegrationsScope], IntegrationsScope]
+	fanOut *concurrency.FanOut[concurrency.ScopedAction[SLOScope], SLOScope]
 }
 
-func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsScope]) *SLOPipeline {
+func NewSLOPipeline(scopes *concurrency.Scopes[SLOScope]) *SLOPipeline {
 	p := &SLOPipeline{
 		fanOut: concurrency.NewActionFanOut(scopes),
 	}
@@ -28,7 +28,7 @@ func NewSLOPipeline(scopes *concurrency.Scopes[IntegrationsScope]) *SLOPipeline 
 }
 
 func (p *SLOPipeline) IngestHttpRequest(m *IngestRequestsMessage) {
-	p.fanOut.Send(m.GetMessageID(), m)
+	p.fanOut.Send(m.GetShardingKey(), m)
 }
 
 func (p *SLOPipeline) Check(m *CheckMessage) {
@@ -36,7 +36,7 @@ func (p *SLOPipeline) Check(m *CheckMessage) {
 }
 
 func (p *SLOPipeline) ModifyRoute(m *ModifyRouteMessage) {
-	p.fanOut.Send(m.GetMessageID(), m)
+	p.fanOut.Send(m.GetShardingKey(), m)
 }
 
 type Check struct {
@@ -49,7 +49,7 @@ type CheckReport struct {
 	Checks []Check
 }
 
-type IntegrationsScope struct {
+type SLOScope struct {
 	Integrations     map[integrations.ID]*HttpApiSLO
 	LastObservedTime time.Time
 
@@ -57,14 +57,14 @@ type IntegrationsScope struct {
 	checkReporter ChecksReporter
 }
 
-func (scope *IntegrationsScope) AdvanceTime(now time.Time) {
+func (scope *SLOScope) AdvanceTime(now time.Time) {
 	if now.After(scope.LastObservedTime) {
 		scope.LastObservedTime = now
 	}
 }
 
-func NewEmptyIntegrationsScope(sloRepository SLODefinitionRepository, checkReporter ChecksReporter) *IntegrationsScope {
-	return &IntegrationsScope{
+func NewEmptyIntegrationsScope(sloRepository SLODefinitionRepository, checkReporter ChecksReporter) *SLOScope {
+	return &SLOScope{
 		Integrations:     make(map[integrations.ID]*HttpApiSLO),
 		LastObservedTime: time.Time{},
 
@@ -77,7 +77,7 @@ type CheckMessage struct {
 	Now time.Time
 }
 
-func (message *CheckMessage) Execute(ctx context.Context, _ string, scope *IntegrationsScope) {
+func (message *CheckMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(message.Now)
 
 	var checks []Check
@@ -102,11 +102,11 @@ type IngestRequestsMessage struct {
 	Reqs []*HttpRequest
 }
 
-func (message *IngestRequestsMessage) GetMessageID() []byte {
+func (message *IngestRequestsMessage) GetShardingKey() []byte {
 	return []byte(message.ID)
 }
 
-func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, scope *IntegrationsScope) {
+func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(message.Now)
 
 	slo, found := scope.Integrations[message.ID]
@@ -130,7 +130,7 @@ type ModifyRouteMessage struct {
 	Route http.Route
 }
 
-func (message *ModifyRouteMessage) Execute(ctx context.Context, _ string, scope *IntegrationsScope) {
+func (message *ModifyRouteMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(message.Now)
 
 	slo, found := scope.Integrations[message.ID]
@@ -160,6 +160,6 @@ func (message *ModifyRouteMessage) Execute(ctx context.Context, _ string, scope 
 	}
 }
 
-func (message *ModifyRouteMessage) GetMessageID() []byte {
+func (message *ModifyRouteMessage) GetShardingKey() []byte {
 	return []byte(message.ID)
 }

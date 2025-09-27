@@ -82,7 +82,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	ingestedRequest := &ingestions.HttpRequest{
-		ID:              v7String,
+		ID:              hotlineHttp.RequestID(v7String),
 		IntegrationID:   integrationID,
 		ProtocolVersion: req.Proto,
 		Method:          req.Method,

@@ -3,7 +3,6 @@ package setup
 import (
 	"app/setup/config"
 	"crypto/rand"
-	"fmt"
 	"hotline/clock"
 	"hotline/concurrency"
 	hotlinehttp "hotline/http"
@@ -55,7 +54,7 @@ type App struct {
 
 func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository *config.InMemorySLODefinitions) (*App, error) {
 	otelReporterScopes := concurrency.NewScopes(
-		createIds("otel-reporter-", 8),
+		concurrency.GenerateScopeIds("otel-reporter", 8),
 		reporters.NewEmptyOtelReporterScope)
 
 	oUrl, urlErr := reporters.NewOtelUrl(cfg.OtelHttpReporter.Secured, cfg.OtelHttpReporter.Host)
@@ -70,8 +69,8 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 	reporter := reporters.NewScopedOtelReporter(otelReporterScopes, managedTime.Sleep, reporterCfg, 100)
 
 	sloPipelineScopes := concurrency.NewScopes(
-		createIds("slo-queue-", 8),
-		func() *servicelevels.IntegrationsScope {
+		concurrency.GenerateScopeIds("slo-scope", 8),
+		func() *servicelevels.SLOScope {
 			return servicelevels.NewEmptyIntegrationsScope(sloConfigRepository, reporter)
 		},
 	)
@@ -174,12 +173,4 @@ func (a *App) GetEgressIngestionUrl() string {
 
 func (a *App) GetCfgAPIUrl() string {
 	return "http://" + a.cfgAPIServer.Host()
-}
-
-func createIds(prefix string, count int) []string {
-	var queueIDs []string
-	for i := range count {
-		queueIDs = append(queueIDs, fmt.Sprintf("%s%d", prefix, i))
-	}
-	return queueIDs
 }

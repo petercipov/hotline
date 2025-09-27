@@ -2,7 +2,6 @@ package servicelevels_test
 
 import (
 	"context"
-	"fmt"
 	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/http"
@@ -121,17 +120,13 @@ type sloPipelineSUT struct {
 
 func (s *sloPipelineSUT) forPipeline() {
 	s.numberOfQueues = 8
-	var queueIDs []string
-	for i := range s.numberOfQueues {
-		queueIDs = append(queueIDs, fmt.Sprintf("queue-%d", i))
-	}
-
+	queueIDs := concurrency.GenerateScopeIds("queue", s.numberOfQueues)
 	s.sloRepository = &fakeSLORepository{
 		configs: make(map[integrations.ID]*servicelevels.HttpApiSLODefinition),
 	}
 	s.sloReporter = &fakeSLOReporter{}
 
-	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.IntegrationsScope {
+	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.SLOScope {
 		return servicelevels.NewEmptyIntegrationsScope(s.sloRepository, s.sloReporter)
 	})
 	s.pipeline = servicelevels.NewSLOPipeline(
