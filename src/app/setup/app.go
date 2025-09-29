@@ -41,7 +41,7 @@ type Config struct {
 type App struct {
 	cfg *Config
 
-	sloPipeline   *servicelevels.SLOPipeline
+	sloPipeline   *servicelevels.Pipeline
 	otelIngestion *otel.TracesHandler
 	otelReporter  *reporters.ScopedOtelReporter
 	managedTime   clock.ManagedTime
@@ -53,7 +53,12 @@ type App struct {
 	cfgAPIServer          HttpServer
 }
 
-func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository repository.SLODefinitionRepository) (*App, error) {
+func NewApp(
+	cfg *Config,
+	managedTime clock.ManagedTime,
+	createServer CreateServer,
+	sloConfigRepository repository.ServiceLevelsRepository,
+) (*App, error) {
 	otelReporterScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("otel-reporter", 8),
 		reporters.NewEmptyOtelReporterScope)
@@ -75,7 +80,7 @@ func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServe
 			return servicelevels.NewEmptyIntegrationsScope(sloConfigRepository, reporter)
 		},
 	)
-	sloPipeline := servicelevels.NewSLOPipeline(sloPipelineScopes)
+	sloPipeline := servicelevels.NewPipeline(sloPipelineScopes)
 
 	converter := otel.NewProtoConverter()
 	otelHandler := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {

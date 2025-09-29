@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Http Api Slo", func() {
+var _ = Describe("Service Levels Checker", func() {
 
 	s := suthttpapislo{}
 
@@ -21,7 +21,7 @@ var _ = Describe("Http Api Slo", func() {
 	})
 
 	It("if no service levels defined, no checks are done", func() {
-		s.forRouteSetupWithDefault(servicelevels.HttpRouteSLODefinition{
+		s.forRouteSetupWithDefault(servicelevels.HttpRouteServiceLevels{
 			Route: http.Route{
 				Method:      "GET",
 				Host:        "iam.example.com",
@@ -251,7 +251,7 @@ var _ = Describe("Http Api Slo", func() {
 		def := defaultRouteDefinition("iam.example.com", "/users")
 		def.Latency.WindowDuration = 1 * time.Minute
 
-		sloDef := servicelevels.HttpApiSLODefinition{}
+		sloDef := servicelevels.HttpApiServiceLevels{}
 
 		sloDef.Upsert(def)
 		Expect(sloDef.Routes[0].Latency.WindowDuration).To(Equal(1 * time.Minute))
@@ -267,7 +267,7 @@ var _ = Describe("Http Api Slo", func() {
 
 	It("will delete default route definition", func() {
 		def := defaultRouteDefinition("iam.example.com", "/users")
-		sloDef := servicelevels.HttpApiSLODefinition{}
+		sloDef := servicelevels.HttpApiServiceLevels{}
 		sloDef.Upsert(def)
 		Expect(sloDef.Routes).To(HaveLen(1))
 
@@ -278,7 +278,7 @@ var _ = Describe("Http Api Slo", func() {
 
 	It("will not delete for unknown key", func() {
 		def := defaultRouteDefinition("iam.example.com", "/users")
-		sloDef := servicelevels.HttpApiSLODefinition{}
+		sloDef := servicelevels.HttpApiServiceLevels{}
 		sloDef.Upsert(def)
 		Expect(sloDef.Routes).To(HaveLen(1))
 		sloDef.DeleteRouteByKey(":uknown::")
@@ -287,7 +287,7 @@ var _ = Describe("Http Api Slo", func() {
 })
 
 type suthttpapislo struct {
-	slo *servicelevels.HttpApiSLO
+	slo *servicelevels.Checker
 }
 
 func (s *suthttpapislo) Check() []servicelevels.SLOCheck {
@@ -300,29 +300,29 @@ func (s *suthttpapislo) AddRequest(request *servicelevels.HttpRequest) {
 	s.slo.AddRequest(now, request)
 }
 
-func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.HttpRouteSLODefinition) {
-	definition := servicelevels.HttpApiSLODefinition{}
+func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.HttpRouteServiceLevels) {
+	definition := servicelevels.HttpApiServiceLevels{}
 
 	for _, route := range routes {
 		definition.Upsert(route)
 	}
 
-	s.slo = servicelevels.NewHttpApiSLO(definition)
+	s.slo = servicelevels.NewHttpApiServiceLevels(definition)
 }
 
-func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRouteSLODefinition) {
+func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRouteServiceLevels) {
 	routes = append(routes, defaultRouteDefinition("", "/"))
 	s.forRouteSetup(routes...)
 }
 
-func defaultRouteDefinitionForMethod(method string, host string, pathPattern string) servicelevels.HttpRouteSLODefinition {
-	return servicelevels.HttpRouteSLODefinition{
+func defaultRouteDefinitionForMethod(method string, host string, pathPattern string) servicelevels.HttpRouteServiceLevels {
+	return servicelevels.HttpRouteServiceLevels{
 		Route: http.Route{
 			Method:      method,
 			PathPattern: pathPattern,
 			Host:        host,
 		},
-		Latency: &servicelevels.HttpLatencySLODefinition{
+		Latency: &servicelevels.HttpLatencyServiceLevels{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{
 					Percentile: 0.999,
@@ -332,7 +332,7 @@ func defaultRouteDefinitionForMethod(method string, host string, pathPattern str
 			},
 			WindowDuration: 1 * time.Minute,
 		},
-		Status: &servicelevels.HttpStatusSLODefinition{
+		Status: &servicelevels.HttpStatusServiceLevels{
 			Expected:        []string{"200", "201"},
 			BreachThreshold: 0.999,
 			WindowDuration:  1 * time.Hour,
@@ -340,7 +340,7 @@ func defaultRouteDefinitionForMethod(method string, host string, pathPattern str
 	}
 }
 
-func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteSLODefinition {
+func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteServiceLevels {
 	return defaultRouteDefinitionForMethod("", host, path)
 }
 

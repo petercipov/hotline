@@ -16,15 +16,15 @@ type HttpRequest struct {
 	URL    *url.URL
 }
 
-type HttpApiSLO struct {
+type Checker struct {
 	mux *hotlinehttp.Mux[HttpRouteSLO]
 }
 
-type HttpApiSLODefinition struct {
-	Routes []HttpRouteSLODefinition
+type HttpApiServiceLevels struct {
+	Routes []HttpRouteServiceLevels
 }
 
-func (d *HttpApiSLODefinition) Upsert(definition HttpRouteSLODefinition) {
+func (d *HttpApiServiceLevels) Upsert(definition HttpRouteServiceLevels) {
 	for i, route := range d.Routes {
 		if route.Route == definition.Route {
 			d.Routes[i] = definition
@@ -34,7 +34,7 @@ func (d *HttpApiSLODefinition) Upsert(definition HttpRouteSLODefinition) {
 	d.Routes = append(d.Routes, definition)
 }
 
-func (d *HttpApiSLODefinition) DeleteRouteByKey(key string) (hotlinehttp.Route, bool) {
+func (d *HttpApiServiceLevels) DeleteRouteByKey(key string) (hotlinehttp.Route, bool) {
 	for i, route := range d.Routes {
 		if route.Route.ID() == key {
 			d.Routes = append(d.Routes[:i], d.Routes[i+1:]...)
@@ -44,24 +44,24 @@ func (d *HttpApiSLODefinition) DeleteRouteByKey(key string) (hotlinehttp.Route, 
 	return hotlinehttp.Route{}, false
 }
 
-type HttpRouteSLODefinition struct {
+type HttpRouteServiceLevels struct {
 	Route   hotlinehttp.Route
-	Latency *HttpLatencySLODefinition
-	Status  *HttpStatusSLODefinition
+	Latency *HttpLatencyServiceLevels
+	Status  *HttpStatusServiceLevels
 }
-type HttpLatencySLODefinition struct {
+type HttpLatencyServiceLevels struct {
 	Percentiles    []PercentileDefinition
 	WindowDuration time.Duration
 }
 
-type HttpStatusSLODefinition struct {
+type HttpStatusServiceLevels struct {
 	Expected        []string
 	BreachThreshold Percentile
 	WindowDuration  time.Duration
 }
 
-func NewHttpApiSLO(definition HttpApiSLODefinition) *HttpApiSLO {
-	apiSlo := &HttpApiSLO{
+func NewHttpApiServiceLevels(definition HttpApiServiceLevels) *Checker {
+	apiSlo := &Checker{
 		mux: &hotlinehttp.Mux[HttpRouteSLO]{},
 	}
 	for _, routeDefinition := range definition.Routes {
@@ -70,7 +70,7 @@ func NewHttpApiSLO(definition HttpApiSLODefinition) *HttpApiSLO {
 	return apiSlo
 }
 
-func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
+func (s *Checker) AddRequest(now time.Time, req *HttpRequest) {
 	locator := hotlinehttp.RequestLocator{
 		Method: req.Method,
 		Path:   req.URL.Path,
@@ -84,7 +84,7 @@ func (s *HttpApiSLO) AddRequest(now time.Time, req *HttpRequest) {
 	}
 }
 
-func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
+func (s *Checker) Check(now time.Time) []SLOCheck {
 	var checks []SLOCheck
 	for _, slo := range s.mux.Handlers() {
 		check := slo.Check(now)
@@ -94,12 +94,12 @@ func (s *HttpApiSLO) Check(now time.Time) []SLOCheck {
 	return checks
 }
 
-func (s *HttpApiSLO) UpsertRoute(routeDefinition HttpRouteSLODefinition) {
+func (s *Checker) UpsertRoute(routeDefinition HttpRouteServiceLevels) {
 	slo := NewHttpPathSLO(routeDefinition)
 	s.mux.Upsert(slo.route, slo)
 }
 
-func (s *HttpApiSLO) DeleteRoute(route hotlinehttp.Route) {
+func (s *Checker) DeleteRoute(route hotlinehttp.Route) {
 	s.mux.Delete(route)
 }
 
@@ -109,7 +109,7 @@ type HttpRouteSLO struct {
 	latencySLO *LatencySLO
 }
 
-func NewHttpPathSLO(slo HttpRouteSLODefinition) *HttpRouteSLO {
+func NewHttpPathSLO(slo HttpRouteServiceLevels) *HttpRouteSLO {
 	tags := map[string]string{
 		"http_route": slo.Route.ID(),
 	}

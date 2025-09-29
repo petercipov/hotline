@@ -15,7 +15,7 @@ import (
 type valueIntegrationID struct{}
 
 type HttpHandler struct {
-	repository    repository.SLODefinitionRepository
+	repository    repository.ServiceLevelsRepository
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
@@ -55,7 +55,7 @@ type APIEvents interface {
 	RouteUpserted(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func NewHttpHandler(repository repository.SLODefinitionRepository, routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)) *HttpHandler {
+func NewHttpHandler(repository repository.ServiceLevelsRepository, routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)) *HttpHandler {
 	return &HttpHandler{
 		repository:    repository,
 		routeUpserted: routeUpserted,
@@ -130,7 +130,7 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 
 	definition := h.repository.GetConfig(ctx, integrationID)
 	if definition == nil {
-		definition = &servicelevels.HttpApiSLODefinition{}
+		definition = &servicelevels.HttpApiServiceLevels{}
 	}
 
 	definition.Upsert(routeDefinition)

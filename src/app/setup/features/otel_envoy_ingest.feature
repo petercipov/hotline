@@ -5,9 +5,9 @@ Feature: Hotline should be able to
 
   Scenario: otel envoy http traffic is ingested and slos are computed
     Given OTEL ingestion is enabled
-    And slo reporter is pointing to collector
+    And service levels reporter is pointing to collector
     And hotline is running
-    And slo configuration for "IN-dd0391f11aba" is set to:
+    And service levels configuration for "IN-dd0391f11aba" is set to:
       """
         {
           "route": { "path": "/" },
@@ -22,7 +22,7 @@ Feature: Hotline should be able to
     When envoy otel traffic is sent for ingestion for integration ID "IN-dd0391f11aba"
     And advance time by 10s
 
-    Then slo metrics are received in collector:
+    Then service levels metrics are received in collector:
       | Timestamp UTC        | Name                                              | Type  | Value     | Unit | Attributes                                                                                     |
       | 2025-02-22T12:02:20Z | service_levels_http_route_latency                 | Gauge | 10140.455 | ms   | metric:p99.9; integration_id:IN-dd0391f11aba; breached:true; http_route::::/                        |
       | 2025-02-22T12:02:20Z | service_levels_http_route_status                  | Gauge | 38.66     | %    | metric:expected; integration_id:IN-dd0391f11aba; breached:true; http_route::::/                   |

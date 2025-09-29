@@ -38,7 +38,7 @@ type appSut struct {
 	fakeCollector    *fakeCollector
 	fakeEgressTarget *fakeEgressTarget
 
-	fakeSLOConfigRepository repository.SLODefinitionRepository
+	fakeSLOConfigRepository repository.ServiceLevelsRepository
 }
 
 func newAppSut(t *testing.T) *appSut {
@@ -69,7 +69,7 @@ func (a *appSut) egressIngestionIsEnabled() {
 	a.egressTargetServer.Start()
 }
 
-func (a *appSut) sloReporterIsPointingToCollector() {
+func (a *appSut) serviceLevelsReporterIsPointingToCollector() {
 	a.collectorServer.Start()
 	a.cfg.OtelHttpReporter.Host = a.collectorServer.Host()
 }
@@ -89,7 +89,7 @@ func (a *appSut) sendEgressTraffic(ctx context.Context, integrationID string) (c
 
 var errUnexpectedResponse = errors.New("unexpected response")
 
-func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
+func (a *appSut) setServiceLevelsConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
 	routeRaws := strings.Split(configRaw, "|||")
 
 	configClient, createClientErr := config.NewClient(a.app.GetCfgAPIUrl())
@@ -126,7 +126,7 @@ func (a *appSut) setSLOConfiguration(ctx context.Context, integrationID string, 
 
 var errConfigDoNotMatch = errors.New("configs do not match")
 
-func (a *appSut) checkSLOConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
+func (a *appSut) checkServiceLevelsConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
 	routeRaws := strings.Split(configRaw, "|||")
 	var routesExpected []string
 	for i, routeRaw := range routeRaws {
@@ -288,7 +288,7 @@ func (a *appSut) shutdownHotline() error {
 	return nil
 }
 
-func (a *appSut) sloMetricsAreReceivedInCollector(ctx context.Context, metrics *godog.Table) (context.Context, error) {
+func (a *appSut) serviceLevelsMetricsAreReceivedInCollector(ctx context.Context, metrics *godog.Table) (context.Context, error) {
 	return a.fakeCollector.ExpectCollectorMetrics(ctx, a.t, metrics)
 }
 
@@ -306,17 +306,17 @@ func TestApp(t *testing.T) {
 
 			sctx.Given("OTEL ingestion is enabled", sut.otelIngestionIsEnabled)
 			sctx.Given("Egress ingestion is enabled", sut.egressIngestionIsEnabled)
-			sctx.Given("slo reporter is pointing to collector", sut.sloReporterIsPointingToCollector)
+			sctx.Given("service levels reporter is pointing to collector", sut.serviceLevelsReporterIsPointingToCollector)
 			sctx.Given("hotline is running", sut.startHotline)
-			sctx.Given(`slo configuration for "([^"]*)" is set to`, sut.setSLOConfiguration)
+			sctx.Given(`service levels configuration for "([^"]*)" is set to`, sut.setServiceLevelsConfiguration)
 
 			sctx.When(`([^"]*) otel traffic is sent for ingestion for integration ID "([^"]*)"`, sut.sendOTELTraffic)
 			sctx.When("advance time by (\\d+)s", sut.advanceTime)
 			sctx.When(`egress traffic is sent for proxying for integration ID "([^"]*)"`, sut.sendEgressTraffic)
-			sctx.When(`slo configuration for "([^"]*)" and routeKey "([^"]*)" is deleted`, sut.deleteSLOConfiguration)
+			sctx.When(`service levels configuration for "([^"]*)" and routeKey "([^"]*)" is deleted`, sut.deleteSLOConfiguration)
 
-			sctx.Then("slo metrics are received in collector", sut.sloMetricsAreReceivedInCollector)
-			sctx.Then(`slo configuration for "([^"]*)" is`, sut.checkSLOConfiguration)
+			sctx.Then("service levels metrics are received in collector", sut.serviceLevelsMetricsAreReceivedInCollector)
+			sctx.Then(`service levels configuration for "([^"]*)" is`, sut.checkServiceLevelsConfiguration)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",

@@ -14,7 +14,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-var _ = Describe("SLO Pipeline", func() {
+var _ = Describe("Service Levels Pipeline", func() {
 	sut := sloPipelineSUT{}
 	It("should report no metrics if configuration not available", func() {
 		sut.forPipeline()
@@ -111,7 +111,7 @@ var _ = Describe("SLO Pipeline", func() {
 })
 
 type sloPipelineSUT struct {
-	pipeline       *servicelevels.SLOPipeline
+	pipeline       *servicelevels.Pipeline
 	sloRepository  *servicelevels.InMemorySLORepository
 	sloReporter    *servicelevels.InMemorySLOReporter
 	numberOfQueues int
@@ -126,7 +126,7 @@ func (s *sloPipelineSUT) forPipeline() {
 	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.SLOScope {
 		return servicelevels.NewEmptyIntegrationsScope(s.sloRepository, s.sloReporter)
 	})
-	s.pipeline = servicelevels.NewSLOPipeline(
+	s.pipeline = servicelevels.NewPipeline(
 		scopes,
 	)
 }
@@ -146,7 +146,7 @@ func (s *sloPipelineSUT) NoConfigPresent(id integrations.ID, timeStr string) {
 }
 
 func (s *sloPipelineSUT) EmptyConfigPresent(id integrations.ID, timeStr string) {
-	s.sloRepository.SetConfig(context.Background(), id, &servicelevels.HttpApiSLODefinition{})
+	s.sloRepository.SetConfig(context.Background(), id, &servicelevels.HttpApiServiceLevels{})
 
 	now := clock.ParseTime(timeStr)
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
@@ -194,8 +194,8 @@ func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID, timeStr string) {
 func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr string) {
 	now := clock.ParseTime(timeStr)
 
-	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiSLODefinition{
-		Routes: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
+	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiServiceLevels{
+		Routes: []servicelevels.HttpRouteServiceLevels{defaultRouteDefinition("", "/")},
 	})
 
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
@@ -211,8 +211,8 @@ func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr str
 func (s *sloPipelineSUT) ForDefaultConfig(integrationID integrations.ID, timeStr string) {
 	now := clock.ParseTime(timeStr)
 
-	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiSLODefinition{
-		Routes: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
+	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiServiceLevels{
+		Routes: []servicelevels.HttpRouteServiceLevels{defaultRouteDefinition("", "/")},
 	})
 
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{

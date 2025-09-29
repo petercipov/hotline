@@ -54,13 +54,13 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 	return (*servicelevels.Percentile)(p)
 }
 
-func ParseRoute(latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.HttpRouteSLODefinition, error) {
-	var status servicelevels.HttpStatusSLODefinition
-	var latency servicelevels.HttpLatencySLODefinition
+func ParseRoute(latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.HttpRouteServiceLevels, error) {
+	var status servicelevels.HttpStatusServiceLevels
+	var latency servicelevels.HttpLatencyServiceLevels
 	if statusDefinition != nil {
 		percentile := statusDefinition.BreachThreshold.Cast()
 
-		status = servicelevels.HttpStatusSLODefinition{
+		status = servicelevels.HttpStatusServiceLevels{
 			Expected:        convertFromExpected(statusDefinition.Expected),
 			BreachThreshold: *percentile,
 			WindowDuration:  time.Duration(statusDefinition.WindowDuration),
@@ -70,16 +70,16 @@ func ParseRoute(latencyDefinition *LatencyServiceLevels, statusDefinition *Statu
 	if latencyDefinition != nil {
 		defs, defsErr := parsePercentileDefinitions(latencyDefinition.Percentiles)
 		if defsErr != nil {
-			return servicelevels.HttpRouteSLODefinition{}, defsErr
+			return servicelevels.HttpRouteServiceLevels{}, defsErr
 		}
 
-		latency = servicelevels.HttpLatencySLODefinition{
+		latency = servicelevels.HttpLatencyServiceLevels{
 			Percentiles:    defs,
 			WindowDuration: time.Duration(latencyDefinition.WindowDuration),
 		}
 	}
 
-	return servicelevels.HttpRouteSLODefinition{
+	return servicelevels.HttpRouteServiceLevels{
 		Route: http.Route{
 			Method:      optString((*string)(route.Method), ""),
 			PathPattern: optString(route.Path, ""),
@@ -121,7 +121,7 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 	return result, nil
 }
 
-func convertRoutes(routes []servicelevels.HttpRouteSLODefinition) []RouteServiceLevels {
+func convertRoutes(routes []servicelevels.HttpRouteServiceLevels) []RouteServiceLevels {
 	var defs []RouteServiceLevels
 	for _, route := range routes {
 		method := RouteMethod(route.Route.Method)

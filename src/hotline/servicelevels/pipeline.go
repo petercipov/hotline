@@ -8,34 +8,34 @@ import (
 	"time"
 )
 
-type SLODefinitionReader interface {
-	GetConfig(ctx context.Context, id integrations.ID) *HttpApiSLODefinition
+type ConfigReader interface {
+	GetConfig(ctx context.Context, id integrations.ID) *HttpApiServiceLevels
 }
 
 type ChecksReporter interface {
 	ReportChecks(ctx context.Context, report *CheckReport)
 }
 
-type SLOPipeline struct {
+type Pipeline struct {
 	fanOut *concurrency.FanOut[concurrency.ScopedAction[SLOScope], SLOScope]
 }
 
-func NewSLOPipeline(scopes *concurrency.Scopes[SLOScope]) *SLOPipeline {
-	p := &SLOPipeline{
+func NewPipeline(scopes *concurrency.Scopes[SLOScope]) *Pipeline {
+	p := &Pipeline{
 		fanOut: concurrency.NewActionFanOut(scopes),
 	}
 	return p
 }
 
-func (p *SLOPipeline) IngestHttpRequest(m *IngestRequestsMessage) {
+func (p *Pipeline) IngestHttpRequest(m *IngestRequestsMessage) {
 	p.fanOut.Send(m.GetShardingKey(), m)
 }
 
-func (p *SLOPipeline) Check(m *CheckMessage) {
+func (p *Pipeline) Check(m *CheckMessage) {
 	p.fanOut.Broadcast(m)
 }
 
-func (p *SLOPipeline) ModifyRoute(m *ModifyRouteMessage) {
+func (p *Pipeline) ModifyRoute(m *ModifyRouteMessage) {
 	p.fanOut.Send(m.GetShardingKey(), m)
 }
 
@@ -50,10 +50,10 @@ type CheckReport struct {
 }
 
 type SLOScope struct {
-	Integrations     map[integrations.ID]*HttpApiSLO
+	Integrations     map[integrations.ID]*Checker
 	LastObservedTime time.Time
 
-	sloRepository SLODefinitionReader
+	sloRepository ConfigReader
 	checkReporter ChecksReporter
 }
 
@@ -63,9 +63,9 @@ func (scope *SLOScope) AdvanceTime(now time.Time) {
 	}
 }
 
-func NewEmptyIntegrationsScope(sloRepository SLODefinitionReader, checkReporter ChecksReporter) *SLOScope {
+func NewEmptyIntegrationsScope(sloRepository ConfigReader, checkReporter ChecksReporter) *SLOScope {
 	return &SLOScope{
-		Integrations:     make(map[integrations.ID]*HttpApiSLO),
+		Integrations:     make(map[integrations.ID]*Checker),
 		LastObservedTime: time.Time{},
 
 		sloRepository: sloRepository,
@@ -115,7 +115,7 @@ func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, sco
 		if config == nil {
 			return
 		}
-		slo = NewHttpApiSLO(*config)
+		slo = NewHttpApiServiceLevels(*config)
 		scope.Integrations[message.ID] = slo
 	}
 	for _, req := range message.Reqs {
@@ -145,7 +145,7 @@ func (message *ModifyRouteMessage) Execute(ctx context.Context, _ string, scope 
 	}
 
 	var foundRouteConfig = false
-	var routeConfig HttpRouteSLODefinition
+	var routeConfig HttpRouteServiceLevels
 	for _, slosConfig := range config.Routes {
 		if slosConfig.Route == message.Route {
 			foundRouteConfig = true

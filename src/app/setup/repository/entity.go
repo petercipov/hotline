@@ -6,7 +6,7 @@ import (
 	"hotline/servicelevels"
 )
 
-type SLODefinitionRepository interface {
-	servicelevels.SLODefinitionReader
-	SetConfig(ctx context.Context, id integrations.ID, slo *servicelevels.HttpApiSLODefinition)
+type ServiceLevelsRepository interface {
+	servicelevels.ConfigReader
+	SetConfig(ctx context.Context, id integrations.ID, slo *servicelevels.HttpApiServiceLevels)
 }

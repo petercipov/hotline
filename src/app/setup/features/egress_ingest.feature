@@ -5,9 +5,9 @@ Feature: Hotline should be able to
 
   Scenario: egress traffic is ingested, proxied and slos are computed
     Given Egress ingestion is enabled
-    And slo reporter is pointing to collector
+    And service levels reporter is pointing to collector
     And hotline is running
-    And slo configuration for "IN-dd0391f11aba" is set to:
+    And service levels configuration for "IN-dd0391f11aba" is set to:
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
@@ -40,7 +40,7 @@ Feature: Hotline should be able to
     When egress traffic is sent for proxying for integration ID "IN-dd0391f11aba"
     And advance time by 10s
 
-    Then slo metrics are received in collector:
+    Then service levels metrics are received in collector:
       | Timestamp UTC        | Name                                              | Type  | Value     | Unit | Attributes                                                                                         |
       | 2025-02-22T12:02:20Z | service_levels_http_route_latency                 | Gauge | 5797.838  | ms   | breached:true; http_route:POST:127.0.0.1::/bookings; integration_id:IN-dd0391f11aba; metric:p99.9               |
       | 2025-02-22T12:02:20Z | service_levels_http_route_latency                 | Gauge | 5797.838  | ms   | breached:true; http_route:GET:127.0.0.1::/bookings; integration_id:IN-dd0391f11aba; metric:p99.9                |
