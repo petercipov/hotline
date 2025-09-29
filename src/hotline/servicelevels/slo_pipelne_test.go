@@ -11,6 +11,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/net/context"
 )
 
 var _ = Describe("SLO Pipeline", func() {
@@ -131,7 +132,7 @@ func (s *sloPipelineSUT) forPipeline() {
 }
 
 func (s *sloPipelineSUT) NoConfigPresent(id integrations.ID, timeStr string) {
-	s.sloRepository.NoConfig(id)
+	s.sloRepository.SetConfig(context.Background(), id, nil)
 
 	now := clock.ParseTime(timeStr)
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
@@ -145,7 +146,7 @@ func (s *sloPipelineSUT) NoConfigPresent(id integrations.ID, timeStr string) {
 }
 
 func (s *sloPipelineSUT) EmptyConfigPresent(id integrations.ID, timeStr string) {
-	s.sloRepository.SetConfig(id, &servicelevels.HttpApiSLODefinition{})
+	s.sloRepository.SetConfig(context.Background(), id, &servicelevels.HttpApiSLODefinition{})
 
 	now := clock.ParseTime(timeStr)
 	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
@@ -193,7 +194,7 @@ func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID, timeStr string) {
 func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr string) {
 	now := clock.ParseTime(timeStr)
 
-	s.sloRepository.SetConfig(integrationID, &servicelevels.HttpApiSLODefinition{
+	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiSLODefinition{
 		Routes: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
 	})
 
@@ -210,7 +211,7 @@ func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr str
 func (s *sloPipelineSUT) ForDefaultConfig(integrationID integrations.ID, timeStr string) {
 	now := clock.ParseTime(timeStr)
 
-	s.sloRepository.SetConfig(integrationID, &servicelevels.HttpApiSLODefinition{
+	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiSLODefinition{
 		Routes: []servicelevels.HttpRouteSLODefinition{defaultRouteDefinition("", "/")},
 	})
 

@@ -1,6 +1,7 @@
 package schemas_test
 
 import (
+	"context"
 	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/http"
@@ -220,7 +221,7 @@ func (s *validationPipelineSut) validateRequest(message *schemas.ValidateRequest
 func (s *validationPipelineSut) withHeaderSchemaValidation() {
 	headersSchemaID, _ := s.schemaIDgenerator(time.UnixMicro(0))
 
-	s.schemaRepo.SetSchema(headersSchemaID, `{
+	s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -236,7 +237,7 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 		"required": ["User-Agent"]
 	}`)
 
-	s.validationRepo.SetConfig("integration-id", &schemas.ValidationDefinition{
+	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{
 			{
 				Route: http.Route{
@@ -257,8 +258,8 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 
 func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
 	headersSchemaID, _ := s.schemaIDgenerator(time.UnixMicro(0))
-	s.schemaRepo.SetSchema(headersSchemaID, `invalid string`)
-	s.validationRepo.SetConfig("integration-id", &schemas.ValidationDefinition{
+	s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `invalid string`)
+	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{
 			{
 				Route: http.Route{
@@ -280,7 +281,7 @@ func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
 func (s *validationPipelineSut) withQuerySchemaValidation() {
 	querySchemaID, _ := s.schemaIDgenerator(time.UnixMicro(1))
 
-	s.schemaRepo.SetSchema(querySchemaID, `{
+	s.schemaRepo.SetSchema(context.Background(), querySchemaID, `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -297,7 +298,7 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 		"required": ["productID"]
 	}`)
 
-	s.validationRepo.SetConfig("integration-id", &schemas.ValidationDefinition{
+	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{
 			{
 				Route: http.Route{
@@ -318,7 +319,7 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 
 func (s *validationPipelineSut) withBodySchemaValidation() {
 	bodySchemaID, _ := s.schemaIDgenerator(time.UnixMicro(3))
-	s.schemaRepo.SetSchema(bodySchemaID, `{
+	s.schemaRepo.SetSchema(context.Background(), bodySchemaID, `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -343,7 +344,7 @@ func (s *validationPipelineSut) withBodySchemaValidation() {
 		"required": ["productID"]
 	}`)
 
-	s.validationRepo.SetConfig("integration-id", &schemas.ValidationDefinition{
+	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{
 			{
 				Route: http.Route{

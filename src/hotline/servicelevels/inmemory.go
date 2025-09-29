@@ -22,19 +22,18 @@ func (i *InMemorySLORepository) GetConfig(_ context.Context, id integrations.ID)
 	return sloConf
 }
 
-func (i *InMemorySLORepository) SetConfig(id integrations.ID, slo *HttpApiSLODefinition) {
+func (i *InMemorySLORepository) SetConfig(_ context.Context, id integrations.ID, slo *HttpApiSLODefinition) {
 	i.mux.Lock()
 	defer i.mux.Unlock()
 	if i.configs == nil {
 		i.configs = make(map[integrations.ID]*HttpApiSLODefinition)
 	}
-	i.configs[id] = slo
-}
 
-func (i *InMemorySLORepository) NoConfig(id integrations.ID) {
-	i.mux.Lock()
-	defer i.mux.Unlock()
-	delete(i.configs, id)
+	if slo == nil {
+		delete(i.configs, id)
+	} else {
+		i.configs[id] = slo
+	}
 }
 
 type InMemorySLOReporter struct {

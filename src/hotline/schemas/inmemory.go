@@ -25,7 +25,7 @@ func (r *InMemorySchemaRepository) GetSchema(_ context.Context, schemaID ID) io.
 	return result
 }
 
-func (r *InMemorySchemaRepository) SetSchema(id ID, content string) {
+func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content string) {
 	r.mutext.Lock()
 	defer r.mutext.Unlock()
 
@@ -52,7 +52,7 @@ func (r *InMemoryValidationRepository) GetConfig(_ context.Context, id integrati
 	return result
 }
 
-func (r *InMemoryValidationRepository) SetConfig(id integrations.ID, definition *ValidationDefinition) {
+func (r *InMemoryValidationRepository) SetConfig(_ context.Context, id integrations.ID, definition *ValidationDefinition) {
 	r.mutext.Lock()
 	defer r.mutext.Unlock()
 
