@@ -32,8 +32,8 @@ var _ = Describe("System Clock", func() {
 		ticks := sut.TickPeriodically(10)
 		Expect(ticks).To(HaveLen(10))
 
-		for _, tick := range ticks {
-			Expect(tick.After(now)).To(BeTrue())
+		for i, tick := range ticks {
+			Expect(tick.After(now)).To(BeTrue(), "%d tick %v should be after %v", i, tick, now)
 			now = tick
 		}
 	})
@@ -71,9 +71,12 @@ func (s *systemClockSUT) After() time.Time {
 func (s *systemClockSUT) TickPeriodically(n int) []time.Time {
 	var ticks []time.Time
 
+	var mux sync.Mutex
 	var w sync.WaitGroup
 	w.Add(n)
 	cancel := s.clock.TickPeriodically(1*time.Millisecond, func(t time.Time) {
+		mux.Lock()
+		defer mux.Unlock()
 		if len(ticks) >= n {
 			return
 		}
