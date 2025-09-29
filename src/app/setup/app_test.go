@@ -3,11 +3,13 @@ package setup_test
 import (
 	"app/setup"
 	"app/setup/config"
+	"app/setup/repository"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"hotline/clock"
+	"hotline/servicelevels"
 	"net/http"
 	"net/url"
 	"strings"
@@ -36,7 +38,7 @@ type appSut struct {
 	fakeCollector    *fakeCollector
 	fakeEgressTarget *fakeEgressTarget
 
-	fakeSLOConfigRepository *config.InMemorySLODefinitions
+	fakeSLOConfigRepository repository.SLODefinitionRepository
 }
 
 func newAppSut(t *testing.T) *appSut {
@@ -45,12 +47,12 @@ func newAppSut(t *testing.T) *appSut {
 		500*time.Microsecond)
 	collector := &fakeCollector{}
 	target := newFakeEgressTarget(manualClock, 1234)
-	fakeSLOConfigRepository := config.NewInMemorySLODefinitions()
+	ineMemorySLODefRepo := &servicelevels.InMemorySLORepository{}
 	return &appSut{
 		t:                       t,
 		fakeCollector:           collector,
 		fakeEgressTarget:        target,
-		fakeSLOConfigRepository: fakeSLOConfigRepository,
+		fakeSLOConfigRepository: ineMemorySLODefRepo,
 		managedClock:            manualClock,
 		collectorServer:         setup.NewHttpTestServer(collector),
 		egressTargetServer:      setup.NewHttpTestServer(target),

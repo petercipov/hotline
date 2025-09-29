@@ -2,8 +2,8 @@ package main
 
 import (
 	"app/setup"
-	"app/setup/config"
 	"hotline/clock"
+	"hotline/servicelevels"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,7 +14,7 @@ import (
 
 func main() {
 	systemClock := clock.NewSystemClock()
-	fakeRepository := config.NewInMemorySLODefinitions()
+	fakeRepository := &servicelevels.InMemorySLORepository{}
 	app, appErr := setup.NewApp(
 		&setup.Config{
 			OtelHttpReporter: struct {

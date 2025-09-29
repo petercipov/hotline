@@ -1,14 +1,12 @@
 package servicelevels_test
 
 import (
-	"context"
 	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/http"
 	"hotline/integrations"
 	"hotline/servicelevels"
 	"strconv"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -113,18 +111,16 @@ var _ = Describe("SLO Pipeline", func() {
 
 type sloPipelineSUT struct {
 	pipeline       *servicelevels.SLOPipeline
-	sloRepository  *fakeSLORepository
-	sloReporter    *fakeSLOReporter
+	sloRepository  *servicelevels.InMemorySLORepository
+	sloReporter    *servicelevels.InMemorySLOReporter
 	numberOfQueues int
 }
 
 func (s *sloPipelineSUT) forPipeline() {
 	s.numberOfQueues = 8
 	queueIDs := concurrency.GenerateScopeIds("queue", s.numberOfQueues)
-	s.sloRepository = &fakeSLORepository{
-		configs: make(map[integrations.ID]*servicelevels.HttpApiSLODefinition),
-	}
-	s.sloReporter = &fakeSLOReporter{}
+	s.sloRepository = &servicelevels.InMemorySLORepository{}
+	s.sloReporter = &servicelevels.InMemorySLOReporter{}
 
 	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.SLOScope {
 		return servicelevels.NewEmptyIntegrationsScope(s.sloRepository, s.sloReporter)
@@ -169,7 +165,7 @@ func (s *sloPipelineSUT) Report(timeStr string) []*servicelevels.CheckReport {
 	})
 
 	for {
-		reports := s.sloReporter.reports
+		reports := s.sloReporter.GetReports()
 		if len(reports) == s.numberOfQueues {
 			return reports
 		}
@@ -226,37 +222,4 @@ func (s *sloPipelineSUT) ForDefaultConfig(integrationID integrations.ID, timeStr
 			PathPattern: "/",
 		},
 	})
-}
-
-type fakeSLOReporter struct {
-	reports []*servicelevels.CheckReport
-	mux     sync.Mutex
-}
-
-func (f *fakeSLOReporter) ReportChecks(_ context.Context, report *servicelevels.CheckReport) {
-	f.mux.Lock()
-	f.reports = append(f.reports, report)
-	f.mux.Unlock()
-}
-
-type fakeSLORepository struct {
-	configs map[integrations.ID]*servicelevels.HttpApiSLODefinition
-}
-
-func (f *fakeSLORepository) GetConfig(_ context.Context, id integrations.ID) *servicelevels.HttpApiSLODefinition {
-
-	sloConf, found := f.configs[id]
-	if !found {
-		return nil
-	}
-
-	return sloConf
-}
-
-func (f *fakeSLORepository) SetConfig(id integrations.ID, slo *servicelevels.HttpApiSLODefinition) {
-	f.configs[id] = slo
-}
-
-func (f *fakeSLORepository) NoConfig(id integrations.ID) {
-	delete(f.configs, id)
 }

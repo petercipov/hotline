@@ -1,6 +1,7 @@
 package config
 
 import (
+	"app/setup/repository"
 	"context"
 	"encoding/json"
 	hotlinehttp "hotline/http"
@@ -14,7 +15,7 @@ import (
 type valueIntegrationID struct{}
 
 type HttpHandler struct {
-	repository    *InMemorySLODefinitions
+	repository    repository.SLODefinitionRepository
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
@@ -54,7 +55,7 @@ type APIEvents interface {
 	RouteUpserted(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func NewHttpHandler(repository *InMemorySLODefinitions, routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)) *HttpHandler {
+func NewHttpHandler(repository repository.SLODefinitionRepository, routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)) *HttpHandler {
 	return &HttpHandler{
 		repository:    repository,
 		routeUpserted: routeUpserted,
@@ -134,7 +135,7 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 
 	definition.Upsert(routeDefinition)
 
-	h.repository.SetConfig(integrationID, *definition)
+	h.repository.SetConfig(ctx, integrationID, definition)
 	h.routeUpserted(integrationID, routeDefinition.Route)
 	key := routeDefinition.Route.ID()
 	writeResponse(ctx, writer, http.StatusOK, UpsertedServiceLevelsResponse{
@@ -178,7 +179,7 @@ func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.
 	}
 
 	route, deleted := config.DeleteRouteByKey(key)
-	h.repository.SetConfig(integrationID, *config)
+	h.repository.SetConfig(ctx, integrationID, config)
 
 	if deleted {
 		h.routeUpserted(integrationID, route)

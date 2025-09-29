@@ -2,6 +2,7 @@ package setup
 
 import (
 	"app/setup/config"
+	"app/setup/repository"
 	"crypto/rand"
 	"hotline/clock"
 	"hotline/concurrency"
@@ -52,7 +53,7 @@ type App struct {
 	cfgAPIServer          HttpServer
 }
 
-func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository *config.InMemorySLODefinitions) (*App, error) {
+func NewApp(cfg *Config, managedTime clock.ManagedTime, createServer CreateServer, sloConfigRepository repository.SLODefinitionRepository) (*App, error) {
 	otelReporterScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("otel-reporter", 8),
 		reporters.NewEmptyOtelReporterScope)

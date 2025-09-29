@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type SLODefinitionRepository interface {
+type SLODefinitionReader interface {
 	GetConfig(ctx context.Context, id integrations.ID) *HttpApiSLODefinition
 }
 
@@ -53,7 +53,7 @@ type SLOScope struct {
 	Integrations     map[integrations.ID]*HttpApiSLO
 	LastObservedTime time.Time
 
-	sloRepository SLODefinitionRepository
+	sloRepository SLODefinitionReader
 	checkReporter ChecksReporter
 }
 
@@ -63,7 +63,7 @@ func (scope *SLOScope) AdvanceTime(now time.Time) {
 	}
 }
 
-func NewEmptyIntegrationsScope(sloRepository SLODefinitionRepository, checkReporter ChecksReporter) *SLOScope {
+func NewEmptyIntegrationsScope(sloRepository SLODefinitionReader, checkReporter ChecksReporter) *SLOScope {
 	return &SLOScope{
 		Integrations:     make(map[integrations.ID]*HttpApiSLO),
 		LastObservedTime: time.Time{},
