@@ -6,12 +6,12 @@ import (
 	"sync"
 )
 
-type InMemorySLORepository struct {
+type InMemoryRepository struct {
 	configs map[integrations.ID]*HttpApiServiceLevels
 	mux     sync.Mutex
 }
 
-func (i *InMemorySLORepository) GetConfig(_ context.Context, id integrations.ID) *HttpApiServiceLevels {
+func (i *InMemoryRepository) GetConfig(_ context.Context, id integrations.ID) *HttpApiServiceLevels {
 	i.mux.Lock()
 	defer i.mux.Unlock()
 	sloConf, found := i.configs[id]
@@ -22,7 +22,7 @@ func (i *InMemorySLORepository) GetConfig(_ context.Context, id integrations.ID)
 	return sloConf
 }
 
-func (i *InMemorySLORepository) SetConfig(_ context.Context, id integrations.ID, slo *HttpApiServiceLevels) {
+func (i *InMemoryRepository) SetConfig(_ context.Context, id integrations.ID, slo *HttpApiServiceLevels) {
 	i.mux.Lock()
 	defer i.mux.Unlock()
 	if i.configs == nil {

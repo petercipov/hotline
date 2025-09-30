@@ -107,22 +107,25 @@ type validationPipelineSut struct {
 	schemaRepo     *schemas.InMemorySchemaRepository
 	validationRepo *schemas.InMemoryValidationRepository
 	reporter       *schemas.InMemoryValidationReporter
-
-	schemaIDgenerator schemas.IDGenerator
 }
 
 func (s *validationPipelineSut) Close() {
+	schemaList := s.schemaRepo.ListSchemas(context.Background())
+	for _, schema := range schemaList {
+		deleteErr := s.schemaRepo.DeleteSchema(context.Background(), schema.ID)
+		Expect(deleteErr).NotTo(HaveOccurred())
+	}
+
 	s.pipeline = nil
 	s.schemaRepo = nil
 	s.validationRepo = nil
 	s.reporter = nil
-	s.schemaIDgenerator = nil
 }
 
 func (s *validationPipelineSut) forPipelineWithoutDefinition() {
-	s.schemaIDgenerator = schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
-
-	s.schemaRepo = &schemas.InMemorySchemaRepository{}
+	s.schemaRepo = schemas.NewInMemorySchemaRepository(
+		uuid.NewDeterministicV7(&uuid.ConstantRandReader{}),
+	)
 	s.validationRepo = &schemas.InMemoryValidationRepository{}
 	s.reporter = &schemas.InMemoryValidationReporter{}
 
@@ -137,6 +140,8 @@ func (s *validationPipelineSut) forPipelineWithoutDefinition() {
 		},
 	)
 	s.pipeline = schemas.NewValidatorPipeline(scopes)
+
+	Expect(s.schemaRepo.ListSchemas(context.Background())).To(BeEmpty())
 }
 
 func (s *validationPipelineSut) validateInvalidRequest() schemas.ValidationResult {
@@ -219,9 +224,9 @@ func (s *validationPipelineSut) validateRequest(message *schemas.ValidateRequest
 }
 
 func (s *validationPipelineSut) withHeaderSchemaValidation() {
-	headersSchemaID, _ := s.schemaIDgenerator(time.UnixMicro(0))
-
-	s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `{
+	headersSchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(0))
+	now := time.Now()
+	schemaErr := s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -235,7 +240,15 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 			}
 		},
 		"required": ["User-Agent"]
-	}`)
+	}`, now)
+	Expect(schemaErr).NotTo(HaveOccurred())
+
+	schemaById, getErr := s.schemaRepo.GetSchemaByID(context.Background(), headersSchemaID)
+	Expect(getErr).NotTo(HaveOccurred())
+	Expect(schemaById.ID).To(Equal(headersSchemaID))
+	Expect(schemaById.UpdatedAt).To(Equal(now))
+	Expect(schemaById.Content).NotTo(BeEmpty())
+	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
 	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{
@@ -257,8 +270,11 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 }
 
 func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
-	headersSchemaID, _ := s.schemaIDgenerator(time.UnixMicro(0))
-	s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `invalid string`)
+	headersSchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(0))
+	schemaErr := s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `invalid string`, time.Now())
+	Expect(schemaErr).To(HaveOccurred())
+	Expect(s.schemaRepo.ListSchemas(context.Background())).To(BeEmpty())
+
 	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{
 			{
@@ -279,9 +295,9 @@ func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
 }
 
 func (s *validationPipelineSut) withQuerySchemaValidation() {
-	querySchemaID, _ := s.schemaIDgenerator(time.UnixMicro(1))
+	querySchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(1))
 
-	s.schemaRepo.SetSchema(context.Background(), querySchemaID, `{
+	schemaErr := s.schemaRepo.SetSchema(context.Background(), querySchemaID, `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -296,7 +312,9 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 			}
 		},
 		"required": ["productID"]
-	}`)
+	}`, time.Now())
+	Expect(schemaErr).NotTo(HaveOccurred())
+	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
 	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{
@@ -318,8 +336,8 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 }
 
 func (s *validationPipelineSut) withBodySchemaValidation() {
-	bodySchemaID, _ := s.schemaIDgenerator(time.UnixMicro(3))
-	s.schemaRepo.SetSchema(context.Background(), bodySchemaID, `{
+	bodySchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(3))
+	schemaErr := s.schemaRepo.SetSchema(context.Background(), bodySchemaID, `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -342,7 +360,9 @@ func (s *validationPipelineSut) withBodySchemaValidation() {
 			}
 		},
 		"required": ["productID"]
-	}`)
+	}`, time.Now())
+	Expect(schemaErr).NotTo(HaveOccurred())
+	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
 	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
 		Routes: []schemas.RouteValidationDefinition{

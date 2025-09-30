@@ -4,8 +4,11 @@ import (
 	"app/setup/repository"
 	"context"
 	"encoding/json"
+	"errors"
+	"hotline/clock"
 	hotlinehttp "hotline/http"
 	"hotline/integrations"
+	"hotline/schemas"
 	"hotline/servicelevels"
 	"io"
 	"log/slog"
@@ -15,24 +18,148 @@ import (
 type valueIntegrationID struct{}
 
 type HttpHandler struct {
-	repository    repository.ServiceLevelsRepository
+	serviceLevelsRepo repository.ServiceLevelsRepository
+	schemasRepo       repository.SchemaRepository
+	nowFunc           clock.NowFunc
+
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func (h *HttpHandler) ListSchemas(_ http.ResponseWriter, _ *http.Request) {
-	panic("implement me")
+func NewHttpHandler(
+	serviceLevelsRepo repository.ServiceLevelsRepository,
+	schemasRepo repository.SchemaRepository,
+	nowFunc clock.NowFunc,
+	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route),
+) *HttpHandler {
+	return &HttpHandler{
+		serviceLevelsRepo: serviceLevelsRepo,
+		schemasRepo:       schemasRepo,
+		nowFunc:           nowFunc,
+		routeUpserted:     routeUpserted,
+	}
 }
 
-func (h *HttpHandler) UploadSchema(_ http.ResponseWriter, _ *http.Request) {
-	panic("implement me")
+func (h *HttpHandler) ListSchemas(writer http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+
+	var list = ListRequestSchemas{
+		Schemas: []SchemaListEntry{},
+	}
+
+	schemaList := h.schemasRepo.ListSchemas(ctx)
+
+	for _, schema := range schemaList {
+		list.Schemas = append(list.Schemas, SchemaListEntry{
+			SchemaID:  schema.ID.String(),
+			UpdatedAt: schema.UpdatedAt,
+		})
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	encodeErr := json.NewEncoder(writer).Encode(list)
+	if encodeErr != nil {
+		slog.Error("Failed to encode response body", slog.Any("error", encodeErr))
+	}
 }
 
-func (h *HttpHandler) DeleteSchemaFile(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
-	panic("implement me")
+func (h *HttpHandler) CreateSchema(writer http.ResponseWriter, req *http.Request) {
+	now := h.nowFunc()
+	ctx := req.Context()
+	schemaID, generateErr := h.schemasRepo.GenerateID(now)
+	if generateErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Schema ID could not be created",
+		})
+		return
+	}
+	defer func() {
+		_ = req.Body.Close()
+	}()
+	content, readErr := io.ReadAll(req.Body)
+	if readErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not read schema content",
+		})
+		return
+	}
+
+	setErr := h.schemasRepo.SetSchema(ctx, schemaID, string(content), now)
+	if setErr != nil {
+		var validationErr *schemas.ValidationError
+		isValidationErr := errors.As(setErr, &validationErr)
+		if isValidationErr {
+			writeResponse(ctx, writer, http.StatusBadRequest, Error{
+				Code:    "bad_request",
+				Message: validationErr.Error(),
+			})
+		} else {
+			writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+				Code:    "internal_error",
+				Message: "Could not store schema",
+			})
+		}
+		return
+	}
+
+	response := RequestSchemaCreated{
+		SchemaID:  ptrString(schemaID.String()),
+		UpdatedAt: &now,
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusCreated)
+	encodeErr := json.NewEncoder(writer).Encode(response)
+	if encodeErr != nil {
+		slog.Error("Failed to encode response body", slog.Any("error", encodeErr))
+	}
 }
 
-func (h *HttpHandler) GetSchema(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
-	panic("implement me")
+func (h *HttpHandler) DeleteSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
+	ctx := req.Context()
+	setErr := h.schemasRepo.DeleteSchema(ctx, schemas.ID(schemaID))
+	if setErr != nil {
+		if errors.Is(setErr, io.EOF) {
+			writeResponse(ctx, writer, http.StatusNotFound, Error{
+				Code:    "not_found",
+				Message: "schema not found",
+			})
+		} else {
+			writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+				Code:    "internal_error",
+				Message: "Could delete schema",
+			})
+		}
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (h *HttpHandler) GetSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
+	ctx := req.Context()
+	schemaEntry, getErr := h.schemasRepo.GetSchemaByID(ctx, schemas.ID(schemaID))
+	if getErr != nil {
+		if errors.Is(getErr, io.EOF) {
+			writeResponse(ctx, writer, http.StatusNotFound, Error{
+				Code:    "not_found",
+				Message: "schema not found",
+			})
+		} else {
+			writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+				Code:    "internal_error",
+				Message: "Could retrieve schema",
+			})
+		}
+		return
+	}
+	writer.Header().Set("Content-Type", "application/octet-stream")
+	writer.Header().Set("Last-Modified", schemaEntry.UpdatedAt.UTC().Format(http.TimeFormat))
+	writer.WriteHeader(http.StatusOK)
+	_, writeErr := writer.Write([]byte(schemaEntry.Content))
+	if writeErr != nil {
+		slog.Error("Failed to write response body", slog.Any("error", writeErr))
+	}
 }
 
 func (h *HttpHandler) UploadSchemaFile(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
@@ -55,13 +182,6 @@ type APIEvents interface {
 	RouteUpserted(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func NewHttpHandler(repository repository.ServiceLevelsRepository, routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)) *HttpHandler {
-	return &HttpHandler{
-		repository:    repository,
-		routeUpserted: routeUpserted,
-	}
-}
-
 func (h *HttpHandler) GetServiceLevels(writer http.ResponseWriter, req *http.Request, params GetServiceLevelsParams) {
 	ctx := req.Context()
 	if len(params.XIntegrationId) == 0 {
@@ -75,7 +195,7 @@ func (h *HttpHandler) GetServiceLevels(writer http.ResponseWriter, req *http.Req
 	integrationID := integrations.ID(params.XIntegrationId)
 	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
 
-	config := h.repository.GetConfig(ctx, integrationID)
+	config := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
 	if config == nil {
 		writeResponse(ctx, writer, http.StatusNotFound, Error{
 			Code:    "not_found",
@@ -128,14 +248,14 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 		})
 	}
 
-	definition := h.repository.GetConfig(ctx, integrationID)
+	definition := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
 	if definition == nil {
 		definition = &servicelevels.HttpApiServiceLevels{}
 	}
 
 	definition.Upsert(routeDefinition)
 
-	h.repository.SetConfig(ctx, integrationID, definition)
+	h.serviceLevelsRepo.SetConfig(ctx, integrationID, definition)
 	h.routeUpserted(integrationID, routeDefinition.Route)
 	key := routeDefinition.Route.ID()
 	writeResponse(ctx, writer, http.StatusOK, UpsertedServiceLevelsResponse{
@@ -169,7 +289,7 @@ func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.
 	integrationID := integrations.ID(params.XIntegrationId)
 	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
 
-	config := h.repository.GetConfig(ctx, integrationID)
+	config := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
 	if config == nil {
 		writeResponse(ctx, writer, http.StatusNotFound, Error{
 			Code:    "not_found",
@@ -179,7 +299,7 @@ func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.
 	}
 
 	route, deleted := config.DeleteRouteByKey(key)
-	h.repository.SetConfig(ctx, integrationID, config)
+	h.serviceLevelsRepo.SetConfig(ctx, integrationID, config)
 
 	if deleted {
 		h.routeUpserted(integrationID, route)

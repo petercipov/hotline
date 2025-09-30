@@ -2,8 +2,11 @@ package main
 
 import (
 	"app/setup"
+	"crypto/rand"
 	"hotline/clock"
+	"hotline/schemas"
 	"hotline/servicelevels"
+	"hotline/uuid"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,7 +17,9 @@ import (
 
 func main() {
 	systemClock := clock.NewSystemClock()
-	fakeRepository := &servicelevels.InMemorySLORepository{}
+	uuidGenerator := uuid.NewDeterministicV7(rand.Reader)
+	inMemoryServiceLevels := &servicelevels.InMemoryRepository{}
+	inMemorySchemas := schemas.NewInMemorySchemaRepository(uuidGenerator)
 	app, appErr := setup.NewApp(
 		&setup.Config{
 			OtelHttpReporter: struct {
@@ -32,7 +37,8 @@ func main() {
 		func(host string, handler http.Handler) setup.HttpServer {
 			return NewGoHttpServer(host, handler)
 		},
-		fakeRepository,
+		inMemoryServiceLevels,
+		inMemorySchemas,
 	)
 
 	if appErr != nil {

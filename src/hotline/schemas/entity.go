@@ -10,6 +10,10 @@ import (
 
 type ID string
 
+func (i *ID) String() string {
+	return string(*i)
+}
+
 type IDGenerator func(now time.Time) (ID, error)
 
 func NewIDGenerator(generator uuid.V7StringGenerator) IDGenerator {

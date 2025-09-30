@@ -4,14 +4,20 @@ import (
 	"app/setup"
 	"app/setup/config"
 	"app/setup/repository"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"hotline/clock"
+	"hotline/schemas"
 	"hotline/servicelevels"
+	"hotline/uuid"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -38,7 +44,8 @@ type appSut struct {
 	fakeCollector    *fakeCollector
 	fakeEgressTarget *fakeEgressTarget
 
-	fakeSLOConfigRepository repository.ServiceLevelsRepository
+	serviceLevelsRepository repository.ServiceLevelsRepository
+	schemaRepository        repository.SchemaRepository
 }
 
 func newAppSut(t *testing.T) *appSut {
@@ -47,12 +54,15 @@ func newAppSut(t *testing.T) *appSut {
 		500*time.Microsecond)
 	collector := &fakeCollector{}
 	target := newFakeEgressTarget(manualClock, 1234)
-	ineMemorySLODefRepo := &servicelevels.InMemorySLORepository{}
+
+	uuidGenerator := uuid.NewDeterministicV7(&uuid.ConstantRandReader{})
+
 	return &appSut{
 		t:                       t,
 		fakeCollector:           collector,
 		fakeEgressTarget:        target,
-		fakeSLOConfigRepository: ineMemorySLODefRepo,
+		serviceLevelsRepository: &servicelevels.InMemoryRepository{},
+		schemaRepository:        schemas.NewInMemorySchemaRepository(uuidGenerator),
 		managedClock:            manualClock,
 		collectorServer:         setup.NewHttpTestServer(collector),
 		egressTargetServer:      setup.NewHttpTestServer(target),
@@ -243,7 +253,8 @@ func (a *appSut) startHotline() error {
 		func(_ string, handler http.Handler) setup.HttpServer {
 			return setup.NewHttpTestServer(handler)
 		},
-		a.fakeSLOConfigRepository,
+		a.serviceLevelsRepository,
+		a.schemaRepository,
 	)
 	if appErr != nil {
 		return appErr
@@ -292,6 +303,123 @@ func (a *appSut) serviceLevelsMetricsAreReceivedInCollector(ctx context.Context,
 	return a.fakeCollector.ExpectCollectorMetrics(ctx, a.t, metrics)
 }
 
+func (a *appSut) checkSchemaList(ctx context.Context, configRaw string) (context.Context, error) {
+	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+
+	listResponse, listErr := configClient.ListSchemasWithResponse(ctx)
+	if listErr != nil {
+		return ctx, listErr
+	}
+
+	if listResponse.StatusCode() != 200 && listResponse.StatusCode() != 404 {
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, listResponse.StatusCode())
+	}
+
+	schemaList := *listResponse.JSON200
+
+	var expectedSchemas config.ListRequestSchemas
+	jsonErr := json.Unmarshal([]byte(configRaw), &expectedSchemas)
+	if jsonErr != nil {
+		return ctx, jsonErr
+	}
+	if !assert.Equal(a.t, expectedSchemas, schemaList, "schemas do not match") {
+		return ctx, errConfigDoNotMatch
+	}
+	return ctx, nil
+}
+
+func (a *appSut) createSchema(ctx context.Context, filePath string) (context.Context, error) {
+	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+	schemaFile, openErr := os.Open(filepath.Clean(filePath))
+	if openErr != nil {
+		return ctx, openErr
+	}
+	defer func() {
+		_ = schemaFile.Close()
+	}()
+
+	buff, _ := io.ReadAll(schemaFile)
+	createSchema, createErr := configClient.CreateSchemaWithBodyWithResponse(
+		ctx,
+		"application/octet-stream",
+		bytes.NewReader(buff),
+	)
+	if createErr != nil {
+		return ctx, createErr
+	}
+
+	if createSchema.StatusCode() != 201 {
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, createSchema.StatusCode())
+	}
+
+	if !assert.NotEmpty(a.t, createSchema.JSON201.SchemaID) {
+		return ctx, errConfigDoNotMatch
+	}
+	if !assert.NotEmpty(a.t, createSchema.JSON201.UpdatedAt) {
+		return ctx, errConfigDoNotMatch
+	}
+
+	return ctx, nil
+}
+
+func (a *appSut) compareSchemaContent(ctx context.Context, schemaID string, expectedFilePath string) (context.Context, error) {
+	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+
+	schemaContent, getErr := configClient.GetSchemaWithResponse(
+		ctx,
+		schemaID,
+	)
+	if getErr != nil {
+		return ctx, getErr
+	}
+
+	if schemaContent.StatusCode() != 200 {
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, schemaContent.StatusCode())
+	}
+
+	assert.NotEmpty(a.t, schemaContent.HTTPResponse.Header.Get("Last-Modified"))
+	assert.Equal(a.t, "application/octet-stream", schemaContent.HTTPResponse.Header.Get("Content-Type"))
+
+	expectedContent, readExpectedErr := os.ReadFile(filepath.Clean(expectedFilePath))
+	if readExpectedErr != nil {
+		return ctx, readExpectedErr
+	}
+
+	receivedBody := string(schemaContent.Body)
+	expectedBody := string(expectedContent)
+	if !assert.Equal(a.t, expectedBody, receivedBody) {
+		return ctx, errConfigDoNotMatch
+	}
+
+	return ctx, nil
+}
+
+func (a *appSut) deleteSchema(ctx context.Context, schemaID string) (context.Context, error) {
+	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+
+	response, deleteErr := configClient.DeleteSchemaWithResponse(ctx, schemaID)
+	if deleteErr != nil {
+		return ctx, deleteErr
+	}
+
+	if response.StatusCode() != 204 {
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, response.StatusCode())
+	}
+	return ctx, nil
+}
+
 func TestApp(t *testing.T) {
 	suite := godog.TestSuite{
 		ScenarioInitializer: func(sctx *godog.ScenarioContext) {
@@ -317,6 +445,11 @@ func TestApp(t *testing.T) {
 
 			sctx.Then("service levels metrics are received in collector", sut.serviceLevelsMetricsAreReceivedInCollector)
 			sctx.Then(`service levels configuration for "([^"]*)" is`, sut.checkServiceLevelsConfiguration)
+
+			sctx.Step(`schema list is`, sut.checkSchemaList)
+			sctx.Step(`schema is created from file "([^"]*)"`, sut.createSchema)
+			sctx.Step(`schema content for "([^"]*)" is same as in file "([^"]*)"`, sut.compareSchemaContent)
+			sctx.Step(`schema "([^"]*)" is deleted`, sut.deleteSchema)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",

@@ -57,7 +57,8 @@ func NewApp(
 	cfg *Config,
 	managedTime clock.ManagedTime,
 	createServer CreateServer,
-	sloConfigRepository repository.ServiceLevelsRepository,
+	serviceLevelsRepository repository.ServiceLevelsRepository,
+	schemaRepository repository.SchemaRepository,
 ) (*App, error) {
 	otelReporterScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("otel-reporter", 8),
@@ -77,7 +78,7 @@ func NewApp(
 	sloPipelineScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("slo-scope", 8),
 		func() *servicelevels.SLOScope {
-			return servicelevels.NewEmptyIntegrationsScope(sloConfigRepository, reporter)
+			return servicelevels.NewEmptyIntegrationsScope(serviceLevelsRepository, reporter)
 		},
 	)
 	sloPipeline := servicelevels.NewPipeline(sloPipelineScopes)
@@ -109,7 +110,10 @@ func NewApp(
 	)
 
 	egressIngestionServer := createServer(cfg.EgressHttpIngestion.Host, egressHandler)
-	cfgAPIHandler := config.HandlerWithOptions(config.NewHttpHandler(sloConfigRepository,
+	cfgAPIHandler := config.HandlerWithOptions(config.NewHttpHandler(
+		serviceLevelsRepository,
+		schemaRepository,
+		managedTime.Now,
 		func(integrationID integrations.ID, route hotlinehttp.Route) {
 			sloPipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
 				ID:    integrationID,

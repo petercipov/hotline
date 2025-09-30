@@ -168,12 +168,7 @@ type LatencyValue = Duration
 // ListRequestSchemas defines model for ListRequestSchemas.
 type ListRequestSchemas struct {
 	// Schemas List of uploaded schemas
-	Schemas []struct {
-		SchemaID SchemaID `json:"schemaID"`
-
-		// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
-		UpdatedAt DateTime `json:"updatedAt"`
-	} `json:"schemas"`
+	Schemas []SchemaListEntry `json:"schemas"`
 }
 
 // PercentileThreshold defines model for PercentileThreshold.
@@ -187,6 +182,14 @@ type PercentileThreshold struct {
 
 // PercentileValue Percentile value (0.0% to 100.0%)
 type PercentileValue = Percentile
+
+// RequestSchemaCreated defines model for RequestSchemaCreated.
+type RequestSchemaCreated struct {
+	SchemaID *SchemaID `json:"schemaID,omitempty"`
+
+	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
+	UpdatedAt *DateTime `json:"updatedAt,omitempty"`
+}
 
 // RequestValidationList List of Request Validations for an integration
 type RequestValidationList struct {
@@ -246,6 +249,14 @@ type RouteServiceLevels struct {
 // SchemaID defines model for SchemaID.
 type SchemaID = string
 
+// SchemaListEntry defines model for SchemaListEntry.
+type SchemaListEntry struct {
+	SchemaID SchemaID `json:"schemaID"`
+
+	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
+	UpdatedAt DateTime `json:"updatedAt"`
+}
+
 // ServiceLevelsList List of Service Levels for an integration
 type ServiceLevelsList struct {
 	// Routes List of route-specific Service Levels
@@ -266,14 +277,6 @@ type StatusServiceLevels struct {
 
 // StatusServiceLevelsExpected defines model for StatusServiceLevels.Expected.
 type StatusServiceLevelsExpected string
-
-// UploadRequestSchemaResponse defines model for UploadRequestSchemaResponse.
-type UploadRequestSchemaResponse struct {
-	SchemaID *SchemaID `json:"schemaID,omitempty"`
-
-	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
-	UpdatedAt *DateTime `json:"updatedAt,omitempty"`
-}
 
 // UpsertRequestValidationRequest defines model for UpsertRequestValidationRequest.
 type UpsertRequestValidationRequest struct {
@@ -327,18 +330,6 @@ type TooManyRequests = Error
 // Unauthorized Detailed error response
 type Unauthorized = Error
 
-// UploadSchemaMultipartBody defines parameters for UploadSchema.
-type UploadSchemaMultipartBody struct {
-	// Jsonschema https://json-schema.org/draft/2020-12/json-schema-core.html
-	Jsonschema *JSONSchemaFileContent `json:"jsonschema,omitempty"`
-}
-
-// UploadSchemaFileMultipartBody defines parameters for UploadSchemaFile.
-type UploadSchemaFileMultipartBody struct {
-	// Jsonschema https://json-schema.org/draft/2020-12/json-schema-core.html
-	Jsonschema *JSONSchemaFileContent `json:"jsonschema,omitempty"`
-}
-
 // GetRequestValidationsParams defines parameters for GetRequestValidations.
 type GetRequestValidationsParams struct {
 	// XIntegrationId Unique identifier of an integration
@@ -374,12 +365,6 @@ type DeleteServiceLevelsParams struct {
 	// XIntegrationId Unique identifier of an integration
 	XIntegrationId IntegrationID `json:"x-integration-id"`
 }
-
-// UploadSchemaMultipartRequestBody defines body for UploadSchema for multipart/form-data ContentType.
-type UploadSchemaMultipartRequestBody UploadSchemaMultipartBody
-
-// UploadSchemaFileMultipartRequestBody defines body for UploadSchemaFile for multipart/form-data ContentType.
-type UploadSchemaFileMultipartRequestBody UploadSchemaFileMultipartBody
 
 // UpsertRequestValidationsJSONRequestBody defines body for UpsertRequestValidations for application/json ContentType.
 type UpsertRequestValidationsJSONRequestBody = UpsertRequestValidationRequest
@@ -463,11 +448,11 @@ type ClientInterface interface {
 	// ListSchemas request
 	ListSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UploadSchemaWithBody request with any body
-	UploadSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateSchemaWithBody request with any body
+	CreateSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteSchemaFile request
-	DeleteSchemaFile(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteSchema request
+	DeleteSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSchema request
 	GetSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -510,8 +495,8 @@ func (c *Client) ListSchemas(ctx context.Context, reqEditors ...RequestEditorFn)
 	return c.Client.Do(req)
 }
 
-func (c *Client) UploadSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadSchemaRequestWithBody(c.Server, contentType, body)
+func (c *Client) CreateSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSchemaRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -522,8 +507,8 @@ func (c *Client) UploadSchemaWithBody(ctx context.Context, contentType string, b
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteSchemaFile(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSchemaFileRequest(c.Server, schemaid)
+func (c *Client) DeleteSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSchemaRequest(c.Server, schemaid)
 	if err != nil {
 		return nil, err
 	}
@@ -681,8 +666,8 @@ func NewListSchemasRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewUploadSchemaRequestWithBody generates requests for UploadSchema with any type of body
-func NewUploadSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewCreateSchemaRequestWithBody generates requests for CreateSchema with any type of body
+func NewCreateSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -710,8 +695,8 @@ func NewUploadSchemaRequestWithBody(server string, contentType string, body io.R
 	return req, nil
 }
 
-// NewDeleteSchemaFileRequest generates requests for DeleteSchemaFile
-func NewDeleteSchemaFileRequest(server string, schemaid SchemaID) (*http.Request, error) {
+// NewDeleteSchemaRequest generates requests for DeleteSchema
+func NewDeleteSchemaRequest(server string, schemaid SchemaID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1140,11 +1125,11 @@ type ClientWithResponsesInterface interface {
 	// ListSchemasWithResponse request
 	ListSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSchemasResponse, error)
 
-	// UploadSchemaWithBodyWithResponse request with any body
-	UploadSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error)
+	// CreateSchemaWithBodyWithResponse request with any body
+	CreateSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSchemaResponse, error)
 
-	// DeleteSchemaFileWithResponse request
-	DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error)
+	// DeleteSchemaWithResponse request
+	DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error)
 
 	// GetSchemaWithResponse request
 	GetSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*GetSchemaResponse, error)
@@ -1202,10 +1187,10 @@ func (r ListSchemasResponse) StatusCode() int {
 	return 0
 }
 
-type UploadSchemaResponse struct {
+type CreateSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON201      *UploadRequestSchemaResponse
+	JSON201      *RequestSchemaCreated
 	JSON400      *BadRequest
 	JSON401      *Unauthorized
 	JSON429      *TooManyRequests
@@ -1213,7 +1198,7 @@ type UploadSchemaResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r UploadSchemaResponse) Status() string {
+func (r CreateSchemaResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1221,14 +1206,14 @@ func (r UploadSchemaResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r UploadSchemaResponse) StatusCode() int {
+func (r CreateSchemaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteSchemaFileResponse struct {
+type DeleteSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
@@ -1239,7 +1224,7 @@ type DeleteSchemaFileResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteSchemaFileResponse) Status() string {
+func (r DeleteSchemaResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1247,7 +1232,7 @@ func (r DeleteSchemaFileResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteSchemaFileResponse) StatusCode() int {
+func (r DeleteSchemaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1257,7 +1242,6 @@ func (r DeleteSchemaFileResponse) StatusCode() int {
 type GetSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *JSONSchemaFileContent
 	JSON400      *BadRequest
 	JSON401      *Unauthorized
 	JSON404      *NotFound
@@ -1476,22 +1460,22 @@ func (c *ClientWithResponses) ListSchemasWithResponse(ctx context.Context, reqEd
 	return ParseListSchemasResponse(rsp)
 }
 
-// UploadSchemaWithBodyWithResponse request with arbitrary body returning *UploadSchemaResponse
-func (c *ClientWithResponses) UploadSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSchemaResponse, error) {
-	rsp, err := c.UploadSchemaWithBody(ctx, contentType, body, reqEditors...)
+// CreateSchemaWithBodyWithResponse request with arbitrary body returning *CreateSchemaResponse
+func (c *ClientWithResponses) CreateSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSchemaResponse, error) {
+	rsp, err := c.CreateSchemaWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUploadSchemaResponse(rsp)
+	return ParseCreateSchemaResponse(rsp)
 }
 
-// DeleteSchemaFileWithResponse request returning *DeleteSchemaFileResponse
-func (c *ClientWithResponses) DeleteSchemaFileWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaFileResponse, error) {
-	rsp, err := c.DeleteSchemaFile(ctx, schemaid, reqEditors...)
+// DeleteSchemaWithResponse request returning *DeleteSchemaResponse
+func (c *ClientWithResponses) DeleteSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteSchemaResponse, error) {
+	rsp, err := c.DeleteSchema(ctx, schemaid, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteSchemaFileResponse(rsp)
+	return ParseDeleteSchemaResponse(rsp)
 }
 
 // GetSchemaWithResponse request returning *GetSchemaResponse
@@ -1643,22 +1627,22 @@ func ParseListSchemasResponse(rsp *http.Response) (*ListSchemasResponse, error) 
 	return response, nil
 }
 
-// ParseUploadSchemaResponse parses an HTTP response from a UploadSchemaWithResponse call
-func ParseUploadSchemaResponse(rsp *http.Response) (*UploadSchemaResponse, error) {
+// ParseCreateSchemaResponse parses an HTTP response from a CreateSchemaWithResponse call
+func ParseCreateSchemaResponse(rsp *http.Response) (*CreateSchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &UploadSchemaResponse{
+	response := &CreateSchemaResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest UploadRequestSchemaResponse
+		var dest RequestSchemaCreated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1697,15 +1681,15 @@ func ParseUploadSchemaResponse(rsp *http.Response) (*UploadSchemaResponse, error
 	return response, nil
 }
 
-// ParseDeleteSchemaFileResponse parses an HTTP response from a DeleteSchemaFileWithResponse call
-func ParseDeleteSchemaFileResponse(rsp *http.Response) (*DeleteSchemaFileResponse, error) {
+// ParseDeleteSchemaResponse parses an HTTP response from a DeleteSchemaWithResponse call
+func ParseDeleteSchemaResponse(rsp *http.Response) (*DeleteSchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteSchemaFileResponse{
+	response := &DeleteSchemaResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1765,13 +1749,6 @@ func ParseGetSchemaResponse(rsp *http.Response) (*GetSchemaResponse, error) {
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest JSONSchemaFileContent
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2225,10 +2202,10 @@ type ServerInterface interface {
 	ListSchemas(w http.ResponseWriter, r *http.Request)
 	// Create Schema
 	// (POST /request-schemas)
-	UploadSchema(w http.ResponseWriter, r *http.Request)
-	// Delete Schema File
+	CreateSchema(w http.ResponseWriter, r *http.Request)
+	// Delete Schema
 	// (DELETE /request-schemas/{schemaid})
-	DeleteSchemaFile(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
+	DeleteSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
 	// Get request schemas
 	// (GET /request-schemas/{schemaid})
 	GetSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
@@ -2284,8 +2261,8 @@ func (siw *ServerInterfaceWrapper) ListSchemas(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
-// UploadSchema operation middleware
-func (siw *ServerInterfaceWrapper) UploadSchema(w http.ResponseWriter, r *http.Request) {
+// CreateSchema operation middleware
+func (siw *ServerInterfaceWrapper) CreateSchema(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
@@ -2294,7 +2271,7 @@ func (siw *ServerInterfaceWrapper) UploadSchema(w http.ResponseWriter, r *http.R
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UploadSchema(w, r)
+		siw.Handler.CreateSchema(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2304,8 +2281,8 @@ func (siw *ServerInterfaceWrapper) UploadSchema(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteSchemaFile operation middleware
-func (siw *ServerInterfaceWrapper) DeleteSchemaFile(w http.ResponseWriter, r *http.Request) {
+// DeleteSchema operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSchema(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -2325,7 +2302,7 @@ func (siw *ServerInterfaceWrapper) DeleteSchemaFile(w http.ResponseWriter, r *ht
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSchemaFile(w, r, schemaid)
+		siw.Handler.DeleteSchema(w, r, schemaid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2836,8 +2813,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc("GET "+options.BaseURL+"/request-schemas", wrapper.ListSchemas)
-	m.HandleFunc("POST "+options.BaseURL+"/request-schemas", wrapper.UploadSchema)
-	m.HandleFunc("DELETE "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.DeleteSchemaFile)
+	m.HandleFunc("POST "+options.BaseURL+"/request-schemas", wrapper.CreateSchema)
+	m.HandleFunc("DELETE "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.DeleteSchema)
 	m.HandleFunc("GET "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.GetSchema)
 	m.HandleFunc("PUT "+options.BaseURL+"/request-schemas/{schemaid}", wrapper.UploadSchemaFile)
 	m.HandleFunc("GET "+options.BaseURL+"/request-validations", wrapper.GetRequestValidations)

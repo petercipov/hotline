@@ -16,6 +16,7 @@ var _ = Describe("Schema ID", func() {
 		id, err := idGenerator(time.Time{})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(id).To(Equal(schemas.ID("SCx3zt0ygAcQGBAQEBAQEBAQ")))
+		Expect(id.String()).To(Equal("SCx3zt0ygAcQGBAQEBAQEBAQ"))
 	})
 
 	It("can fails if ran cannot be read", func() {

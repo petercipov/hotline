@@ -9,11 +9,11 @@ import (
 	"time"
 )
 
-type SchemaRepository interface {
-	GetSchema(ctx context.Context, schema ID) io.ReadCloser
+type SchemaReader interface {
+	GetSchemaContent(ctx context.Context, schema ID) io.ReadCloser
 }
 
-type ValidationRepository interface {
+type ValidationReader interface {
 	GetConfig(ctx context.Context, id integrations.ID) *ValidationDefinition
 }
 
@@ -25,21 +25,21 @@ type ValidatorScope struct {
 	validators map[integrations.ID]*IntegrationValidation
 
 	LastObservedTime time.Time
-	schemaRepo       SchemaRepository
-	validationRepo   ValidationRepository
+	schemaReader     SchemaReader
+	validationReader ValidationReader
 
-	reporter ValidationReporter
+	validationReporter ValidationReporter
 }
 
-func NewEmptyValidatorScope(schemaRepo SchemaRepository, validationRepo ValidationRepository, reporter ValidationReporter) *ValidatorScope {
+func NewEmptyValidatorScope(schemaRepo SchemaReader, validationRepo ValidationReader, reporter ValidationReporter) *ValidatorScope {
 	return &ValidatorScope{
 		validators: make(map[integrations.ID]*IntegrationValidation),
 
 		LastObservedTime: time.Time{},
-		schemaRepo:       schemaRepo,
-		validationRepo:   validationRepo,
+		schemaReader:     schemaRepo,
+		validationReader: validationRepo,
 
-		reporter: reporter,
+		validationReporter: reporter,
 	}
 }
 
@@ -52,7 +52,7 @@ func (scope *ValidatorScope) AdvanceTime(now time.Time) {
 func (scope *ValidatorScope) ensureValidation(ctx context.Context, id integrations.ID) *IntegrationValidation {
 	currentValidator, found := scope.validators[id]
 	if !found {
-		cfg := scope.validationRepo.GetConfig(ctx, id)
+		cfg := scope.validationReader.GetConfig(ctx, id)
 		if cfg != nil {
 			currentValidator = scope.buildRouteValidator(ctx, *cfg)
 			scope.validators[id] = currentValidator
@@ -84,16 +84,13 @@ func (scope *ValidatorScope) buildValidator(ctx context.Context, def RouteSchema
 		requestSchema.RequestBody = scope.getSchemaDefinition(ctx, def.Request.BodySchemaID)
 	}
 
-	validator, buildErr := NewRequestValidator(requestSchema)
-	if buildErr != nil {
-		return nil
-	}
+	validator, _ := NewRequestValidator(requestSchema)
 	return validator
 }
 
 func (scope *ValidatorScope) getSchemaDefinition(ctx context.Context, id *ID) *SchemaDefinition {
 	if id != nil {
-		content := scope.schemaRepo.GetSchema(ctx, *id)
+		content := scope.schemaReader.GetSchemaContent(ctx, *id)
 		if content != nil {
 			defer func() {
 				_ = content.Close()
@@ -190,5 +187,5 @@ func (message *ValidateRequestMessage) Execute(ctx context.Context, _ string, sc
 		result.Success = success
 	}
 
-	scope.reporter.Report(ctx, result)
+	scope.validationReporter.Report(ctx, result)
 }

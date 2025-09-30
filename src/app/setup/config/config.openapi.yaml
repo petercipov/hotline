@@ -131,27 +131,24 @@ paths:
           $ref: '#/components/responses/InternalServerError'
     post:
       summary: Create Schema
-      description: Upload schema for request validation
-      operationId: uploadSchema
+      description: Create schema for request validation
+      operationId: createSchema
       tags:
         - Request Schemas
       requestBody:
         description: Schema definition
         required: true
         content:
-          multipart/form-data:
+          application/octet-stream:
             schema:
-              type: object
-              properties:
-                jsonschema:
-                  $ref: '#/components/schemas/JSONSchemaFileContent'
+              $ref: '#/components/schemas/JSONSchemaFileContent'
       responses:
         '201':
           description: Created request schema
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadRequestSchemaResponse'
+                $ref: '#/components/schemas/RequestSchemaCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -173,8 +170,17 @@ paths:
       responses:
         '200':
           description: Get Schema File Content
+          headers:
+            Last-Modified:
+              schema:
+                type: string
+                format: date-time
+                minLength: 15
+                maxLength: 30
+                description: format to use when generating times in headers. Time as in RFC1123 but hard-codes GMT as the time zone
+                example: "Sat, 22 Feb 2025 12:02:10 GMT"
           content:
-            application/json:
+            application/octet-stream:
               schema:
                 $ref: '#/components/schemas/JSONSchemaFileContent'
         '400':
@@ -188,9 +194,9 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
-      summary: Delete Schema File
-      description: Delete request schema file
-      operationId: deleteSchemaFile
+      summary: Delete Schema
+      description: Delete request schema
+      operationId: deleteSchema
       tags:
         - Request Schemas
       parameters:
@@ -220,12 +226,9 @@ paths:
         description: Schema definition
         required: true
         content:
-          multipart/form-data:
+          application/octet-stream:
             schema:
-              type: object
-              properties:
-                jsonschema:
-                  $ref: '#/components/schemas/JSONSchemaFileContent'
+              $ref: '#/components/schemas/JSONSchemaFileContent'
       responses:
         '201':
           description: Request schema file created successfully
@@ -385,7 +388,7 @@ components:
       description: https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
       example: "2017-07-21T17:32:28Z"
 
-    UploadRequestSchemaResponse:
+    RequestSchemaCreated:
       type: object
       properties:
         schemaID:
@@ -402,16 +405,19 @@ components:
           type: array
           maxItems: 1024
           items:
-            required:
-              - schemaID
-              - title
-              - updatedAt
-            properties:
-              schemaID:
-                $ref: '#/components/schemas/SchemaID'
-              updatedAt:
-                $ref: '#/components/schemas/DateTime'
+            $ref: '#/components/schemas/SchemaListEntry'
           description: List of uploaded schemas
+
+    SchemaListEntry:
+      type: object
+      required:
+        - schemaID
+        - updatedAt
+      properties:
+        schemaID:
+          $ref: '#/components/schemas/SchemaID'
+        updatedAt:
+          $ref: '#/components/schemas/DateTime'
 
     UpsertedServiceLevelsResponse:
       type: object

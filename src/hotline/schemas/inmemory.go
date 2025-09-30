@@ -3,36 +3,130 @@ package schemas
 import (
 	"context"
 	"hotline/integrations"
+	"hotline/uuid"
 	"io"
 	"strings"
 	"sync"
+	"time"
 )
 
-type InMemorySchemaRepository struct {
-	mutext  sync.Mutex
-	schemas map[ID]string
+type SchemaEntry struct {
+	ID        ID
+	Content   string
+	UpdatedAt time.Time
 }
 
-func (r *InMemorySchemaRepository) GetSchema(_ context.Context, schemaID ID) io.ReadCloser {
+type SchemaListEntry struct {
+	ID        ID
+	UpdatedAt time.Time
+}
+
+type inMemorySchemaEntry struct {
+	id        ID
+	content   string
+	updatedAt time.Time
+}
+type InMemorySchemaRepository struct {
+	mutext      sync.Mutex
+	schemas     map[ID]inMemorySchemaEntry
+	idGenerator IDGenerator
+}
+
+func NewInMemorySchemaRepository(generator uuid.V7StringGenerator) *InMemorySchemaRepository {
+	return &InMemorySchemaRepository{
+		schemas:     make(map[ID]inMemorySchemaEntry),
+		idGenerator: NewIDGenerator(generator),
+	}
+}
+
+func (r *InMemorySchemaRepository) GenerateID(now time.Time) (ID, error) {
+	return r.idGenerator(now)
+}
+
+func (r *InMemorySchemaRepository) GetSchemaByID(_ context.Context, schemaID ID) (SchemaEntry, error) {
+	r.mutext.Lock()
+	defer r.mutext.Unlock()
+
+	var result SchemaEntry
+	var resErr = io.EOF
+	entry, found := r.schemas[schemaID]
+	if found {
+		result = SchemaEntry{
+			ID:        entry.id,
+			Content:   entry.content,
+			UpdatedAt: entry.updatedAt,
+		}
+		resErr = nil
+	}
+	return result, resErr
+}
+
+func (r *InMemorySchemaRepository) GetSchemaContent(_ context.Context, schemaID ID) io.ReadCloser {
 	r.mutext.Lock()
 	defer r.mutext.Unlock()
 
 	var result io.ReadCloser
-	schemas, found := r.schemas[schemaID]
+	entry, found := r.schemas[schemaID]
 	if found {
-		result = io.NopCloser(strings.NewReader(schemas))
+		result = io.NopCloser(strings.NewReader(entry.content))
 	}
 	return result
 }
 
-func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content string) {
+func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content string, updatedAt time.Time) error {
 	r.mutext.Lock()
 	defer r.mutext.Unlock()
 
-	if r.schemas == nil {
-		r.schemas = make(map[ID]string)
+	compiler := createCompiler()
+	_, validatorErr := newJsonSchemaValidator(
+		SchemaDefinition{
+			ID:      id,
+			Content: strings.NewReader(content),
+		},
+		"test",
+		compiler,
+	)
+
+	if validatorErr != nil {
+		return &ValidationError{
+			SchemaID: id,
+			Err:      validatorErr,
+		}
 	}
-	r.schemas[id] = content
+
+	r.schemas[id] = inMemorySchemaEntry{
+		id:        id,
+		content:   content,
+		updatedAt: updatedAt,
+	}
+	return nil
+}
+
+func (r *InMemorySchemaRepository) ListSchemas(_ context.Context) []SchemaListEntry {
+	r.mutext.Lock()
+	defer r.mutext.Unlock()
+
+	var entries []SchemaListEntry
+	for id, entry := range r.schemas {
+		entries = append(entries, SchemaListEntry{
+			ID:        id,
+			UpdatedAt: entry.updatedAt,
+		})
+	}
+	return entries
+}
+
+func (r *InMemorySchemaRepository) DeleteSchema(_ context.Context, schemaID ID) error {
+	r.mutext.Lock()
+	defer r.mutext.Unlock()
+
+	var resErr = io.EOF
+	_, found := r.schemas[schemaID]
+	if found {
+		resErr = nil
+		delete(r.schemas, schemaID)
+	}
+	return resErr
 }
 
 type InMemoryValidationRepository struct {

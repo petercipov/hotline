@@ -95,9 +95,7 @@ func newJsonSchemaValidator(definition SchemaDefinition, name string, c *jsonsch
 }
 
 func NewRequestValidator(definitions RequestSchema) (*Validator, error) {
-	c := jsonschema.NewCompiler()
-	c.DefaultDraft(jsonschema.Draft2020)
-	c.UseLoader(&nopLoader{})
+	c := createCompiler()
 	validator := &Validator{}
 
 	var parseErr error
@@ -136,6 +134,13 @@ func NewRequestValidator(definitions RequestSchema) (*Validator, error) {
 		}
 	}
 	return validator, nil
+}
+
+func createCompiler() *jsonschema.Compiler {
+	c := jsonschema.NewCompiler()
+	c.DefaultDraft(jsonschema.Draft2020)
+	c.UseLoader(&nopLoader{})
+	return c
 }
 
 func parse(c *jsonschema.Compiler, url string, r io.Reader) (*jsonschema.Schema, error) {

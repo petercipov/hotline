@@ -112,7 +112,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 type sloPipelineSUT struct {
 	pipeline       *servicelevels.Pipeline
-	sloRepository  *servicelevels.InMemorySLORepository
+	sloRepository  *servicelevels.InMemoryRepository
 	sloReporter    *servicelevels.InMemorySLOReporter
 	numberOfQueues int
 }
@@ -120,7 +120,7 @@ type sloPipelineSUT struct {
 func (s *sloPipelineSUT) forPipeline() {
 	s.numberOfQueues = 8
 	queueIDs := concurrency.GenerateScopeIds("queue", s.numberOfQueues)
-	s.sloRepository = &servicelevels.InMemorySLORepository{}
+	s.sloRepository = &servicelevels.InMemoryRepository{}
 	s.sloReporter = &servicelevels.InMemorySLOReporter{}
 
 	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.SLOScope {
