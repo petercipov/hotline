@@ -22,7 +22,7 @@ paths:
     get:
       summary: List Request Validations
       description: Retrieve Request Validations
-      operationId: getRequestValidations
+      operationId: listRequestValidations
       tags:
         - Request Validations
       parameters:
@@ -107,9 +107,9 @@ paths:
 
   /request-schemas:
     get:
-      summary: List request schemas
+      summary: List Request Schemas
       description: Retrieve list of request schemas
-      operationId: listSchemas
+      operationId: listRequestSchemas
       tags:
         - Request Schemas
       responses:
@@ -130,9 +130,9 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
-      summary: Create Schema
+      summary: Create Request Schema
       description: Create schema for request validation
-      operationId: createSchema
+      operationId: createRequestSchema
       tags:
         - Request Schemas
       requestBody:
@@ -160,9 +160,9 @@ paths:
 
   /request-schemas/{schemaid}:
     get:
-      summary: Get request schemas
-      description: Retrieve request schema
-      operationId: getSchema
+      summary: Get Request Schema
+      description: Retrieve request schema content
+      operationId: getRequestSchema
       tags:
         - Request Schemas
       parameters:
@@ -194,9 +194,9 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
-      summary: Delete Schema
+      summary: Delete Request Schema
       description: Delete request schema
-      operationId: deleteSchema
+      operationId: deleteRequestSchema
       tags:
         - Request Schemas
       parameters:
@@ -215,9 +215,9 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
-      summary: Upload Schema File
-      description: Upload request schema file
-      operationId: uploadSchemaFile
+      summary: Set Request Schema
+      description: Set request schema to newer version
+      operationId: putRequestSchema
       tags:
         - Request Schemas
       parameters:
@@ -248,7 +248,7 @@ paths:
     get:
       summary: List Service Levels
       description: Retrieve HTTP API Service Levels
-      operationId: getServiceLevels
+      operationId: listServiceLevels
       tags:
         - Service Levels
       parameters:

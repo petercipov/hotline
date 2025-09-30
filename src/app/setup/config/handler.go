@@ -25,6 +25,18 @@ type HttpHandler struct {
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
+func (h *HttpHandler) ListRequestValidations(w http.ResponseWriter, r *http.Request, params ListRequestValidationsParams) {
+	panic("implement me")
+}
+
+func (h *HttpHandler) UpsertRequestValidations(w http.ResponseWriter, r *http.Request, params UpsertRequestValidationsParams) {
+	panic("implement me")
+}
+
+func (h *HttpHandler) DeleteRequestValidation(w http.ResponseWriter, r *http.Request, routekey RouteKey, params DeleteRequestValidationParams) {
+	panic("implement me")
+}
+
 func NewHttpHandler(
 	serviceLevelsRepo repository.ServiceLevelsRepository,
 	schemasRepo repository.SchemaRepository,
@@ -39,7 +51,7 @@ func NewHttpHandler(
 	}
 }
 
-func (h *HttpHandler) ListSchemas(writer http.ResponseWriter, req *http.Request) {
+func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 
 	var list = ListRequestSchemas{
@@ -63,7 +75,7 @@ func (h *HttpHandler) ListSchemas(writer http.ResponseWriter, req *http.Request)
 	}
 }
 
-func (h *HttpHandler) CreateSchema(writer http.ResponseWriter, req *http.Request) {
+func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.Request) {
 	now := h.nowFunc()
 	ctx := req.Context()
 	schemaID, generateErr := h.schemasRepo.GenerateID(now)
@@ -116,7 +128,7 @@ func (h *HttpHandler) CreateSchema(writer http.ResponseWriter, req *http.Request
 	}
 }
 
-func (h *HttpHandler) DeleteSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
+func (h *HttpHandler) DeleteRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
 	ctx := req.Context()
 	setErr := h.schemasRepo.DeleteSchema(ctx, schemas.ID(schemaID))
 	if setErr != nil {
@@ -136,7 +148,7 @@ func (h *HttpHandler) DeleteSchema(writer http.ResponseWriter, req *http.Request
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-func (h *HttpHandler) GetSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
+func (h *HttpHandler) GetRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
 	ctx := req.Context()
 	schemaEntry, getErr := h.schemasRepo.GetSchemaByID(ctx, schemas.ID(schemaID))
 	if getErr != nil {
@@ -162,19 +174,7 @@ func (h *HttpHandler) GetSchema(writer http.ResponseWriter, req *http.Request, s
 	}
 }
 
-func (h *HttpHandler) UploadSchemaFile(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
-	panic("implement me")
-}
-
-func (h *HttpHandler) GetRequestValidations(_ http.ResponseWriter, _ *http.Request, _ GetRequestValidationsParams) {
-	panic("implement me")
-}
-
-func (h *HttpHandler) UpsertRequestValidations(_ http.ResponseWriter, _ *http.Request, _ UpsertRequestValidationsParams) {
-	panic("implement me")
-}
-
-func (h *HttpHandler) DeleteRequestValidation(_ http.ResponseWriter, _ *http.Request, _ RouteKey, _ DeleteRequestValidationParams) {
+func (h *HttpHandler) PutRequestSchema(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
 	panic("implement me")
 }
 
@@ -182,7 +182,7 @@ type APIEvents interface {
 	RouteUpserted(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func (h *HttpHandler) GetServiceLevels(writer http.ResponseWriter, req *http.Request, params GetServiceLevelsParams) {
+func (h *HttpHandler) ListServiceLevels(writer http.ResponseWriter, req *http.Request, params ListServiceLevelsParams) {
 	ctx := req.Context()
 	if len(params.XIntegrationId) == 0 {
 		slog.Error("Could not find X-Integration-Id header")

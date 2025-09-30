@@ -151,9 +151,9 @@ func (a *appSut) checkServiceLevelsConfiguration(ctx context.Context, integratio
 		return ctx, createClientErr
 	}
 
-	resp, responseErr := configClient.GetServiceLevelsWithResponse(
+	resp, responseErr := configClient.ListServiceLevelsWithResponse(
 		ctx,
-		&config.GetServiceLevelsParams{XIntegrationId: integrationID})
+		&config.ListServiceLevelsParams{XIntegrationId: integrationID})
 
 	if responseErr != nil {
 		return ctx, responseErr
@@ -309,7 +309,7 @@ func (a *appSut) checkSchemaList(ctx context.Context, configRaw string) (context
 		return ctx, createClientErr
 	}
 
-	listResponse, listErr := configClient.ListSchemasWithResponse(ctx)
+	listResponse, listErr := configClient.ListRequestSchemasWithResponse(ctx)
 	if listErr != nil {
 		return ctx, listErr
 	}
@@ -345,7 +345,7 @@ func (a *appSut) createSchema(ctx context.Context, filePath string) (context.Con
 	}()
 
 	buff, _ := io.ReadAll(schemaFile)
-	createSchema, createErr := configClient.CreateSchemaWithBodyWithResponse(
+	createSchema, createErr := configClient.CreateRequestSchemaWithBodyWithResponse(
 		ctx,
 		"application/octet-stream",
 		bytes.NewReader(buff),
@@ -374,7 +374,7 @@ func (a *appSut) compareSchemaContent(ctx context.Context, schemaID string, expe
 		return ctx, createClientErr
 	}
 
-	schemaContent, getErr := configClient.GetSchemaWithResponse(
+	schemaContent, getErr := configClient.GetRequestSchemaWithResponse(
 		ctx,
 		schemaID,
 	)
@@ -409,7 +409,7 @@ func (a *appSut) deleteSchema(ctx context.Context, schemaID string) (context.Con
 		return ctx, createClientErr
 	}
 
-	response, deleteErr := configClient.DeleteSchemaWithResponse(ctx, schemaID)
+	response, deleteErr := configClient.DeleteRequestSchemaWithResponse(ctx, schemaID)
 	if deleteErr != nil {
 		return ctx, deleteErr
 	}

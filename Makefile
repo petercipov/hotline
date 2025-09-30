@@ -4,6 +4,7 @@ generate:
 	cd ./src/app/setup/config && oapi-codegen -config=codegen.config.yaml config.openapi.yaml
 
 test:
+	go clean -testcache
 	go test  ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...
 	go test  ./src/app/... -coverprofile=./cover.app.out -covermode=atomic -coverpkg=./src/app/...
 
