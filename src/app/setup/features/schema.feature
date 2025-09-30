@@ -29,3 +29,28 @@ Feature: Hotline should be able to
       """
       { "schemas": [] }
       """
+  Scenario: schema can be upserted
+    Given hotline is running
+    And schema is created from file "./features/fixtures/product_schema.json"
+    And schema list is:
+      """
+      { "schemas": [
+        {
+          "schemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
+          "updatedAt": "2025-02-22T12:02:10.0005Z"
+        }
+      ] }
+      """
+
+    When advance time by 10s
+    And schema "SCAZUtiVXQcQGBAQEBAQEBAQ" is upserted from file "./features/fixtures/product_schema.v2.json"
+
+    Then schema list is:
+      """
+      { "schemas": [
+        {
+          "schemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
+          "updatedAt": "2025-02-22T12:02:20.00150Z"
+        }
+      ] }
+      """

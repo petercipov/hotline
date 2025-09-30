@@ -174,8 +174,46 @@ func (h *HttpHandler) GetRequestSchema(writer http.ResponseWriter, req *http.Req
 	}
 }
 
-func (h *HttpHandler) PutRequestSchema(_ http.ResponseWriter, _ *http.Request, _ SchemaID) {
-	panic("implement me")
+func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
+	now := h.nowFunc()
+	ctx := req.Context()
+	content, readErr := io.ReadAll(req.Body)
+	if readErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not read schema content",
+		})
+		return
+	}
+
+	entry, getErr := h.schemasRepo.GetSchemaByID(req.Context(), schemas.ID(schemaID))
+	if getErr != nil {
+		writeResponse(ctx, writer, http.StatusNotFound, Error{
+			Code:    "not_found",
+			Message: "Request Schema not found",
+		})
+		return
+	}
+
+	setErr := h.schemasRepo.SetSchema(ctx, entry.ID, string(content), now)
+	if setErr != nil {
+		var validationErr *schemas.ValidationError
+		isValidationErr := errors.As(setErr, &validationErr)
+		if isValidationErr {
+			writeResponse(ctx, writer, http.StatusBadRequest, Error{
+				Code:    "bad_request",
+				Message: validationErr.Error(),
+			})
+		} else {
+			writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+				Code:    "internal_error",
+				Message: "Could not store schema",
+			})
+		}
+		return
+	}
+
+	writer.WriteHeader(http.StatusCreated)
 }
 
 type APIEvents interface {

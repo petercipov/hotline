@@ -403,6 +403,37 @@ func (a *appSut) compareSchemaContent(ctx context.Context, schemaID string, expe
 	return ctx, nil
 }
 
+func (a *appSut) schemaIsUpsertedFromFile(ctx context.Context, schemaID string, schemaFilePath string) (context.Context, error) {
+	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+
+	schemaFile, openErr := os.Open(filepath.Clean(schemaFilePath))
+	if openErr != nil {
+		return ctx, openErr
+	}
+	defer func() {
+		_ = schemaFile.Close()
+	}()
+
+	buff, _ := io.ReadAll(schemaFile)
+
+	resp, respErr := configClient.PutRequestSchemaWithBodyWithResponse(
+		ctx,
+		schemaID,
+		"application/octet-stream",
+		bytes.NewReader(buff),
+	)
+	if respErr != nil {
+		return ctx, respErr
+	}
+	if resp.StatusCode() != http.StatusCreated {
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, resp.StatusCode())
+	}
+	return ctx, nil
+}
+
 func (a *appSut) deleteSchema(ctx context.Context, schemaID string) (context.Context, error) {
 	configClient, createClientErr := config.NewClientWithResponses(a.app.GetCfgAPIUrl())
 	if createClientErr != nil {
@@ -450,6 +481,7 @@ func TestApp(t *testing.T) {
 			sctx.Step(`schema is created from file "([^"]*)"`, sut.createSchema)
 			sctx.Step(`schema content for "([^"]*)" is same as in file "([^"]*)"`, sut.compareSchemaContent)
 			sctx.Step(`schema "([^"]*)" is deleted`, sut.deleteSchema)
+			sctx.Step(`schema "([^"]*)" is upserted from file "([^"]*)"`, sut.schemaIsUpsertedFromFile)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",
