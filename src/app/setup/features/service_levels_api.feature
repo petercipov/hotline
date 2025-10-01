@@ -1,7 +1,5 @@
-Feature: Config API
-  1) list slo definitions
-  2) update slo definitions
-  3) delete slo defnitions
+Feature: Service Levels API
+  1) CRUD service levels
 
   Scenario: no definitions
     Given hotline is running

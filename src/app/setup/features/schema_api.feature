@@ -1,4 +1,4 @@
-Feature: Hotline should be able to
+Feature: Schema API
   1) list schema
   2) upload schema
   3) list schema
