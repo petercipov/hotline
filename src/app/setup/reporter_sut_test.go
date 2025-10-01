@@ -10,7 +10,6 @@ import (
 
 type ReporterSut struct {
 	collectorServer setup.HttpServer
-	egressClient    *EgressClient
 	fakeCollector   *fakeCollector
 	callback        urlCallback
 	t               *testing.T

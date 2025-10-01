@@ -69,7 +69,6 @@ func (a *appSut) startHotline(_ context.Context, features *godog.Table) error {
 				if enabled {
 					a.cfg.OtelHttpIngestion.Host = "localhost"
 				}
-				break
 			case "egress ingestion":
 				if enabled {
 					a.cfg.EgressHttpIngestion.Host = "localhost"

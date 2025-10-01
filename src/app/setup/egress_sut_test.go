@@ -13,7 +13,6 @@ type EgressSut struct {
 	clock              *clock.ManualClock
 	fakeEgressTarget   *fakeEgressTarget
 	egressTargetServer setup.HttpServer
-	callback           urlCallback
 
 	egressUrl func() string
 }
