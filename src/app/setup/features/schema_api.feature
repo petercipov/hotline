@@ -5,14 +5,16 @@ Feature: Schema API
   4) get schema content
 
   Scenario: list of schemas is empty for not configured hotline
-    Given hotline is running
+    Given hotline is running:
+      | Feature           | Enabled |
     Then schema list is:
       """
       { "schemas": [] }
       """
 
   Scenario: schema can be listed, created and deleted
-    Given hotline is running
+    Given hotline is running:
+      | Feature           | Enabled |
     When schema is created from file "./features/fixtures/product_schema.json"
     Then schema list is:
       """
@@ -30,7 +32,8 @@ Feature: Schema API
       { "schemas": [] }
       """
   Scenario: schema can be upserted
-    Given hotline is running
+    Given hotline is running:
+      | Feature           | Enabled |
     And schema is created from file "./features/fixtures/product_schema.json"
     And schema list is:
       """

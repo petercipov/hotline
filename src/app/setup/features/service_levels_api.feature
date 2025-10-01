@@ -2,14 +2,16 @@ Feature: Service Levels API
   1) CRUD service levels
 
   Scenario: no definitions
-    Given hotline is running
-    Then service levels configuration for "IN-dd0391f11aba" is:
+    Given hotline is running:
+      | Feature           | Enabled |
+    Then service levels for "IN-dd0391f11aba" are:
       """
       """
 
   Scenario: upsert definition
-    Given hotline is running
-    And service levels configuration for "IN-dd0391f11aba" is set to:
+    Given hotline is running:
+      | Feature           | Enabled |
+    And service levels for "IN-dd0391f11aba" is set to:
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
@@ -20,7 +22,7 @@ Feature: Service Levels API
           "status": { "expected": [ "200" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
         }
       """
-    Then service levels configuration for "IN-dd0391f11aba" is:
+    Then service levels for "IN-dd0391f11aba" are:
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
@@ -33,8 +35,9 @@ Feature: Service Levels API
         }
       """
   Scenario: delete definition
-    Given hotline is running
-    And service levels configuration for "IN-dd0391f11aba" is set to:
+    Given hotline is running:
+      | Feature           | Enabled |
+    And service levels for "IN-dd0391f11aba" is set to:
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
@@ -45,7 +48,7 @@ Feature: Service Levels API
           "status": { "expected": [ "200" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
         }
       """
-    When service levels configuration for "IN-dd0391f11aba" and routeKey "GET:127.0.0.1::/bookings" is deleted
-    Then service levels configuration for "IN-dd0391f11aba" is:
+    When service levels for "IN-dd0391f11aba" and routeKey "GET:127.0.0.1::/bookings" are deleted
+    Then service levels for "IN-dd0391f11aba" are:
       """
       """

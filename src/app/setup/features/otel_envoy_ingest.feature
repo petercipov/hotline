@@ -4,10 +4,11 @@ Feature: Hotline should be able to
   3) report slos to otel
 
   Scenario: otel envoy http traffic is ingested and slos are computed
-    Given OTEL ingestion is enabled
-    And service levels reporter is pointing to collector
-    And hotline is running
-    And service levels configuration for "IN-dd0391f11aba" is set to:
+    Given service levels reporter is pointing to collector
+    And hotline is running:
+      | Feature           | Enabled |
+      | otel ingestion    | true    |
+    And service levels for "IN-dd0391f11aba" is set to:
       """
         {
           "route": { "path": "/" },
@@ -19,7 +20,7 @@ Feature: Hotline should be able to
         }
       """
 
-    When envoy otel traffic is sent for ingestion for integration ID "IN-dd0391f11aba"
+    When OTEL traffic for "envoy" is sent for integration ID "IN-dd0391f11aba"
     And advance time by 10s
 
     Then service levels metrics are received in collector:

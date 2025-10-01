@@ -4,10 +4,11 @@ Feature: Hotline should be able to
   3) report slos to otel
 
   Scenario: egress traffic is ingested, proxied and slos are computed
-    Given Egress ingestion is enabled
-    And service levels reporter is pointing to collector
-    And hotline is running
-    And service levels configuration for "IN-dd0391f11aba" is set to:
+    Given service levels reporter is pointing to collector
+    And hotline is running:
+      | Feature           | Enabled |
+      | egress ingestion  | true    |
+    And service levels for "IN-dd0391f11aba" is set to:
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
@@ -37,7 +38,7 @@ Feature: Hotline should be able to
         }
       """
 
-    When egress traffic is sent for proxying for integration ID "IN-dd0391f11aba"
+    When Egress traffic is sent for proxying for integration ID "IN-dd0391f11aba"
     And advance time by 10s
 
     Then service levels metrics are received in collector:
