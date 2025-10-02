@@ -1,14 +1,14 @@
 Feature: Service Levels API
   1) CRUD service levels
 
-  Scenario: no definitions
+  Scenario: no service levels
     Given hotline is running:
       | Feature           | Enabled |
     Then service levels for "IN-dd0391f11aba" are:
       """
       """
 
-  Scenario: upsert definition
+  Scenario: upsert service levels
     Given hotline is running:
       | Feature           | Enabled |
     And service levels for "IN-dd0391f11aba" is set to:
@@ -26,7 +26,7 @@ Feature: Service Levels API
       """
         {
           "route": { "method": "GET", "host": "127.0.0.1", "path": "/bookings" },
-          "routeKey": "GET:127.0.0.1::/bookings",
+          "routeKey": "RK7k6fbRtiQp4",
           "latency": {
             "percentiles": [{ "percentile": "99.9%", "breachLatency": "2s" }],
             "windowDuration": "1m0s"
@@ -34,7 +34,7 @@ Feature: Service Levels API
           "status": { "expected": [ "200" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
         }
       """
-  Scenario: delete definition
+  Scenario: delete service levels
     Given hotline is running:
       | Feature           | Enabled |
     And service levels for "IN-dd0391f11aba" is set to:
@@ -48,7 +48,7 @@ Feature: Service Levels API
           "status": { "expected": [ "200" ], "breachThreshold": "99.9%", "windowDuration": "1h0m0s" }
         }
       """
-    When service levels for "IN-dd0391f11aba" and routeKey "GET:127.0.0.1::/bookings" are deleted
+    When service levels for "IN-dd0391f11aba" and routeKey "RK7k6fbRtiQp4" are deleted
     Then service levels for "IN-dd0391f11aba" are:
       """
       """

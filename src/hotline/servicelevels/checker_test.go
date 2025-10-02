@@ -57,7 +57,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": ":::/",
+				"http_route": "RKOYeGEFTT-BM",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -71,7 +71,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": ":::/",
+				"http_route": "RKOYeGEFTT-BM",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -104,7 +104,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": ":iam.example.com::/users",
+				"http_route": "RKyx_d19M6zrA",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -118,7 +118,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": ":iam.example.com::/users",
+				"http_route": "RKyx_d19M6zrA",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -157,7 +157,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 2,
 			},
 			Tags: map[string]string{
-				"http_route": ":iam.example.com::/users",
+				"http_route": "RKyx_d19M6zrA",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -201,7 +201,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": ":iam.example.com::/users",
+				"http_route": "RKyx_d19M6zrA",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -240,7 +240,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "POST:iam.example.com::/users",
+				"http_route": "RKlBHXZb1EEqk",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -271,7 +271,7 @@ var _ = Describe("Service Levels Checker", func() {
 		sloDef.Upsert(def)
 		Expect(sloDef.Routes).To(HaveLen(1))
 
-		sloDef.DeleteRouteByKey(":iam.example.com::/users")
+		sloDef.DeleteRouteByKey("RKyx_d19M6zrA")
 
 		Expect(sloDef.Routes).To(BeEmpty())
 	})
@@ -316,12 +316,14 @@ func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRou
 }
 
 func defaultRouteDefinitionForMethod(method string, host string, pathPattern string) servicelevels.HttpRouteServiceLevels {
+	route := http.Route{
+		Method:      method,
+		PathPattern: pathPattern,
+		Host:        host,
+	}
 	return servicelevels.HttpRouteServiceLevels{
-		Route: http.Route{
-			Method:      method,
-			PathPattern: pathPattern,
-			Host:        host,
-		},
+		Route: route,
+		Key:   route.GenerateKey("some salt"),
 		Latency: &servicelevels.HttpLatencyServiceLevels{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{

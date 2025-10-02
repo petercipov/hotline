@@ -34,9 +34,9 @@ func (d *HttpApiServiceLevels) Upsert(definition HttpRouteServiceLevels) {
 	d.Routes = append(d.Routes, definition)
 }
 
-func (d *HttpApiServiceLevels) DeleteRouteByKey(key string) (hotlinehttp.Route, bool) {
+func (d *HttpApiServiceLevels) DeleteRouteByKey(key hotlinehttp.RouteKey) (hotlinehttp.Route, bool) {
 	for i, route := range d.Routes {
-		if route.Route.ID() == key {
+		if route.Key == key {
 			d.Routes = append(d.Routes[:i], d.Routes[i+1:]...)
 			return route.Route, true
 		}
@@ -46,6 +46,7 @@ func (d *HttpApiServiceLevels) DeleteRouteByKey(key string) (hotlinehttp.Route, 
 
 type HttpRouteServiceLevels struct {
 	Route   hotlinehttp.Route
+	Key     hotlinehttp.RouteKey
 	Latency *HttpLatencyServiceLevels
 	Status  *HttpStatusServiceLevels
 }
@@ -111,7 +112,7 @@ type HttpRouteSLO struct {
 
 func NewHttpPathSLO(slo HttpRouteServiceLevels) *HttpRouteSLO {
 	tags := map[string]string{
-		"http_route": slo.Route.ID(),
+		"http_route": slo.Key.String(),
 	}
 
 	var stateSLO *HttpStatusSLO

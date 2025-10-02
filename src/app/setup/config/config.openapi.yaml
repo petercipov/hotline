@@ -477,10 +477,10 @@ components:
 
     RouteKey:
       type: string
-      format: uri
-      minLength: 1
-      maxLength: 8196
-      example: GET:api.example.com:8080:/api/users/{id}
+      minLength: 13
+      maxLength: 13
+      pattern: "RK[A-Za-z0-9_\\-]+"
+      example: RKyx_d19M6zrA
 
     ServiceLevelsList:
       type: object

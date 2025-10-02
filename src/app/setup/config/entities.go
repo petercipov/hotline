@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"hotline/http"
+	"hotline/integrations"
 	"hotline/servicelevels"
 	"math"
 	"time"
@@ -54,7 +55,7 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 	return (*servicelevels.Percentile)(p)
 }
 
-func ParseRoute(latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.HttpRouteServiceLevels, error) {
+func ParseRoute(integrationID integrations.ID, latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.HttpRouteServiceLevels, error) {
 	var status servicelevels.HttpStatusServiceLevels
 	var latency servicelevels.HttpLatencyServiceLevels
 	if statusDefinition != nil {
@@ -79,13 +80,16 @@ func ParseRoute(latencyDefinition *LatencyServiceLevels, statusDefinition *Statu
 		}
 	}
 
+	httpRoute := http.Route{
+		Method:      optString((*string)(route.Method), ""),
+		PathPattern: optString(route.Path, ""),
+		Host:        optString(route.Host, ""),
+		Port:        int(optInt32(route.Port, 0)),
+	}
+
 	return servicelevels.HttpRouteServiceLevels{
-		Route: http.Route{
-			Method:      optString((*string)(route.Method), ""),
-			PathPattern: optString(route.Path, ""),
-			Host:        optString(route.Host, ""),
-			Port:        int(optInt32(route.Port, 0)),
-		},
+		Route:   httpRoute,
+		Key:     httpRoute.GenerateKey(integrationID.String()),
 		Latency: &latency,
 		Status:  &status,
 	}, nil
@@ -152,7 +156,7 @@ func convertRoutes(routes []servicelevels.HttpRouteServiceLevels) []RouteService
 				Path:   ptrString(route.Route.PathPattern),
 				Port:   ptrInt32(route.Route.Port),
 			},
-			RouteKey: route.Route.ID(),
+			RouteKey: route.Key.String(),
 		})
 	}
 

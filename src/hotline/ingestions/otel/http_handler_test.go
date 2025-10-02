@@ -7,7 +7,6 @@ import (
 	"hotline/clock"
 	"hotline/ingestions"
 	"hotline/ingestions/otel"
-	"hotline/integrations"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -84,7 +83,7 @@ var _ = Describe("Otel Http Ingestion of Traces", func() {
 		requests := s.ingest()
 		Expect(requests).To(HaveLen(1))
 
-		Expect(requests[0].IntegrationID).To(Equal(integrations.ID("id.of.integration")))
+		Expect(requests[0].IntegrationID.String()).To(Equal("id.of.integration"))
 	})
 
 	It("refuses to ingest other than kind client spans", func() {

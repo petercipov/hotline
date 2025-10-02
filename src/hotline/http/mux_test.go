@@ -19,15 +19,17 @@ var _ = Describe("HTTP RoutePattern Matching", func() {
 				Port:        443,
 			}
 
-			Expect(r.ID()).To(Equal(
-				"GET:example.com:443:/users/{user-id}",
+			key := r.GenerateKey("some salt")
+			Expect(key.String()).To(Equal(
+				"RKQ4-S4aI1Efk",
 			))
 		})
 
 		It("creates Id from empty", func() {
 			r := http.Route{}
-			Expect(r.ID()).To(Equal(
-				":::",
+			key := r.GenerateKey("some salt")
+			Expect(key.String()).To(Equal(
+				"RKBzH5QWiFkG0",
 			))
 		})
 	})

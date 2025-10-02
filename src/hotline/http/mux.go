@@ -1,9 +1,12 @@
 package http
 
 import (
+	"encoding/base64"
 	"fmt"
+	"hash/crc64"
 	"iter"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -91,6 +94,12 @@ type Route struct {
 	Port        int
 }
 
+type RouteKey string
+
+func (k *RouteKey) String() string {
+	return string(*k)
+}
+
 func (r *Route) Normalize() Route {
 	return Route{
 		Method:      strings.ToUpper(r.Method),
@@ -100,11 +109,26 @@ func (r *Route) Normalize() Route {
 	}
 }
 
-func (r *Route) ID() string {
+func (r *Route) GenerateKey(salt string) RouteKey {
+	table := crc64.MakeTable(crc64.ISO)
+	hash := crc64.New(table)
+
+	_, _ = hash.Write([]byte(salt))
+	_, _ = hash.Write([]byte(":"))
+	_, _ = hash.Write([]byte(r.Method))
+	_, _ = hash.Write([]byte(":"))
+	_, _ = hash.Write([]byte(r.Host))
+	_, _ = hash.Write([]byte(":"))
 	if r.Port == AnyPort {
-		return fmt.Sprintf("%s:%s::%s", r.Method, r.Host, r.PathPattern)
+		_, _ = hash.Write([]byte(strconv.Itoa(r.Port)))
 	}
-	return fmt.Sprintf("%s:%s:%d:%s", r.Method, r.Host, r.Port, r.PathPattern)
+	_, _ = hash.Write([]byte(":"))
+	_, _ = hash.Write([]byte(r.PathPattern))
+	_, _ = hash.Write([]byte(":"))
+	_, _ = hash.Write([]byte(salt))
+
+	keyBytes := hash.Sum(nil)
+	return RouteKey("RK" + base64.RawURLEncoding.EncodeToString(keyBytes))
 }
 
 type RoutePattern struct {

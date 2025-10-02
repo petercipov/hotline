@@ -74,7 +74,6 @@ func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.R
 		slog.Error("Failed to encode response body", slog.Any("error", encodeErr))
 	}
 }
-
 func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.Request) {
 	now := h.nowFunc()
 	ctx := req.Context()
@@ -127,7 +126,6 @@ func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.
 		slog.Error("Failed to encode response body", slog.Any("error", encodeErr))
 	}
 }
-
 func (h *HttpHandler) DeleteRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
 	ctx := req.Context()
 	setErr := h.schemasRepo.DeleteSchema(ctx, schemas.ID(schemaID))
@@ -147,7 +145,6 @@ func (h *HttpHandler) DeleteRequestSchema(writer http.ResponseWriter, req *http.
 	}
 	writer.WriteHeader(http.StatusNoContent)
 }
-
 func (h *HttpHandler) GetRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
 	ctx := req.Context()
 	schemaEntry, getErr := h.schemasRepo.GetSchemaByID(ctx, schemas.ID(schemaID))
@@ -173,7 +170,6 @@ func (h *HttpHandler) GetRequestSchema(writer http.ResponseWriter, req *http.Req
 		slog.Error("Failed to write response body", slog.Any("error", writeErr))
 	}
 }
-
 func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
 	now := h.nowFunc()
 	ctx := req.Context()
@@ -214,10 +210,6 @@ func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Req
 	}
 
 	writer.WriteHeader(http.StatusCreated)
-}
-
-type APIEvents interface {
-	RouteUpserted(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
 func (h *HttpHandler) ListServiceLevels(writer http.ResponseWriter, req *http.Request, params ListServiceLevelsParams) {
@@ -277,7 +269,7 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 		return
 	}
 
-	routeDefinition, routeErr := ParseRoute(request.Latency, request.Status, request.Route)
+	routeDefinition, routeErr := ParseRoute(integrationID, request.Latency, request.Status, request.Route)
 	if routeErr != nil {
 		slog.Error("Could not parse route", slog.String("integration-id", string(integrationID)), slog.Any("error", routeErr))
 		writeResponse(ctx, writer, http.StatusBadRequest, Error{
@@ -295,24 +287,10 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 
 	h.serviceLevelsRepo.SetConfig(ctx, integrationID, definition)
 	h.routeUpserted(integrationID, routeDefinition.Route)
-	key := routeDefinition.Route.ID()
+	key := routeDefinition.Route.GenerateKey(integrationID.String())
 	writeResponse(ctx, writer, http.StatusOK, UpsertedServiceLevelsResponse{
-		RouteKey: &key,
+		RouteKey: ptrString(key.String()),
 	})
-}
-
-func writeResponse(ctx context.Context, writer http.ResponseWriter, status int, value any) {
-	integrationID := ctx.Value(valueIntegrationID{}).(integrations.ID)
-	writer.Header().Set("Content-Type", "application/json")
-	writer.WriteHeader(status)
-	raw, errMarshalErr := json.Marshal(value)
-	if errMarshalErr != nil {
-		slog.Error("Could not marshal response", slog.String("integration-id", string(integrationID)), slog.Any("error", errMarshalErr))
-	}
-	_, writeErr := writer.Write(raw)
-	if writeErr != nil {
-		slog.Error("Could not write error", slog.String("integration-id", string(integrationID)), slog.Any("error", writeErr))
-	}
 }
 func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.Request, key RouteKey, params DeleteServiceLevelsParams) {
 	ctx := req.Context()
@@ -336,7 +314,7 @@ func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.
 		return
 	}
 
-	route, deleted := config.DeleteRouteByKey(key)
+	route, deleted := config.DeleteRouteByKey(hotlinehttp.RouteKey(key))
 	h.serviceLevelsRepo.SetConfig(ctx, integrationID, config)
 
 	if deleted {
@@ -344,4 +322,18 @@ func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.
 	}
 
 	writeResponse(ctx, writer, http.StatusNoContent, nil)
+}
+
+func writeResponse(ctx context.Context, writer http.ResponseWriter, status int, value any) {
+	integrationID := ctx.Value(valueIntegrationID{}).(integrations.ID)
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(status)
+	raw, errMarshalErr := json.Marshal(value)
+	if errMarshalErr != nil {
+		slog.Error("Could not marshal response", slog.String("integration-id", string(integrationID)), slog.Any("error", errMarshalErr))
+	}
+	_, writeErr := writer.Write(raw)
+	if writeErr != nil {
+		slog.Error("Could not write error", slog.String("integration-id", string(integrationID)), slog.Any("error", writeErr))
+	}
 }
