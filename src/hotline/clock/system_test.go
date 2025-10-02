@@ -9,8 +9,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("System Clock", func() {
+var _ = Describe("System Clock", Ordered, func() {
 	sut := systemClockSUT{}
+
+	AfterEach(func() {
+		sut.clock = nil
+	})
 
 	It("should sleep for given time", func() {
 		sut.ForSystemClock()
