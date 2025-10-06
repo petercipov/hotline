@@ -141,7 +141,7 @@ func TestApp(t *testing.T) {
 			})
 
 			sctx.Given("hotline is running", sut.startHotline)
-			sctx.When("advance time by (\\d+)s", sut.advanceTime)
+			sctx.Step("advance time by (\\d+)s", sut.advanceTime)
 
 			schemaAPISut.AddSteps(sctx)
 			serviceLevelsAPISut.AddSteps(sctx)

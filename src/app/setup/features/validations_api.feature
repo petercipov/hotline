@@ -13,26 +13,27 @@ Feature: Validations API
   Scenario: attach existing schema id:
     Given hotline is running:
       | Feature           | Enabled |
+    And advance time by 1s
     And schema is created from file "./features/fixtures/product_schema.json"
+    And advance time by 1s
     And schema is created from file "./features/fixtures/headers_schema.json"
+    And advance time by 1s
     And schema is created from file "./features/fixtures/query_schema.json"
     And schema list is:
       """
       { "schemas": [
         {
-          "schemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
-          "title": "./features/fixtures/product_schema.json",
-          "updatedAt": "2025-02-22T12:02:10.0005Z"
-        },
-        {
-          "schemaID": "SCAZUtiVXRcQGBAQEBAQEBAQ",
-          "title": "./features/fixtures/headers_schema.json",
-          "updatedAt": "2025-02-22T12:02:10.001Z"
-        },
-        {
-          "schemaID" : "SCAZUtiVXRcQKBAQEBAQEBAQ",
+          "schemaID" : "SCAZUtiVm5cQGBAQEBAQEBAQ",
+          "title" : "./features/fixtures/product_schema.json",
+          "updatedAt" : "2025-02-22T12:02:11.001Z"
+        }, {
+          "schemaID" : "SCAZUtiV2icQGBAQEBAQEBAQ",
+          "title" : "./features/fixtures/headers_schema.json",
+          "updatedAt" : "2025-02-22T12:02:12.002Z"
+        }, {
+          "schemaID" : "SCAZUtiWGLcQGBAQEBAQEBAQ",
           "title" : "./features/fixtures/query_schema.json",
-          "updatedAt" : "2025-02-22T12:02:10.0015Z"
+          "updatedAt" : "2025-02-22T12:02:13.003Z"
         }
       ] }
       """
