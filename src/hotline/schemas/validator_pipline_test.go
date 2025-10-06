@@ -124,7 +124,7 @@ func (s *validationPipelineSut) Close() {
 
 func (s *validationPipelineSut) forPipelineWithoutDefinition() {
 	s.schemaRepo = schemas.NewInMemorySchemaRepository(
-		uuid.NewDeterministicV7(&uuid.ConstantRandReader{}),
+		uuid.NewV7(&uuid.ConstantRandReader{}),
 	)
 	s.validationRepo = schemas.NewInMemoryValidationRepository()
 	s.reporter = &schemas.InMemoryValidationReporter{}
@@ -240,7 +240,7 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 			}
 		},
 		"required": ["User-Agent"]
-	}`, now)
+	}`, now, "header.schema.json")
 	Expect(schemaErr).NotTo(HaveOccurred())
 
 	schemaById, getErr := s.schemaRepo.GetSchemaByID(context.Background(), headersSchemaID)
@@ -266,7 +266,7 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 
 func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
 	headersSchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(0))
-	schemaErr := s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `invalid string`, time.Now())
+	schemaErr := s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `invalid string`, time.Now(), "header.schema.json")
 	Expect(schemaErr).To(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).To(BeEmpty())
 
@@ -302,7 +302,7 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 			}
 		},
 		"required": ["productID"]
-	}`, time.Now())
+	}`, time.Now(), "query.schema.json")
 	Expect(schemaErr).NotTo(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
@@ -345,7 +345,7 @@ func (s *validationPipelineSut) withBodySchemaValidation() {
 			}
 		},
 		"required": ["productID"]
-	}`, time.Now())
+	}`, time.Now(), "body.schema.json")
 	Expect(schemaErr).NotTo(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 

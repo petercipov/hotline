@@ -15,17 +15,20 @@ import (
 type SchemaEntry struct {
 	ID        ID
 	Content   string
+	Title     string
 	UpdatedAt time.Time
 }
 
 type SchemaListEntry struct {
 	ID        ID
+	Title     string
 	UpdatedAt time.Time
 }
 
 type inMemorySchemaEntry struct {
 	id        ID
 	content   string
+	title     string
 	updatedAt time.Time
 }
 type InMemorySchemaRepository struct {
@@ -56,6 +59,7 @@ func (r *InMemorySchemaRepository) GetSchemaByID(_ context.Context, schemaID ID)
 		result = SchemaEntry{
 			ID:        entry.id,
 			Content:   entry.content,
+			Title:     entry.title,
 			UpdatedAt: entry.updatedAt,
 		}
 		resErr = nil
@@ -75,7 +79,7 @@ func (r *InMemorySchemaRepository) GetSchemaContent(_ context.Context, schemaID 
 	return result
 }
 
-func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content string, updatedAt time.Time) error {
+func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content string, updatedAt time.Time, title string) error {
 	r.mutext.Lock()
 	defer r.mutext.Unlock()
 
@@ -99,6 +103,7 @@ func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content s
 	r.schemas[id] = inMemorySchemaEntry{
 		id:        id,
 		content:   content,
+		title:     title,
 		updatedAt: updatedAt,
 	}
 	return nil
@@ -112,6 +117,7 @@ func (r *InMemorySchemaRepository) ListSchemas(_ context.Context) []SchemaListEn
 	for id, entry := range r.schemas {
 		entries = append(entries, SchemaListEntry{
 			ID:        id,
+			Title:     entry.title,
 			UpdatedAt: entry.updatedAt,
 		})
 	}

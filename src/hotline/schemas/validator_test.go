@@ -346,7 +346,7 @@ func (s *validatorSut) forValidatorWithHeaders() {
 }
 
 func (s *validatorSut) forValidatorWithHeadersSchema(schema string) {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -362,7 +362,7 @@ func (s *validatorSut) forValidatorWithHeadersSchema(schema string) {
 }
 
 func (s *validatorSut) forValidatorWithInvalidHeaderSchema(schema string) error {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -378,7 +378,7 @@ func (s *validatorSut) forValidatorWithInvalidHeaderSchema(schema string) error 
 }
 
 func (s *validatorSut) forValidatorWithInvalidQuerySchema(schema string) error {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -394,7 +394,7 @@ func (s *validatorSut) forValidatorWithInvalidQuerySchema(schema string) error {
 }
 
 func (s *validatorSut) forValidatorWithInvalidBodySchema(schema string) error {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -433,7 +433,7 @@ func (s *validatorSut) forValidatorWithQuery() {
 }
 
 func (s *validatorSut) forValidatorWithQuerySchema(schema string) {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -476,7 +476,7 @@ func (s *validatorSut) forValidatorWithBody() {
 }
 
 func (s *validatorSut) forValidatorWithBodySchema(schema string) {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -510,7 +510,7 @@ func (s *validatorSut) forValidatorWithResponseHeaders() {
 }
 
 func (s *validatorSut) forValidatorWithHeadersResponseSchema(schema string) {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -546,7 +546,7 @@ func (s *validatorSut) validateResponse() error {
 }
 
 func (s *validatorSut) forValidatorWithInvalidHeaderResponseSchema(schema string) error {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -589,7 +589,7 @@ func (s *validatorSut) forValidatorWithResponseBody() {
 }
 
 func (s *validatorSut) forValidatorWithReponseBodySchema(schema string) {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 
@@ -606,7 +606,7 @@ func (s *validatorSut) forValidatorWithReponseBodySchema(schema string) {
 }
 
 func (s *validatorSut) forValidatorWithInvalidResponseBodySchema(schema string) error {
-	idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+	idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 	id, idErr := idGenerator(time.Time{})
 	Expect(idErr).ToNot(HaveOccurred())
 

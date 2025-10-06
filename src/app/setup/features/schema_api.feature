@@ -21,6 +21,7 @@ Feature: Schema API
       { "schemas": [
         {
           "schemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
+          "title": "./features/fixtures/product_schema.json",
           "updatedAt": "2025-02-22T12:02:10.0005Z"
         }
       ] }
@@ -40,6 +41,7 @@ Feature: Schema API
       { "schemas": [
         {
           "schemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
+          "title": "./features/fixtures/product_schema.json",
           "updatedAt": "2025-02-22T12:02:10.0005Z"
         }
       ] }
@@ -53,6 +55,7 @@ Feature: Schema API
       { "schemas": [
         {
           "schemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
+          "title": "./features/fixtures/product_schema.v2.json",
           "updatedAt": "2025-02-22T12:02:20.00150Z"
         }
       ] }

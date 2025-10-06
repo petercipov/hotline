@@ -18,7 +18,7 @@ type SchemaRepository interface {
 	schemas.SchemaReader
 	GetSchemaByID(ctx context.Context, id schemas.ID) (schemas.SchemaEntry, error)
 	GenerateID(now time.Time) (schemas.ID, error)
-	SetSchema(ctx context.Context, id schemas.ID, content string, updateAt time.Time) error
+	SetSchema(ctx context.Context, id schemas.ID, content string, updateAt time.Time, title string) error
 	ListSchemas(ctx context.Context) []schemas.SchemaListEntry
 	DeleteSchema(ctx context.Context, id schemas.ID) error
 }

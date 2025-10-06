@@ -17,7 +17,7 @@ import (
 
 func main() {
 	systemClock := clock.NewSystemClock()
-	uuidGenerator := uuid.NewDeterministicV7(rand.Reader)
+	uuidGenerator := uuid.NewV7(rand.Reader)
 	inMemoryServiceLevels := &servicelevels.InMemoryRepository{}
 	inMemorySchemas := schemas.NewInMemorySchemaRepository(uuidGenerator)
 	inMemoryValidations := schemas.NewInMemoryValidationRepository()

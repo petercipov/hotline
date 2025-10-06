@@ -34,7 +34,7 @@ func newAppSut(t *testing.T) *appSut {
 		clock.ParseTime("2025-02-22T12:02:10Z"),
 		500*time.Microsecond)
 
-	uuidGenerator := uuid.NewDeterministicV7(&uuid.ConstantRandReader{})
+	uuidGenerator := uuid.NewV7(&uuid.ConstantRandReader{})
 	return &appSut{
 		t:                       t,
 		serviceLevelsRepository: &servicelevels.InMemoryRepository{},

@@ -80,6 +80,7 @@ func (a *SchemaAPISut) createSchema(ctx context.Context, filePath string) (conte
 	buff, _ := io.ReadAll(schemaFile)
 	createSchema, createErr := configClient.CreateRequestSchemaWithBodyWithResponse(
 		ctx,
+		&config.CreateRequestSchemaParams{Title: &filePath},
 		"application/octet-stream",
 		bytes.NewReader(buff),
 	)
@@ -155,6 +156,7 @@ func (a *SchemaAPISut) schemaIsUpsertedFromFile(ctx context.Context, schemaID st
 	resp, respErr := configClient.PutRequestSchemaWithBodyWithResponse(
 		ctx,
 		schemaID,
+		&config.PutRequestSchemaParams{Title: &schemaFilePath},
 		"application/octet-stream",
 		bytes.NewReader(buff),
 	)

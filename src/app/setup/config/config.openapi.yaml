@@ -135,6 +135,8 @@ paths:
       operationId: createRequestSchema
       tags:
         - Request Schemas
+      parameters:
+        - $ref: '#/components/parameters/FileTitle'
       requestBody:
         description: Schema definition
         required: true
@@ -222,6 +224,7 @@ paths:
         - Request Schemas
       parameters:
         - $ref: '#/components/parameters/SchemaID'
+        - $ref: '#/components/parameters/FileTitle'
       requestBody:
         description: Schema definition
         required: true
@@ -333,6 +336,14 @@ paths:
 
 components:
   parameters:
+    FileTitle:
+      in: query
+      required: false
+      name: title
+      description: name of file
+      schema:
+        $ref: '#/components/schemas/Title'
+
     RouteKey:
       in: path
       required: true
@@ -412,12 +423,21 @@ components:
       type: object
       required:
         - schemaID
+        - title
         - updatedAt
       properties:
         schemaID:
           $ref: '#/components/schemas/SchemaID'
+        title:
+          $ref: '#/components/schemas/Title'
         updatedAt:
           $ref: '#/components/schemas/DateTime'
+
+    Title:
+      type: string
+      maxLength: 128
+      minLength: 0
+      pattern: "[a-zA-Z0-9 _-]"
 
     UpsertedServiceLevelsResponse:
       type: object

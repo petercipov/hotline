@@ -11,7 +11,7 @@ import (
 
 var _ = Describe("Schema ID", func() {
 	It("can generate schemaID", func() {
-		idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ConstantRandReader{}))
+		idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ConstantRandReader{}))
 
 		id, err := idGenerator(time.Time{})
 		Expect(err).ToNot(HaveOccurred())
@@ -20,7 +20,7 @@ var _ = Describe("Schema ID", func() {
 	})
 
 	It("can fails if ran cannot be read", func() {
-		idGenerator := schemas.NewIDGenerator(uuid.NewDeterministicV7(&uuid.ErrorRandReader{}))
+		idGenerator := schemas.NewIDGenerator(uuid.NewV7(&uuid.ErrorRandReader{}))
 
 		_, err := idGenerator(time.Time{})
 		Expect(err).To(HaveOccurred())

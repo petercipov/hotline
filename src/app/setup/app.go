@@ -95,7 +95,7 @@ func NewApp(
 	otelIngestionServer := createServer(cfg.OtelHttpIngestion.Host, otelHandler)
 
 	egressTransport := &http.Transport{}
-	uuidGenerator := uuid.NewDeterministicV7(rand.Reader)
+	uuidGenerator := uuid.NewV7(rand.Reader)
 
 	defaultSemantics := egress.DefaultRequestSemantics()
 	egressHandler := egress.New(

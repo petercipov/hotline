@@ -10,7 +10,7 @@ import (
 
 var _ = Describe("UUID", func() {
 	It("generates deterministic v7 UUID", func() {
-		v7 := uuid.NewDeterministicV7(&uuid.ConstantRandReader{})
+		v7 := uuid.NewV7(&uuid.ConstantRandReader{})
 
 		v7uuid, err := v7(time.Time{})
 		Expect(err).ToNot(HaveOccurred())
@@ -18,7 +18,7 @@ var _ = Describe("UUID", func() {
 	})
 
 	It("returns error when readin random fails", func() {
-		v7 := uuid.NewDeterministicV7(&uuid.ErrorRandReader{})
+		v7 := uuid.NewV7(&uuid.ErrorRandReader{})
 
 		_, err := v7(time.Time{})
 		Expect(err).To(HaveOccurred())

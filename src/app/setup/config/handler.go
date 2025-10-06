@@ -135,6 +135,7 @@ func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.R
 	for _, schema := range schemaList {
 		list.Schemas = append(list.Schemas, SchemaListEntry{
 			SchemaID:  schema.ID.String(),
+			Title:     schema.Title,
 			UpdatedAt: schema.UpdatedAt,
 		})
 	}
@@ -146,7 +147,7 @@ func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.R
 		slog.Error("Failed to encode response body", slog.Any("error", encodeErr))
 	}
 }
-func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.Request) {
+func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.Request, params CreateRequestSchemaParams) {
 	now := h.nowFunc()
 	ctx := req.Context()
 	schemaID, generateErr := h.schemasRepo.GenerateID(now)
@@ -169,7 +170,7 @@ func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.
 		return
 	}
 
-	setErr := h.schemasRepo.SetSchema(ctx, schemaID, string(content), now)
+	setErr := h.schemasRepo.SetSchema(ctx, schemaID, string(content), now, optString(params.Title, ""))
 	if setErr != nil {
 		var validationErr *schemas.ValidationError
 		isValidationErr := errors.As(setErr, &validationErr)
@@ -242,7 +243,7 @@ func (h *HttpHandler) GetRequestSchema(writer http.ResponseWriter, req *http.Req
 		slog.Error("Failed to write response body", slog.Any("error", writeErr))
 	}
 }
-func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
+func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID, params PutRequestSchemaParams) {
 	now := h.nowFunc()
 	ctx := req.Context()
 	content, readErr := io.ReadAll(req.Body)
@@ -263,7 +264,7 @@ func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
-	setErr := h.schemasRepo.SetSchema(ctx, entry.ID, string(content), now)
+	setErr := h.schemasRepo.SetSchema(ctx, entry.ID, string(content), now, optString(params.Title, ""))
 	if setErr != nil {
 		var validationErr *schemas.ValidationError
 		isValidationErr := errors.As(setErr, &validationErr)

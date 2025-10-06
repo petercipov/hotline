@@ -252,6 +252,7 @@ type SchemaID = string
 // SchemaListEntry defines model for SchemaListEntry.
 type SchemaListEntry struct {
 	SchemaID SchemaID `json:"schemaID"`
+	Title    Title    `json:"title"`
 
 	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
 	UpdatedAt DateTime `json:"updatedAt"`
@@ -277,6 +278,9 @@ type StatusServiceLevels struct {
 
 // StatusServiceLevelsExpected defines model for StatusServiceLevels.Expected.
 type StatusServiceLevelsExpected string
+
+// Title defines model for Title.
+type Title = string
 
 // UpsertRequestValidationRequest defines model for UpsertRequestValidationRequest.
 type UpsertRequestValidationRequest struct {
@@ -315,6 +319,9 @@ type ValidationServiceLevels struct {
 // WindowValue Duration string (e.g., "5m", "1h", "30s")
 type WindowValue = Duration
 
+// FileTitle defines model for FileTitle.
+type FileTitle = Title
+
 // BadRequest Detailed error response
 type BadRequest = Error
 
@@ -329,6 +336,18 @@ type TooManyRequests = Error
 
 // Unauthorized Detailed error response
 type Unauthorized = Error
+
+// CreateRequestSchemaParams defines parameters for CreateRequestSchema.
+type CreateRequestSchemaParams struct {
+	// Title name of file
+	Title *FileTitle `form:"title,omitempty" json:"title,omitempty"`
+}
+
+// PutRequestSchemaParams defines parameters for PutRequestSchema.
+type PutRequestSchemaParams struct {
+	// Title name of file
+	Title *FileTitle `form:"title,omitempty" json:"title,omitempty"`
+}
 
 // ListRequestValidationsParams defines parameters for ListRequestValidations.
 type ListRequestValidationsParams struct {
@@ -449,7 +468,7 @@ type ClientInterface interface {
 	ListRequestSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateRequestSchemaWithBody request with any body
-	CreateRequestSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateRequestSchemaWithBody(ctx context.Context, params *CreateRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteRequestSchema request
 	DeleteRequestSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -458,7 +477,7 @@ type ClientInterface interface {
 	GetRequestSchema(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PutRequestSchemaWithBody request with any body
-	PutRequestSchemaWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PutRequestSchemaWithBody(ctx context.Context, schemaid SchemaID, params *PutRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListRequestValidations request
 	ListRequestValidations(ctx context.Context, params *ListRequestValidationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -495,8 +514,8 @@ func (c *Client) ListRequestSchemas(ctx context.Context, reqEditors ...RequestEd
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateRequestSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateRequestSchemaRequestWithBody(c.Server, contentType, body)
+func (c *Client) CreateRequestSchemaWithBody(ctx context.Context, params *CreateRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateRequestSchemaRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -531,8 +550,8 @@ func (c *Client) GetRequestSchema(ctx context.Context, schemaid SchemaID, reqEdi
 	return c.Client.Do(req)
 }
 
-func (c *Client) PutRequestSchemaWithBody(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutRequestSchemaRequestWithBody(c.Server, schemaid, contentType, body)
+func (c *Client) PutRequestSchemaWithBody(ctx context.Context, schemaid SchemaID, params *PutRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutRequestSchemaRequestWithBody(c.Server, schemaid, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -667,7 +686,7 @@ func NewListRequestSchemasRequest(server string) (*http.Request, error) {
 }
 
 // NewCreateRequestSchemaRequestWithBody generates requests for CreateRequestSchema with any type of body
-func NewCreateRequestSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+func NewCreateRequestSchemaRequestWithBody(server string, params *CreateRequestSchemaParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -683,6 +702,28 @@ func NewCreateRequestSchemaRequestWithBody(server string, contentType string, bo
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Title != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "title", runtime.ParamLocationQuery, *params.Title); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), body)
@@ -764,7 +805,7 @@ func NewGetRequestSchemaRequest(server string, schemaid SchemaID) (*http.Request
 }
 
 // NewPutRequestSchemaRequestWithBody generates requests for PutRequestSchema with any type of body
-func NewPutRequestSchemaRequestWithBody(server string, schemaid SchemaID, contentType string, body io.Reader) (*http.Request, error) {
+func NewPutRequestSchemaRequestWithBody(server string, schemaid SchemaID, params *PutRequestSchemaParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -787,6 +828,28 @@ func NewPutRequestSchemaRequestWithBody(server string, schemaid SchemaID, conten
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Title != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "title", runtime.ParamLocationQuery, *params.Title); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
@@ -1126,7 +1189,7 @@ type ClientWithResponsesInterface interface {
 	ListRequestSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListRequestSchemasResponse, error)
 
 	// CreateRequestSchemaWithBodyWithResponse request with any body
-	CreateRequestSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRequestSchemaResponse, error)
+	CreateRequestSchemaWithBodyWithResponse(ctx context.Context, params *CreateRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRequestSchemaResponse, error)
 
 	// DeleteRequestSchemaWithResponse request
 	DeleteRequestSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*DeleteRequestSchemaResponse, error)
@@ -1135,7 +1198,7 @@ type ClientWithResponsesInterface interface {
 	GetRequestSchemaWithResponse(ctx context.Context, schemaid SchemaID, reqEditors ...RequestEditorFn) (*GetRequestSchemaResponse, error)
 
 	// PutRequestSchemaWithBodyWithResponse request with any body
-	PutRequestSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutRequestSchemaResponse, error)
+	PutRequestSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, params *PutRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutRequestSchemaResponse, error)
 
 	// ListRequestValidationsWithResponse request
 	ListRequestValidationsWithResponse(ctx context.Context, params *ListRequestValidationsParams, reqEditors ...RequestEditorFn) (*ListRequestValidationsResponse, error)
@@ -1461,8 +1524,8 @@ func (c *ClientWithResponses) ListRequestSchemasWithResponse(ctx context.Context
 }
 
 // CreateRequestSchemaWithBodyWithResponse request with arbitrary body returning *CreateRequestSchemaResponse
-func (c *ClientWithResponses) CreateRequestSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRequestSchemaResponse, error) {
-	rsp, err := c.CreateRequestSchemaWithBody(ctx, contentType, body, reqEditors...)
+func (c *ClientWithResponses) CreateRequestSchemaWithBodyWithResponse(ctx context.Context, params *CreateRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRequestSchemaResponse, error) {
+	rsp, err := c.CreateRequestSchemaWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1488,8 +1551,8 @@ func (c *ClientWithResponses) GetRequestSchemaWithResponse(ctx context.Context, 
 }
 
 // PutRequestSchemaWithBodyWithResponse request with arbitrary body returning *PutRequestSchemaResponse
-func (c *ClientWithResponses) PutRequestSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutRequestSchemaResponse, error) {
-	rsp, err := c.PutRequestSchemaWithBody(ctx, schemaid, contentType, body, reqEditors...)
+func (c *ClientWithResponses) PutRequestSchemaWithBodyWithResponse(ctx context.Context, schemaid SchemaID, params *PutRequestSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutRequestSchemaResponse, error) {
+	rsp, err := c.PutRequestSchemaWithBody(ctx, schemaid, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2202,7 +2265,7 @@ type ServerInterface interface {
 	ListRequestSchemas(w http.ResponseWriter, r *http.Request)
 	// Create Request Schema
 	// (POST /request-schemas)
-	CreateRequestSchema(w http.ResponseWriter, r *http.Request)
+	CreateRequestSchema(w http.ResponseWriter, r *http.Request, params CreateRequestSchemaParams)
 	// Delete Request Schema
 	// (DELETE /request-schemas/{schemaid})
 	DeleteRequestSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
@@ -2211,7 +2274,7 @@ type ServerInterface interface {
 	GetRequestSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
 	// Set Request Schema
 	// (PUT /request-schemas/{schemaid})
-	PutRequestSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID)
+	PutRequestSchema(w http.ResponseWriter, r *http.Request, schemaid SchemaID, params PutRequestSchemaParams)
 	// List Request Validations
 	// (GET /request-validations)
 	ListRequestValidations(w http.ResponseWriter, r *http.Request, params ListRequestValidationsParams)
@@ -2264,14 +2327,27 @@ func (siw *ServerInterfaceWrapper) ListRequestSchemas(w http.ResponseWriter, r *
 // CreateRequestSchema operation middleware
 func (siw *ServerInterfaceWrapper) CreateRequestSchema(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateRequestSchemaParams
+
+	// ------------- Optional query parameter "title" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "title", r.URL.Query(), &params.Title)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "title", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateRequestSchema(w, r)
+		siw.Handler.CreateRequestSchema(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2363,8 +2439,19 @@ func (siw *ServerInterfaceWrapper) PutRequestSchema(w http.ResponseWriter, r *ht
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutRequestSchemaParams
+
+	// ------------- Optional query parameter "title" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "title", r.URL.Query(), &params.Title)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "title", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutRequestSchema(w, r, schemaid)
+		siw.Handler.PutRequestSchema(w, r, schemaid, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

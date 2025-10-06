@@ -10,7 +10,7 @@ import (
 
 type V7StringGenerator func(time.Time) (string, error)
 
-func NewDeterministicV7(randReader io.Reader) V7StringGenerator {
+func NewV7(randReader io.Reader) V7StringGenerator {
 	gen := uuid.NewGenWithOptions(
 		uuid.WithRandomReader(randReader),
 	)
