@@ -127,40 +127,53 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 
 func convertRoutes(routes []servicelevels.HttpRouteServiceLevels) []RouteServiceLevels {
 	var defs []RouteServiceLevels
-	for _, route := range routes {
-		method := RouteMethod(route.Route.Method)
+	for _, routeSericeLevel := range routes {
 		var latencyLevels LatencyServiceLevels
 		var statusLevels StatusServiceLevels
 
-		if route.Latency != nil {
+		if routeSericeLevel.Latency != nil {
 			latencyLevels = LatencyServiceLevels{
-				Percentiles:    convertPercentiles(route.Latency.Percentiles),
-				WindowDuration: Duration(route.Latency.WindowDuration),
+				Percentiles:    convertPercentiles(routeSericeLevel.Latency.Percentiles),
+				WindowDuration: Duration(routeSericeLevel.Latency.WindowDuration),
 			}
 		}
 
-		if route.Status != nil {
+		if routeSericeLevel.Status != nil {
 			statusLevels = StatusServiceLevels{
-				BreachThreshold: Percentile(route.Status.BreachThreshold),
-				Expected:        convertToExpected(route.Status.Expected),
-				WindowDuration:  Duration(route.Status.WindowDuration),
+				BreachThreshold: Percentile(routeSericeLevel.Status.BreachThreshold),
+				Expected:        convertToExpected(routeSericeLevel.Status.Expected),
+				WindowDuration:  Duration(routeSericeLevel.Status.WindowDuration),
 			}
 		}
 
 		defs = append(defs, RouteServiceLevels{
-			Latency: &latencyLevels,
-			Status:  &statusLevels,
-			Route: Route{
-				Host:   ptrString(route.Route.Host),
-				Method: &method,
-				Path:   ptrString(route.Route.PathPattern),
-				Port:   ptrInt32(route.Route.Port),
-			},
-			RouteKey: route.Key.String(),
+			Latency:  &latencyLevels,
+			Status:   &statusLevels,
+			Route:    convertRoute(routeSericeLevel.Route),
+			RouteKey: routeSericeLevel.Key.String(),
 		})
 	}
 
 	return defs
+}
+
+func parseRoute(route Route) http.Route {
+	return http.Route{
+		Method:      optString((*string)(route.Method), ""),
+		PathPattern: optString(route.Path, ""),
+		Host:        optString(route.Host, ""),
+		Port:        int(optInt32(route.Port, 0)),
+	}
+}
+
+func convertRoute(r http.Route) Route {
+	method := RouteMethod(r.Method)
+	return Route{
+		Host:   ptrString(r.Host),
+		Method: &method,
+		Path:   ptrString(r.PathPattern),
+		Port:   ptrInt32(r.Port),
+	}
 }
 
 func convertPercentiles(percentiles []servicelevels.PercentileDefinition) []PercentileThreshold {

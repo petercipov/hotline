@@ -126,7 +126,7 @@ func (s *validationPipelineSut) forPipelineWithoutDefinition() {
 	s.schemaRepo = schemas.NewInMemorySchemaRepository(
 		uuid.NewDeterministicV7(&uuid.ConstantRandReader{}),
 	)
-	s.validationRepo = &schemas.InMemoryValidationRepository{}
+	s.validationRepo = schemas.NewInMemoryValidationRepository()
 	s.reporter = &schemas.InMemoryValidationReporter{}
 
 	scopes := concurrency.NewScopes(
@@ -250,23 +250,18 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 	Expect(schemaById.Content).NotTo(BeEmpty())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
-		Routes: []schemas.RouteValidationDefinition{
-			{
-				Route: http.Route{
-					Method:      "GET",
-					PathPattern: "/test",
-					Host:        "example.com",
-					Port:        80,
-				},
-				SchemaDef: schemas.RouteSchemaDefinition{
-					Request: &schemas.RequestSchemaDefinition{
-						HeaderSchemaID: &headersSchemaID,
-					},
-				},
-			},
+	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+		http.Route{
+			Method:      "GET",
+			PathPattern: "/test",
+			Host:        "example.com",
+			Port:        80,
 		},
-	})
+		schemas.RouteSchemaDefinition{
+			Request: &schemas.RequestSchemaDefinition{
+				HeaderSchemaID: &headersSchemaID,
+			},
+		})
 }
 
 func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
@@ -275,23 +270,18 @@ func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
 	Expect(schemaErr).To(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).To(BeEmpty())
 
-	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
-		Routes: []schemas.RouteValidationDefinition{
-			{
-				Route: http.Route{
-					Method:      "GET",
-					PathPattern: "/test",
-					Host:        "example.com",
-					Port:        80,
-				},
-				SchemaDef: schemas.RouteSchemaDefinition{
-					Request: &schemas.RequestSchemaDefinition{
-						HeaderSchemaID: &headersSchemaID,
-					},
-				},
-			},
+	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+		http.Route{
+			Method:      "GET",
+			PathPattern: "/test",
+			Host:        "example.com",
+			Port:        80,
 		},
-	})
+		schemas.RouteSchemaDefinition{
+			Request: &schemas.RequestSchemaDefinition{
+				HeaderSchemaID: &headersSchemaID,
+			},
+		})
 }
 
 func (s *validationPipelineSut) withQuerySchemaValidation() {
@@ -316,23 +306,18 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 	Expect(schemaErr).NotTo(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
-		Routes: []schemas.RouteValidationDefinition{
-			{
-				Route: http.Route{
-					Method:      "GET",
-					PathPattern: "/test",
-					Host:        "example.com",
-					Port:        80,
-				},
-				SchemaDef: schemas.RouteSchemaDefinition{
-					Request: &schemas.RequestSchemaDefinition{
-						QuerySchemaID: &querySchemaID,
-					},
-				},
-			},
+	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+		http.Route{
+			Method:      "GET",
+			PathPattern: "/test",
+			Host:        "example.com",
+			Port:        80,
 		},
-	})
+		schemas.RouteSchemaDefinition{
+			Request: &schemas.RequestSchemaDefinition{
+				QuerySchemaID: &querySchemaID,
+			},
+		})
 }
 
 func (s *validationPipelineSut) withBodySchemaValidation() {
@@ -364,21 +349,29 @@ func (s *validationPipelineSut) withBodySchemaValidation() {
 	Expect(schemaErr).NotTo(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	s.validationRepo.SetConfig(context.Background(), "integration-id", &schemas.ValidationDefinition{
-		Routes: []schemas.RouteValidationDefinition{
-			{
-				Route: http.Route{
-					Method:      "GET",
-					PathPattern: "/test",
-					Host:        "example.com",
-					Port:        80,
-				},
-				SchemaDef: schemas.RouteSchemaDefinition{
-					Request: &schemas.RequestSchemaDefinition{
-						BodySchemaID: &bodySchemaID,
-					},
-				},
-			},
+	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+		http.Route{
+			Method:      "GET",
+			PathPattern: "/test",
+			Host:        "example.com",
+			Port:        80,
 		},
-	})
+		schemas.RouteSchemaDefinition{
+			Request: &schemas.RequestSchemaDefinition{
+				BodySchemaID: &bodySchemaID,
+			},
+		})
+
+	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+		http.Route{
+			Method:      "GET",
+			PathPattern: "/alias",
+			Host:        "example.com",
+			Port:        80,
+		},
+		schemas.RouteSchemaDefinition{
+			Request: &schemas.RequestSchemaDefinition{
+				BodySchemaID: &bodySchemaID,
+			},
+		})
 }

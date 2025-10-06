@@ -20,17 +20,10 @@ type valueIntegrationID struct{}
 type HttpHandler struct {
 	serviceLevelsRepo repository.ServiceLevelsRepository
 	schemasRepo       repository.SchemaRepository
+	validationsRepo   repository.ValidationRepository
 	nowFunc           clock.NowFunc
 
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
-}
-
-func (h *HttpHandler) ListRequestValidations(w http.ResponseWriter, r *http.Request, params ListRequestValidationsParams) {
-	panic("implement me")
-}
-
-func (h *HttpHandler) UpsertRequestValidations(w http.ResponseWriter, r *http.Request, params UpsertRequestValidationsParams) {
-	panic("implement me")
 }
 
 func (h *HttpHandler) DeleteRequestValidation(w http.ResponseWriter, r *http.Request, routekey RouteKey, params DeleteRequestValidationParams) {
@@ -40,17 +33,96 @@ func (h *HttpHandler) DeleteRequestValidation(w http.ResponseWriter, r *http.Req
 func NewHttpHandler(
 	serviceLevelsRepo repository.ServiceLevelsRepository,
 	schemasRepo repository.SchemaRepository,
+	validationsRepo repository.ValidationRepository,
 	nowFunc clock.NowFunc,
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route),
 ) *HttpHandler {
 	return &HttpHandler{
 		serviceLevelsRepo: serviceLevelsRepo,
 		schemasRepo:       schemasRepo,
+		validationsRepo:   validationsRepo,
 		nowFunc:           nowFunc,
 		routeUpserted:     routeUpserted,
 	}
 }
 
+func (h *HttpHandler) ListRequestValidations(writer http.ResponseWriter, req *http.Request, params ListRequestValidationsParams) {
+	var list = RequestValidationList{
+		RouteValidations: []RouteRequestValidation{},
+	}
+	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
+	if !validIntegrationId {
+		return
+	}
+
+	config := h.validationsRepo.GetConfig(ctx, integrationID)
+	if config != nil {
+		for _, r := range config.Routes {
+			key := r.Route.GenerateKey(integrationID.String())
+			routeValidation := RouteRequestValidation{
+				RequestSchema:  nil,
+				ResponseSchema: nil,
+				Route:          convertRoute(r.Route),
+				RouteKey:       key.String(),
+			}
+			if r.SchemaDef.Request != nil {
+				routeValidation.RequestSchema = &RequestValidationSchema{
+					BodySchemaID:   optSchemaID(r.SchemaDef.Request.BodySchemaID),
+					HeaderSchemaID: optSchemaID(r.SchemaDef.Request.HeaderSchemaID),
+					QuerySchemaID:  optSchemaID(r.SchemaDef.Request.QuerySchemaID),
+				}
+			}
+			list.RouteValidations = append(list.RouteValidations, routeValidation)
+		}
+	}
+	writeResponse(ctx, writer, http.StatusOK, list)
+}
+
+func (h *HttpHandler) UpsertRequestValidations(writer http.ResponseWriter, req *http.Request, params UpsertRequestValidationsParams) {
+	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
+	if !validIntegrationId {
+		return
+	}
+	defer func() {
+		_ = req.Body.Close()
+	}()
+
+	var v UpsertRequestValidationRequest
+	decodeErr := json.NewDecoder(req.Body).Decode(&v)
+	if decodeErr != nil {
+		writeResponse(ctx, writer, http.StatusBadRequest, Error{
+			Code:    "invalid_request",
+			Message: "Could not decode request body",
+		})
+		return
+	}
+
+	route := parseRoute(v.Route)
+	route = route.Normalize()
+	schemaDef := schemas.RouteSchemaDefinition{}
+
+	if v.RequestSchema != nil {
+		schemaDef.Request = &schemas.RequestSchemaDefinition{
+			HeaderSchemaID: parseSchemaID(v.RequestSchema.HeaderSchemaID),
+			QuerySchemaID:  parseSchemaID(v.RequestSchema.QuerySchemaID),
+			BodySchemaID:   parseSchemaID(v.RequestSchema.BodySchemaID),
+		}
+	}
+
+	setErr := h.validationsRepo.SetConfig(ctx, integrationID, route, schemaDef)
+	if setErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not store validation",
+		})
+		return
+	}
+
+	routeKey := route.GenerateKey(integrationID.String())
+	writeResponse(ctx, writer, http.StatusCreated, UpsertedRequestValidationResponse{
+		RouteKey: routeKey.String(),
+	})
+}
 func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 
@@ -213,17 +285,10 @@ func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Req
 }
 
 func (h *HttpHandler) ListServiceLevels(writer http.ResponseWriter, req *http.Request, params ListServiceLevelsParams) {
-	ctx := req.Context()
-	if len(params.XIntegrationId) == 0 {
-		slog.Error("Could not find X-Integration-Id header")
-		writeResponse(ctx, writer, http.StatusBadRequest, Error{
-			Code:    "invalid_request",
-			Message: "X-Integration-Id header is required",
-		})
+	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
+	if !validIntegrationId {
 		return
 	}
-	integrationID := integrations.ID(params.XIntegrationId)
-	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
 
 	config := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
 	if config == nil {
@@ -241,18 +306,10 @@ func (h *HttpHandler) ListServiceLevels(writer http.ResponseWriter, req *http.Re
 	writeResponse(ctx, writer, http.StatusOK, resp)
 }
 func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.Request, params UpsertServiceLevelsParams) {
-	ctx := req.Context()
-	if len(params.XIntegrationId) == 0 {
-		slog.Error("Could not find X-Integration-Id header")
-		writeResponse(ctx, writer, http.StatusBadRequest, Error{
-			Code:    "invalid_request",
-			Message: "X-Integration-Id header is required",
-		})
+	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
+	if !validIntegrationId {
 		return
 	}
-
-	integrationID := integrations.ID(params.XIntegrationId)
-	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
 
 	defer func() {
 		_ = req.Body.Close()
@@ -293,17 +350,10 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 	})
 }
 func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.Request, key RouteKey, params DeleteServiceLevelsParams) {
-	ctx := req.Context()
-	if len(params.XIntegrationId) == 0 {
-		slog.Error("Could not find X-Integration-Id header")
-		writeResponse(ctx, writer, http.StatusBadRequest, Error{
-			Code:    "invalid_request",
-			Message: "X-Integration-Id header is required",
-		})
+	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
+	if !validIntegrationId {
 		return
 	}
-	integrationID := integrations.ID(params.XIntegrationId)
-	ctx = context.WithValue(req.Context(), valueIntegrationID{}, integrationID)
 
 	config := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
 	if config == nil {
@@ -324,6 +374,22 @@ func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.
 	writeResponse(ctx, writer, http.StatusNoContent, nil)
 }
 
+func requireIntegrationId(ctx context.Context, raw string, writer http.ResponseWriter) (context.Context, bool, integrations.ID) {
+	if len(raw) == 0 {
+		slog.Error("Could not find X-Integration-Id header")
+		writeResponse(ctx, writer, http.StatusBadRequest, Error{
+			Code:    "invalid_request",
+			Message: "X-Integration-Id header is required",
+		})
+		return ctx, false, ""
+	}
+
+	integrationID := integrations.ID(raw)
+	ctx = context.WithValue(ctx, valueIntegrationID{}, integrationID)
+
+	return ctx, true, integrationID
+}
+
 func writeResponse(ctx context.Context, writer http.ResponseWriter, status int, value any) {
 	integrationID := ctx.Value(valueIntegrationID{}).(integrations.ID)
 	writer.Header().Set("Content-Type", "application/json")
@@ -336,4 +402,23 @@ func writeResponse(ctx context.Context, writer http.ResponseWriter, status int, 
 	if writeErr != nil {
 		slog.Error("Could not write error", slog.String("integration-id", string(integrationID)), slog.Any("error", writeErr))
 	}
+}
+
+func optSchemaID(id *schemas.ID) *SchemaID {
+	if id == nil {
+		return nil
+	}
+
+	rawID := id.String()
+	return &rawID
+}
+
+func parseSchemaID(id *SchemaID) *schemas.ID {
+	if id == nil {
+		return nil
+	}
+
+	schemaID := schemas.ID(*id)
+
+	return &schemaID
 }

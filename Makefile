@@ -18,6 +18,9 @@ cover:
 	-go tool cover -func cover.app.filtered.out | grep -v "100.0"
 	! go tool cover -func cover.out | grep -v "100.0" || exit 1
 	#! go tool cover -func cover.app.out | grep -v "100.0" || exit 1
+	rm -f cover.out
+	rm -f cover.app.out
+	rm -f cover.app.filtered.out
 
 deps:
 	go mod download

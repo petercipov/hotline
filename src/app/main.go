@@ -20,6 +20,7 @@ func main() {
 	uuidGenerator := uuid.NewDeterministicV7(rand.Reader)
 	inMemoryServiceLevels := &servicelevels.InMemoryRepository{}
 	inMemorySchemas := schemas.NewInMemorySchemaRepository(uuidGenerator)
+	inMemoryValidations := schemas.NewInMemoryValidationRepository()
 	app, appErr := setup.NewApp(
 		&setup.Config{
 			OtelHttpReporter: struct {
@@ -39,6 +40,7 @@ func main() {
 		},
 		inMemoryServiceLevels,
 		inMemorySchemas,
+		inMemoryValidations,
 	)
 
 	if appErr != nil {

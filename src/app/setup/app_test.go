@@ -26,6 +26,7 @@ type appSut struct {
 
 	serviceLevelsRepository repository.ServiceLevelsRepository
 	schemaRepository        repository.SchemaRepository
+	validationRepository    repository.ValidationRepository
 }
 
 func newAppSut(t *testing.T) *appSut {
@@ -38,6 +39,7 @@ func newAppSut(t *testing.T) *appSut {
 		t:                       t,
 		serviceLevelsRepository: &servicelevels.InMemoryRepository{},
 		schemaRepository:        schemas.NewInMemorySchemaRepository(uuidGenerator),
+		validationRepository:    schemas.NewInMemoryValidationRepository(),
 		managedClock:            manualClock,
 	}
 }
@@ -85,6 +87,7 @@ func (a *appSut) startHotline(_ context.Context, features *godog.Table) error {
 		},
 		a.serviceLevelsRepository,
 		a.schemaRepository,
+		a.validationRepository,
 	)
 	if appErr != nil {
 		return appErr
@@ -117,6 +120,8 @@ func TestApp(t *testing.T) {
 			otelSut := NewOTELSut(sut.managedClock, func() string {
 				return sut.app.GetOTELIngestionUrl()
 			})
+			validationsAPISut := NewValidationsAPISut(t, sut.GetCfgAPIUrl)
+
 			sctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 				closeAppErr := sut.Close()
 				if closeAppErr != nil {
@@ -143,6 +148,7 @@ func TestApp(t *testing.T) {
 			reporterSut.AddSteps(sctx)
 			egressSut.AddSteps(sctx)
 			otelSut.AddSteps(sctx)
+			validationsAPISut.AddSteps(sctx)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",

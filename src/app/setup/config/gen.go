@@ -193,8 +193,8 @@ type RequestSchemaCreated struct {
 
 // RequestValidationList List of Request Validations for an integration
 type RequestValidationList struct {
-	// Routes List of route-specific Request Validations
-	Routes []RouteRequestValidation `json:"routes"`
+	// RouteValidations List of route-specific Request Validations
+	RouteValidations []RouteRequestValidation `json:"route-validations"`
 }
 
 // RequestValidationSchema defines model for RequestValidationSchema.
@@ -295,7 +295,7 @@ type UpsertServiceLevelsRequest struct {
 
 // UpsertedRequestValidationResponse defines model for UpsertedRequestValidationResponse.
 type UpsertedRequestValidationResponse struct {
-	RouteKey *RouteKey `json:"routeKey,omitempty"`
+	RouteKey RouteKey `json:"routeKey"`
 }
 
 // UpsertedServiceLevelsResponse defines model for UpsertedServiceLevelsResponse.

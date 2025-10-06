@@ -59,6 +59,7 @@ func NewApp(
 	createServer CreateServer,
 	serviceLevelsRepository repository.ServiceLevelsRepository,
 	schemaRepository repository.SchemaRepository,
+	validationRepository repository.ValidationRepository,
 ) (*App, error) {
 	otelReporterScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("otel-reporter", 8),
@@ -113,6 +114,7 @@ func NewApp(
 	cfgAPIHandler := config.HandlerWithOptions(config.NewHttpHandler(
 		serviceLevelsRepository,
 		schemaRepository,
+		validationRepository,
 		managedTime.Now,
 		func(integrationID integrations.ID, route hotlinehttp.Route) {
 			sloPipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{

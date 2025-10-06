@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"hotline/http"
 	"hotline/integrations"
 	"hotline/schemas"
 	"hotline/servicelevels"
@@ -20,4 +21,9 @@ type SchemaRepository interface {
 	SetSchema(ctx context.Context, id schemas.ID, content string, updateAt time.Time) error
 	ListSchemas(ctx context.Context) []schemas.SchemaListEntry
 	DeleteSchema(ctx context.Context, id schemas.ID) error
+}
+
+type ValidationRepository interface {
+	schemas.ValidationReader
+	SetConfig(ctx context.Context, id integrations.ID, route http.Route, schemaDef schemas.RouteSchemaDefinition) error
 }

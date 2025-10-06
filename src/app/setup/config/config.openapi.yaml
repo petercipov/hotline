@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Config API
   description: API for managing integration Service Levels
-  version: 1.0.0
+  version: 0.0.1
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
@@ -427,6 +427,8 @@ components:
 
     UpsertedRequestValidationResponse:
       type: object
+      required:
+        - routeKey
       properties:
         routeKey:
           $ref: '#/components/schemas/RouteKey'
@@ -499,9 +501,9 @@ components:
       type: object
       description: List of Request Validations for an integration
       required:
-        - routes
+        - route-validations
       properties:
-        routes:
+        route-validations:
           type: array
           maxItems: 1024
           items:

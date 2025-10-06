@@ -2,9 +2,11 @@ package schemas
 
 import (
 	"context"
+	"hotline/http"
 	"hotline/integrations"
 	"hotline/uuid"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -130,13 +132,19 @@ func (r *InMemorySchemaRepository) DeleteSchema(_ context.Context, schemaID ID) 
 }
 
 type InMemoryValidationRepository struct {
-	mutext  sync.Mutex
+	mutex   sync.Mutex
 	mapping map[integrations.ID]*ValidationDefinition
 }
 
+func NewInMemoryValidationRepository() *InMemoryValidationRepository {
+	return &InMemoryValidationRepository{
+		mapping: make(map[integrations.ID]*ValidationDefinition),
+	}
+}
+
 func (r *InMemoryValidationRepository) GetConfig(_ context.Context, id integrations.ID) *ValidationDefinition {
-	r.mutext.Lock()
-	defer r.mutext.Unlock()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
 	var result *ValidationDefinition
 	definitions, found := r.mapping[id]
@@ -146,15 +154,25 @@ func (r *InMemoryValidationRepository) GetConfig(_ context.Context, id integrati
 	return result
 }
 
-func (r *InMemoryValidationRepository) SetConfig(_ context.Context, id integrations.ID, definition *ValidationDefinition) {
-	r.mutext.Lock()
-	defer r.mutext.Unlock()
+func (r *InMemoryValidationRepository) SetConfig(_ context.Context, id integrations.ID, route http.Route, schemaDef RouteSchemaDefinition) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
-	if r.mapping == nil {
-		r.mapping = make(map[integrations.ID]*ValidationDefinition)
+	byIntegration, found := r.mapping[id]
+	if !found {
+		byIntegration = &ValidationDefinition{}
+		r.mapping[id] = byIntegration
 	}
 
-	r.mapping[id] = definition
+	byIntegration.Routes = slices.DeleteFunc(byIntegration.Routes, func(def RouteValidationDefinition) bool {
+		return def.Route == route
+	})
+
+	byIntegration.Routes = append(byIntegration.Routes, RouteValidationDefinition{
+		Route:     route,
+		SchemaDef: schemaDef,
+	})
+	return nil
 }
 
 type InMemoryValidationReporter struct {
