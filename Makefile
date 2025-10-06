@@ -4,6 +4,9 @@ generate:
 	cd ./src/app/setup/config && oapi-codegen -config=codegen.config.yaml config.openapi.yaml
 
 test:
+	rm -f cover.out
+	rm -f cover.app.out
+	rm -f cover.app.filtered.out
 	go clean -testcache
 	go test  ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...
 	go test  ./src/app/... -coverprofile=./cover.app.out -covermode=atomic -coverpkg=./src/app/...
@@ -18,9 +21,6 @@ cover:
 	-go tool cover -func cover.app.filtered.out | grep -v "100.0"
 	! go tool cover -func cover.out | grep -v "100.0" || exit 1
 	#! go tool cover -func cover.app.out | grep -v "100.0" || exit 1
-	rm -f cover.out
-	rm -f cover.app.out
-	rm -f cover.app.filtered.out
 
 deps:
 	go mod download
