@@ -39,9 +39,11 @@ Feature: Validations API
     When validation for integration "INdd0391f11aba" is created:
       """
       {
-        "route": { "method": "GET", "host": "127.0.0.1", "path": "/products/{productId}" },
+        "route": { "method": "GET", "host": "127.0.0.1", "path": "/products" },
         "requestSchema": {
-          "bodySchemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ"
+          "bodySchemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
+          "headerSchemaID": "SCAZUtiVXRcQGBAQEBAQEBAQ",
+          "querySchemaID": "SCAZUtiVXRcQKBAQEBAQEBAQ"
         }
       }
       """
@@ -50,14 +52,16 @@ Feature: Validations API
       {
         "route-validations" : [{
           "requestSchema" : {
-            "bodySchemaID" : "SCAZUtiVXQcQGBAQEBAQEBAQ"
+            "bodySchemaID" : "SCAZUtiVXQcQGBAQEBAQEBAQ",
+            "headerSchemaID": "SCAZUtiVXRcQGBAQEBAQEBAQ",
+            "querySchemaID": "SCAZUtiVXRcQKBAQEBAQEBAQ"
           },
           "route" : {
             "host" : "127.0.0.1",
             "method" : "GET",
-            "path" : "/products/{productid}"
+            "path" : "/products"
           },
-          "routeKey" : "RK81oVF6Req0k"
+          "routeKey" : "RKbhmdHaevZLs"
         }]
       }
       """
