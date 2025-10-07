@@ -7,21 +7,17 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"testing"
 
 	"github.com/cucumber/godog"
-	"github.com/stretchr/testify/assert"
 )
 
 type ServiceLevelsAPISut struct {
 	apiURL func() string
-	t      *testing.T
 }
 
-func NewServiceLevelsAPISut(t *testing.T, apiURL func() string) *ServiceLevelsAPISut {
+func NewServiceLevelsAPISut(apiURL func() string) *ServiceLevelsAPISut {
 	return &ServiceLevelsAPISut{
 		apiURL: apiURL,
-		t:      t,
 	}
 }
 
@@ -132,8 +128,9 @@ func (a *ServiceLevelsAPISut) checkServiceLevelsConfiguration(ctx context.Contex
 			return ctx, unmarshalErr
 		}
 
-		if !assert.Equal(a.t, reqObj, routes[i], "request route at index ", i, " is not equal to expected route") {
-			return ctx, errConfigDoNotMatch
+		eqErr := ObjectsAreEqual(reqObj, routes[i], "request route at index ", i, " is not equal to expected route")
+		if eqErr != nil {
+			return ctx, eqErr
 		}
 	}
 

@@ -26,10 +26,6 @@ type HttpHandler struct {
 	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
 }
 
-func (h *HttpHandler) DeleteRequestValidation(w http.ResponseWriter, r *http.Request, routekey RouteKey, params DeleteRequestValidationParams) {
-	panic("implement me")
-}
-
 func NewHttpHandler(
 	serviceLevelsRepo repository.ServiceLevelsRepository,
 	schemasRepo repository.SchemaRepository,
@@ -58,12 +54,11 @@ func (h *HttpHandler) ListRequestValidations(writer http.ResponseWriter, req *ht
 	config := h.validationsRepo.GetConfig(ctx, integrationID)
 	if config != nil {
 		for _, r := range config.Routes {
-			key := r.Route.GenerateKey(integrationID.String())
 			routeValidation := RouteRequestValidation{
 				RequestSchema:  nil,
 				ResponseSchema: nil,
 				Route:          convertRoute(r.Route),
-				RouteKey:       key.String(),
+				RouteKey:       r.RouteKey.String(),
 			}
 			if r.SchemaDef.Request != nil {
 				routeValidation.RequestSchema = &RequestValidationSchema{
@@ -109,7 +104,7 @@ func (h *HttpHandler) UpsertRequestValidations(writer http.ResponseWriter, req *
 		}
 	}
 
-	setErr := h.validationsRepo.SetConfig(ctx, integrationID, route, schemaDef)
+	routeKey, setErr := h.validationsRepo.SetForRoute(ctx, integrationID, route, schemaDef)
 	if setErr != nil {
 		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
 			Code:    "internal_error",
@@ -118,11 +113,31 @@ func (h *HttpHandler) UpsertRequestValidations(writer http.ResponseWriter, req *
 		return
 	}
 
-	routeKey := route.GenerateKey(integrationID.String())
 	writeResponse(ctx, writer, http.StatusCreated, UpsertedRequestValidationResponse{
 		RouteKey: routeKey.String(),
 	})
 }
+
+func (h *HttpHandler) DeleteRequestValidation(writer http.ResponseWriter, req *http.Request, routekey RouteKey, params DeleteRequestValidationParams) {
+	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
+	if !validIntegrationId {
+		return
+	}
+	defer func() {
+		_ = req.Body.Close()
+	}()
+
+	deleteErr := h.validationsRepo.DeleteRouteByKey(ctx, integrationID, hotlinehttp.RouteKey(routekey))
+	if deleteErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not delete validation",
+		})
+		return
+	}
+	writeResponse(ctx, writer, http.StatusNoContent, nil)
+}
+
 func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 

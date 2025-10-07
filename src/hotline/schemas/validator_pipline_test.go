@@ -116,6 +116,15 @@ func (s *validationPipelineSut) Close() {
 		Expect(deleteErr).NotTo(HaveOccurred())
 	}
 
+	validationsList := s.validationRepo.GetConfig(
+		context.Background(), "integration-id")
+	if validationsList != nil {
+		for _, route := range validationsList.Routes {
+			deleteErr := s.validationRepo.DeleteRouteByKey(context.Background(), "integration-id", route.RouteKey)
+			Expect(deleteErr).NotTo(HaveOccurred())
+		}
+	}
+
 	s.pipeline = nil
 	s.schemaRepo = nil
 	s.validationRepo = nil
@@ -250,7 +259,7 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 	Expect(schemaById.Content).NotTo(BeEmpty())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
@@ -270,7 +279,7 @@ func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
 	Expect(schemaErr).To(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).To(BeEmpty())
 
-	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
@@ -306,7 +315,7 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 	Expect(schemaErr).NotTo(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
@@ -349,7 +358,7 @@ func (s *validationPipelineSut) withBodySchemaValidation() {
 	Expect(schemaErr).NotTo(HaveOccurred())
 	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
@@ -362,7 +371,7 @@ func (s *validationPipelineSut) withBodySchemaValidation() {
 			},
 		})
 
-	_ = s.validationRepo.SetConfig(context.Background(), "integration-id",
+	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/alias",

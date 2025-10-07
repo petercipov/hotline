@@ -160,7 +160,7 @@ func (r *InMemoryValidationRepository) GetConfig(_ context.Context, id integrati
 	return result
 }
 
-func (r *InMemoryValidationRepository) SetConfig(_ context.Context, id integrations.ID, route http.Route, schemaDef RouteSchemaDefinition) error {
+func (r *InMemoryValidationRepository) SetForRoute(_ context.Context, id integrations.ID, route http.Route, schemaDef RouteSchemaDefinition) (http.RouteKey, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -174,10 +174,25 @@ func (r *InMemoryValidationRepository) SetConfig(_ context.Context, id integrati
 		return def.Route == route
 	})
 
+	routeKey := route.GenerateKey(id.String())
 	byIntegration.Routes = append(byIntegration.Routes, RouteValidationDefinition{
 		Route:     route,
+		RouteKey:  routeKey,
 		SchemaDef: schemaDef,
 	})
+	return routeKey, nil
+}
+
+func (r *InMemoryValidationRepository) DeleteRouteByKey(_ context.Context, id integrations.ID, key http.RouteKey) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	byIntegration, found := r.mapping[id]
+	if found {
+		byIntegration.Routes = slices.DeleteFunc(byIntegration.Routes, func(def RouteValidationDefinition) bool {
+			return def.Route.GenerateKey(id.String()) == key
+		})
+	}
 	return nil
 }
 

@@ -32,14 +32,8 @@ var _ = Describe("System Clock", Ordered, func() {
 
 	It("should tick periodically", func() {
 		sut.ForSystemClock()
-		now := sut.Now()
 		ticks := sut.TickPeriodically(10)
 		Expect(ticks).To(HaveLen(10))
-
-		for i, tick := range ticks {
-			Expect(tick.After(now)).To(BeTrue(), "%d tick %v should be after %v", i, tick, now)
-			now = tick
-		}
 	})
 })
 

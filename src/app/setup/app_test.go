@@ -5,6 +5,7 @@ import (
 	"app/setup/repository"
 	"context"
 	"errors"
+	"fmt"
 	"hotline/clock"
 	"hotline/schemas"
 	"hotline/servicelevels"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	"github.com/stretchr/testify/assert"
 )
 
 type appSut struct {
@@ -49,7 +51,6 @@ func (a *appSut) GetCfgAPIUrl() string {
 }
 
 var errUnexpectedResponse = errors.New("unexpected response")
-var errConfigDoNotMatch = errors.New("configs do not match")
 
 func (a *appSut) advanceTime(ctx context.Context, seconds int) (context.Context, error) {
 	a.managedClock.Advance(time.Duration(seconds) * time.Second)
@@ -109,8 +110,8 @@ func TestApp(t *testing.T) {
 	suite := godog.TestSuite{
 		ScenarioInitializer: func(sctx *godog.ScenarioContext) {
 			sut := newAppSut(t)
-			schemaAPISut := NewSchemaAPISut(t, sut.GetCfgAPIUrl)
-			serviceLevelsAPISut := NewServiceLevelsAPISut(t, sut.GetCfgAPIUrl)
+			schemaAPISut := NewSchemaAPISut(sut.GetCfgAPIUrl)
+			serviceLevelsAPISut := NewServiceLevelsAPISut(sut.GetCfgAPIUrl)
 			reporterSut := NewReporterSut(t, func(url string) {
 				sut.cfg.OtelHttpReporter.Host = url
 			})
@@ -120,7 +121,7 @@ func TestApp(t *testing.T) {
 			otelSut := NewOTELSut(sut.managedClock, func() string {
 				return sut.app.GetOTELIngestionUrl()
 			})
-			validationsAPISut := NewValidationsAPISut(t, sut.GetCfgAPIUrl)
+			validationsAPISut := NewValidationsAPISut(sut.GetCfgAPIUrl)
 
 			sctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 				closeAppErr := sut.Close()
@@ -157,5 +158,39 @@ func TestApp(t *testing.T) {
 			TestingT: t,
 		},
 	}
-	suite.Run()
+	if suite.Run() != 0 {
+		t.Fatal("non-zero status returned, failed to run feature tests")
+	}
+}
+
+var ErrObjectsDoNotMatch = errors.New("objects do not match")
+var ErrObjectsIsEmpty = errors.New("object is empty")
+
+type Assert struct {
+	msg     string
+	msgArgs []interface{}
+}
+
+func ObjectsAreEqual(expected, actual interface{}, msg ...interface{}) error {
+	a := &Assert{}
+	assert.Equal(a, expected, actual, msg)
+	return a.wrapErr(ErrObjectsDoNotMatch)
+}
+
+func ObjectNotEmpty(actual interface{}, msg ...interface{}) error {
+	a := &Assert{}
+	assert.NotEmpty(a, actual, msg)
+	return a.wrapErr(ErrObjectsIsEmpty)
+}
+
+func (a *Assert) Errorf(msg string, msgArgs ...interface{}) {
+	a.msgArgs = msgArgs
+	a.msg = msg
+}
+
+func (a *Assert) wrapErr(err error) error {
+	if len(a.msgArgs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w::: \n%s", err, a.msgArgs[0])
 }

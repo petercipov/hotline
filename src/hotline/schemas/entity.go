@@ -32,6 +32,7 @@ type ValidationDefinition struct {
 
 type RouteValidationDefinition struct {
 	Route     http.Route
+	RouteKey  http.RouteKey
 	SchemaDef RouteSchemaDefinition
 }
 

@@ -25,5 +25,6 @@ type SchemaRepository interface {
 
 type ValidationRepository interface {
 	schemas.ValidationReader
-	SetConfig(ctx context.Context, id integrations.ID, route http.Route, schemaDef schemas.RouteSchemaDefinition) error
+	SetForRoute(ctx context.Context, id integrations.ID, route http.Route, schemaDef schemas.RouteSchemaDefinition) (http.RouteKey, error)
+	DeleteRouteByKey(ctx context.Context, id integrations.ID, key http.RouteKey) error
 }

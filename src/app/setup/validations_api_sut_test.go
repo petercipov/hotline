@@ -5,27 +5,44 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"testing"
 
 	"github.com/cucumber/godog"
-	"github.com/stretchr/testify/assert"
 )
 
 type ValidationsAPISut struct {
 	apiURL func() string
-	t      *testing.T
 }
 
-func NewValidationsAPISut(t *testing.T, apiURL func() string) *ValidationsAPISut {
+func NewValidationsAPISut(apiURL func() string) *ValidationsAPISut {
 	return &ValidationsAPISut{
 		apiURL: apiURL,
-		t:      t,
 	}
 }
 
 func (a *ValidationsAPISut) AddSteps(sctx *godog.ScenarioContext) {
 	sctx.Step(`validations for integration "([^"]*)" list is`, a.checkSchemaList)
 	sctx.Step(`validation for integration "([^"]*)" is created`, a.createValidations)
+	sctx.Step(`validation for integration "([^"]*)" with routeKey "([^"]*)" is deleted`, a.deleteValidation)
+}
+
+func (a *ValidationsAPISut) deleteValidation(ctx context.Context, integrationID string, routeKey string) (context.Context, error) {
+	configClient, createClientErr := config.NewClientWithResponses(a.apiURL())
+	if createClientErr != nil {
+		return ctx, createClientErr
+	}
+
+	resp, respErr := configClient.DeleteRequestValidationWithResponse(ctx, routeKey, &config.DeleteRequestValidationParams{
+		XIntegrationId: integrationID,
+	})
+	if respErr != nil {
+		return ctx, respErr
+	}
+
+	if resp.StatusCode() != 204 {
+		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, resp.StatusCode())
+	}
+
+	return ctx, nil
 }
 
 func (a *ValidationsAPISut) createValidations(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
@@ -78,8 +95,9 @@ func (a *ValidationsAPISut) checkSchemaList(ctx context.Context, integrationID s
 	if jsonErr != nil {
 		return ctx, jsonErr
 	}
-	if !assert.Equal(a.t, expectedSchemas, schemaList, "schemas do not match") {
-		return ctx, errConfigDoNotMatch
+	eqErr := ObjectsAreEqual(expectedSchemas, schemaList, "schemas do not match")
+	if eqErr != nil {
+		return ctx, eqErr
 	}
 	return ctx, nil
 }

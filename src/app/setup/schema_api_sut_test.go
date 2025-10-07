@@ -10,21 +10,17 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/cucumber/godog"
-	"github.com/stretchr/testify/assert"
 )
 
 type SchemaAPISut struct {
 	apiURL func() string
-	t      *testing.T
 }
 
-func NewSchemaAPISut(t *testing.T, apiURL func() string) *SchemaAPISut {
+func NewSchemaAPISut(apiURL func() string) *SchemaAPISut {
 	return &SchemaAPISut{
 		apiURL: apiURL,
-		t:      t,
 	}
 }
 
@@ -58,8 +54,10 @@ func (a *SchemaAPISut) checkSchemaList(ctx context.Context, configRaw string) (c
 	if jsonErr != nil {
 		return ctx, jsonErr
 	}
-	if !assert.Equal(a.t, expectedSchemas, schemaList, "schemas do not match") {
-		return ctx, errConfigDoNotMatch
+
+	eqErr := ObjectsAreEqual(expectedSchemas, schemaList, "schemas do not match")
+	if eqErr != nil {
+		return ctx, eqErr
 	}
 	return ctx, nil
 }
@@ -92,11 +90,11 @@ func (a *SchemaAPISut) createSchema(ctx context.Context, filePath string) (conte
 		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, createSchema.StatusCode())
 	}
 
-	if !assert.NotEmpty(a.t, createSchema.JSON201.SchemaID) {
-		return ctx, errConfigDoNotMatch
+	if err := ObjectNotEmpty(createSchema.JSON201.SchemaID, "schema_id is empty"); err != nil {
+		return ctx, err
 	}
-	if !assert.NotEmpty(a.t, createSchema.JSON201.UpdatedAt) {
-		return ctx, errConfigDoNotMatch
+	if err := ObjectNotEmpty(createSchema.JSON201.UpdatedAt, "updated_at is empty"); err != nil {
+		return ctx, err
 	}
 
 	return ctx, nil
@@ -120,8 +118,12 @@ func (a *SchemaAPISut) compareSchemaContent(ctx context.Context, schemaID string
 		return ctx, fmt.Errorf("%w status code: %d", errUnexpectedResponse, schemaContent.StatusCode())
 	}
 
-	assert.NotEmpty(a.t, schemaContent.HTTPResponse.Header.Get("Last-Modified"))
-	assert.Equal(a.t, "application/octet-stream", schemaContent.HTTPResponse.Header.Get("Content-Type"))
+	if err := ObjectNotEmpty(schemaContent.HTTPResponse.Header.Get("Last-Modified")); err != nil {
+		return ctx, err
+	}
+	if err := ObjectsAreEqual("application/octet-stream", schemaContent.HTTPResponse.Header.Get("Content-Type")); err != nil {
+		return ctx, err
+	}
 
 	expectedContent, readExpectedErr := os.ReadFile(filepath.Clean(expectedFilePath))
 	if readExpectedErr != nil {
@@ -130,8 +132,9 @@ func (a *SchemaAPISut) compareSchemaContent(ctx context.Context, schemaID string
 
 	receivedBody := string(schemaContent.Body)
 	expectedBody := string(expectedContent)
-	if !assert.Equal(a.t, expectedBody, receivedBody) {
-		return ctx, errConfigDoNotMatch
+
+	if err := ObjectsAreEqual(expectedBody, receivedBody, "body do not match"); err != nil {
+		return ctx, err
 	}
 
 	return ctx, nil

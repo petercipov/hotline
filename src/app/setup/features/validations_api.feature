@@ -10,7 +10,7 @@ Feature: Validations API
       { "route-validations": [] }
       """
 
-  Scenario: attach existing schema id:
+  Scenario: attach existing schema id
     Given hotline is running:
       | Feature           | Enabled |
     And advance time by 1s
@@ -65,4 +65,49 @@ Feature: Validations API
           "routeKey" : "RKbhmdHaevZLs"
         }]
       }
+      """
+  Scenario: delete existing validation
+    Given hotline is running:
+      | Feature           | Enabled |
+    And advance time by 1s
+    And schema is created from file "./features/fixtures/product_schema.json"
+    And schema list is:
+      """
+      { "schemas": [
+        {
+          "schemaID" : "SCAZUtiVm5cQGBAQEBAQEBAQ",
+          "title" : "./features/fixtures/product_schema.json",
+          "updatedAt" : "2025-02-22T12:02:11.001Z"
+        }
+      ] }
+      """
+    And validation for integration "INdd0391f11aba" is created:
+      """
+      {
+        "route": { "method": "GET", "host": "127.0.0.1", "path": "/products" },
+        "requestSchema": {
+          "bodySchemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ"
+        }
+      }
+      """
+    And validations for integration "INdd0391f11aba" list is:
+      """
+      {
+        "route-validations" : [{
+          "requestSchema" : {
+            "bodySchemaID" : "SCAZUtiVXQcQGBAQEBAQEBAQ"
+          },
+          "route" : {
+            "host" : "127.0.0.1",
+            "method" : "GET",
+            "path" : "/products"
+          },
+          "routeKey" : "RKbhmdHaevZLs"
+        }]
+      }
+      """
+    When validation for integration "INdd0391f11aba" with routeKey "RKbhmdHaevZLs" is deleted
+    Then validations for integration "INdd0391f11aba" list is:
+      """
+      { "route-validations": [] }
       """
