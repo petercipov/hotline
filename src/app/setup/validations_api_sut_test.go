@@ -95,8 +95,9 @@ func (a *ValidationsAPISut) checkSchemaList(ctx context.Context, integrationID s
 	if jsonErr != nil {
 		return ctx, jsonErr
 	}
-	eqErr := ObjectsAreEqual(expectedSchemas, schemaList, "schemas do not match")
+	eqErr := ObjectsAreEqual(expectedSchemas, schemaList, "validations do not match, response body", string(listResponse.Body))
 	if eqErr != nil {
+
 		return ctx, eqErr
 	}
 	return ctx, nil

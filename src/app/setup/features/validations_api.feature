@@ -111,3 +111,76 @@ Feature: Validations API
       """
       { "route-validations": [] }
       """
+  Scenario: update existing validation
+    Given hotline is running:
+      | Feature           | Enabled |
+    And advance time by 1s
+    And schema is created from file "./features/fixtures/product_schema.json"
+    And And advance time by 1s
+    And schema is created from file "./features/fixtures/product_schema.v2.json"
+    And schema list is:
+      """
+      { "schemas": [
+        {
+          "schemaID" : "SCAZUtiVm5cQGBAQEBAQEBAQ",
+          "title" : "./features/fixtures/product_schema.json",
+          "updatedAt" : "2025-02-22T12:02:11.001Z"
+        },
+        {
+          "schemaID" : "SCAZUtiV2icQGBAQEBAQEBAQ",
+          "title" : "./features/fixtures/product_schema.v2.json",
+          "updatedAt" : "2025-02-22T12:02:12.002Z"
+        }
+      ] }
+      """
+    And validation for integration "INdd0391f11aba" is created:
+      """
+      {
+        "route": { "method": "GET", "host": "127.0.0.1", "path": "/products" },
+        "requestSchema": {
+          "bodySchemaID": "SCAZUtiVm5cQGBAQEBAQEBAQ"
+        }
+      }
+      """
+    And validations for integration "INdd0391f11aba" list is:
+      """
+      {
+        "route-validations" : [{
+          "requestSchema" : {
+            "bodySchemaID" : "SCAZUtiVm5cQGBAQEBAQEBAQ"
+          },
+          "route" : {
+            "host" : "127.0.0.1",
+            "method" : "GET",
+            "path" : "/products"
+          },
+          "routeKey" : "RKbhmdHaevZLs"
+        }]
+      }
+      """
+
+    When validation for integration "INdd0391f11aba" is created:
+      """
+      {
+        "route": { "method": "GET", "host": "127.0.0.1", "path": "/products" },
+        "requestSchema": {
+          "bodySchemaID": "SCAZUtiV2icQGBAQEBAQEBAQ"
+        }
+      }
+      """
+    Then validations for integration "INdd0391f11aba" list is:
+      """
+      {
+        "route-validations" : [{
+          "requestSchema" : {
+            "bodySchemaID" : "SCAZUtiV2icQGBAQEBAQEBAQ"
+          },
+          "route" : {
+            "host" : "127.0.0.1",
+            "method" : "GET",
+            "path" : "/products"
+          },
+          "routeKey" : "RKbhmdHaevZLs"
+        }]
+      }
+      """

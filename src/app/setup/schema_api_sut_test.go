@@ -55,7 +55,7 @@ func (a *SchemaAPISut) checkSchemaList(ctx context.Context, configRaw string) (c
 		return ctx, jsonErr
 	}
 
-	eqErr := ObjectsAreEqual(expectedSchemas, schemaList, "schemas do not match")
+	eqErr := ObjectsAreEqual(expectedSchemas, schemaList, "schemas do not match, response body", string(listResponse.Body))
 	if eqErr != nil {
 		return ctx, eqErr
 	}
