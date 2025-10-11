@@ -26,21 +26,17 @@ func NewIDGenerator(generator uuid.V7StringGenerator) IDGenerator {
 	}
 }
 
-type ValidationDefinition struct {
-	Routes []RouteValidationDefinition
-}
-
 type RouteValidationDefinition struct {
-	Route     http.Route
-	RouteKey  http.RouteKey
-	SchemaDef RouteSchemaDefinition
+	Route      http.Route
+	RouteKey   http.RouteKey
+	Validators RouteValidators
 }
 
-type RouteSchemaDefinition struct {
-	Request *RequestSchemaDefinition
+type RouteValidators struct {
+	Request *RequestValidators
 }
 
-type RequestSchemaDefinition struct {
+type RequestValidators struct {
 	HeaderSchemaID *ID
 	QuerySchemaID  *ID
 	BodySchemaID   *ID

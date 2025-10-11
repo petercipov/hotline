@@ -55,7 +55,7 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 	return (*servicelevels.Percentile)(p)
 }
 
-func ParseRoute(integrationID integrations.ID, latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.HttpRouteServiceLevels, error) {
+func ParseRoute(integrationID integrations.ID, latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.RouteModification, error) {
 	var status servicelevels.HttpStatusServiceLevels
 	var latency servicelevels.HttpLatencyServiceLevels
 	if statusDefinition != nil {
@@ -71,7 +71,7 @@ func ParseRoute(integrationID integrations.ID, latencyDefinition *LatencyService
 	if latencyDefinition != nil {
 		defs, defsErr := parsePercentileDefinitions(latencyDefinition.Percentiles)
 		if defsErr != nil {
-			return servicelevels.HttpRouteServiceLevels{}, defsErr
+			return servicelevels.RouteModification{}, defsErr
 		}
 
 		latency = servicelevels.HttpLatencyServiceLevels{
@@ -87,9 +87,8 @@ func ParseRoute(integrationID integrations.ID, latencyDefinition *LatencyService
 		Port:        int(optInt32(route.Port, 0)),
 	}
 
-	return servicelevels.HttpRouteServiceLevels{
+	return servicelevels.RouteModification{
 		Route:   httpRoute,
-		Key:     httpRoute.GenerateKey(integrationID.String()),
 		Latency: &latency,
 		Status:  &status,
 	}, nil
@@ -125,7 +124,7 @@ func parsePercentileDefinitions(percentiles []PercentileThreshold) ([]servicelev
 	return result, nil
 }
 
-func convertRoutes(routes []servicelevels.HttpRouteServiceLevels) []RouteServiceLevels {
+func convertRoutes(routes []servicelevels.RouteServiceLevels) []RouteServiceLevels {
 	var defs []RouteServiceLevels
 	for _, routeSericeLevel := range routes {
 		var latencyLevels LatencyServiceLevels

@@ -4,10 +4,7 @@ import (
 	"context"
 	"hotline/http"
 	"hotline/integrations"
-	"hotline/uuid"
-	"io"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 )
@@ -32,28 +29,22 @@ type inMemorySchemaEntry struct {
 	updatedAt time.Time
 }
 type InMemorySchemaRepository struct {
-	mutext      sync.Mutex
-	schemas     map[ID]inMemorySchemaEntry
-	idGenerator IDGenerator
+	mutex   sync.Mutex
+	schemas map[ID]inMemorySchemaEntry
 }
 
-func NewInMemorySchemaRepository(generator uuid.V7StringGenerator) *InMemorySchemaRepository {
+func NewInMemorySchemaRepository() *InMemorySchemaRepository {
 	return &InMemorySchemaRepository{
-		schemas:     make(map[ID]inMemorySchemaEntry),
-		idGenerator: NewIDGenerator(generator),
+		schemas: make(map[ID]inMemorySchemaEntry),
 	}
 }
 
-func (r *InMemorySchemaRepository) GenerateID(now time.Time) (ID, error) {
-	return r.idGenerator(now)
-}
-
-func (r *InMemorySchemaRepository) GetSchemaByID(_ context.Context, schemaID ID) (SchemaEntry, error) {
-	r.mutext.Lock()
-	defer r.mutext.Unlock()
+func (r *InMemorySchemaRepository) GetSchema(_ context.Context, schemaID ID) (SchemaEntry, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
 	var result SchemaEntry
-	var resErr = io.EOF
+	var resErr = ErrSchemaNotFound
 	entry, found := r.schemas[schemaID]
 	if found {
 		result = SchemaEntry{
@@ -67,38 +58,22 @@ func (r *InMemorySchemaRepository) GetSchemaByID(_ context.Context, schemaID ID)
 	return result, resErr
 }
 
-func (r *InMemorySchemaRepository) GetSchemaContent(_ context.Context, schemaID ID) io.ReadCloser {
-	r.mutext.Lock()
-	defer r.mutext.Unlock()
-
-	var result io.ReadCloser
-	entry, found := r.schemas[schemaID]
-	if found {
-		result = io.NopCloser(strings.NewReader(entry.content))
+func (r *InMemorySchemaRepository) GetSchemaEntry(ctx context.Context, id ID) (SchemaListEntry, error) {
+	schema, getErr := r.GetSchema(ctx, id)
+	var entry SchemaListEntry
+	if getErr == nil {
+		entry = SchemaListEntry{
+			ID:        schema.ID,
+			Title:     schema.Title,
+			UpdatedAt: schema.UpdatedAt,
+		}
 	}
-	return result
+	return entry, getErr
 }
 
 func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content string, updatedAt time.Time, title string) error {
-	r.mutext.Lock()
-	defer r.mutext.Unlock()
-
-	compiler := createCompiler()
-	_, validatorErr := newJsonSchemaValidator(
-		SchemaDefinition{
-			ID:      id,
-			Content: strings.NewReader(content),
-		},
-		"test",
-		compiler,
-	)
-
-	if validatorErr != nil {
-		return &ValidationError{
-			SchemaID: id,
-			Err:      validatorErr,
-		}
-	}
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
 	r.schemas[id] = inMemorySchemaEntry{
 		id:        id,
@@ -109,9 +84,9 @@ func (r *InMemorySchemaRepository) SetSchema(_ context.Context, id ID, content s
 	return nil
 }
 
-func (r *InMemorySchemaRepository) ListSchemas(_ context.Context) []SchemaListEntry {
-	r.mutext.Lock()
-	defer r.mutext.Unlock()
+func (r *InMemorySchemaRepository) ListSchemas(_ context.Context) ([]SchemaListEntry, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
 	var entries []SchemaListEntry
 	for id, entry := range r.schemas {
@@ -121,14 +96,14 @@ func (r *InMemorySchemaRepository) ListSchemas(_ context.Context) []SchemaListEn
 			UpdatedAt: entry.updatedAt,
 		})
 	}
-	return entries
+	return entries, nil
 }
 
 func (r *InMemorySchemaRepository) DeleteSchema(_ context.Context, schemaID ID) error {
-	r.mutext.Lock()
-	defer r.mutext.Unlock()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
-	var resErr = io.EOF
+	var resErr = ErrSchemaNotFound
 	_, found := r.schemas[schemaID]
 	if found {
 		resErr = nil
@@ -137,50 +112,53 @@ func (r *InMemorySchemaRepository) DeleteSchema(_ context.Context, schemaID ID) 
 	return resErr
 }
 
+type inMemValidations struct {
+	routes []RouteValidationDefinition
+}
+
 type InMemoryValidationRepository struct {
 	mutex   sync.Mutex
-	mapping map[integrations.ID]*ValidationDefinition
+	mapping map[integrations.ID]*inMemValidations
 }
 
 func NewInMemoryValidationRepository() *InMemoryValidationRepository {
 	return &InMemoryValidationRepository{
-		mapping: make(map[integrations.ID]*ValidationDefinition),
+		mapping: make(map[integrations.ID]*inMemValidations),
 	}
 }
 
-func (r *InMemoryValidationRepository) GetConfig(_ context.Context, id integrations.ID) *ValidationDefinition {
+func (r *InMemoryValidationRepository) GetValidations(_ context.Context, id integrations.ID) ([]RouteValidationDefinition, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	var result *ValidationDefinition
+	var result []RouteValidationDefinition
 	definitions, found := r.mapping[id]
 	if found {
-		result = definitions
+		result = definitions.routes
 	}
-	return result
+	return result, nil
 }
 
-func (r *InMemoryValidationRepository) SetForRoute(_ context.Context, id integrations.ID, route http.Route, schemaDef RouteSchemaDefinition) (http.RouteKey, error) {
+func (r *InMemoryValidationRepository) SetForRoute(_ context.Context, id integrations.ID, routeKey http.RouteKey, route http.Route, schemaDef RouteValidators) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	byIntegration, found := r.mapping[id]
 	if !found {
-		byIntegration = &ValidationDefinition{}
+		byIntegration = &inMemValidations{}
 		r.mapping[id] = byIntegration
 	}
 
-	byIntegration.Routes = slices.DeleteFunc(byIntegration.Routes, func(def RouteValidationDefinition) bool {
+	byIntegration.routes = slices.DeleteFunc(byIntegration.routes, func(def RouteValidationDefinition) bool {
 		return def.Route == route
 	})
 
-	routeKey := route.GenerateKey(id.String())
-	byIntegration.Routes = append(byIntegration.Routes, RouteValidationDefinition{
-		Route:     route,
-		RouteKey:  routeKey,
-		SchemaDef: schemaDef,
+	byIntegration.routes = append(byIntegration.routes, RouteValidationDefinition{
+		Route:      route,
+		RouteKey:   routeKey,
+		Validators: schemaDef,
 	})
-	return routeKey, nil
+	return nil
 }
 
 func (r *InMemoryValidationRepository) DeleteRouteByKey(_ context.Context, id integrations.ID, key http.RouteKey) error {
@@ -189,7 +167,7 @@ func (r *InMemoryValidationRepository) DeleteRouteByKey(_ context.Context, id in
 
 	byIntegration, found := r.mapping[id]
 	if found {
-		byIntegration.Routes = slices.DeleteFunc(byIntegration.Routes, func(def RouteValidationDefinition) bool {
+		byIntegration.routes = slices.DeleteFunc(byIntegration.routes, func(def RouteValidationDefinition) bool {
 			return def.Route.GenerateKey(id.String()) == key
 		})
 	}

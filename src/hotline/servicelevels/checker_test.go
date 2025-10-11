@@ -21,7 +21,7 @@ var _ = Describe("Service Levels Checker", func() {
 	})
 
 	It("if no service levels defined, no checks are done", func() {
-		s.forRouteSetupWithDefault(servicelevels.HttpRouteServiceLevels{
+		s.forRouteSetupWithDefault(servicelevels.RouteModification{
 			Route: http.Route{
 				Method:      "GET",
 				Host:        "iam.example.com",
@@ -57,7 +57,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "RKOYeGEFTT-BM",
+				"http_route": "RKumkv7ml0-xQ",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -71,7 +71,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "RKOYeGEFTT-BM",
+				"http_route": "RKumkv7ml0-xQ",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -86,7 +86,7 @@ var _ = Describe("Service Levels Checker", func() {
 	})
 
 	It("check route service levels when route defined", func() {
-		s.forRouteSetupWithDefault(defaultRouteDefinition("iam.example.com", "/users"))
+		s.forRouteSetupWithDefault(defaultRouteModificationForMethod("", "iam.example.com", "/users"))
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
@@ -104,7 +104,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "RKyx_d19M6zrA",
+				"http_route": "RKjhq92VEGBI4",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -118,7 +118,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "RKyx_d19M6zrA",
+				"http_route": "RKjhq92VEGBI4",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -133,7 +133,7 @@ var _ = Describe("Service Levels Checker", func() {
 	})
 
 	It("breaks unexpected states by ranges", func() {
-		s.forRouteSetupWithDefault(defaultRouteDefinition("iam.example.com", "/users"))
+		s.forRouteSetupWithDefault(defaultRouteModificationForMethod("", "iam.example.com", "/users"))
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "404",
@@ -157,7 +157,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 2,
 			},
 			Tags: map[string]string{
-				"http_route": "RKyx_d19M6zrA",
+				"http_route": "RKjhq92VEGBI4",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -183,7 +183,7 @@ var _ = Describe("Service Levels Checker", func() {
 	})
 
 	It("breaks unknown unexpected state", func() {
-		s.forRouteSetupWithDefault(defaultRouteDefinition("iam.example.com", "/users"))
+		s.forRouteSetupWithDefault(defaultRouteModificationForMethod("", "iam.example.com", "/users"))
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "unknown_state",
@@ -201,7 +201,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "RKyx_d19M6zrA",
+				"http_route": "RKjhq92VEGBI4",
 			},
 			Breakdown: []servicelevels.Metric{
 				{
@@ -221,7 +221,7 @@ var _ = Describe("Service Levels Checker", func() {
 	})
 
 	It("creates pattern per http method", func() {
-		s.forRouteSetupWithDefault(defaultRouteDefinitionForMethod("POST", "iam.example.com", "/users"))
+		s.forRouteSetupWithDefault(defaultRouteModificationForMethod("POST", "iam.example.com", "/users"))
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
@@ -240,7 +240,7 @@ var _ = Describe("Service Levels Checker", func() {
 				EventsCount: 1,
 			},
 			Tags: map[string]string{
-				"http_route": "RKlBHXZb1EEqk",
+				"http_route": "RKROuLp_UwI5A",
 			},
 			Breakdown: nil,
 			Breach:    nil,
@@ -248,15 +248,15 @@ var _ = Describe("Service Levels Checker", func() {
 	})
 
 	It("will override default route definition", func() {
-		def := defaultRouteDefinition("iam.example.com", "/users")
+		def := defaultRouteModification("iam.example.com", "/users")
 		def.Latency.WindowDuration = 1 * time.Minute
 
-		sloDef := servicelevels.HttpApiServiceLevels{}
+		sloDef := servicelevels.ApiServiceLevels{}
 
 		sloDef.Upsert(def)
 		Expect(sloDef.Routes[0].Latency.WindowDuration).To(Equal(1 * time.Minute))
 
-		defNext := defaultRouteDefinition("iam.example.com", "/users")
+		defNext := defaultRouteModification("iam.example.com", "/users")
 		defNext.Latency.WindowDuration = 10 * time.Minute
 		sloDef.Upsert(defNext)
 
@@ -266,19 +266,19 @@ var _ = Describe("Service Levels Checker", func() {
 	})
 
 	It("will delete default route definition", func() {
-		def := defaultRouteDefinition("iam.example.com", "/users")
-		sloDef := servicelevels.HttpApiServiceLevels{}
+		def := defaultRouteModification("iam.example.com", "/users")
+		sloDef := servicelevels.ApiServiceLevels{}
 		sloDef.Upsert(def)
 		Expect(sloDef.Routes).To(HaveLen(1))
 
-		sloDef.DeleteRouteByKey("RKyx_d19M6zrA")
+		sloDef.DeleteRouteByKey("RKjhq92VEGBI4")
 
 		Expect(sloDef.Routes).To(BeEmpty())
 	})
 
 	It("will not delete for unknown key", func() {
-		def := defaultRouteDefinition("iam.example.com", "/users")
-		sloDef := servicelevels.HttpApiServiceLevels{}
+		def := defaultRouteModification("iam.example.com", "/users")
+		sloDef := servicelevels.ApiServiceLevels{}
 		sloDef.Upsert(def)
 		Expect(sloDef.Routes).To(HaveLen(1))
 		sloDef.DeleteRouteByKey(":uknown::")
@@ -300,30 +300,34 @@ func (s *suthttpapislo) AddRequest(request *servicelevels.HttpRequest) {
 	s.slo.AddRequest(now, request)
 }
 
-func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.HttpRouteServiceLevels) {
-	definition := servicelevels.HttpApiServiceLevels{}
+func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.RouteModification) {
+	definition := servicelevels.ApiServiceLevels{}
 
 	for _, route := range routes {
-		definition.Upsert(route)
+		definition.Upsert(servicelevels.RouteServiceLevels{
+			Route:   route.Route,
+			Key:     route.Route.GenerateKey("integration-id"),
+			Latency: route.Latency,
+			Status:  route.Status,
+		})
 	}
 
 	s.slo = servicelevels.NewHttpApiServiceLevels(definition)
 }
 
-func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.HttpRouteServiceLevels) {
-	routes = append(routes, defaultRouteDefinition("", "/"))
+func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.RouteModification) {
+	routes = append(routes, defaultRouteModificationForMethod("", "", "/"))
 	s.forRouteSetup(routes...)
 }
 
-func defaultRouteDefinitionForMethod(method string, host string, pathPattern string) servicelevels.HttpRouteServiceLevels {
+func defaultRouteModificationForMethod(method string, host string, pathPattern string) servicelevels.RouteModification {
 	route := http.Route{
 		Method:      method,
 		PathPattern: pathPattern,
 		Host:        host,
 	}
-	return servicelevels.HttpRouteServiceLevels{
+	return servicelevels.RouteModification{
 		Route: route,
-		Key:   route.GenerateKey("some salt"),
 		Latency: &servicelevels.HttpLatencyServiceLevels{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{
@@ -342,8 +346,14 @@ func defaultRouteDefinitionForMethod(method string, host string, pathPattern str
 	}
 }
 
-func defaultRouteDefinition(host string, path string) servicelevels.HttpRouteServiceLevels {
-	return defaultRouteDefinitionForMethod("", host, path)
+func defaultRouteModification(host string, path string) servicelevels.RouteServiceLevels {
+	modification := defaultRouteModificationForMethod("", host, path)
+	return servicelevels.RouteServiceLevels{
+		Route:   modification.Route,
+		Key:     modification.Route.GenerateKey("integration-id"),
+		Latency: modification.Latency,
+		Status:  modification.Status,
+	}
 }
 
 func newUrl(urlString string) *url.URL {

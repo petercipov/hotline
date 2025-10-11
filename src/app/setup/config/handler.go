@@ -1,11 +1,9 @@
 package config
 
 import (
-	"app/setup/repository"
 	"context"
 	"encoding/json"
 	"errors"
-	"hotline/clock"
 	hotlinehttp "hotline/http"
 	"hotline/integrations"
 	"hotline/schemas"
@@ -18,27 +16,20 @@ import (
 type valueIntegrationID struct{}
 
 type HttpHandler struct {
-	serviceLevelsRepo repository.ServiceLevelsRepository
-	schemasRepo       repository.SchemaRepository
-	validationsRepo   repository.ValidationRepository
-	nowFunc           clock.NowFunc
-
-	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route)
+	serviceLevelsUseCases *servicelevels.UseCase
+	schemasUseCases       *schemas.SchemaUseCase
+	validationUseCases    *schemas.ValidationUseCase
 }
 
 func NewHttpHandler(
-	serviceLevelsRepo repository.ServiceLevelsRepository,
-	schemasRepo repository.SchemaRepository,
-	validationsRepo repository.ValidationRepository,
-	nowFunc clock.NowFunc,
-	routeUpserted func(integrationID integrations.ID, route hotlinehttp.Route),
+	serviceLevelsUseCases *servicelevels.UseCase,
+	schemasUseCases *schemas.SchemaUseCase,
+	validationUseCases *schemas.ValidationUseCase,
 ) *HttpHandler {
 	return &HttpHandler{
-		serviceLevelsRepo: serviceLevelsRepo,
-		schemasRepo:       schemasRepo,
-		validationsRepo:   validationsRepo,
-		nowFunc:           nowFunc,
-		routeUpserted:     routeUpserted,
+		serviceLevelsUseCases: serviceLevelsUseCases,
+		schemasUseCases:       schemasUseCases,
+		validationUseCases:    validationUseCases,
 	}
 }
 
@@ -51,28 +42,31 @@ func (h *HttpHandler) ListRequestValidations(writer http.ResponseWriter, req *ht
 		return
 	}
 
-	config := h.validationsRepo.GetConfig(ctx, integrationID)
-	if config != nil {
-		for _, r := range config.Routes {
-			routeValidation := RouteRequestValidation{
-				RequestSchema:  nil,
-				ResponseSchema: nil,
-				Route:          convertRoute(r.Route),
-				RouteKey:       r.RouteKey.String(),
-			}
-			if r.SchemaDef.Request != nil {
-				routeValidation.RequestSchema = &RequestValidationSchema{
-					BodySchemaID:   optSchemaID(r.SchemaDef.Request.BodySchemaID),
-					HeaderSchemaID: optSchemaID(r.SchemaDef.Request.HeaderSchemaID),
-					QuerySchemaID:  optSchemaID(r.SchemaDef.Request.QuerySchemaID),
-				}
-			}
-			list.RouteValidations = append(list.RouteValidations, routeValidation)
+	validations, getErr := h.validationUseCases.GetValidations(ctx, integrationID)
+	if getErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not list validations",
+		})
+	}
+	for _, r := range validations {
+		routeValidation := RouteRequestValidation{
+			RequestSchema:  nil,
+			ResponseSchema: nil,
+			Route:          convertRoute(r.Route),
+			RouteKey:       r.RouteKey.String(),
 		}
+		if r.Validators.Request != nil {
+			routeValidation.RequestSchema = &RequestValidationSchema{
+				BodySchemaID:   optSchemaID(r.Validators.Request.BodySchemaID),
+				HeaderSchemaID: optSchemaID(r.Validators.Request.HeaderSchemaID),
+				QuerySchemaID:  optSchemaID(r.Validators.Request.QuerySchemaID),
+			}
+		}
+		list.RouteValidations = append(list.RouteValidations, routeValidation)
 	}
 	writeResponse(ctx, writer, http.StatusOK, list)
 }
-
 func (h *HttpHandler) UpsertRequestValidations(writer http.ResponseWriter, req *http.Request, params UpsertRequestValidationsParams) {
 	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
 	if !validIntegrationId {
@@ -93,18 +87,17 @@ func (h *HttpHandler) UpsertRequestValidations(writer http.ResponseWriter, req *
 	}
 
 	route := parseRoute(v.Route)
-	route = route.Normalize()
-	schemaDef := schemas.RouteSchemaDefinition{}
+	routeValidators := schemas.RouteValidators{}
 
 	if v.RequestSchema != nil {
-		schemaDef.Request = &schemas.RequestSchemaDefinition{
+		routeValidators.Request = &schemas.RequestValidators{
 			HeaderSchemaID: parseSchemaID(v.RequestSchema.HeaderSchemaID),
 			QuerySchemaID:  parseSchemaID(v.RequestSchema.QuerySchemaID),
 			BodySchemaID:   parseSchemaID(v.RequestSchema.BodySchemaID),
 		}
 	}
 
-	routeKey, setErr := h.validationsRepo.SetForRoute(ctx, integrationID, route, schemaDef)
+	routeKey, setErr := h.validationUseCases.UpsertValidation(ctx, integrationID, route, routeValidators)
 	if setErr != nil {
 		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
 			Code:    "internal_error",
@@ -117,7 +110,6 @@ func (h *HttpHandler) UpsertRequestValidations(writer http.ResponseWriter, req *
 		RouteKey: routeKey.String(),
 	})
 }
-
 func (h *HttpHandler) DeleteRequestValidation(writer http.ResponseWriter, req *http.Request, routekey RouteKey, params DeleteRequestValidationParams) {
 	ctx, validIntegrationId, integrationID := requireIntegrationId(req.Context(), params.XIntegrationId, writer)
 	if !validIntegrationId {
@@ -127,7 +119,7 @@ func (h *HttpHandler) DeleteRequestValidation(writer http.ResponseWriter, req *h
 		_ = req.Body.Close()
 	}()
 
-	deleteErr := h.validationsRepo.DeleteRouteByKey(ctx, integrationID, hotlinehttp.RouteKey(routekey))
+	deleteErr := h.validationUseCases.DeleteValidation(ctx, integrationID, hotlinehttp.RouteKey(routekey))
 	if deleteErr != nil {
 		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
 			Code:    "internal_error",
@@ -140,12 +132,22 @@ func (h *HttpHandler) DeleteRequestValidation(writer http.ResponseWriter, req *h
 
 func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+	defer func() {
+		_ = req.Body.Close()
+	}()
 
 	var list = ListRequestSchemas{
 		Schemas: []SchemaListEntry{},
 	}
 
-	schemaList := h.schemasRepo.ListSchemas(ctx)
+	schemaList, listErr := h.schemasUseCases.ListSchemas(ctx)
+	if listErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not list schemas",
+		})
+		return
+	}
 
 	for _, schema := range schemaList {
 		list.Schemas = append(list.Schemas, SchemaListEntry{
@@ -154,7 +156,6 @@ func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.R
 			UpdatedAt: schema.UpdatedAt,
 		})
 	}
-
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 	encodeErr := json.NewEncoder(writer).Encode(list)
@@ -163,16 +164,7 @@ func (h *HttpHandler) ListRequestSchemas(writer http.ResponseWriter, req *http.R
 	}
 }
 func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.Request, params CreateRequestSchemaParams) {
-	now := h.nowFunc()
 	ctx := req.Context()
-	schemaID, generateErr := h.schemasRepo.GenerateID(now)
-	if generateErr != nil {
-		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
-			Code:    "internal_error",
-			Message: "Schema ID could not be created",
-		})
-		return
-	}
 	defer func() {
 		_ = req.Body.Close()
 	}()
@@ -185,7 +177,7 @@ func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.
 		return
 	}
 
-	setErr := h.schemasRepo.SetSchema(ctx, schemaID, string(content), now, optString(params.Title, ""))
+	entry, setErr := h.schemasUseCases.CreateSchema(ctx, string(content), optString(params.Title, ""))
 	if setErr != nil {
 		var validationErr *schemas.ValidationError
 		isValidationErr := errors.As(setErr, &validationErr)
@@ -204,8 +196,8 @@ func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.
 	}
 
 	response := RequestSchemaCreated{
-		SchemaID:  ptrString(schemaID.String()),
-		UpdatedAt: &now,
+		SchemaID:  entry.ID.String(),
+		UpdatedAt: entry.UpdatedAt,
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
@@ -216,9 +208,9 @@ func (h *HttpHandler) CreateRequestSchema(writer http.ResponseWriter, req *http.
 }
 func (h *HttpHandler) DeleteRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
 	ctx := req.Context()
-	setErr := h.schemasRepo.DeleteSchema(ctx, schemas.ID(schemaID))
+	setErr := h.schemasUseCases.DeleteSchema(ctx, schemas.ID(schemaID))
 	if setErr != nil {
-		if errors.Is(setErr, io.EOF) {
+		if errors.Is(setErr, schemas.ErrSchemaNotFound) {
 			writeResponse(ctx, writer, http.StatusNotFound, Error{
 				Code:    "not_found",
 				Message: "schema not found",
@@ -235,9 +227,9 @@ func (h *HttpHandler) DeleteRequestSchema(writer http.ResponseWriter, req *http.
 }
 func (h *HttpHandler) GetRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID) {
 	ctx := req.Context()
-	schemaEntry, getErr := h.schemasRepo.GetSchemaByID(ctx, schemas.ID(schemaID))
+	schemaEntry, getErr := h.schemasUseCases.GetSchema(ctx, schemas.ID(schemaID))
 	if getErr != nil {
-		if errors.Is(getErr, io.EOF) {
+		if errors.Is(getErr, schemas.ErrSchemaNotFound) {
 			writeResponse(ctx, writer, http.StatusNotFound, Error{
 				Code:    "not_found",
 				Message: "schema not found",
@@ -259,8 +251,10 @@ func (h *HttpHandler) GetRequestSchema(writer http.ResponseWriter, req *http.Req
 	}
 }
 func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Request, schemaID SchemaID, params PutRequestSchemaParams) {
-	now := h.nowFunc()
 	ctx := req.Context()
+	defer func() {
+		_ = req.Body.Close()
+	}()
 	content, readErr := io.ReadAll(req.Body)
 	if readErr != nil {
 		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
@@ -270,29 +264,27 @@ func (h *HttpHandler) PutRequestSchema(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
-	entry, getErr := h.schemasRepo.GetSchemaByID(req.Context(), schemas.ID(schemaID))
-	if getErr != nil {
-		writeResponse(ctx, writer, http.StatusNotFound, Error{
-			Code:    "not_found",
-			Message: "Request Schema not found",
-		})
-		return
-	}
-
-	setErr := h.schemasRepo.SetSchema(ctx, entry.ID, string(content), now, optString(params.Title, ""))
-	if setErr != nil {
+	modifyErr := h.schemasUseCases.ModifySchema(ctx, schemas.ID(schemaID), string(content), optString(params.Title, ""))
+	if modifyErr != nil {
 		var validationErr *schemas.ValidationError
-		isValidationErr := errors.As(setErr, &validationErr)
+		isValidationErr := errors.As(modifyErr, &validationErr)
 		if isValidationErr {
 			writeResponse(ctx, writer, http.StatusBadRequest, Error{
 				Code:    "bad_request",
 				Message: validationErr.Error(),
 			})
 		} else {
-			writeResponse(ctx, writer, http.StatusInternalServerError, Error{
-				Code:    "internal_error",
-				Message: "Could not store schema",
-			})
+			if errors.Is(modifyErr, schemas.ErrSchemaNotFound) {
+				writeResponse(ctx, writer, http.StatusNotFound, Error{
+					Code:    "not_found",
+					Message: "Request Schema not found",
+				})
+			} else {
+				writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+					Code:    "internal_error",
+					Message: "Could not store schema",
+				})
+			}
 		}
 		return
 	}
@@ -305,16 +297,19 @@ func (h *HttpHandler) ListServiceLevels(writer http.ResponseWriter, req *http.Re
 	if !validIntegrationId {
 		return
 	}
+	defer func() {
+		_ = req.Body.Close()
+	}()
 
-	config := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
-	if config == nil {
-		writeResponse(ctx, writer, http.StatusNotFound, Error{
-			Code:    "not_found",
-			Message: "SLO config not found",
-		})
-		return
+	config, getErr := h.serviceLevelsUseCases.GetServiceLevels(ctx, integrationID)
+	if getErr != nil {
+		if !errors.Is(getErr, servicelevels.ErrServiceLevelsNotFound) {
+			writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+				Code:    "internal_error",
+				Message: "Could not list service levels",
+			})
+		}
 	}
-
 	resp := ServiceLevelsList{
 		Routes: convertRoutes(config.Routes),
 	}
@@ -326,10 +321,10 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 	if !validIntegrationId {
 		return
 	}
-
 	defer func() {
 		_ = req.Body.Close()
 	}()
+
 	buf, _ := io.ReadAll(req.Body)
 	var request UpsertServiceLevelsRequest
 	unmarshalErr := json.Unmarshal(buf, &request)
@@ -351,18 +346,16 @@ func (h *HttpHandler) UpsertServiceLevels(writer http.ResponseWriter, req *http.
 		})
 	}
 
-	definition := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
-	if definition == nil {
-		definition = &servicelevels.HttpApiServiceLevels{}
+	routeKey, modifyErr := h.serviceLevelsUseCases.ModifyRoute(ctx, integrationID, routeDefinition)
+	if modifyErr != nil {
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not modify service levels",
+		})
+		return
 	}
-
-	definition.Upsert(routeDefinition)
-
-	h.serviceLevelsRepo.SetConfig(ctx, integrationID, definition)
-	h.routeUpserted(integrationID, routeDefinition.Route)
-	key := routeDefinition.Route.GenerateKey(integrationID.String())
 	writeResponse(ctx, writer, http.StatusOK, UpsertedServiceLevelsResponse{
-		RouteKey: ptrString(key.String()),
+		RouteKey: routeKey.String(),
 	})
 }
 func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.Request, key RouteKey, params DeleteServiceLevelsParams) {
@@ -370,23 +363,32 @@ func (h *HttpHandler) DeleteServiceLevels(writer http.ResponseWriter, req *http.
 	if !validIntegrationId {
 		return
 	}
+	defer func() {
+		_ = req.Body.Close()
+	}()
 
-	config := h.serviceLevelsRepo.GetConfig(ctx, integrationID)
-	if config == nil {
-		writeResponse(ctx, writer, http.StatusNotFound, Error{
-			Code:    "not_found",
-			Message: "SLO config not found",
+	deleteErr := h.serviceLevelsUseCases.DeleteRoute(ctx, integrationID, hotlinehttp.RouteKey(key))
+	if deleteErr != nil {
+		if errors.Is(deleteErr, servicelevels.ErrServiceLevelsNotFound) {
+			writeResponse(ctx, writer, http.StatusNotFound, Error{
+				Code:    "not_found",
+				Message: "Service Levels not found",
+			})
+			return
+		}
+		if errors.Is(deleteErr, servicelevels.ErrRouteNotFound) {
+			writeResponse(ctx, writer, http.StatusNotFound, Error{
+				Code:    "not_found",
+				Message: "Route not found",
+			})
+			return
+		}
+		writeResponse(ctx, writer, http.StatusInternalServerError, Error{
+			Code:    "internal_error",
+			Message: "Could not delete service levels",
 		})
 		return
 	}
-
-	route, deleted := config.DeleteRouteByKey(hotlinehttp.RouteKey(key))
-	h.serviceLevelsRepo.SetConfig(ctx, integrationID, config)
-
-	if deleted {
-		h.routeUpserted(integrationID, route)
-	}
-
 	writeResponse(ctx, writer, http.StatusNoContent, nil)
 }
 

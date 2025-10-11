@@ -20,11 +20,11 @@ type Checker struct {
 	mux *hotlinehttp.Mux[HttpRouteSLO]
 }
 
-type HttpApiServiceLevels struct {
-	Routes []HttpRouteServiceLevels
+type ApiServiceLevels struct {
+	Routes []RouteServiceLevels
 }
 
-func (d *HttpApiServiceLevels) Upsert(definition HttpRouteServiceLevels) {
+func (d *ApiServiceLevels) Upsert(definition RouteServiceLevels) {
 	for i, route := range d.Routes {
 		if route.Route == definition.Route {
 			d.Routes[i] = definition
@@ -34,7 +34,7 @@ func (d *HttpApiServiceLevels) Upsert(definition HttpRouteServiceLevels) {
 	d.Routes = append(d.Routes, definition)
 }
 
-func (d *HttpApiServiceLevels) DeleteRouteByKey(key hotlinehttp.RouteKey) (hotlinehttp.Route, bool) {
+func (d *ApiServiceLevels) DeleteRouteByKey(key hotlinehttp.RouteKey) (hotlinehttp.Route, bool) {
 	for i, route := range d.Routes {
 		if route.Key == key {
 			d.Routes = append(d.Routes[:i], d.Routes[i+1:]...)
@@ -44,12 +44,13 @@ func (d *HttpApiServiceLevels) DeleteRouteByKey(key hotlinehttp.RouteKey) (hotli
 	return hotlinehttp.Route{}, false
 }
 
-type HttpRouteServiceLevels struct {
+type RouteServiceLevels struct {
 	Route   hotlinehttp.Route
 	Key     hotlinehttp.RouteKey
 	Latency *HttpLatencyServiceLevels
 	Status  *HttpStatusServiceLevels
 }
+
 type HttpLatencyServiceLevels struct {
 	Percentiles    []PercentileDefinition
 	WindowDuration time.Duration
@@ -61,7 +62,7 @@ type HttpStatusServiceLevels struct {
 	WindowDuration  time.Duration
 }
 
-func NewHttpApiServiceLevels(definition HttpApiServiceLevels) *Checker {
+func NewHttpApiServiceLevels(definition ApiServiceLevels) *Checker {
 	apiSlo := &Checker{
 		mux: &hotlinehttp.Mux[HttpRouteSLO]{},
 	}
@@ -95,7 +96,7 @@ func (s *Checker) Check(now time.Time) []SLOCheck {
 	return checks
 }
 
-func (s *Checker) UpsertRoute(routeDefinition HttpRouteServiceLevels) {
+func (s *Checker) UpsertRoute(routeDefinition RouteServiceLevels) {
 	slo := NewHttpPathSLO(routeDefinition)
 	s.mux.Upsert(slo.route, slo)
 }
@@ -110,7 +111,7 @@ type HttpRouteSLO struct {
 	latencySLO *LatencySLO
 }
 
-func NewHttpPathSLO(slo HttpRouteServiceLevels) *HttpRouteSLO {
+func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
 	tags := map[string]string{
 		"http_route": slo.Key.String(),
 	}

@@ -2,18 +2,16 @@ package setup
 
 import (
 	"app/setup/config"
-	"app/setup/repository"
-	"crypto/rand"
 	"hotline/clock"
 	"hotline/concurrency"
-	hotlinehttp "hotline/http"
 	"hotline/ingestions"
 	"hotline/ingestions/egress"
 	"hotline/ingestions/otel"
-	"hotline/integrations"
 	"hotline/reporters"
+	"hotline/schemas"
 	"hotline/servicelevels"
 	"hotline/uuid"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -55,12 +53,14 @@ type App struct {
 
 func NewApp(
 	cfg *Config,
+	randReader io.Reader,
 	managedTime clock.ManagedTime,
 	createServer CreateServer,
-	serviceLevelsRepository repository.ServiceLevelsRepository,
-	schemaRepository repository.SchemaRepository,
-	validationRepository repository.ValidationRepository,
+	serviceLevelsRepository servicelevels.Repository,
+	schemaRepository schemas.SchemaRepository,
+	validationRepository schemas.ValidationRepository,
 ) (*App, error) {
+	uuidGenerator := uuid.NewV7(randReader)
 	otelReporterScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("otel-reporter", 8),
 		reporters.NewEmptyOtelReporterScope)
@@ -76,13 +76,21 @@ func NewApp(
 	}
 	reporter := reporters.NewScopedOtelReporter(otelReporterScopes, managedTime.Sleep, reporterCfg, 100)
 
+	eventsHandler := &servicelevels.EventsHandler{}
+	serviceLevelsUseCase := servicelevels.NewUseCase(
+		serviceLevelsRepository,
+		managedTime.Now,
+		eventsHandler,
+	)
+
 	sloPipelineScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("slo-scope", 8),
 		func() *servicelevels.SLOScope {
-			return servicelevels.NewEmptyIntegrationsScope(serviceLevelsRepository, reporter)
+			return servicelevels.NewEmptyIntegrationsScope(serviceLevelsUseCase, reporter)
 		},
 	)
 	sloPipeline := servicelevels.NewPipeline(sloPipelineScopes)
+	eventsHandler.Pipeline = sloPipeline
 
 	converter := otel.NewProtoConverter()
 	otelHandler := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
@@ -93,13 +101,9 @@ func NewApp(
 	}, converter)
 
 	otelIngestionServer := createServer(cfg.OtelHttpIngestion.Host, otelHandler)
-
-	egressTransport := &http.Transport{}
-	uuidGenerator := uuid.NewV7(rand.Reader)
-
 	defaultSemantics := egress.DefaultRequestSemantics()
 	egressHandler := egress.New(
-		egressTransport,
+		&http.Transport{},
 		func(req *ingestions.HttpRequest) {
 			sloRequest := ingestions.ToSLOSingleRequestMessage(req, managedTime.Now())
 			sloPipeline.IngestHttpRequest(sloRequest)
@@ -110,19 +114,14 @@ func NewApp(
 		&defaultSemantics,
 	)
 
+	schemasUseCases := schemas.NewSchemaUseCase(schemaRepository, managedTime.Now, uuidGenerator)
+	validationUseCase := schemas.NewValidationUseCase(validationRepository, schemaRepository)
+
 	egressIngestionServer := createServer(cfg.EgressHttpIngestion.Host, egressHandler)
 	cfgAPIHandler := config.HandlerWithOptions(config.NewHttpHandler(
-		serviceLevelsRepository,
-		schemaRepository,
-		validationRepository,
-		managedTime.Now,
-		func(integrationID integrations.ID, route hotlinehttp.Route) {
-			sloPipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
-				ID:    integrationID,
-				Now:   managedTime.Now(),
-				Route: route,
-			})
-		},
+		serviceLevelsUseCase,
+		schemasUseCases,
+		validationUseCase,
 	), config.StdHTTPServerOptions{})
 	cfgAPIServer := createServer(cfg.ConfigAPI.Host, cfgAPIHandler)
 
@@ -132,6 +131,7 @@ func NewApp(
 		managedTime:           managedTime,
 		otelIngestion:         otelHandler,
 		otelReporter:          reporter,
+		stopTick:              nil,
 		otelIngestionServer:   otelIngestionServer,
 		egressIngestionServer: egressIngestionServer,
 		cfgAPIServer:          cfgAPIServer,
@@ -159,10 +159,6 @@ func (a *App) Start() {
 	slog.Info("Started Config API server", slog.String("config-api-url", a.cfgAPIServer.Host()))
 }
 
-func (a *App) GetOTELIngestionUrl() string {
-	return "http://" + a.otelIngestionServer.Host()
-}
-
 func (a *App) Stop() error {
 	if a == nil {
 		return nil
@@ -177,6 +173,10 @@ func (a *App) Stop() error {
 	}
 
 	return nil
+}
+
+func (a *App) GetOTELIngestionUrl() string {
+	return "http://" + a.otelIngestionServer.Host()
 }
 
 func (a *App) GetEgressIngestionUrl() string {

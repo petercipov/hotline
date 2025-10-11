@@ -6,15 +6,16 @@ import (
 	hotlinehttp "hotline/http"
 	"hotline/integrations"
 	"io"
+	"strings"
 	"time"
 )
 
 type SchemaReader interface {
-	GetSchemaContent(ctx context.Context, schema ID) io.ReadCloser
+	GetSchema(ctx context.Context, id ID) (SchemaEntry, error)
 }
 
 type ValidationReader interface {
-	GetConfig(ctx context.Context, id integrations.ID) *ValidationDefinition
+	GetValidations(ctx context.Context, id integrations.ID) ([]RouteValidationDefinition, error)
 }
 
 type ValidationReporter interface {
@@ -52,19 +53,19 @@ func (scope *ValidatorScope) AdvanceTime(now time.Time) {
 func (scope *ValidatorScope) ensureValidation(ctx context.Context, id integrations.ID) *IntegrationValidation {
 	currentValidator, found := scope.validators[id]
 	if !found {
-		cfg := scope.validationReader.GetConfig(ctx, id)
-		if cfg != nil {
-			currentValidator = scope.buildRouteValidator(ctx, *cfg)
+		validations, getErr := scope.validationReader.GetValidations(ctx, id)
+		if getErr == nil {
+			currentValidator = scope.buildRouteValidator(ctx, validations)
 			scope.validators[id] = currentValidator
 		}
 	}
 	return currentValidator
 }
 
-func (scope *ValidatorScope) buildRouteValidator(ctx context.Context, cfg ValidationDefinition) *IntegrationValidation {
+func (scope *ValidatorScope) buildRouteValidator(ctx context.Context, routes []RouteValidationDefinition) *IntegrationValidation {
 	mux := &hotlinehttp.Mux[RouteValidator]{}
-	for _, routeDef := range cfg.Routes {
-		validator := scope.buildValidator(ctx, routeDef.SchemaDef)
+	for _, routeDef := range routes {
+		validator := scope.buildValidator(ctx, routeDef.Validators)
 		if validator != nil {
 			mux.Upsert(routeDef.Route, &RouteValidator{
 				validator: validator,
@@ -76,7 +77,7 @@ func (scope *ValidatorScope) buildRouteValidator(ctx context.Context, cfg Valida
 	}
 }
 
-func (scope *ValidatorScope) buildValidator(ctx context.Context, def RouteSchemaDefinition) *Validator {
+func (scope *ValidatorScope) buildValidator(ctx context.Context, def RouteValidators) *Validator {
 	var requestSchema RequestSchema
 	if def.Request != nil {
 		requestSchema.RequestHeaders = scope.getSchemaDefinition(ctx, def.Request.HeaderSchemaID)
@@ -90,14 +91,11 @@ func (scope *ValidatorScope) buildValidator(ctx context.Context, def RouteSchema
 
 func (scope *ValidatorScope) getSchemaDefinition(ctx context.Context, id *ID) *SchemaDefinition {
 	if id != nil {
-		content := scope.schemaReader.GetSchemaContent(ctx, *id)
-		if content != nil {
-			defer func() {
-				_ = content.Close()
-			}()
+		entry, getErr := scope.schemaReader.GetSchema(ctx, *id)
+		if getErr == nil {
 			return &SchemaDefinition{
 				ID:      *id,
-				Content: content,
+				Content: strings.NewReader(entry.Content),
 			}
 		}
 	}

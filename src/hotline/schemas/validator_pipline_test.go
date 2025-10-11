@@ -103,54 +103,64 @@ var _ = Describe("Request Validator", func() {
 })
 
 type validationPipelineSut struct {
-	pipeline       *schemas.ValidatorPipeline
-	schemaRepo     *schemas.InMemorySchemaRepository
-	validationRepo *schemas.InMemoryValidationRepository
-	reporter       *schemas.InMemoryValidationReporter
+	pipeline          *schemas.ValidatorPipeline
+	schemaRepo        *schemas.InMemorySchemaRepository
+	schemaUseCase     *schemas.SchemaUseCase
+	validationRepo    *schemas.InMemoryValidationRepository
+	validationUseCase *schemas.ValidationUseCase
+	reporter          *schemas.InMemoryValidationReporter
 }
 
 func (s *validationPipelineSut) Close() {
-	schemaList := s.schemaRepo.ListSchemas(context.Background())
+	schemaList, listErr := s.schemaUseCase.ListSchemas(context.Background())
+	Expect(listErr).NotTo(HaveOccurred())
 	for _, schema := range schemaList {
-		deleteErr := s.schemaRepo.DeleteSchema(context.Background(), schema.ID)
+		deleteErr := s.schemaUseCase.DeleteSchema(context.Background(), schema.ID)
 		Expect(deleteErr).NotTo(HaveOccurred())
 	}
 
-	validationsList := s.validationRepo.GetConfig(
+	validationsList, listErr := s.validationRepo.GetValidations(
 		context.Background(), "integration-id")
-	if validationsList != nil {
-		for _, route := range validationsList.Routes {
-			deleteErr := s.validationRepo.DeleteRouteByKey(context.Background(), "integration-id", route.RouteKey)
-			Expect(deleteErr).NotTo(HaveOccurred())
-		}
+	Expect(listErr).NotTo(HaveOccurred())
+	for _, route := range validationsList {
+		deleteErr := s.validationRepo.DeleteRouteByKey(context.Background(), "integration-id", route.RouteKey)
+		Expect(deleteErr).NotTo(HaveOccurred())
 	}
 
 	s.pipeline = nil
+	s.schemaUseCase = nil
 	s.schemaRepo = nil
 	s.validationRepo = nil
+	s.validationUseCase = nil
 	s.reporter = nil
 }
 
 func (s *validationPipelineSut) forPipelineWithoutDefinition() {
-	s.schemaRepo = schemas.NewInMemorySchemaRepository(
+	manualTime := clock.NewManualClock(
+		clock.ParseTime("2025-02-22T12:02:10Z"),
+		500*time.Microsecond)
+	s.schemaRepo = schemas.NewInMemorySchemaRepository()
+	s.validationRepo = schemas.NewInMemoryValidationRepository()
+	s.validationUseCase = schemas.NewValidationUseCase(s.validationRepo, s.schemaRepo)
+	s.reporter = &schemas.InMemoryValidationReporter{}
+	s.schemaUseCase = schemas.NewSchemaUseCase(
+		s.schemaRepo,
+		manualTime.Now,
 		uuid.NewV7(&uuid.ConstantRandReader{}),
 	)
-	s.validationRepo = schemas.NewInMemoryValidationRepository()
-	s.reporter = &schemas.InMemoryValidationReporter{}
 
 	scopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("validators", 8),
 		func() *schemas.ValidatorScope {
 			return schemas.NewEmptyValidatorScope(
-				s.schemaRepo,
+				s.schemaUseCase,
 				s.validationRepo,
 				s.reporter,
 			)
 		},
 	)
 	s.pipeline = schemas.NewValidatorPipeline(scopes)
-
-	Expect(s.schemaRepo.ListSchemas(context.Background())).To(BeEmpty())
+	Expect(s.schemaUseCase.ListSchemas(context.Background())).To(BeEmpty())
 }
 
 func (s *validationPipelineSut) validateInvalidRequest() schemas.ValidationResult {
@@ -233,9 +243,7 @@ func (s *validationPipelineSut) validateRequest(message *schemas.ValidateRequest
 }
 
 func (s *validationPipelineSut) withHeaderSchemaValidation() {
-	headersSchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(0))
-	now := time.Now()
-	schemaErr := s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `{
+	schemaById, createErr := s.schemaUseCase.CreateSchema(context.Background(), `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -249,54 +257,50 @@ func (s *validationPipelineSut) withHeaderSchemaValidation() {
 			}
 		},
 		"required": ["User-Agent"]
-	}`, now, "header.schema.json")
-	Expect(schemaErr).NotTo(HaveOccurred())
+	}`, "header.schema.json")
 
-	schemaById, getErr := s.schemaRepo.GetSchemaByID(context.Background(), headersSchemaID)
-	Expect(getErr).NotTo(HaveOccurred())
-	Expect(schemaById.ID).To(Equal(headersSchemaID))
-	Expect(schemaById.UpdatedAt).To(Equal(now))
-	Expect(schemaById.Content).NotTo(BeEmpty())
-	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
+	Expect(createErr).NotTo(HaveOccurred())
+	Expect(schemaById.ID.String()).To(Equal("SCAZUtiVXQcQGBAQEBAQEBAQ"))
+	Expect(schemaById.Title).To(Equal("header.schema.json"))
+	Expect(schemaById.UpdatedAt.String()).To(Equal("2025-02-22 12:02:10 +0000 UTC"))
+	Expect(s.schemaUseCase.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
+	_, _ = s.validationUseCase.UpsertValidation(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
 			Host:        "example.com",
 			Port:        80,
 		},
-		schemas.RouteSchemaDefinition{
-			Request: &schemas.RequestSchemaDefinition{
-				HeaderSchemaID: &headersSchemaID,
+		schemas.RouteValidators{
+			Request: &schemas.RequestValidators{
+				HeaderSchemaID: &schemaById.ID,
 			},
 		})
 }
 
 func (s *validationPipelineSut) withInvalidHeaderSchemaValidation() {
-	headersSchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(0))
+	headersSchemaID := schemas.ID("some")
 	schemaErr := s.schemaRepo.SetSchema(context.Background(), headersSchemaID, `invalid string`, time.Now(), "header.schema.json")
-	Expect(schemaErr).To(HaveOccurred())
-	Expect(s.schemaRepo.ListSchemas(context.Background())).To(BeEmpty())
+	Expect(schemaErr).NotTo(HaveOccurred())
+	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
+	_, _ = s.validationUseCase.UpsertValidation(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
 			Host:        "example.com",
 			Port:        80,
 		},
-		schemas.RouteSchemaDefinition{
-			Request: &schemas.RequestSchemaDefinition{
+		schemas.RouteValidators{
+			Request: &schemas.RequestValidators{
 				HeaderSchemaID: &headersSchemaID,
 			},
 		})
 }
 
 func (s *validationPipelineSut) withQuerySchemaValidation() {
-	querySchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(1))
-
-	schemaErr := s.schemaRepo.SetSchema(context.Background(), querySchemaID, `{
+	entry, schemaErr := s.schemaUseCase.CreateSchema(context.Background(), `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -311,27 +315,26 @@ func (s *validationPipelineSut) withQuerySchemaValidation() {
 			}
 		},
 		"required": ["productID"]
-	}`, time.Now(), "query.schema.json")
+	}`, "query.schema.json")
 	Expect(schemaErr).NotTo(HaveOccurred())
-	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
+	Expect(s.schemaUseCase.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
+	_, _ = s.validationUseCase.UpsertValidation(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
 			Host:        "example.com",
 			Port:        80,
 		},
-		schemas.RouteSchemaDefinition{
-			Request: &schemas.RequestSchemaDefinition{
-				QuerySchemaID: &querySchemaID,
+		schemas.RouteValidators{
+			Request: &schemas.RequestValidators{
+				QuerySchemaID: &entry.ID,
 			},
 		})
 }
 
 func (s *validationPipelineSut) withBodySchemaValidation() {
-	bodySchemaID, _ := s.schemaRepo.GenerateID(time.UnixMicro(3))
-	schemaErr := s.schemaRepo.SetSchema(context.Background(), bodySchemaID, `{
+	entry, schemaErr := s.schemaUseCase.CreateSchema(context.Background(), `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -354,33 +357,33 @@ func (s *validationPipelineSut) withBodySchemaValidation() {
 			}
 		},
 		"required": ["productID"]
-	}`, time.Now(), "body.schema.json")
+	}`, "body.schema.json")
 	Expect(schemaErr).NotTo(HaveOccurred())
-	Expect(s.schemaRepo.ListSchemas(context.Background())).NotTo(BeEmpty())
+	Expect(s.schemaUseCase.ListSchemas(context.Background())).NotTo(BeEmpty())
 
-	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
+	_, _ = s.validationUseCase.UpsertValidation(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/test",
 			Host:        "example.com",
 			Port:        80,
 		},
-		schemas.RouteSchemaDefinition{
-			Request: &schemas.RequestSchemaDefinition{
-				BodySchemaID: &bodySchemaID,
+		schemas.RouteValidators{
+			Request: &schemas.RequestValidators{
+				BodySchemaID: &entry.ID,
 			},
 		})
 
-	_, _ = s.validationRepo.SetForRoute(context.Background(), "integration-id",
+	_, _ = s.validationUseCase.UpsertValidation(context.Background(), "integration-id",
 		http.Route{
 			Method:      "GET",
 			PathPattern: "/alias",
 			Host:        "example.com",
 			Port:        80,
 		},
-		schemas.RouteSchemaDefinition{
-			Request: &schemas.RequestSchemaDefinition{
-				BodySchemaID: &bodySchemaID,
+		schemas.RouteValidators{
+			Request: &schemas.RequestValidators{
+				BodySchemaID: &entry.ID,
 			},
 		})
 }

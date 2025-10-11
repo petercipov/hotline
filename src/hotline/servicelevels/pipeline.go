@@ -2,14 +2,18 @@ package servicelevels
 
 import (
 	"context"
+	"errors"
 	"hotline/concurrency"
 	"hotline/http"
 	"hotline/integrations"
 	"time"
 )
 
-type ConfigReader interface {
-	GetConfig(ctx context.Context, id integrations.ID) *HttpApiServiceLevels
+var ErrServiceLevelsNotFound = errors.New("service levels not found")
+var ErrRouteNotFound = errors.New("route not found")
+
+type Reader interface {
+	GetServiceLevels(ctx context.Context, id integrations.ID) (ApiServiceLevels, error)
 }
 
 type ChecksReporter interface {
@@ -35,7 +39,7 @@ func (p *Pipeline) Check(m *CheckMessage) {
 	p.fanOut.Broadcast(m)
 }
 
-func (p *Pipeline) ModifyRoute(m *ModifyRouteMessage) {
+func (p *Pipeline) RouteModified(m *ModifyForRouteMessage) {
 	p.fanOut.Send(m.GetShardingKey(), m)
 }
 
@@ -53,7 +57,7 @@ type SLOScope struct {
 	Integrations     map[integrations.ID]*Checker
 	LastObservedTime time.Time
 
-	sloRepository ConfigReader
+	sloRepository Reader
 	checkReporter ChecksReporter
 }
 
@@ -63,7 +67,7 @@ func (scope *SLOScope) AdvanceTime(now time.Time) {
 	}
 }
 
-func NewEmptyIntegrationsScope(sloRepository ConfigReader, checkReporter ChecksReporter) *SLOScope {
+func NewEmptyIntegrationsScope(sloRepository Reader, checkReporter ChecksReporter) *SLOScope {
 	return &SLOScope{
 		Integrations:     make(map[integrations.ID]*Checker),
 		LastObservedTime: time.Time{},
@@ -111,11 +115,11 @@ func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, sco
 
 	slo, found := scope.Integrations[message.ID]
 	if !found {
-		config := scope.sloRepository.GetConfig(ctx, message.ID)
-		if config == nil {
+		config, getErr := scope.sloRepository.GetServiceLevels(ctx, message.ID)
+		if getErr != nil {
 			return
 		}
-		slo = NewHttpApiServiceLevels(*config)
+		slo = NewHttpApiServiceLevels(config)
 		scope.Integrations[message.ID] = slo
 	}
 	for _, req := range message.Reqs {
@@ -123,29 +127,30 @@ func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, sco
 	}
 }
 
-type ModifyRouteMessage struct {
+type ModifyForRouteMessage struct {
 	ID  integrations.ID
 	Now time.Time
 
 	Route http.Route
 }
 
-func (message *ModifyRouteMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
+func (message *ModifyForRouteMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(message.Now)
 
 	slo, found := scope.Integrations[message.ID]
 	if !found {
 		return
 	}
-
-	config := scope.sloRepository.GetConfig(ctx, message.ID)
-	if config == nil {
-		delete(scope.Integrations, message.ID)
+	config, getErr := scope.sloRepository.GetServiceLevels(ctx, message.ID)
+	if getErr != nil {
+		if errors.Is(getErr, ErrServiceLevelsNotFound) {
+			delete(scope.Integrations, message.ID)
+		}
 		return
 	}
 
 	var foundRouteConfig = false
-	var routeConfig HttpRouteServiceLevels
+	var routeConfig RouteServiceLevels
 	for _, slosConfig := range config.Routes {
 		if slosConfig.Route == message.Route {
 			foundRouteConfig = true
@@ -160,6 +165,17 @@ func (message *ModifyRouteMessage) Execute(ctx context.Context, _ string, scope 
 	}
 }
 
-func (message *ModifyRouteMessage) GetShardingKey() []byte {
+func (message *ModifyForRouteMessage) GetShardingKey() []byte {
 	return []byte(message.ID)
+}
+
+type EventsHandler struct {
+	Pipeline *Pipeline
+}
+
+func (h *EventsHandler) HandleRouteModified(messages []ModifyForRouteMessage) error {
+	for _, m := range messages {
+		h.Pipeline.RouteModified(&m)
+	}
+	return nil
 }

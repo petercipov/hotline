@@ -2,7 +2,6 @@ package setup_test
 
 import (
 	"app/setup"
-	"app/setup/repository"
 	"context"
 	"errors"
 	"fmt"
@@ -26,9 +25,9 @@ type appSut struct {
 	app          *setup.App
 	managedClock *clock.ManualClock
 
-	serviceLevelsRepository repository.ServiceLevelsRepository
-	schemaRepository        repository.SchemaRepository
-	validationRepository    repository.ValidationRepository
+	serviceLevelsRepository servicelevels.Repository
+	schemaRepository        schemas.SchemaRepository
+	validationRepository    schemas.ValidationRepository
 }
 
 func newAppSut(t *testing.T) *appSut {
@@ -36,11 +35,10 @@ func newAppSut(t *testing.T) *appSut {
 		clock.ParseTime("2025-02-22T12:02:10Z"),
 		500*time.Microsecond)
 
-	uuidGenerator := uuid.NewV7(&uuid.ConstantRandReader{})
 	return &appSut{
 		t:                       t,
 		serviceLevelsRepository: &servicelevels.InMemoryRepository{},
-		schemaRepository:        schemas.NewInMemorySchemaRepository(uuidGenerator),
+		schemaRepository:        schemas.NewInMemorySchemaRepository(),
 		validationRepository:    schemas.NewInMemoryValidationRepository(),
 		managedClock:            manualClock,
 	}
@@ -82,6 +80,7 @@ func (a *appSut) startHotline(_ context.Context, features *godog.Table) error {
 
 	app, appErr := setup.NewApp(
 		&a.cfg,
+		&uuid.ConstantRandReader{},
 		a.managedClock,
 		func(_ string, handler http.Handler) setup.HttpServer {
 			return setup.NewHttpTestServer(handler)

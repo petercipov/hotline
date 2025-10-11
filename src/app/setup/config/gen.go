@@ -185,10 +185,10 @@ type PercentileValue = Percentile
 
 // RequestSchemaCreated defines model for RequestSchemaCreated.
 type RequestSchemaCreated struct {
-	SchemaID *SchemaID `json:"schemaID,omitempty"`
+	SchemaID SchemaID `json:"schemaID"`
 
 	// UpdatedAt https://datatracker.ietf.org/doc/html/rfc3339#section-5.6 - RFC3339 date-time in UTC
-	UpdatedAt *DateTime `json:"updatedAt,omitempty"`
+	UpdatedAt DateTime `json:"updatedAt"`
 }
 
 // RequestValidationList List of Request Validations for an integration
@@ -304,7 +304,7 @@ type UpsertedRequestValidationResponse struct {
 
 // UpsertedServiceLevelsResponse defines model for UpsertedServiceLevelsResponse.
 type UpsertedServiceLevelsResponse struct {
-	RouteKey *RouteKey `json:"routeKey,omitempty"`
+	RouteKey RouteKey `json:"routeKey"`
 }
 
 // ValidationServiceLevels defines model for ValidationServiceLevels.

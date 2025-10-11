@@ -401,6 +401,9 @@ components:
 
     RequestSchemaCreated:
       type: object
+      required:
+        - schemaID
+        - updatedAt
       properties:
         schemaID:
           $ref: '#/components/schemas/SchemaID'
@@ -441,6 +444,8 @@ components:
 
     UpsertedServiceLevelsResponse:
       type: object
+      required:
+        - routeKey
       properties:
         routeKey:
           $ref: '#/components/schemas/RouteKey'

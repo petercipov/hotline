@@ -7,33 +7,38 @@ import (
 )
 
 type InMemoryRepository struct {
-	configs map[integrations.ID]*HttpApiServiceLevels
+	configs map[integrations.ID]*ApiServiceLevels
 	mux     sync.Mutex
 }
 
-func (i *InMemoryRepository) GetConfig(_ context.Context, id integrations.ID) *HttpApiServiceLevels {
+func (i *InMemoryRepository) GetServiceLevels(_ context.Context, id integrations.ID) (ApiServiceLevels, error) {
 	i.mux.Lock()
 	defer i.mux.Unlock()
 	sloConf, found := i.configs[id]
 	if !found {
-		return nil
+		return ApiServiceLevels{}, ErrServiceLevelsNotFound
 	}
 
-	return sloConf
+	return *sloConf, nil
 }
 
-func (i *InMemoryRepository) SetConfig(_ context.Context, id integrations.ID, slo *HttpApiServiceLevels) {
+func (i *InMemoryRepository) Modify(_ context.Context, id integrations.ID, slo ApiServiceLevels) error {
 	i.mux.Lock()
 	defer i.mux.Unlock()
 	if i.configs == nil {
-		i.configs = make(map[integrations.ID]*HttpApiServiceLevels)
+		i.configs = make(map[integrations.ID]*ApiServiceLevels)
 	}
 
-	if slo == nil {
-		delete(i.configs, id)
-	} else {
-		i.configs[id] = slo
-	}
+	i.configs[id] = &slo
+
+	return nil
+}
+
+func (i *InMemoryRepository) Drop(_ context.Context, id integrations.ID) error {
+	i.mux.Lock()
+	defer i.mux.Unlock()
+	delete(i.configs, id)
+	return nil
 }
 
 type InMemorySLOReporter struct {
@@ -52,4 +57,16 @@ func (f *InMemorySLOReporter) GetReports() []*CheckReport {
 	defer f.mux.Unlock()
 
 	return f.reports
+}
+
+type InMemoryEventPublisher struct {
+	arr []ModifyForRouteMessage
+	mux sync.Mutex
+}
+
+func (p *InMemoryEventPublisher) HandleRouteModified(event []ModifyForRouteMessage) error {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	p.arr = append(p.arr, event...)
+	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"hotline/clock"
 	"hotline/schemas"
 	"hotline/servicelevels"
-	"hotline/uuid"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,9 +16,8 @@ import (
 
 func main() {
 	systemClock := clock.NewSystemClock()
-	uuidGenerator := uuid.NewV7(rand.Reader)
 	inMemoryServiceLevels := &servicelevels.InMemoryRepository{}
-	inMemorySchemas := schemas.NewInMemorySchemaRepository(uuidGenerator)
+	inMemorySchemas := schemas.NewInMemorySchemaRepository()
 	inMemoryValidations := schemas.NewInMemoryValidationRepository()
 	app, appErr := setup.NewApp(
 		&setup.Config{
@@ -34,6 +32,7 @@ func main() {
 				CheckPeriod: 10 * time.Second,
 			},
 		},
+		rand.Reader,
 		systemClock,
 		func(host string, handler http.Handler) setup.HttpServer {
 			return NewGoHttpServer(host, handler)

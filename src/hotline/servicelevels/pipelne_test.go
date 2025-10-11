@@ -16,6 +16,11 @@ import (
 
 var _ = Describe("Service Levels Pipeline", func() {
 	sut := sloPipelineSUT{}
+
+	BeforeEach(func() {
+		sut.Close()
+	})
+
 	It("should report no metrics if configuration not available", func() {
 		sut.forPipeline()
 
@@ -108,55 +113,82 @@ var _ = Describe("Service Levels Pipeline", func() {
 			}
 		})
 	})
+
+	It("should report less when config is reduced from multiple to single slo", func() {
+		sut.forPipeline()
+		sut.ForMultipleConfig("known_integration_id", "2025-02-22T12:04:00Z")
+
+		sut.IngestOKRequestToUrl("known_integration_id", "2025-02-22T12:04:05Z", "/api")
+		sut.IngestOKRequestToUrl("known_integration_id", "2025-02-22T12:04:05Z", "/products")
+		sut.IngestOKRequestToUrl("known_integration_id", "2025-02-22T12:04:05Z", "/orders")
+
+		sut.DropNonDefaultRoutes("known_integration_id")
+
+		reports := sut.Report("2025-02-22T12:05:05Z")
+		Expect(reports).To(HaveLen(sut.numberOfQueues))
+
+		checks := 0
+		for _, report := range reports {
+			checks += len(report.Checks)
+		}
+		Expect(checks).To(Equal(1))
+	})
 })
 
 type sloPipelineSUT struct {
-	pipeline       *servicelevels.Pipeline
-	sloRepository  *servicelevels.InMemoryRepository
-	sloReporter    *servicelevels.InMemorySLOReporter
+	pipeline      *servicelevels.Pipeline
+	sloRepository *servicelevels.InMemoryRepository
+	sloReporter   *servicelevels.InMemorySLOReporter
+	eventsHandler *servicelevels.EventsHandler
+
+	useCase        *servicelevels.UseCase
+	manualClock    *clock.ManualClock
 	numberOfQueues int
 }
 
 func (s *sloPipelineSUT) forPipeline() {
+	s.manualClock = clock.NewManualClock(
+		clock.ParseTime("2025-02-22T12:02:10Z"),
+		500*time.Microsecond,
+	)
+
 	s.numberOfQueues = 8
 	queueIDs := concurrency.GenerateScopeIds("queue", s.numberOfQueues)
 	s.sloRepository = &servicelevels.InMemoryRepository{}
 	s.sloReporter = &servicelevels.InMemorySLOReporter{}
+	s.eventsHandler = &servicelevels.EventsHandler{}
+
+	s.useCase = servicelevels.NewUseCase(
+		s.sloRepository,
+		s.manualClock.Now,
+		s.eventsHandler,
+	)
 
 	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.SLOScope {
-		return servicelevels.NewEmptyIntegrationsScope(s.sloRepository, s.sloReporter)
+		return servicelevels.NewEmptyIntegrationsScope(s.useCase, s.sloReporter)
 	})
 	s.pipeline = servicelevels.NewPipeline(
 		scopes,
 	)
+	s.eventsHandler.Pipeline = s.pipeline
 }
 
 func (s *sloPipelineSUT) NoConfigPresent(id integrations.ID, timeStr string) {
-	s.sloRepository.SetConfig(context.Background(), id, nil)
-
-	now := clock.ParseTime(timeStr)
-	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
-		ID:  id,
-		Now: now,
-
-		Route: http.Route{
-			PathPattern: "/",
-		},
-	})
+	dropErr := s.useCase.DropServiceLevels(context.Background(), id)
+	Expect(dropErr).NotTo(HaveOccurred())
 }
 
 func (s *sloPipelineSUT) EmptyConfigPresent(id integrations.ID, timeStr string) {
-	s.sloRepository.SetConfig(context.Background(), id, &servicelevels.HttpApiServiceLevels{})
-
-	now := clock.ParseTime(timeStr)
-	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
-		ID:  id,
-		Now: now,
-
-		Route: http.Route{
-			PathPattern: "/",
-		},
-	})
+	s.manualClock.Reset(clock.ParseTime(timeStr))
+	_, err := s.useCase.ModifyRoute(
+		context.Background(),
+		id,
+		servicelevels.RouteModification{
+			Route: http.Route{
+				PathPattern: "/",
+			},
+		})
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func (s *sloPipelineSUT) Report(timeStr string) []*servicelevels.CheckReport {
@@ -176,6 +208,10 @@ func (s *sloPipelineSUT) Report(timeStr string) []*servicelevels.CheckReport {
 }
 
 func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID, timeStr string) {
+	s.IngestOKRequestToUrl(id, timeStr, "/api/")
+}
+
+func (s *sloPipelineSUT) IngestOKRequestToUrl(id integrations.ID, timeStr string, path string) {
 	now := clock.ParseTime(timeStr)
 	s.pipeline.IngestHttpRequest(&servicelevels.IngestRequestsMessage{
 		ID:  id,
@@ -185,42 +221,54 @@ func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID, timeStr string) {
 				Latency: 1000,
 				State:   "200",
 				Method:  "GET",
-				URL:     newUrl("https://test.com/api/"),
+				URL:     newUrl("https://test.com" + path),
 			},
 		},
 	})
 }
 
 func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr string) {
-	now := clock.ParseTime(timeStr)
+	s.manualClock.Reset(clock.ParseTime(timeStr))
 
-	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiServiceLevels{
-		Routes: []servicelevels.HttpRouteServiceLevels{defaultRouteDefinition("", "/")},
-	})
-
-	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
-		ID:  integrationID,
-		Now: now,
-
-		Route: http.Route{
-			PathPattern: "/",
-		},
-	})
+	_, err := s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/"))
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func (s *sloPipelineSUT) ForDefaultConfig(integrationID integrations.ID, timeStr string) {
-	now := clock.ParseTime(timeStr)
+	s.manualClock.Reset(clock.ParseTime(timeStr))
 
-	s.sloRepository.SetConfig(context.Background(), integrationID, &servicelevels.HttpApiServiceLevels{
-		Routes: []servicelevels.HttpRouteServiceLevels{defaultRouteDefinition("", "/")},
-	})
+	_, err := s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/"))
+	Expect(err).NotTo(HaveOccurred())
+}
 
-	s.pipeline.ModifyRoute(&servicelevels.ModifyRouteMessage{
-		ID:  integrationID,
-		Now: now,
+func (s *sloPipelineSUT) ForMultipleConfig(integrationID integrations.ID, timeStr string) {
+	s.manualClock.Reset(clock.ParseTime(timeStr))
 
-		Route: http.Route{
-			PathPattern: "/",
-		},
-	})
+	_, err := s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/"))
+	Expect(err).NotTo(HaveOccurred())
+	_, err = s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/products"))
+	Expect(err).NotTo(HaveOccurred())
+	_, err = s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/orders"))
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func (s *sloPipelineSUT) Close() {
+	s.pipeline = nil
+	s.sloRepository = nil
+	s.sloReporter = nil
+	s.manualClock = nil
+	s.useCase = nil
+	s.eventsHandler = nil
+	s.numberOfQueues = 0
+}
+
+func (s *sloPipelineSUT) DropNonDefaultRoutes(id integrations.ID) {
+	levels, getErr := s.useCase.GetServiceLevels(context.Background(), id)
+	Expect(getErr).NotTo(HaveOccurred())
+	for _, route := range levels.Routes {
+		if route.Route.PathPattern == "/products" || route.Route.PathPattern == "/orders" {
+			delErr := s.useCase.DeleteRoute(context.Background(), id, route.Key)
+			Expect(delErr).NotTo(HaveOccurred())
+		}
+	}
 }

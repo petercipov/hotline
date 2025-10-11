@@ -23,8 +23,8 @@ func NewServiceLevelsAPISut(apiURL func() string) *ServiceLevelsAPISut {
 
 func (a *ServiceLevelsAPISut) AddSteps(sctx *godog.ScenarioContext) {
 	sctx.Step(`service levels for "([^"]*)" is set to`, a.setServiceLevelsConfiguration)
-	sctx.Step(`service levels for "([^"]*)" and routeKey "([^"]*)" are deleted`, a.deleteSLOConfiguration)
-	sctx.Step(`service levels for "([^"]*)" are`, a.checkServiceLevelsConfiguration)
+	sctx.Step(`service levels for "([^"]*)" and routeKey "([^"]*)" are deleted`, a.deleteServiceLevels)
+	sctx.Step(`service levels for "([^"]*)" are`, a.checkServiceLevels)
 }
 
 func (a *ServiceLevelsAPISut) setServiceLevelsConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
@@ -62,7 +62,7 @@ func (a *ServiceLevelsAPISut) setServiceLevelsConfiguration(ctx context.Context,
 	return ctx, nil
 }
 
-func (a *ServiceLevelsAPISut) deleteSLOConfiguration(ctx context.Context, integrationID string, routeKey string) (context.Context, error) {
+func (a *ServiceLevelsAPISut) deleteServiceLevels(ctx context.Context, integrationID string, routeKey string) (context.Context, error) {
 	configClient, createClientErr := config.NewClientWithResponses(a.apiURL())
 	if createClientErr != nil {
 		return ctx, createClientErr
@@ -86,7 +86,7 @@ func (a *ServiceLevelsAPISut) deleteSLOConfiguration(ctx context.Context, integr
 	return ctx, nil
 }
 
-func (a *ServiceLevelsAPISut) checkServiceLevelsConfiguration(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
+func (a *ServiceLevelsAPISut) checkServiceLevels(ctx context.Context, integrationID string, configRaw string) (context.Context, error) {
 	routeRaws := strings.Split(configRaw, "|||")
 	var routesExpected []string
 	for i, routeRaw := range routeRaws {

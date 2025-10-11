@@ -42,9 +42,9 @@ Feature: Validations API
       {
         "route": { "method": "GET", "host": "127.0.0.1", "path": "/products" },
         "requestSchema": {
-          "bodySchemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ",
-          "headerSchemaID": "SCAZUtiVXRcQGBAQEBAQEBAQ",
-          "querySchemaID": "SCAZUtiVXRcQKBAQEBAQEBAQ"
+          "bodySchemaID": "SCAZUtiVm5cQGBAQEBAQEBAQ",
+          "headerSchemaID": "SCAZUtiV2icQGBAQEBAQEBAQ",
+          "querySchemaID": "SCAZUtiWGLcQGBAQEBAQEBAQ"
         }
       }
       """
@@ -53,9 +53,9 @@ Feature: Validations API
       {
         "route-validations" : [{
           "requestSchema" : {
-            "bodySchemaID" : "SCAZUtiVXQcQGBAQEBAQEBAQ",
-            "headerSchemaID": "SCAZUtiVXRcQGBAQEBAQEBAQ",
-            "querySchemaID": "SCAZUtiVXRcQKBAQEBAQEBAQ"
+            "bodySchemaID" : "SCAZUtiVm5cQGBAQEBAQEBAQ",
+            "headerSchemaID": "SCAZUtiV2icQGBAQEBAQEBAQ",
+            "querySchemaID": "SCAZUtiWGLcQGBAQEBAQEBAQ"
           },
           "route" : {
             "host" : "127.0.0.1",
@@ -86,7 +86,7 @@ Feature: Validations API
       {
         "route": { "method": "GET", "host": "127.0.0.1", "path": "/products" },
         "requestSchema": {
-          "bodySchemaID": "SCAZUtiVXQcQGBAQEBAQEBAQ"
+          "bodySchemaID": "SCAZUtiVm5cQGBAQEBAQEBAQ"
         }
       }
       """
@@ -95,7 +95,7 @@ Feature: Validations API
       {
         "route-validations" : [{
           "requestSchema" : {
-            "bodySchemaID" : "SCAZUtiVXQcQGBAQEBAQEBAQ"
+            "bodySchemaID" : "SCAZUtiVm5cQGBAQEBAQEBAQ"
           },
           "route" : {
             "host" : "127.0.0.1",
