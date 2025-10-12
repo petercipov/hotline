@@ -1,6 +1,7 @@
 package servicelevels_test
 
 import (
+	"context"
 	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/http"
@@ -11,7 +12,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"golang.org/x/net/context"
 )
 
 var _ = Describe("Service Levels Pipeline", func() {
