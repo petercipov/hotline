@@ -56,12 +56,12 @@ func (p *Percentile) Cast() *servicelevels.Percentile {
 }
 
 func ParseRoute(integrationID integrations.ID, latencyDefinition *LatencyServiceLevels, statusDefinition *StatusServiceLevels, route Route) (servicelevels.RouteModification, error) {
-	var status servicelevels.HttpStatusServiceLevels
-	var latency servicelevels.HttpLatencyServiceLevels
+	var status servicelevels.StatusServiceLevels
+	var latency servicelevels.LatencyServiceLevels
 	if statusDefinition != nil {
 		percentile := statusDefinition.BreachThreshold.Cast()
 
-		status = servicelevels.HttpStatusServiceLevels{
+		status = servicelevels.StatusServiceLevels{
 			Expected:        convertFromExpected(statusDefinition.Expected),
 			BreachThreshold: *percentile,
 			WindowDuration:  time.Duration(statusDefinition.WindowDuration),
@@ -74,7 +74,7 @@ func ParseRoute(integrationID integrations.ID, latencyDefinition *LatencyService
 			return servicelevels.RouteModification{}, defsErr
 		}
 
-		latency = servicelevels.HttpLatencyServiceLevels{
+		latency = servicelevels.LatencyServiceLevels{
 			Percentiles:    defs,
 			WindowDuration: time.Duration(latencyDefinition.WindowDuration),
 		}

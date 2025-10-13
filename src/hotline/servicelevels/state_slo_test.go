@@ -25,8 +25,9 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("state1")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       100,
@@ -52,8 +53,9 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("state2")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       100,
@@ -87,8 +89,9 @@ var _ = Describe("State SLO", func() {
 
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       100,
@@ -120,8 +123,9 @@ var _ = Describe("State SLO", func() {
 
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -143,8 +147,9 @@ var _ = Describe("State SLO", func() {
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
-			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -177,8 +182,9 @@ var _ = Describe("State SLO", func() {
 
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       100,
@@ -212,8 +218,9 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("abcd")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -235,8 +242,9 @@ var _ = Describe("State SLO", func() {
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
-			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -268,8 +276,9 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("abcd")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -291,8 +300,9 @@ var _ = Describe("State SLO", func() {
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
-			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -324,8 +334,9 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("timeout")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -347,8 +358,9 @@ var _ = Describe("State SLO", func() {
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
-			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -381,8 +393,9 @@ var _ = Describe("State SLO", func() {
 			sut.AddState("unknnown_unknown")
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
-			Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       60,
@@ -404,8 +417,9 @@ var _ = Describe("State SLO", func() {
 					WindowDuration: 1 * time.Hour,
 				},
 			}))
-			Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "test-namespace",
+				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       40,
@@ -445,7 +459,7 @@ func (s *stateslosut) forEmptySLO() {
 	s.forSLO()
 }
 
-func (s *stateslosut) getMetrics() []servicelevels.SLOCheck {
+func (s *stateslosut) getMetrics() []servicelevels.LevelsCheck {
 	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	return s.slo.Check(now)
 }

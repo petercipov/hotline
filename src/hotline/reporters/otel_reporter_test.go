@@ -16,6 +16,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
@@ -42,6 +43,7 @@ var _ = Describe("OTEL Reporter", func() {
 		Expect(messages[0].ResourceMetrics).To(HaveLen(1))
 		Expect(messages[0].ResourceMetrics[0].ScopeMetrics).To(HaveLen(1))
 		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics).To(HaveLen(6))
+		format.MaxLength = 100000000
 		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[0]).To(Equal(&metricspb.Metric{
 			Name: "service_levels_http_route_status",
 			Unit: "%",
@@ -64,6 +66,7 @@ var _ = Describe("OTEL Reporter", func() {
 				},
 			},
 		}))
+
 		Expect(messages[0].ResourceMetrics[0].ScopeMetrics[0].Metrics[1]).To(Equal(&metricspb.Metric{
 			Name: "service_levels_http_route_status_events",
 			Unit: "#",
@@ -310,9 +313,7 @@ func (r *otelReporterSUT) receivedOtelMessages() []*colmetricspb.ExportMetricsSe
 }
 
 func (r *otelReporterSUT) sendEmptyMetrics() {
-	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now: clock.ParseTime("2025-02-22T12:04:05Z"),
-	})
+	reportErr := r.reporter.ReportChecks(context.Background(), servicelevels.CheckReport{})
 	Expect(reportErr).NotTo(HaveOccurred())
 }
 
@@ -322,10 +323,9 @@ func (r *otelReporterSUT) Close() {
 }
 
 func (r *otelReporterSUT) sendSloCheck() error {
-	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
-		Checks: simpleSLOCheck(),
-	})
+	reportErr := r.reporter.ReportChecks(context.Background(),
+		simpleSLOCheck(),
+	)
 
 	return reportErr
 }
@@ -334,9 +334,10 @@ func simpleSLOCheck() []servicelevels.Check {
 	return []servicelevels.Check{
 		{
 			IntegrationID: "integration-abcd",
-			SLO: []servicelevels.SLOCheck{
+			Levels: []servicelevels.LevelsCheck{
 				{
 					Namespace: "http_route_status",
+					Timestamp: clock.ParseTime("2025-02-22T12:04:05Z"),
 					Metric: servicelevels.Metric{
 						Name:        "unexpected",
 						Value:       100,
@@ -379,10 +380,7 @@ func (r *otelReporterSUT) sendUnmarshalableMessage() error {
 		return nil, errUnexpected
 	}
 
-	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
-		Checks: simpleSLOCheck(),
-	})
+	reportErr := r.reporter.ReportChecks(context.Background(), simpleSLOCheck())
 	r.marshalFunc = proto.Marshal
 
 	return reportErr
@@ -390,10 +388,7 @@ func (r *otelReporterSUT) sendUnmarshalableMessage() error {
 
 func (r *otelReporterSUT) sendMesaageWithWrongMethod() error {
 	r.cfg.Method = "❌"
-	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
-		Checks: simpleSLOCheck(),
-	})
+	reportErr := r.reporter.ReportChecks(context.Background(), simpleSLOCheck())
 	r.cfg.Method = http.MethodPost
 
 	return reportErr
@@ -403,10 +398,7 @@ func (r *otelReporterSUT) sendMessageWithNetworkFailure() error {
 	failing := &failingTransport{}
 	previous := r.httpClient.Transport
 	r.httpClient.Transport = failing
-	reportErr := r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
-		Checks: simpleSLOCheck(),
-	})
+	reportErr := r.reporter.ReportChecks(context.Background(), simpleSLOCheck())
 	r.httpClient.Transport = previous
 	return reportErr
 }

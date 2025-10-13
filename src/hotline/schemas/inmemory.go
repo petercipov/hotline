@@ -179,7 +179,7 @@ type InMemoryValidationReporter struct {
 	mutext  sync.Mutex
 }
 
-func (r *InMemoryValidationReporter) Report(_ context.Context, res ValidationResult) {
+func (r *InMemoryValidationReporter) HandleRequestValidated(_ context.Context, res ValidationResult) {
 	r.mutext.Lock()
 	defer r.mutext.Unlock()
 	r.results = append(r.results, res)

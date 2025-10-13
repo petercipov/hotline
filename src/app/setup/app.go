@@ -64,7 +64,6 @@ func NewApp(
 	otelReporterScopes := concurrency.NewScopes(
 		concurrency.GenerateScopeIds("otel-reporter", 8),
 		reporters.NewEmptyOtelReporterScope)
-
 	oUrl, urlErr := reporters.NewOtelUrl(cfg.OtelHttpReporter.Secured, cfg.OtelHttpReporter.Host)
 	if urlErr != nil {
 		return nil, urlErr

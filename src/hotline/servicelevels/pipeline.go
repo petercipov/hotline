@@ -17,7 +17,7 @@ type Reader interface {
 }
 
 type ChecksReporter interface {
-	ReportChecks(ctx context.Context, report *CheckReport)
+	ReportChecks(ctx context.Context, report CheckReport)
 }
 
 type Pipeline struct {
@@ -43,18 +43,19 @@ func (p *Pipeline) RouteModified(m *ModifyForRouteMessage) {
 	p.fanOut.Send(m.GetShardingKey(), m)
 }
 
+func (p *Pipeline) RequestValidated(m *RequestValidatedMessage) {
+	p.fanOut.Send(m.GetShardingKey(), m)
+}
+
 type Check struct {
-	SLO           []SLOCheck
+	Levels        []LevelsCheck
 	IntegrationID integrations.ID
 }
 
-type CheckReport struct {
-	Now    time.Time
-	Checks []Check
-}
+type CheckReport []Check
 
 type SLOScope struct {
-	Integrations     map[integrations.ID]*Checker
+	Integrations     map[integrations.ID]*IntegrationServiceLevels
 	LastObservedTime time.Time
 
 	sloRepository Reader
@@ -67,9 +68,23 @@ func (scope *SLOScope) AdvanceTime(now time.Time) {
 	}
 }
 
+func (scope *SLOScope) EnsureServiceLevels(ctx context.Context, id integrations.ID) (*IntegrationServiceLevels, error) {
+	slo, found := scope.Integrations[id]
+	if !found {
+		config, getErr := scope.sloRepository.GetServiceLevels(ctx, id)
+		if getErr != nil {
+			return nil, getErr
+		}
+		slo = NewHttpApiServiceLevels(config)
+		scope.Integrations[id] = slo
+	}
+
+	return slo, nil
+}
+
 func NewEmptyIntegrationsScope(sloRepository Reader, checkReporter ChecksReporter) *SLOScope {
 	return &SLOScope{
-		Integrations:     make(map[integrations.ID]*Checker),
+		Integrations:     make(map[integrations.ID]*IntegrationServiceLevels),
 		LastObservedTime: time.Time{},
 
 		sloRepository: sloRepository,
@@ -88,15 +103,12 @@ func (message *CheckMessage) Execute(ctx context.Context, _ string, scope *SLOSc
 	for id, integration := range scope.Integrations {
 		metrics := integration.Check(scope.LastObservedTime)
 		checks = append(checks, Check{
-			SLO:           metrics,
+			Levels:        metrics,
 			IntegrationID: id,
 		})
 	}
 
-	scope.checkReporter.ReportChecks(ctx, &CheckReport{
-		Now:    scope.LastObservedTime,
-		Checks: checks,
-	})
+	scope.checkReporter.ReportChecks(ctx, checks)
 }
 
 type IngestRequestsMessage struct {
@@ -113,14 +125,9 @@ func (message *IngestRequestsMessage) GetShardingKey() []byte {
 func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(message.Now)
 
-	slo, found := scope.Integrations[message.ID]
-	if !found {
-		config, getErr := scope.sloRepository.GetServiceLevels(ctx, message.ID)
-		if getErr != nil {
-			return
-		}
-		slo = NewHttpApiServiceLevels(config)
-		scope.Integrations[message.ID] = slo
+	slo, ensureErr := scope.EnsureServiceLevels(ctx, message.ID)
+	if ensureErr != nil {
+		return
 	}
 	for _, req := range message.Reqs {
 		slo.AddRequest(scope.LastObservedTime, req)
@@ -167,6 +174,28 @@ func (message *ModifyForRouteMessage) Execute(ctx context.Context, _ string, sco
 
 func (message *ModifyForRouteMessage) GetShardingKey() []byte {
 	return []byte(message.ID)
+}
+
+type RequestValidatedMessage struct {
+	ID  integrations.ID
+	Now time.Time
+
+	Locator http.RequestLocator
+}
+
+func (m *RequestValidatedMessage) Execute(_ context.Context, _ string, scope *SLOScope) {
+	scope.AdvanceTime(m.Now)
+
+	slo, ensureErr := scope.EnsureServiceLevels(context.Background(), m.ID)
+	if ensureErr != nil {
+		return
+	}
+
+	slo.AddRequestValidation(scope.LastObservedTime, m.Locator)
+}
+
+func (m *RequestValidatedMessage) GetShardingKey() []byte {
+	return []byte(m.ID)
 }
 
 type EventsHandler struct {

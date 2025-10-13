@@ -2,10 +2,8 @@ package reporters_test
 
 import (
 	"context"
-	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/reporters"
-	"hotline/servicelevels"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -85,10 +83,9 @@ func (r *scopedReporterSUT) forConcurrentReporter() {
 }
 
 func (r *scopedReporterSUT) sendCommand() {
-	r.reporter.ReportChecks(context.Background(), &servicelevels.CheckReport{
-		Now:    clock.ParseTime("2025-02-22T12:04:05Z"),
-		Checks: simpleSLOCheck(),
-	})
+	r.reporter.ReportChecks(context.Background(),
+		simpleSLOCheck(),
+	)
 }
 
 type reportedMetrics struct {

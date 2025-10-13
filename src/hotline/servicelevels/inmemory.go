@@ -42,20 +42,19 @@ func (i *InMemoryRepository) Drop(_ context.Context, id integrations.ID) error {
 }
 
 type InMemorySLOReporter struct {
-	reports []*CheckReport
+	reports []CheckReport
 	mux     sync.Mutex
 }
 
-func (f *InMemorySLOReporter) ReportChecks(_ context.Context, report *CheckReport) {
+func (f *InMemorySLOReporter) ReportChecks(_ context.Context, report CheckReport) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 	f.reports = append(f.reports, report)
 }
 
-func (f *InMemorySLOReporter) GetReports() []*CheckReport {
+func (f *InMemorySLOReporter) GetReports() ReportArr {
 	f.mux.Lock()
 	defer f.mux.Unlock()
-
 	return f.reports
 }
 
@@ -69,4 +68,16 @@ func (p *InMemoryEventPublisher) HandleRouteModified(event []ModifyForRouteMessa
 	defer p.mux.Unlock()
 	p.arr = append(p.arr, event...)
 	return nil
+}
+
+type ReportArr []CheckReport
+
+func (r ReportArr) GroupByIntegrationID() map[integrations.ID][]LevelsCheck {
+	byIntegrationID := make(map[integrations.ID][]LevelsCheck)
+	for _, checks := range r {
+		for _, check := range checks {
+			byIntegrationID[check.IntegrationID] = append(byIntegrationID[check.IntegrationID], check.Levels...)
+		}
+	}
+	return byIntegrationID
 }

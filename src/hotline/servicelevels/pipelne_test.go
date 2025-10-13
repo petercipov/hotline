@@ -32,7 +32,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 		reports := sut.Report("2025-02-22T12:04:55Z")
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 		for _, report := range reports {
-			Expect(report.Checks).To(BeEmpty())
+			Expect(report).To(BeEmpty())
 		}
 	})
 
@@ -45,9 +45,9 @@ var _ = Describe("Service Levels Pipeline", func() {
 		reports := sut.Report("2025-02-22T12:04:55Z")
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 
-		var nonEmptyReports []*servicelevels.CheckReport
+		var nonEmptyReports []servicelevels.CheckReport
 		for _, report := range reports {
-			if len(report.Checks) > 0 {
+			if len(report) > 0 {
 				nonEmptyReports = append(nonEmptyReports, report)
 			}
 		}
@@ -67,9 +67,9 @@ var _ = Describe("Service Levels Pipeline", func() {
 			reports := sut.Report("2025-02-22T12:05:05Z")
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 
-			var nonEmptyReports []*servicelevels.CheckReport
+			var nonEmptyReports []servicelevels.CheckReport
 			for _, report := range reports {
-				if len(report.Checks) > 0 {
+				if len(report) > 0 {
 					nonEmptyReports = append(nonEmptyReports, report)
 				}
 			}
@@ -88,7 +88,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 			for _, report := range reports {
-				Expect(report.Checks).To(BeEmpty())
+				Expect(report).To(BeEmpty())
 			}
 		})
 
@@ -104,11 +104,11 @@ var _ = Describe("Service Levels Pipeline", func() {
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 			for _, report := range reports {
-				if len(report.Checks) == 1 {
-					Expect(report.Checks[0].SLO).To(BeEmpty())
-					Expect(string(report.Checks[0].IntegrationID)).To(Equal("known_integration_id"))
+				if len(report) == 1 {
+					Expect(report[0].Levels).To(BeEmpty())
+					Expect(string(report[0].IntegrationID)).To(Equal("known_integration_id"))
 				} else {
-					Expect(report.Checks).To(BeEmpty())
+					Expect(report).To(BeEmpty())
 				}
 			}
 		})
@@ -129,9 +129,50 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 		checks := 0
 		for _, report := range reports {
-			checks += len(report.Checks)
+			checks += len(report)
 		}
 		Expect(checks).To(Equal(1))
+	})
+
+	Context("request validation", func() {
+
+		It("computes nothing if service levels are not configured", func() {
+			sut.forPipeline()
+			sut.IngestValidationMessage()
+
+			reports := sut.Report("2025-02-22T12:05:05Z")
+			Expect(reports).To(HaveLen(sut.numberOfQueues))
+			byIntegration := reports.GroupByIntegrationID()
+			Expect(byIntegration).To(BeEmpty())
+		})
+
+		It("computes number of not validated requests, when no validation was done", func() {
+			sut.forPipeline()
+			sut.forConfigWithRequestValidation()
+
+			for range 10 {
+				sut.IngestValidationMessage()
+			}
+			reports := sut.Report("2025-02-22T12:05:05Z")
+			Expect(reports).To(HaveLen(sut.numberOfQueues))
+			byIntegration := reports.GroupByIntegrationID()
+			Expect(byIntegration).NotTo(BeEmpty())
+			integrationChecks := byIntegration["known_integration_id"]
+			Expect(integrationChecks).To(HaveLen(1))
+			Expect(integrationChecks[0]).To(Equal(servicelevels.LevelsCheck{
+				Namespace: "http_route_validation",
+				Timestamp: clock.ParseTime("2025-02-22T12:05:05Z"),
+				Metric: servicelevels.Metric{
+					Name:        "skipped",
+					Value:       100,
+					Unit:        "%",
+					EventsCount: 10,
+				},
+				Tags: map[string]string{
+					"http_route": "RKpMj21xeTHEQ",
+				},
+			}))
+		})
 	})
 })
 
@@ -191,7 +232,7 @@ func (s *sloPipelineSUT) EmptyConfigPresent(id integrations.ID, timeStr string) 
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func (s *sloPipelineSUT) Report(timeStr string) []*servicelevels.CheckReport {
+func (s *sloPipelineSUT) Report(timeStr string) servicelevels.ReportArr {
 	now := clock.ParseTime(timeStr)
 	s.pipeline.Check(&servicelevels.CheckMessage{
 		Now: now,
@@ -220,8 +261,12 @@ func (s *sloPipelineSUT) IngestOKRequestToUrl(id integrations.ID, timeStr string
 			{
 				Latency: 1000,
 				State:   "200",
-				Method:  "GET",
-				URL:     newUrl("https://test.com" + path),
+				Locator: http.RequestLocator{
+					Method: "GET",
+					Path:   path,
+					Host:   "test.com",
+					Port:   443,
+				},
 			},
 		},
 	})
@@ -271,4 +316,32 @@ func (s *sloPipelineSUT) DropNonDefaultRoutes(id integrations.ID) {
 			Expect(delErr).NotTo(HaveOccurred())
 		}
 	}
+}
+
+func (s *sloPipelineSUT) forConfigWithRequestValidation() {
+	_, err := s.useCase.ModifyRoute(
+		context.Background(),
+		"known_integration_id",
+		servicelevels.RouteModification{
+			Route: http.Route{
+				Method:      "GET",
+				PathPattern: "/products",
+			},
+			Validation: &servicelevels.ValidationServiceLevels{},
+		},
+	)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func (s *sloPipelineSUT) IngestValidationMessage() {
+	s.pipeline.RequestValidated(&servicelevels.RequestValidatedMessage{
+		ID:  "known_integration_id",
+		Now: s.manualClock.Now(),
+		Locator: http.RequestLocator{
+			Method: "GET",
+			Path:   "/products",
+			Host:   "test.com",
+			Port:   443,
+		},
+	})
 }

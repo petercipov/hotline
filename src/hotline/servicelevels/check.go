@@ -2,12 +2,13 @@ package servicelevels
 
 import "time"
 
-type SLOCheck struct {
+type LevelsCheck struct {
 	Namespace string
 	Metric    Metric
 	Tags      map[string]string
 	Breakdown []Metric
 	Breach    *SLOBreach
+	Timestamp time.Time
 }
 
 type Metric struct {

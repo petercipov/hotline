@@ -1,7 +1,6 @@
 package servicelevels
 
 import (
-	"net/url"
 	"slices"
 	"time"
 
@@ -12,11 +11,10 @@ type HttpRequest struct {
 	Latency LatencyMs
 	State   string
 
-	Method string
-	URL    *url.URL
+	Locator hotlinehttp.RequestLocator
 }
 
-type Checker struct {
+type IntegrationServiceLevels struct {
 	mux *hotlinehttp.Mux[HttpRouteSLO]
 }
 
@@ -45,25 +43,29 @@ func (d *ApiServiceLevels) DeleteRouteByKey(key hotlinehttp.RouteKey) (hotlineht
 }
 
 type RouteServiceLevels struct {
-	Route   hotlinehttp.Route
-	Key     hotlinehttp.RouteKey
-	Latency *HttpLatencyServiceLevels
-	Status  *HttpStatusServiceLevels
+	Route      hotlinehttp.Route
+	Key        hotlinehttp.RouteKey
+	Latency    *LatencyServiceLevels
+	Status     *StatusServiceLevels
+	Validation *ValidationServiceLevels
 }
 
-type HttpLatencyServiceLevels struct {
+type LatencyServiceLevels struct {
 	Percentiles    []PercentileDefinition
 	WindowDuration time.Duration
 }
 
-type HttpStatusServiceLevels struct {
+type StatusServiceLevels struct {
 	Expected        []string
 	BreachThreshold Percentile
 	WindowDuration  time.Duration
 }
 
-func NewHttpApiServiceLevels(definition ApiServiceLevels) *Checker {
-	apiSlo := &Checker{
+type ValidationServiceLevels struct {
+}
+
+func NewHttpApiServiceLevels(definition ApiServiceLevels) *IntegrationServiceLevels {
+	apiSlo := &IntegrationServiceLevels{
 		mux: &hotlinehttp.Mux[HttpRouteSLO]{},
 	}
 	for _, routeDefinition := range definition.Routes {
@@ -72,22 +74,15 @@ func NewHttpApiServiceLevels(definition ApiServiceLevels) *Checker {
 	return apiSlo
 }
 
-func (s *Checker) AddRequest(now time.Time, req *HttpRequest) {
-	locator := hotlinehttp.RequestLocator{
-		Method: req.Method,
-		Path:   req.URL.Path,
-		Host:   req.URL.Hostname(),
-		Port:   80,
-	}
-
-	handler := s.mux.LocaleHandler(locator)
+func (s *IntegrationServiceLevels) AddRequest(now time.Time, req *HttpRequest) {
+	handler := s.mux.LocaleHandler(req.Locator)
 	if handler != nil {
 		handler.AddRequest(now, req)
 	}
 }
 
-func (s *Checker) Check(now time.Time) []SLOCheck {
-	var checks []SLOCheck
+func (s *IntegrationServiceLevels) Check(now time.Time) []LevelsCheck {
+	var checks []LevelsCheck
 	for _, slo := range s.mux.Handlers() {
 		check := slo.Check(now)
 		checks = append(checks, check...)
@@ -96,19 +91,27 @@ func (s *Checker) Check(now time.Time) []SLOCheck {
 	return checks
 }
 
-func (s *Checker) UpsertRoute(routeDefinition RouteServiceLevels) {
+func (s *IntegrationServiceLevels) UpsertRoute(routeDefinition RouteServiceLevels) {
 	slo := NewHttpPathSLO(routeDefinition)
 	s.mux.Upsert(slo.route, slo)
 }
 
-func (s *Checker) DeleteRoute(route hotlinehttp.Route) {
+func (s *IntegrationServiceLevels) DeleteRoute(route hotlinehttp.Route) {
 	s.mux.Delete(route)
 }
 
+func (s *IntegrationServiceLevels) AddRequestValidation(now time.Time, locator hotlinehttp.RequestLocator) {
+	handler := s.mux.LocaleHandler(locator)
+	if handler != nil {
+		handler.AddRequestValidation(now)
+	}
+}
+
 type HttpRouteSLO struct {
-	route      hotlinehttp.Route
-	stateSLO   *HttpStatusSLO
-	latencySLO *LatencySLO
+	route         hotlinehttp.Route
+	stateSLO      *HttpStatusSLO
+	latencySLO    *LatencySLO
+	validationSLO *ValidationSLO
 }
 
 func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
@@ -136,10 +139,20 @@ func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
 		)
 	}
 
+	var validationSLO *ValidationSLO
+	if slo.Validation != nil {
+		validationSLO = NewValidationSLO(
+			1*time.Hour,
+			"http_route_validation",
+			tags,
+		)
+	}
+
 	return &HttpRouteSLO{
-		route:      slo.Route,
-		stateSLO:   stateSLO,
-		latencySLO: latencySLO,
+		route:         slo.Route,
+		stateSLO:      stateSLO,
+		latencySLO:    latencySLO,
+		validationSLO: validationSLO,
 	}
 }
 
@@ -153,16 +166,27 @@ func (s *HttpRouteSLO) AddRequest(now time.Time, req *HttpRequest) {
 	}
 }
 
-func (s *HttpRouteSLO) Check(now time.Time) []SLOCheck {
-	var latencyCheck []SLOCheck
+func (s *HttpRouteSLO) Check(now time.Time) []LevelsCheck {
+	var latencyCheck []LevelsCheck
 	if s.latencySLO != nil {
 		latencyCheck = s.latencySLO.Check(now)
 	}
 
-	var stateCheck []SLOCheck
+	var stateCheck []LevelsCheck
 	if s.stateSLO != nil {
 		stateCheck = s.stateSLO.Check(now)
 	}
 
-	return slices.Concat(latencyCheck, stateCheck)
+	var validationCheck []LevelsCheck
+	if s.validationSLO != nil {
+		validationCheck = s.validationSLO.Check(now)
+	}
+
+	return slices.Concat(latencyCheck, stateCheck, validationCheck)
+}
+
+func (s *HttpRouteSLO) AddRequestValidation(now time.Time) {
+	if s.validationSLO != nil {
+		s.validationSLO.AddValidation(now)
+	}
 }

@@ -53,6 +53,6 @@ func (s *HttpStatusSLO) AddHttpState(now time.Time, state string) {
 	s.stateSLO.AddState(now, httpRangeUnknown)
 }
 
-func (s *HttpStatusSLO) Check(now time.Time) []SLOCheck {
+func (s *HttpStatusSLO) Check(now time.Time) []LevelsCheck {
 	return s.stateSLO.Check(now)
 }

@@ -5,6 +5,7 @@ import (
 	"hotline/integrations"
 	"hotline/servicelevels"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -60,10 +61,20 @@ func ToSLORequest(httpRequest *HttpRequest) *servicelevels.HttpRequest {
 	if len(httpRequest.StatusCode) > 0 {
 		state = httpRequest.StatusCode
 	}
+
+	var port = 443
+	parsedPort, parseErr := strconv.ParseInt(httpRequest.URL.Port(), 10, 32)
+	if parseErr == nil {
+		port = int(parsedPort)
+	}
 	return &servicelevels.HttpRequest{
 		Latency: latency,
 		State:   state,
-		Method:  httpRequest.Method,
-		URL:     httpRequest.URL,
+		Locator: http.RequestLocator{
+			Method: httpRequest.Method,
+			Path:   httpRequest.URL.Path,
+			Host:   httpRequest.URL.Hostname(),
+			Port:   port,
+		},
 	}
 }

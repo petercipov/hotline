@@ -19,7 +19,7 @@ type ValidationReader interface {
 }
 
 type ValidationReporter interface {
-	Report(ctx context.Context, result ValidationResult)
+	HandleRequestValidated(ctx context.Context, result ValidationResult)
 }
 
 type ValidatorScope struct {
@@ -32,13 +32,13 @@ type ValidatorScope struct {
 	validationReporter ValidationReporter
 }
 
-func NewEmptyValidatorScope(schemaRepo SchemaReader, validationRepo ValidationReader, reporter ValidationReporter) *ValidatorScope {
+func NewEmptyValidatorScope(schemaReader SchemaReader, validationReader ValidationReader, reporter ValidationReporter) *ValidatorScope {
 	return &ValidatorScope{
 		validators: make(map[integrations.ID]*IntegrationValidation),
 
 		LastObservedTime: time.Time{},
-		schemaReader:     schemaRepo,
-		validationReader: validationRepo,
+		schemaReader:     schemaReader,
+		validationReader: validationReader,
 
 		validationReporter: reporter,
 	}
@@ -185,5 +185,5 @@ func (message *ValidateRequestMessage) Execute(ctx context.Context, _ string, sc
 		result.Success = success
 	}
 
-	scope.validationReporter.Report(ctx, result)
+	scope.validationReporter.HandleRequestValidated(ctx, result)
 }

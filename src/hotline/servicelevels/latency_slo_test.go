@@ -105,7 +105,7 @@ func (s *latencySLOSUT) forEmptySLO() {
 		1*time.Minute)
 }
 
-func (s *latencySLOSUT) getMetrics() []servicelevels.SLOCheck {
+func (s *latencySLOSUT) getMetrics() []servicelevels.LevelsCheck {
 	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	return s.slo.Check(now)
 }

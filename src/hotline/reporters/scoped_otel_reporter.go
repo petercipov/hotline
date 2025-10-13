@@ -46,7 +46,7 @@ func NewScopedOtelReporter(
 			return NewOtelReporter(&scopedConfig, scope.client, scope.gzip, proto.Marshal)
 		},
 		func(ctx context.Context, _ string, _ *OtelReporterScope, worker *OtelReporter, message *servicelevels.CheckReport) {
-			reportErr := worker.ReportChecks(ctx, message)
+			reportErr := worker.ReportChecks(ctx, *message)
 			if reportErr != nil {
 				slog.ErrorContext(ctx, "Failed to report SLO checks ", slog.Any("error", reportErr))
 			}
@@ -58,6 +58,6 @@ func NewScopedOtelReporter(
 	}
 }
 
-func (r *ScopedOtelReporter) ReportChecks(_ context.Context, check *servicelevels.CheckReport) {
-	r.workers.Execute(check)
+func (r *ScopedOtelReporter) ReportChecks(_ context.Context, check servicelevels.CheckReport) {
+	r.workers.Execute(&check)
 }

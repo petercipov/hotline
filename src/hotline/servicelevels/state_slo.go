@@ -85,7 +85,7 @@ func (s *StateSLO) AddState(now time.Time, state string) {
 	s.window.AddValue(now, state)
 }
 
-func (s *StateSLO) Check(now time.Time) []SLOCheck {
+func (s *StateSLO) Check(now time.Time) []LevelsCheck {
 	activeWindow := s.window.GetActiveWindow(now)
 	if activeWindow == nil {
 		return nil
@@ -95,11 +95,12 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 	expectedBreach, expectedMetric, expectedEventsCount, expectedBreakdown := s.checkExpectedBreach(histogram)
 	unexpectedBreach, unexpectedMetric, unexpectedEventsCount, unexpectedBreakdown := s.checkUnexpectedBreach(histogram)
 
-	checks := make([]SLOCheck, 2)
+	checks := make([]LevelsCheck, 2)
 	checks = checks[:0]
 	if len(expectedBreakdown) > 0 {
-		checks = append(checks, SLOCheck{
+		checks = append(checks, LevelsCheck{
 			Namespace: s.namespace,
+			Timestamp: now,
 			Metric: Metric{
 				Name:        expectedStateName,
 				Value:       expectedMetric,
@@ -113,8 +114,9 @@ func (s *StateSLO) Check(now time.Time) []SLOCheck {
 	}
 
 	if unexpectedBreach != nil {
-		checks = append(checks, SLOCheck{
+		checks = append(checks, LevelsCheck{
 			Namespace: s.namespace,
+			Timestamp: now,
 			Metric: Metric{
 				Name:        unexpectedStateName,
 				Value:       unexpectedMetric,

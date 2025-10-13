@@ -62,10 +62,10 @@ func NewOtelReporter(cfg *OtelReporterConfig, client *http.Client, gzipWriter *g
 
 var ErrOtelUnexpectedStatus = errors.New("otel server returned unexpected status code")
 
-func (o *OtelReporter) ReportChecks(ctx context.Context, report *servicelevels.CheckReport) error {
+func (o *OtelReporter) ReportChecks(ctx context.Context, report servicelevels.CheckReport) error {
 	var allMetrics []*metricspb.Metric
-	for _, check := range report.Checks {
-		metrics := toMetrics(report.Now, check)
+	for _, check := range report {
+		metrics := toMetrics(check)
 		allMetrics = append(allMetrics, metrics...)
 	}
 
@@ -119,33 +119,33 @@ func (o *OtelReporter) ReportChecks(ctx context.Context, report *servicelevels.C
 	return fmt.Errorf("%w code: %d for req %s %s", ErrOtelUnexpectedStatus, response.StatusCode, postReq.Method, postReq.URL.String())
 }
 
-func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
+func toMetrics(check servicelevels.Check) []*metricspb.Metric {
 	var metrics []*metricspb.Metric
-	for _, slo := range check.SLO {
+	for _, level := range check.Levels {
 
 		attributes := []*commonpb.KeyValue{
 			StringAttribute("integration_id", string(check.IntegrationID)),
-			StringAttribute("metric", slo.Metric.Name),
-			BoolAttribute("breached", slo.Breach != nil),
+			StringAttribute("metric", level.Metric.Name),
+			BoolAttribute("breached", level.Breach != nil),
 		}
-		for key, val := range slo.Tags {
+		for key, val := range level.Tags {
 			attributes = append(attributes, StringAttribute(key, val))
 		}
 
-		metricID := "service_levels_" + slo.Namespace
+		metricID := "service_levels_" + level.Namespace
 		metricIDEvents := metricID + "_events"
 
 		metrics = append(metrics, &metricspb.Metric{
 			Name: metricID,
-			Unit: slo.Metric.Unit,
+			Unit: level.Metric.Unit,
 			Data: &metricspb.Metric_Gauge{
 				Gauge: &metricspb.Gauge{
 					DataPoints: []*metricspb.NumberDataPoint{
 						{
 							Attributes:   attributes,
-							TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
+							TimeUnixNano: clock.TimeToUint64NanoOrZero(level.Timestamp),
 							Value: &metricspb.NumberDataPoint_AsDouble{
-								AsDouble: slo.Metric.Value,
+								AsDouble: level.Metric.Value,
 							},
 						},
 					},
@@ -159,9 +159,9 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 					DataPoints: []*metricspb.NumberDataPoint{
 						{
 							Attributes:   attributes,
-							TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
+							TimeUnixNano: clock.TimeToUint64NanoOrZero(level.Timestamp),
 							Value: &metricspb.NumberDataPoint_AsInt{
-								AsInt: slo.Metric.EventsCount,
+								AsInt: level.Metric.EventsCount,
 							},
 						},
 					},
@@ -173,14 +173,14 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 		breakDownMetricID := metricID + "_breakdown"
 		breakDownCountID := breakDownMetricID + "_events"
 
-		for _, breakdown := range slo.Breakdown {
+		for _, breakdown := range level.Breakdown {
 			attributes = []*commonpb.KeyValue{
 				StringAttribute("integration_id", string(check.IntegrationID)),
 				StringAttribute("breakdown", breakdown.Name),
-				StringAttribute("metric", slo.Metric.Name),
-				BoolAttribute("breached", slo.Breach != nil),
+				StringAttribute("metric", level.Metric.Name),
+				BoolAttribute("breached", level.Breach != nil),
 			}
-			for key, val := range slo.Tags {
+			for key, val := range level.Tags {
 				attributes = append(attributes, StringAttribute(key, val))
 			}
 
@@ -192,7 +192,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 						DataPoints: []*metricspb.NumberDataPoint{
 							{
 								Attributes:   attributes,
-								TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
+								TimeUnixNano: clock.TimeToUint64NanoOrZero(level.Timestamp),
 								Value: &metricspb.NumberDataPoint_AsDouble{
 									AsDouble: breakdown.Value,
 								},
@@ -208,7 +208,7 @@ func toMetrics(now time.Time, check servicelevels.Check) []*metricspb.Metric {
 						DataPoints: []*metricspb.NumberDataPoint{
 							{
 								Attributes:   attributes,
-								TimeUnixNano: clock.TimeToUint64NanoOrZero(now),
+								TimeUnixNano: clock.TimeToUint64NanoOrZero(level.Timestamp),
 								Value: &metricspb.NumberDataPoint_AsInt{
 									AsInt: breakdown.EventsCount,
 								},

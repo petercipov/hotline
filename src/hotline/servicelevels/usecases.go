@@ -37,9 +37,10 @@ func (u *UseCase) GetServiceLevels(ctx context.Context, id integrations.ID) (Api
 }
 
 type RouteModification struct {
-	Route   http.Route
-	Latency *HttpLatencyServiceLevels
-	Status  *HttpStatusServiceLevels
+	Route      http.Route
+	Latency    *LatencyServiceLevels
+	Status     *StatusServiceLevels
+	Validation *ValidationServiceLevels
 }
 
 func (u *UseCase) ModifyRoute(ctx context.Context, id integrations.ID, routeDef RouteModification) (http.RouteKey, error) {
@@ -54,10 +55,11 @@ func (u *UseCase) ModifyRoute(ctx context.Context, id integrations.ID, routeDef 
 		}
 	}
 	levels.Upsert(RouteServiceLevels{
-		Route:   route,
-		Key:     key,
-		Latency: routeDef.Latency,
-		Status:  routeDef.Status,
+		Route:      route,
+		Key:        key,
+		Latency:    routeDef.Latency,
+		Status:     routeDef.Status,
+		Validation: routeDef.Validation,
 	})
 	setErr := u.repo.Modify(ctx, id, levels)
 	if setErr != nil {

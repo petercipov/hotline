@@ -4,7 +4,6 @@ import (
 	"hotline/clock"
 	"hotline/http"
 	"hotline/servicelevels"
-	"net/url"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,8 +30,12 @@ var _ = Describe("Service Levels Checker", func() {
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
-			Method:  "GET",
-			URL:     newUrl("https://iam.example.com/users"),
+			Locator: http.RequestLocator{
+				Method: "GET",
+				Path:   "/users",
+				Host:   "iam.example.com",
+				Port:   443,
+			},
 		})
 		metrics := s.Check()
 		Expect(metrics).To(BeEmpty())
@@ -43,13 +46,16 @@ var _ = Describe("Service Levels Checker", func() {
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
-			Method:  "GET",
-			URL:     newUrl("/"),
+			Locator: http.RequestLocator{
+				Method: "GET",
+				Path:   "/",
+			},
 		})
 		metrics := s.Check()
 		Expect(metrics).To(HaveLen(2))
-		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+		Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_latency",
+			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 			Metric: servicelevels.Metric{
 				Name:        "p99",
 				Value:       0,
@@ -62,8 +68,9 @@ var _ = Describe("Service Levels Checker", func() {
 			Breakdown: nil,
 			Breach:    nil,
 		}))
-		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
+			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 			Metric: servicelevels.Metric{
 				Name:        "expected",
 				Value:       100,
@@ -90,13 +97,18 @@ var _ = Describe("Service Levels Checker", func() {
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
-			Method:  "GET",
-			URL:     newUrl("https://iam.example.com/users"),
+			Locator: http.RequestLocator{
+				Method: "GET",
+				Path:   "/users",
+				Host:   "iam.example.com",
+				Port:   443,
+			},
 		})
 		metrics := s.Check()
 		Expect(metrics).To(HaveLen(2))
-		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+		Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_latency",
+			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 			Metric: servicelevels.Metric{
 				Name:        "p99",
 				Value:       0,
@@ -109,8 +121,9 @@ var _ = Describe("Service Levels Checker", func() {
 			Breakdown: nil,
 			Breach:    nil,
 		}))
-		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
+			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 			Metric: servicelevels.Metric{
 				Name:        "expected",
 				Value:       100,
@@ -137,19 +150,28 @@ var _ = Describe("Service Levels Checker", func() {
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "404",
-			Method:  "GET",
-			URL:     newUrl("https://iam.example.com/users"),
+			Locator: http.RequestLocator{
+				Method: "GET",
+				Path:   "/users",
+				Host:   "iam.example.com",
+				Port:   443,
+			},
 		})
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "500",
-			Method:  "GET",
-			URL:     newUrl("https://iam.example.com/users"),
+			Locator: http.RequestLocator{
+				Method: "GET",
+				Path:   "/users",
+				Host:   "iam.example.com",
+				Port:   443,
+			},
 		})
 		metrics := s.Check()
 		Expect(metrics).To(HaveLen(2))
-		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
+			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 			Metric: servicelevels.Metric{
 				Name:        "unexpected",
 				Value:       100,
@@ -187,13 +209,18 @@ var _ = Describe("Service Levels Checker", func() {
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "unknown_state",
-			Method:  "GET",
-			URL:     newUrl("https://iam.example.com/users"),
+			Locator: http.RequestLocator{
+				Method: "GET",
+				Path:   "/users",
+				Host:   "iam.example.com",
+				Port:   443,
+			},
 		})
 		metrics := s.Check()
 		Expect(metrics).To(HaveLen(2))
-		Expect(metrics[1]).To(Equal(servicelevels.SLOCheck{
+		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
+			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 			Metric: servicelevels.Metric{
 				Name:        "unexpected",
 				Value:       100,
@@ -225,14 +252,19 @@ var _ = Describe("Service Levels Checker", func() {
 		s.AddRequest(&servicelevels.HttpRequest{
 			Latency: 1000,
 			State:   "200",
-			Method:  "POST",
-			URL:     newUrl("https://iam.example.com/users"),
+			Locator: http.RequestLocator{
+				Method: "POST",
+				Path:   "/users",
+				Host:   "iam.example.com",
+				Port:   443,
+			},
 		})
 
 		metrics := s.Check()
 		Expect(metrics).To(HaveLen(2))
-		Expect(metrics[0]).To(Equal(servicelevels.SLOCheck{
+		Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_latency",
+			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 			Metric: servicelevels.Metric{
 				Name:        "p99",
 				Value:       0,
@@ -287,10 +319,10 @@ var _ = Describe("Service Levels Checker", func() {
 })
 
 type suthttpapislo struct {
-	slo *servicelevels.Checker
+	slo *servicelevels.IntegrationServiceLevels
 }
 
-func (s *suthttpapislo) Check() []servicelevels.SLOCheck {
+func (s *suthttpapislo) Check() []servicelevels.LevelsCheck {
 	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	return s.slo.Check(now)
 }
@@ -328,7 +360,7 @@ func defaultRouteModificationForMethod(method string, host string, pathPattern s
 	}
 	return servicelevels.RouteModification{
 		Route: route,
-		Latency: &servicelevels.HttpLatencyServiceLevels{
+		Latency: &servicelevels.LatencyServiceLevels{
 			Percentiles: []servicelevels.PercentileDefinition{
 				{
 					Percentile: 0.999,
@@ -338,7 +370,7 @@ func defaultRouteModificationForMethod(method string, host string, pathPattern s
 			},
 			WindowDuration: 1 * time.Minute,
 		},
-		Status: &servicelevels.HttpStatusServiceLevels{
+		Status: &servicelevels.StatusServiceLevels{
 			Expected:        []string{"200", "201"},
 			BreachThreshold: 0.999,
 			WindowDuration:  1 * time.Hour,
@@ -354,10 +386,4 @@ func defaultRouteModification(host string, path string) servicelevels.RouteServi
 		Latency: modification.Latency,
 		Status:  modification.Status,
 	}
-}
-
-func newUrl(urlString string) *url.URL {
-	u, err := url.Parse(urlString)
-	Expect(err).ToNot(HaveOccurred())
-	return u
 }

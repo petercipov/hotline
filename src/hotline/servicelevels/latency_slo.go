@@ -35,14 +35,14 @@ func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Durat
 	}
 }
 
-func (s *LatencySLO) Check(now time.Time) []SLOCheck {
+func (s *LatencySLO) Check(now time.Time) []LevelsCheck {
 	activeWindow := s.window.GetActiveWindow(now)
 	if activeWindow == nil {
 		return nil
 	}
 
 	histogram := activeWindow.Accumulator.(*metrics.LatencyHistogram)
-	metrics := make([]SLOCheck, len(s.percentiles))
+	metrics := make([]LevelsCheck, len(s.percentiles))
 	for i, definition := range s.percentiles {
 		bucket, eventsCount := histogram.ComputePercentile(definition.Percentile.Normalized())
 		metric := bucket.To
@@ -56,7 +56,7 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 				WindowDuration: s.window.Size,
 			}
 		}
-		metrics[i] = SLOCheck{
+		metrics[i] = LevelsCheck{
 			Namespace: s.namespace,
 			Metric: Metric{
 				Name:        definition.Name,
@@ -64,8 +64,9 @@ func (s *LatencySLO) Check(now time.Time) []SLOCheck {
 				Unit:        "ms",
 				EventsCount: eventsCount,
 			},
-			Tags:   s.tags,
-			Breach: breach,
+			Tags:      s.tags,
+			Breach:    breach,
+			Timestamp: now,
 		}
 	}
 	return metrics
