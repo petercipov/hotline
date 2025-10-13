@@ -42,7 +42,7 @@ jobs:
           git-branch: badges
           git-file-name: .badges/main/hotline.svg
       - name: check app test coverage
-        uses: vladopajic/go-test-coverage@v2
+        uses: vladopajic/go-test-coverage@cc5012c2cfa84542e02b079141958a885861d326 # v2.17.0
         with:
           profile: cover.app.out
           source-dir: ./src/app
