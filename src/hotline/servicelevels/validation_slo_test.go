@@ -30,10 +30,7 @@ func (s *validationSloSut) forValidationSLO() {
 		map[string]string{
 			"test": "tag",
 		})
-	s.clock = clock.NewManualClock(
-		clock.ParseTime("2025-02-22T12:02:10Z"),
-		500*time.Microsecond,
-	)
+	s.clock = clock.NewDefaultManualClock()
 }
 
 func (s *validationSloSut) Check() []servicelevels.LevelsCheck {

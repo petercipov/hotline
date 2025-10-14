@@ -7,7 +7,6 @@ import (
 	"hotline/http"
 	"hotline/integrations"
 	"hotline/servicelevels"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -88,10 +87,7 @@ type usecaseSut struct {
 }
 
 func (u *usecaseSut) forEmptyUseCase() {
-	u.manualClock = clock.NewManualClock(
-		clock.ParseTime("2025-02-22T12:02:10Z"),
-		500*time.Microsecond,
-	)
+	u.manualClock = clock.NewDefaultManualClock()
 	u.repo = &repoWithFailures{}
 	u.publisher = &publisherWithFailures{}
 	u.usecase = servicelevels.NewUseCase(

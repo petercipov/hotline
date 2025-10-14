@@ -31,9 +31,7 @@ type appSut struct {
 }
 
 func newAppSut(t *testing.T) *appSut {
-	manualClock := clock.NewManualClock(
-		clock.ParseTime("2025-02-22T12:02:10Z"),
-		500*time.Microsecond)
+	manualClock := clock.NewDefaultManualClock()
 
 	return &appSut{
 		t:                       t,

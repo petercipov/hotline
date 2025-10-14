@@ -149,7 +149,7 @@ func (s *proxySUT) ForRunningProxy() {
 }
 
 func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTripper, reader io.Reader) {
-	s.managedTime = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"), 1*time.Second)
+	s.managedTime = clock.NewDefaultManualClock()
 
 	s.semantics = egress.DefaultRequestSemantics()
 	s.integrationID = "integration 123"

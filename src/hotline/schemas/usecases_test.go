@@ -8,7 +8,6 @@ import (
 	"hotline/schemas"
 	"hotline/uuid"
 	"io"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -150,10 +149,7 @@ func (sut *UsecaseSut) Close() error {
 }
 
 func (sut *UsecaseSut) build(generator uuid.V7StringGenerator) {
-	manualClock := clock.NewManualClock(
-		clock.ParseTime("2025-02-22T12:02:10Z"),
-		500*time.Microsecond,
-	)
+	manualClock := clock.NewDefaultManualClock()
 	schemaRepo := schemas.NewInMemorySchemaRepository()
 	validatorRepo := schemas.NewInMemoryValidationRepository()
 	sut.schema = schemas.NewSchemaUseCase(

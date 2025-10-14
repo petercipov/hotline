@@ -136,9 +136,7 @@ func (s *validationPipelineSut) Close() {
 }
 
 func (s *validationPipelineSut) forPipelineWithoutDefinition() {
-	manualTime := clock.NewManualClock(
-		clock.ParseTime("2025-02-22T12:02:10Z"),
-		500*time.Microsecond)
+	manualTime := clock.NewDefaultManualClock()
 	s.schemaRepo = schemas.NewInMemorySchemaRepository()
 	s.validationRepo = schemas.NewInMemoryValidationRepository()
 	s.validationUseCase = schemas.NewValidationUseCase(s.validationRepo, s.schemaRepo)
