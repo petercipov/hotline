@@ -116,11 +116,11 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 	It("should report less when config is reduced from multiple to single slo", func() {
 		sut.forPipeline()
-		sut.ForMultipleConfig("known_integration_id")
+		sut.ForMultipleConfig()
 
-		sut.IngestOKRequestToUrl("known_integration_id", "/api")
-		sut.IngestOKRequestToUrl("known_integration_id", "/products")
-		sut.IngestOKRequestToUrl("known_integration_id", "/orders")
+		sut.IngestOKRequestForPath("/api")
+		sut.IngestOKRequestForPath("/products")
+		sut.IngestOKRequestForPath("/orders")
 
 		sut.DropNonDefaultRoutes("known_integration_id")
 
@@ -248,14 +248,18 @@ func (s *sloPipelineSUT) Report() servicelevels.ReportArr {
 }
 
 func (s *sloPipelineSUT) IngestOKRequestForIntegration(id integrations.ID) {
-	s.IngestOKRequestToUrl(id, "/api/")
+	s.IngestOKRequestForIntegrationAndPath(id, "/api/")
 }
 
 func (s *sloPipelineSUT) IngestOKRequest() {
-	s.IngestOKRequestForIntegration("known_integration_id")
+	s.IngestOKRequestForIntegrationAndPath("known_integration_id", "/api/")
 }
 
-func (s *sloPipelineSUT) IngestOKRequestToUrl(id integrations.ID, path string) {
+func (s *sloPipelineSUT) IngestOKRequestForPath(path string) {
+	s.IngestOKRequestForIntegrationAndPath("known_integration_id", path)
+}
+
+func (s *sloPipelineSUT) IngestOKRequestForIntegrationAndPath(id integrations.ID, path string) {
 	now := s.manualClock.Now()
 	s.pipeline.IngestHttpRequest(&servicelevels.IngestRequestsMessage{
 		ID:  id,
@@ -292,7 +296,8 @@ func (s *sloPipelineSUT) ForDefaultConfig() {
 	s.ForDefaultConfigForIntegration("known_integration_id")
 }
 
-func (s *sloPipelineSUT) ForMultipleConfig(integrationID integrations.ID) {
+func (s *sloPipelineSUT) ForMultipleConfig() {
+	integrationID := integrations.ID("known_integration_id")
 	_, err := s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/"))
 	Expect(err).NotTo(HaveOccurred())
 	_, err = s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/products"))
