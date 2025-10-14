@@ -26,10 +26,10 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 		for i := range 1000 {
 			id := integrations.ID("unknown_integration_id-" + strconv.Itoa(i))
-			sut.NoConfigPresent(id, "2025-02-22T12:04:00Z")
-			sut.IngestOKRequest(id, "2025-02-22T12:04:05Z")
+			sut.NoConfigPresentForIntegration(id)
+			sut.IngestOKRequestForIntegration(id)
 		}
-		reports := sut.Report("2025-02-22T12:04:55Z")
+		reports := sut.Report()
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 		for _, report := range reports {
 			Expect(report).To(BeEmpty())
@@ -38,11 +38,11 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 	It("should report metrics if configuration available", func() {
 		sut.forPipeline()
-		sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
+		sut.ForDefaultConfig()
 		for range 1000 {
-			sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
+			sut.IngestOKRequest()
 		}
-		reports := sut.Report("2025-02-22T12:04:55Z")
+		reports := sut.Report()
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 		var nonEmptyReports []servicelevels.CheckReport
@@ -57,14 +57,14 @@ var _ = Describe("Service Levels Pipeline", func() {
 	Context("updating slo config", func() {
 		It("should report different config if route was changed", func() {
 			sut.forPipeline()
-			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
+			sut.ForDefaultConfig()
 			for range 1000 {
-				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
+				sut.IngestOKRequest()
 			}
 
-			sut.ChangeConfig("known_integration_id", "2025-02-22T12:05:05Z")
+			sut.ChangeConfig()
 
-			reports := sut.Report("2025-02-22T12:05:05Z")
+			reports := sut.Report()
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 			var nonEmptyReports []servicelevels.CheckReport
@@ -78,13 +78,13 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 		It("should report nothing when config was removed", func() {
 			sut.forPipeline()
-			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
+			sut.ForDefaultConfig()
 			for range 10 {
-				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
+				sut.IngestOKRequest()
 			}
-			sut.NoConfigPresent("known_integration_id", "2025-02-22T12:04:05Z")
+			sut.NoConfigPresent()
 
-			reports := sut.Report("2025-02-22T12:05:05Z")
+			reports := sut.Report()
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 			for _, report := range reports {
@@ -94,13 +94,13 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 		It("should report nothing when config was emptied", func() {
 			sut.forPipeline()
-			sut.ForDefaultConfig("known_integration_id", "2025-02-22T12:04:00Z")
+			sut.ForDefaultConfig()
 			for range 10 {
-				sut.IngestOKRequest("known_integration_id", "2025-02-22T12:04:05Z")
+				sut.IngestOKRequest()
 			}
-			sut.EmptyConfigPresent("known_integration_id", "2025-02-22T12:04:05Z")
+			sut.EmptyConfigPresent()
 
-			reports := sut.Report("2025-02-22T12:05:05Z")
+			reports := sut.Report()
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 			for _, report := range reports {
@@ -116,15 +116,15 @@ var _ = Describe("Service Levels Pipeline", func() {
 
 	It("should report less when config is reduced from multiple to single slo", func() {
 		sut.forPipeline()
-		sut.ForMultipleConfig("known_integration_id", "2025-02-22T12:04:00Z")
+		sut.ForMultipleConfig("known_integration_id")
 
-		sut.IngestOKRequestToUrl("known_integration_id", "2025-02-22T12:04:05Z", "/api")
-		sut.IngestOKRequestToUrl("known_integration_id", "2025-02-22T12:04:05Z", "/products")
-		sut.IngestOKRequestToUrl("known_integration_id", "2025-02-22T12:04:05Z", "/orders")
+		sut.IngestOKRequestToUrl("known_integration_id", "/api")
+		sut.IngestOKRequestToUrl("known_integration_id", "/products")
+		sut.IngestOKRequestToUrl("known_integration_id", "/orders")
 
 		sut.DropNonDefaultRoutes("known_integration_id")
 
-		reports := sut.Report("2025-02-22T12:05:05Z")
+		reports := sut.Report()
 		Expect(reports).To(HaveLen(sut.numberOfQueues))
 
 		checks := 0
@@ -140,7 +140,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 			sut.forPipeline()
 			sut.IngestValidationMessage()
 
-			reports := sut.Report("2025-02-22T12:05:05Z")
+			reports := sut.Report()
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 			byIntegration := reports.GroupByIntegrationID()
 			Expect(byIntegration).To(BeEmpty())
@@ -153,7 +153,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 			for range 10 {
 				sut.IngestValidationMessage()
 			}
-			reports := sut.Report("2025-02-22T12:05:05Z")
+			reports := sut.Report()
 			Expect(reports).To(HaveLen(sut.numberOfQueues))
 			byIntegration := reports.GroupByIntegrationID()
 			Expect(byIntegration).NotTo(BeEmpty())
@@ -161,7 +161,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 			Expect(integrationChecks).To(HaveLen(1))
 			Expect(integrationChecks[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_validation",
-				Timestamp: clock.ParseTime("2025-02-22T12:05:05Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0055Z"),
 				Metric: servicelevels.Metric{
 					Name:        "skipped",
 					Value:       100,
@@ -188,11 +188,7 @@ type sloPipelineSUT struct {
 }
 
 func (s *sloPipelineSUT) forPipeline() {
-	s.manualClock = clock.NewManualClock(
-		clock.ParseTime("2025-02-22T12:02:10Z"),
-		500*time.Microsecond,
-	)
-
+	s.manualClock = clock.NewDefaultManualClock()
 	s.numberOfQueues = 8
 	queueIDs := concurrency.GenerateScopeIds("queue", s.numberOfQueues)
 	s.sloRepository = &servicelevels.InMemoryRepository{}
@@ -214,16 +210,19 @@ func (s *sloPipelineSUT) forPipeline() {
 	s.eventsHandler.Pipeline = s.pipeline
 }
 
-func (s *sloPipelineSUT) NoConfigPresent(id integrations.ID, timeStr string) {
+func (s *sloPipelineSUT) NoConfigPresentForIntegration(id integrations.ID) {
 	dropErr := s.useCase.DropServiceLevels(context.Background(), id)
 	Expect(dropErr).NotTo(HaveOccurred())
 }
 
-func (s *sloPipelineSUT) EmptyConfigPresent(id integrations.ID, timeStr string) {
-	s.manualClock.Reset(clock.ParseTime(timeStr))
+func (s *sloPipelineSUT) NoConfigPresent() {
+	s.NoConfigPresentForIntegration("known_integration_id")
+}
+
+func (s *sloPipelineSUT) EmptyConfigPresent() {
 	_, err := s.useCase.ModifyRoute(
 		context.Background(),
-		id,
+		"known_integration_id",
 		servicelevels.RouteModification{
 			Route: http.Route{
 				PathPattern: "/",
@@ -232,8 +231,8 @@ func (s *sloPipelineSUT) EmptyConfigPresent(id integrations.ID, timeStr string) 
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func (s *sloPipelineSUT) Report(timeStr string) servicelevels.ReportArr {
-	now := clock.ParseTime(timeStr)
+func (s *sloPipelineSUT) Report() servicelevels.ReportArr {
+	now := s.manualClock.Now()
 	s.pipeline.Check(&servicelevels.CheckMessage{
 		Now: now,
 	})
@@ -248,12 +247,16 @@ func (s *sloPipelineSUT) Report(timeStr string) servicelevels.ReportArr {
 	}
 }
 
-func (s *sloPipelineSUT) IngestOKRequest(id integrations.ID, timeStr string) {
-	s.IngestOKRequestToUrl(id, timeStr, "/api/")
+func (s *sloPipelineSUT) IngestOKRequestForIntegration(id integrations.ID) {
+	s.IngestOKRequestToUrl(id, "/api/")
 }
 
-func (s *sloPipelineSUT) IngestOKRequestToUrl(id integrations.ID, timeStr string, path string) {
-	now := clock.ParseTime(timeStr)
+func (s *sloPipelineSUT) IngestOKRequest() {
+	s.IngestOKRequestForIntegration("known_integration_id")
+}
+
+func (s *sloPipelineSUT) IngestOKRequestToUrl(id integrations.ID, path string) {
+	now := s.manualClock.Now()
 	s.pipeline.IngestHttpRequest(&servicelevels.IngestRequestsMessage{
 		ID:  id,
 		Now: now,
@@ -272,23 +275,24 @@ func (s *sloPipelineSUT) IngestOKRequestToUrl(id integrations.ID, timeStr string
 	})
 }
 
-func (s *sloPipelineSUT) ChangeConfig(integrationID integrations.ID, timeStr string) {
-	s.manualClock.Reset(clock.ParseTime(timeStr))
+func (s *sloPipelineSUT) ChangeConfig() {
+	_, err := s.useCase.ModifyRoute(
+		context.Background(),
+		"known_integration_id",
+		defaultRouteModificationForMethod("", "", "/"))
+	Expect(err).NotTo(HaveOccurred())
+}
 
+func (s *sloPipelineSUT) ForDefaultConfigForIntegration(integrationID integrations.ID) {
 	_, err := s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/"))
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func (s *sloPipelineSUT) ForDefaultConfig(integrationID integrations.ID, timeStr string) {
-	s.manualClock.Reset(clock.ParseTime(timeStr))
-
-	_, err := s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/"))
-	Expect(err).NotTo(HaveOccurred())
+func (s *sloPipelineSUT) ForDefaultConfig() {
+	s.ForDefaultConfigForIntegration("known_integration_id")
 }
 
-func (s *sloPipelineSUT) ForMultipleConfig(integrationID integrations.ID, timeStr string) {
-	s.manualClock.Reset(clock.ParseTime(timeStr))
-
+func (s *sloPipelineSUT) ForMultipleConfig(integrationID integrations.ID) {
 	_, err := s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/"))
 	Expect(err).NotTo(HaveOccurred())
 	_, err = s.useCase.ModifyRoute(context.Background(), integrationID, defaultRouteModificationForMethod("", "", "/products"))

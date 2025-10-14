@@ -13,6 +13,13 @@ type ManualClock struct {
 	advanceOnNow time.Duration
 }
 
+func NewDefaultManualClock() *ManualClock {
+	return NewManualClock(
+		ParseTime("2025-02-22T12:02:10Z"),
+		500*time.Microsecond,
+	)
+}
+
 func NewManualClock(now time.Time, advanceOnNow time.Duration) *ManualClock {
 	return &ManualClock{
 		now:          now,
