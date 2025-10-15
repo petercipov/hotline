@@ -192,7 +192,7 @@ func (m *RequestValidatedMessage) Execute(_ context.Context, _ string, scope *SL
 		return
 	}
 
-	slo.AddRequestValidation(scope.LastObservedTime, m.Locator)
+	slo.AddRequestValidation(scope.LastObservedTime, m.Locator, m.Status)
 }
 
 func (m *RequestValidatedMessage) GetShardingKey() []byte {

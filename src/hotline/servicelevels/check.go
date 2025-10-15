@@ -28,4 +28,5 @@ type SLOBreach struct {
 	ThresholdUnit  string
 	Operation      Operation
 	WindowDuration time.Duration
+	Uptime         time.Duration
 }

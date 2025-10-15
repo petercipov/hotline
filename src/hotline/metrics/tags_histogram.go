@@ -20,12 +20,16 @@ func (h *TagHistogram[T]) Add(tag T) {
 	h.buckets.Add(*key, 1)
 }
 
+func (h *TagHistogram[T]) Total() int64 {
+	return h.buckets.Sum()
+}
+
 func (h *TagHistogram[T]) ComputePercentile(tag T) (*float64, int64) {
 	key := h.layout.key(tag)
 	if key == nil {
 		return nil, 0
 	}
-	total := float64(h.buckets.Sum())
+	total := float64(h.Total())
 	counter := h.buckets.GetCounter(*key)
 	if counter == nil {
 		return nil, 0

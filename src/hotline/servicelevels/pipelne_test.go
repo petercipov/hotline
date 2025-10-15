@@ -146,7 +146,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 			Expect(byIntegration).To(BeEmpty())
 		})
 
-		It("computes number of not validated requests, when no validation was done", func() {
+		It("computes number of success validated requests, when validation was done", func() {
 			sut.forPipeline()
 			sut.forConfigWithRequestValidation()
 
@@ -163,7 +163,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 				Namespace: "http_route_validation",
 				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0055Z"),
 				Metric: servicelevels.Metric{
-					Name:        "skipped",
+					Name:        "valid_requests",
 					Value:       100,
 					Unit:        "%",
 					EventsCount: 10,
@@ -171,12 +171,27 @@ var _ = Describe("Service Levels Pipeline", func() {
 				Tags: map[string]string{
 					"http_route": "RKpMj21xeTHEQ",
 				},
+				Breakdown: []servicelevels.Metric{
+					{
+						Name:        "skipped",
+						Value:       0,
+						Unit:        "%",
+						EventsCount: 0,
+					},
+					{
+						Name:        "valid",
+						Value:       100,
+						Unit:        "%",
+						EventsCount: 10,
+					},
+					{
+						Name:        "invalid",
+						Value:       0,
+						Unit:        "%",
+						EventsCount: 0,
+					},
+				},
 			}))
-		})
-
-		It("computes number of succesfully validated requests", func() {
-			sut.forPipeline()
-			sut.forConfigWithRequestValidation()
 		})
 	})
 })
@@ -360,6 +375,6 @@ func (s *sloPipelineSUT) IngestValidationMessage() {
 			Host:   "test.com",
 			Port:   443,
 		},
-		Status: servicelevels.ValidationStatusSkipped,
+		Status: servicelevels.ValidationStatusSuccess,
 	})
 }

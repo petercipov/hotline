@@ -48,6 +48,7 @@ type RouteServiceLevels struct {
 	Latency    *LatencyServiceLevels
 	Status     *StatusServiceLevels
 	Validation *ValidationServiceLevels
+	CreatedAt  time.Time
 }
 
 type LatencyServiceLevels struct {
@@ -102,10 +103,10 @@ func (s *IntegrationServiceLevels) DeleteRoute(route hotlinehttp.Route) {
 	s.mux.Delete(route)
 }
 
-func (s *IntegrationServiceLevels) AddRequestValidation(now time.Time, locator hotlinehttp.RequestLocator) {
+func (s *IntegrationServiceLevels) AddRequestValidation(now time.Time, locator hotlinehttp.RequestLocator, status ValidationStatus) {
 	handler := s.mux.LocaleHandler(locator)
 	if handler != nil {
-		handler.AddRequestValidation(now)
+		handler.AddRequestValidation(now, status)
 	}
 }
 
@@ -148,6 +149,7 @@ func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
 			slo.Validation.WindowDuration,
 			"http_route_validation",
 			tags,
+			slo.CreatedAt,
 		)
 	}
 
@@ -188,8 +190,8 @@ func (s *HttpRouteSLO) Check(now time.Time) []LevelsCheck {
 	return slices.Concat(latencyCheck, stateCheck, validationCheck)
 }
 
-func (s *HttpRouteSLO) AddRequestValidation(now time.Time) {
+func (s *HttpRouteSLO) AddRequestValidation(now time.Time, status ValidationStatus) {
 	if s.validationSLO != nil {
-		s.validationSLO.AddValidation(now, ValidationStatusSkipped)
+		s.validationSLO.AddValidation(now, status)
 	}
 }

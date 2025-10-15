@@ -18,6 +18,7 @@ type ValidationSLO struct {
 	namespace       string
 	tags            map[string]string
 	breachThreshold Percentile
+	createAt        time.Time
 }
 
 func NewValidationSLO(
@@ -25,6 +26,7 @@ func NewValidationSLO(
 	windowDuration time.Duration,
 	namespace string,
 	tags map[string]string,
+	now time.Time,
 ) *ValidationSLO {
 	window := metrics.NewSlidingWindow(func() metrics.Accumulator[ValidationStatus] {
 		return metrics.NewTagsHistogram([]ValidationStatus{
@@ -39,6 +41,7 @@ func NewValidationSLO(
 		namespace:       namespace,
 		window:          window,
 		tags:            tags,
+		createAt:        now,
 	}
 }
 
@@ -51,26 +54,70 @@ func (s *ValidationSLO) Check(now time.Time) []LevelsCheck {
 	if activeWindow == nil {
 		return nil
 	}
-	checks := make([]LevelsCheck, 1)
-	checks = checks[:0]
+	uptime := now.Sub(s.createAt)
 	histogram := activeWindow.Accumulator.(*metrics.TagHistogram[ValidationStatus])
 
-	percentage, total := histogram.ComputePercentile(ValidationStatusSkipped)
-	if percentage != nil {
-		checks = append(checks, LevelsCheck{
+	skippedPercentage, totalSkipped := histogram.ComputePercentile(ValidationStatusSkipped)
+	successPercentage, totalSuccess := histogram.ComputePercentile(ValidationStatusSuccess)
+	failurePercentage, totalFailure := histogram.ComputePercentile(ValidationStatusFailure)
+
+	if skippedPercentage == nil && successPercentage == nil && failurePercentage == nil {
+		return nil
+	}
+
+	total := histogram.Total()
+
+	var breach *SLOBreach
+	isBreached := optFloat(successPercentage) < s.breachThreshold.AsPercent()
+	if isBreached {
+		breach = &SLOBreach{
+			ThresholdValue: s.breachThreshold.AsPercent(),
+			ThresholdUnit:  "%",
+			Operation:      OperationL,
+			WindowDuration: s.window.Size,
+			Uptime:         uptime,
+		}
+	}
+
+	return []LevelsCheck{
+		{
 			Namespace: s.namespace,
-			Timestamp: now,
 			Metric: Metric{
-				Name:        string(ValidationStatusSkipped),
-				Value:       *percentage,
+				Name:        "valid_requests",
+				Value:       optFloat(successPercentage),
 				Unit:        "%",
 				EventsCount: total,
 			},
-			Breakdown: nil,
-			Breach:    nil,
-			Tags:      s.tags,
-		})
+			Tags: s.tags,
+			Breakdown: []Metric{
+				{
+					Name:        "skipped",
+					Value:       optFloat(skippedPercentage),
+					Unit:        "%",
+					EventsCount: totalSkipped,
+				},
+				{
+					Name:        "valid",
+					Value:       optFloat(successPercentage),
+					Unit:        "%",
+					EventsCount: totalSuccess,
+				},
+				{
+					Name:        "invalid",
+					Value:       optFloat(failurePercentage),
+					Unit:        "%",
+					EventsCount: totalFailure,
+				},
+			},
+			Breach:    breach,
+			Timestamp: now,
+		},
 	}
+}
 
-	return checks
+func optFloat(val *float64) float64 {
+	if val == nil {
+		return 0
+	}
+	return *val
 }
