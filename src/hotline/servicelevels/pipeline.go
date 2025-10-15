@@ -181,6 +181,7 @@ type RequestValidatedMessage struct {
 	Now time.Time
 
 	Locator http.RequestLocator
+	Status  ValidationStatus
 }
 
 func (m *RequestValidatedMessage) Execute(_ context.Context, _ string, scope *SLOScope) {

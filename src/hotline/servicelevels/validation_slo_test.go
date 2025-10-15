@@ -25,6 +25,7 @@ type validationSloSut struct {
 
 func (s *validationSloSut) forValidationSLO() {
 	s.slo = servicelevels.NewValidationSLO(
+		servicelevels.P999,
 		1*time.Hour,
 		"http_route_validation",
 		map[string]string{

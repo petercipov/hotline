@@ -173,6 +173,11 @@ var _ = Describe("Service Levels Pipeline", func() {
 				},
 			}))
 		})
+
+		It("computes number of succesfully validated requests", func() {
+			sut.forPipeline()
+			sut.forConfigWithRequestValidation()
+		})
 	})
 })
 
@@ -336,7 +341,10 @@ func (s *sloPipelineSUT) forConfigWithRequestValidation() {
 				Method:      "GET",
 				PathPattern: "/products",
 			},
-			Validation: &servicelevels.ValidationServiceLevels{},
+			Validation: &servicelevels.ValidationServiceLevels{
+				BreachThreshold: servicelevels.P999,
+				WindowDuration:  1 * time.Hour,
+			},
 		},
 	)
 	Expect(err).NotTo(HaveOccurred())
@@ -352,5 +360,6 @@ func (s *sloPipelineSUT) IngestValidationMessage() {
 			Host:   "test.com",
 			Port:   443,
 		},
+		Status: servicelevels.ValidationStatusSkipped,
 	})
 }

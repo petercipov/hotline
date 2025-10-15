@@ -52,7 +52,7 @@ var _ = Describe("Tags Histogram", func() {
 })
 
 type suttagshistogram struct {
-	histogram *metrics.TagHistogram
+	histogram *metrics.TagHistogram[string]
 }
 
 func (s *suttagshistogram) forEmptyHistogram() {

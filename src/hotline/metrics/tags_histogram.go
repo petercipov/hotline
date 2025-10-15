@@ -1,18 +1,18 @@
 package metrics
 
-type TagHistogram struct {
+type TagHistogram[T comparable] struct {
 	buckets *bucketedCounters
-	layout  *tagsLayout
+	layout  *tagsLayout[T]
 }
 
-func NewTagsHistogram(tags []string) *TagHistogram {
-	return &TagHistogram{
+func NewTagsHistogram[T comparable](tags []T) *TagHistogram[T] {
+	return &TagHistogram[T]{
 		buckets: newBucketedCounters(),
 		layout:  newTagsLayout(tags),
 	}
 }
 
-func (h *TagHistogram) Add(tag string) {
+func (h *TagHistogram[T]) Add(tag T) {
 	key := h.layout.key(tag)
 	if key == nil {
 		return
@@ -20,7 +20,7 @@ func (h *TagHistogram) Add(tag string) {
 	h.buckets.Add(*key, 1)
 }
 
-func (h *TagHistogram) ComputePercentile(tag string) (*float64, int64) {
+func (h *TagHistogram[T]) ComputePercentile(tag T) (*float64, int64) {
 	key := h.layout.key(tag)
 	if key == nil {
 		return nil, 0
@@ -35,28 +35,28 @@ func (h *TagHistogram) ComputePercentile(tag string) (*float64, int64) {
 	return &percentile, sum
 }
 
-type tagsLayout struct {
-	tags              []string
-	toIndex           map[string]*bucketIndex
+type tagsLayout[T comparable] struct {
+	tags              []T
+	toIndex           map[T]*bucketIndex
 	indexedByTagOrder []bucketIndex
 }
 
-func newTagsLayout(tags []string) *tagsLayout {
-	toIndex := make(map[string]*bucketIndex, len(tags))
+func newTagsLayout[T comparable](tags []T) *tagsLayout[T] {
+	toIndex := make(map[T]*bucketIndex, len(tags))
 	sortedIndexes := make([]bucketIndex, len(tags))
 	for i, tag := range tags {
 		index := bucketIndex(i)
 		toIndex[tag] = &index
 		sortedIndexes[i] = index
 	}
-	return &tagsLayout{
+	return &tagsLayout[T]{
 		tags:              tags,
 		toIndex:           toIndex,
 		indexedByTagOrder: sortedIndexes,
 	}
 }
 
-func (l *tagsLayout) key(tag string) *bucketIndex {
+func (l *tagsLayout[T]) key(tag T) *bucketIndex {
 	key, found := l.toIndex[tag]
 	if !found {
 		return nil

@@ -90,7 +90,7 @@ func (s *StateSLO) Check(now time.Time) []LevelsCheck {
 	if activeWindow == nil {
 		return nil
 	}
-	histogram := activeWindow.Accumulator.(*metrics.TagHistogram)
+	histogram := activeWindow.Accumulator.(*metrics.TagHistogram[string])
 
 	expectedBreach, expectedMetric, expectedEventsCount, expectedBreakdown := s.checkExpectedBreach(histogram)
 	unexpectedBreach, unexpectedMetric, unexpectedEventsCount, unexpectedBreakdown := s.checkUnexpectedBreach(histogram)
@@ -133,7 +133,7 @@ func (s *StateSLO) Check(now time.Time) []LevelsCheck {
 
 }
 
-func (s *StateSLO) checkUnexpectedBreach(histogram *metrics.TagHistogram) (*SLOBreach, float64, int64, []Metric) {
+func (s *StateSLO) checkUnexpectedBreach(histogram *metrics.TagHistogram[string]) (*SLOBreach, float64, int64, []Metric) {
 	breakDown := make([]Metric, len(s.unexpectedStatesMap))
 	breakDown = breakDown[:0]
 	unexpectedSum := float64(0)
@@ -166,7 +166,7 @@ func (s *StateSLO) checkUnexpectedBreach(histogram *metrics.TagHistogram) (*SLOB
 	return breach, unexpectedSum, eventsSum, breakDown
 }
 
-func (s *StateSLO) checkExpectedBreach(histogram *metrics.TagHistogram) (*SLOBreach, float64, int64, []Metric) {
+func (s *StateSLO) checkExpectedBreach(histogram *metrics.TagHistogram[string]) (*SLOBreach, float64, int64, []Metric) {
 	breakDown := make([]Metric, len(s.expectedStates))
 	breakDown = breakDown[:0]
 	expectedSum := float64(0)

@@ -62,6 +62,8 @@ type StatusServiceLevels struct {
 }
 
 type ValidationServiceLevels struct {
+	BreachThreshold Percentile
+	WindowDuration  time.Duration
 }
 
 func NewHttpApiServiceLevels(definition ApiServiceLevels) *IntegrationServiceLevels {
@@ -142,7 +144,8 @@ func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
 	var validationSLO *ValidationSLO
 	if slo.Validation != nil {
 		validationSLO = NewValidationSLO(
-			1*time.Hour,
+			slo.Validation.BreachThreshold,
+			slo.Validation.WindowDuration,
 			"http_route_validation",
 			tags,
 		)
@@ -187,6 +190,6 @@ func (s *HttpRouteSLO) Check(now time.Time) []LevelsCheck {
 
 func (s *HttpRouteSLO) AddRequestValidation(now time.Time) {
 	if s.validationSLO != nil {
-		s.validationSLO.AddValidation(now)
+		s.validationSLO.AddValidation(now, ValidationStatusSkipped)
 	}
 }
