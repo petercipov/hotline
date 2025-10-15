@@ -61,10 +61,6 @@ func (s *ValidationSLO) Check(now time.Time) []LevelsCheck {
 	successPercentage, totalSuccess := histogram.ComputePercentile(ValidationStatusSuccess)
 	failurePercentage, totalFailure := histogram.ComputePercentile(ValidationStatusFailure)
 
-	if skippedPercentage == nil && successPercentage == nil && failurePercentage == nil {
-		return nil
-	}
-
 	total := histogram.Total()
 
 	var breach *SLOBreach
