@@ -68,14 +68,14 @@ func (scope *SLOScope) AdvanceTime(now time.Time) {
 	}
 }
 
-func (scope *SLOScope) EnsureServiceLevels(ctx context.Context, id integrations.ID) (*IntegrationServiceLevels, error) {
+func (scope *SLOScope) EnsureServiceLevels(ctx context.Context, id integrations.ID, createdAt time.Time) (*IntegrationServiceLevels, error) {
 	slo, found := scope.Integrations[id]
 	if !found {
 		config, getErr := scope.sloRepository.GetServiceLevels(ctx, id)
 		if getErr != nil {
 			return nil, getErr
 		}
-		slo = NewHttpApiServiceLevels(config)
+		slo = NewHttpApiServiceLevels(config, createdAt)
 		scope.Integrations[id] = slo
 	}
 
@@ -125,7 +125,7 @@ func (message *IngestRequestsMessage) GetShardingKey() []byte {
 func (message *IngestRequestsMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(message.Now)
 
-	slo, ensureErr := scope.EnsureServiceLevels(ctx, message.ID)
+	slo, ensureErr := scope.EnsureServiceLevels(ctx, message.ID, message.Now)
 	if ensureErr != nil {
 		return
 	}
@@ -166,7 +166,7 @@ func (message *ModifyForRouteMessage) Execute(ctx context.Context, _ string, sco
 		}
 	}
 	if foundRouteConfig {
-		slo.UpsertRoute(routeConfig)
+		slo.UpsertRoute(routeConfig, message.Now)
 	} else {
 		slo.DeleteRoute(message.Route)
 	}
@@ -187,7 +187,7 @@ type RequestValidatedMessage struct {
 func (m *RequestValidatedMessage) Execute(_ context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(m.Now)
 
-	slo, ensureErr := scope.EnsureServiceLevels(context.Background(), m.ID)
+	slo, ensureErr := scope.EnsureServiceLevels(context.Background(), m.ID, m.Now)
 	if ensureErr != nil {
 		return
 	}

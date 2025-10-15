@@ -48,7 +48,6 @@ type RouteServiceLevels struct {
 	Latency    *LatencyServiceLevels
 	Status     *StatusServiceLevels
 	Validation *ValidationServiceLevels
-	CreatedAt  time.Time
 }
 
 type LatencyServiceLevels struct {
@@ -67,12 +66,12 @@ type ValidationServiceLevels struct {
 	WindowDuration  time.Duration
 }
 
-func NewHttpApiServiceLevels(definition ApiServiceLevels) *IntegrationServiceLevels {
+func NewHttpApiServiceLevels(definition ApiServiceLevels, createdAt time.Time) *IntegrationServiceLevels {
 	apiSlo := &IntegrationServiceLevels{
 		mux: &hotlinehttp.Mux[HttpRouteSLO]{},
 	}
 	for _, routeDefinition := range definition.Routes {
-		apiSlo.UpsertRoute(routeDefinition)
+		apiSlo.UpsertRoute(routeDefinition, createdAt)
 	}
 	return apiSlo
 }
@@ -94,8 +93,8 @@ func (s *IntegrationServiceLevels) Check(now time.Time) []LevelsCheck {
 	return checks
 }
 
-func (s *IntegrationServiceLevels) UpsertRoute(routeDefinition RouteServiceLevels) {
-	slo := NewHttpPathSLO(routeDefinition)
+func (s *IntegrationServiceLevels) UpsertRoute(routeDefinition RouteServiceLevels, createdAt time.Time) {
+	slo := NewHttpPathSLO(routeDefinition, createdAt)
 	s.mux.Upsert(slo.route, slo)
 }
 
@@ -117,7 +116,7 @@ type HttpRouteSLO struct {
 	validationSLO *ValidationSLO
 }
 
-func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
+func NewHttpPathSLO(slo RouteServiceLevels, createdAt time.Time) *HttpRouteSLO {
 	tags := map[string]string{
 		"http_route": slo.Key.String(),
 	}
@@ -129,6 +128,7 @@ func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
 			slo.Status.BreachThreshold,
 			slo.Status.WindowDuration,
 			tags,
+			createdAt,
 		)
 	}
 
@@ -139,6 +139,7 @@ func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
 			slo.Latency.WindowDuration,
 			"http_route_latency",
 			tags,
+			createdAt,
 		)
 	}
 
@@ -149,7 +150,7 @@ func NewHttpPathSLO(slo RouteServiceLevels) *HttpRouteSLO {
 			slo.Validation.WindowDuration,
 			"http_route_validation",
 			tags,
-			slo.CreatedAt,
+			createdAt,
 		)
 	}
 

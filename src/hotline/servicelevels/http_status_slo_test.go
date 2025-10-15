@@ -27,7 +27,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.001Z"),
+				Uptime:    1 * time.Millisecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       100,
@@ -55,7 +56,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       100,
@@ -91,7 +93,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       100,
@@ -125,7 +128,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -149,7 +153,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -184,7 +189,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       100,
@@ -220,7 +226,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -244,7 +251,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -278,7 +286,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -302,7 +311,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -336,7 +346,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       75,
@@ -360,7 +371,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0025Z"),
+				Uptime:    2*time.Millisecond + 500*time.Microsecond,
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       25,
@@ -395,7 +407,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.003Z"),
+				Uptime:    3 * time.Millisecond,
 				Metric: servicelevels.Metric{
 					Name:        "expected",
 					Value:       60,
@@ -419,7 +432,8 @@ var _ = Describe("HTTP Status SLO", func() {
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
-				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+				Timestamp: clock.ParseTime("2025-02-22T12:02:10.003Z"),
+				Uptime:    3 * time.Millisecond,
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
 					Value:       40,
@@ -452,7 +466,8 @@ var _ = Describe("HTTP Status SLO", func() {
 })
 
 type statusSLOsut struct {
-	slo *servicelevels.HttpStatusSLO
+	slo        *servicelevels.HttpStatusSLO
+	manulClock *clock.ManualClock
 }
 
 func (s *statusSLOsut) forEmptySLO() {
@@ -460,18 +475,22 @@ func (s *statusSLOsut) forEmptySLO() {
 }
 
 func (s *statusSLOsut) getMetrics() []servicelevels.LevelsCheck {
-	now := clock.ParseTime("2025-02-22T12:04:55Z")
-	return s.slo.Check(now)
+	return s.slo.Check(s.manulClock.Now())
 }
 
 func (s *statusSLOsut) forSLO(expectedStates ...string) {
 	p, failure := servicelevels.ParsePercentile(99.99)
 	Expect(failure).ToNot(HaveOccurred())
 
-	s.slo = servicelevels.NewHttpStatusSLO(expectedStates, p, 1*time.Hour, nil)
+	s.manulClock = clock.NewDefaultManualClock()
+	s.slo = servicelevels.NewHttpStatusSLO(
+		expectedStates,
+		p,
+		1*time.Hour,
+		nil,
+		s.manulClock.Now())
 }
 
 func (s *statusSLOsut) AddState(state string) {
-	now := clock.ParseTime("2025-02-22T12:04:55Z")
-	s.slo.AddHttpState(now, state)
+	s.slo.AddHttpState(s.manulClock.Now(), state)
 }

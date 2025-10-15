@@ -10,6 +10,7 @@ type LatencySLO struct {
 	percentiles []PercentileDefinition
 	namespace   string
 	tags        map[string]string
+	createdAt   time.Time
 }
 
 type PercentileDefinition struct {
@@ -18,7 +19,13 @@ type PercentileDefinition struct {
 	Name       string
 }
 
-func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Duration, namespace string, tags map[string]string) *LatencySLO {
+func NewLatencySLO(
+	percentiles []PercentileDefinition,
+	windowDuration time.Duration,
+	namespace string,
+	tags map[string]string,
+	createdAt time.Time,
+) *LatencySLO {
 	var splitLatencies []float64
 	for i := range percentiles {
 		splitLatencies = append(splitLatencies, float64(percentiles[i].Threshold))
@@ -32,6 +39,7 @@ func NewLatencySLO(percentiles []PercentileDefinition, windowDuration time.Durat
 		window:      window,
 		namespace:   namespace,
 		tags:        tags,
+		createdAt:   createdAt,
 	}
 }
 
@@ -40,9 +48,10 @@ func (s *LatencySLO) Check(now time.Time) []LevelsCheck {
 	if activeWindow == nil {
 		return nil
 	}
+	uptime := now.Sub(s.createdAt)
 
 	histogram := activeWindow.Accumulator.(*metrics.LatencyHistogram)
-	metrics := make([]LevelsCheck, len(s.percentiles))
+	levels := make([]LevelsCheck, len(s.percentiles))
 	for i, definition := range s.percentiles {
 		bucket, eventsCount := histogram.ComputePercentile(definition.Percentile.Normalized())
 		metric := bucket.To
@@ -56,7 +65,7 @@ func (s *LatencySLO) Check(now time.Time) []LevelsCheck {
 				WindowDuration: s.window.Size,
 			}
 		}
-		metrics[i] = LevelsCheck{
+		levels[i] = LevelsCheck{
 			Namespace: s.namespace,
 			Metric: Metric{
 				Name:        definition.Name,
@@ -67,9 +76,10 @@ func (s *LatencySLO) Check(now time.Time) []LevelsCheck {
 			Tags:      s.tags,
 			Breach:    breach,
 			Timestamp: now,
+			Uptime:    uptime,
 		}
 	}
-	return metrics
+	return levels
 }
 
 func (s *LatencySLO) AddLatency(now time.Time, latency LatencyMs) {

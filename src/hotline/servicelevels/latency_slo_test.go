@@ -96,7 +96,8 @@ var _ = Describe("LatencyMs SLO", func() {
 })
 
 type latencySLOSUT struct {
-	slo *servicelevels.LatencySLO
+	slo         *servicelevels.LatencySLO
+	manualClock *clock.ManualClock
 }
 
 func (s *latencySLOSUT) forEmptySLO() {
@@ -106,12 +107,11 @@ func (s *latencySLOSUT) forEmptySLO() {
 }
 
 func (s *latencySLOSUT) getMetrics() []servicelevels.LevelsCheck {
-	now := clock.ParseTime("2025-02-22T12:04:55Z")
-	return s.slo.Check(now)
+	return s.slo.Check(s.manualClock.Now())
 }
 
 func (s *latencySLOSUT) WithValues(latencies ...servicelevels.LatencyMs) {
-	now := clock.ParseTime("2025-02-22T12:04:05Z")
+	now := s.manualClock.Now()
 	for _, latency := range latencies {
 		s.slo.AddLatency(now, latency)
 	}
@@ -122,11 +122,15 @@ func (s *latencySLOSUT) forSLO(percentiles []servicelevels.PercentileDefinition,
 		percentiles[i].Name = fmt.Sprintf("p%g", percentiles[i].Percentile*100)
 	}
 
-	s.slo = servicelevels.NewLatencySLO(percentiles, duration, "test-namespace", nil)
+	s.manualClock = clock.NewDefaultManualClock()
+	s.slo = servicelevels.NewLatencySLO(
+		percentiles,
+		duration,
+		"test-namespace", nil, s.manualClock.Now())
 }
 
 func (s *latencySLOSUT) WithRandomValues(count int, maxValue float64) {
-	now := clock.ParseTime("2025-02-22T12:04:05Z")
+	now := s.manualClock.Now()
 	r := rand.New(rand.NewSource(10000))
 	for range count {
 		value := r.Float64() * maxValue

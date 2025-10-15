@@ -55,7 +55,8 @@ var _ = Describe("Service Levels Checker", func() {
 		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_latency",
-			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+			Timestamp: clock.ParseTime("2025-02-22T12:02:10.001Z"),
+			Uptime:    1 * time.Millisecond,
 			Metric: servicelevels.Metric{
 				Name:        "p99",
 				Value:       0,
@@ -70,7 +71,8 @@ var _ = Describe("Service Levels Checker", func() {
 		}))
 		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
-			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+			Timestamp: clock.ParseTime("2025-02-22T12:02:10.001Z"),
+			Uptime:    1 * time.Millisecond,
 			Metric: servicelevels.Metric{
 				Name:        "expected",
 				Value:       100,
@@ -108,7 +110,8 @@ var _ = Describe("Service Levels Checker", func() {
 		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_latency",
-			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+			Timestamp: clock.ParseTime("2025-02-22T12:02:10.001Z"),
+			Uptime:    1 * time.Millisecond,
 			Metric: servicelevels.Metric{
 				Name:        "p99",
 				Value:       0,
@@ -123,7 +126,8 @@ var _ = Describe("Service Levels Checker", func() {
 		}))
 		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
-			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+			Timestamp: clock.ParseTime("2025-02-22T12:02:10.001Z"),
+			Uptime:    1 * time.Millisecond,
 			Metric: servicelevels.Metric{
 				Name:        "expected",
 				Value:       100,
@@ -171,7 +175,8 @@ var _ = Describe("Service Levels Checker", func() {
 		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
-			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+			Timestamp: clock.ParseTime("2025-02-22T12:02:10.0015Z"),
+			Uptime:    1*time.Millisecond + 500*time.Microsecond,
 			Metric: servicelevels.Metric{
 				Name:        "unexpected",
 				Value:       100,
@@ -220,7 +225,8 @@ var _ = Describe("Service Levels Checker", func() {
 		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
-			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+			Timestamp: clock.ParseTime("2025-02-22T12:02:10.001Z"),
+			Uptime:    1 * time.Millisecond,
 			Metric: servicelevels.Metric{
 				Name:        "unexpected",
 				Value:       100,
@@ -264,7 +270,8 @@ var _ = Describe("Service Levels Checker", func() {
 		Expect(metrics).To(HaveLen(2))
 		Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_latency",
-			Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
+			Timestamp: clock.ParseTime("2025-02-22T12:02:10.001Z"),
+			Uptime:    1 * time.Millisecond,
 			Metric: servicelevels.Metric{
 				Name:        "p99",
 				Value:       0,
@@ -319,17 +326,16 @@ var _ = Describe("Service Levels Checker", func() {
 })
 
 type suthttpapislo struct {
-	slo *servicelevels.IntegrationServiceLevels
+	slo        *servicelevels.IntegrationServiceLevels
+	manulClock *clock.ManualClock
 }
 
 func (s *suthttpapislo) Check() []servicelevels.LevelsCheck {
-	now := clock.ParseTime("2025-02-22T12:04:55Z")
-	return s.slo.Check(now)
+	return s.slo.Check(s.manulClock.Now())
 }
 
 func (s *suthttpapislo) AddRequest(request *servicelevels.HttpRequest) {
-	now := clock.ParseTime("2025-02-22T12:04:05Z")
-	s.slo.AddRequest(now, request)
+	s.slo.AddRequest(s.manulClock.Now(), request)
 }
 
 func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.RouteModification) {
@@ -343,8 +349,8 @@ func (s *suthttpapislo) forRouteSetup(routes ...servicelevels.RouteModification)
 			Status:  route.Status,
 		})
 	}
-
-	s.slo = servicelevels.NewHttpApiServiceLevels(definition)
+	s.manulClock = clock.NewDefaultManualClock()
+	s.slo = servicelevels.NewHttpApiServiceLevels(definition, s.manulClock.Now())
 }
 
 func (s *suthttpapislo) forRouteSetupWithDefault(routes ...servicelevels.RouteModification) {

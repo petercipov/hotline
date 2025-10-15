@@ -71,7 +71,6 @@ func (s *ValidationSLO) Check(now time.Time) []LevelsCheck {
 			ThresholdUnit:  "%",
 			Operation:      OperationL,
 			WindowDuration: s.window.Size,
-			Uptime:         uptime,
 		}
 	}
 
@@ -107,6 +106,7 @@ func (s *ValidationSLO) Check(now time.Time) []LevelsCheck {
 			},
 			Breach:    breach,
 			Timestamp: now,
+			Uptime:    uptime,
 		},
 	}
 }

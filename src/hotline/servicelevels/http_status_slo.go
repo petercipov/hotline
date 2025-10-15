@@ -17,6 +17,7 @@ type HttpStatusSLO struct {
 
 	namespace string
 	tags      map[string]string
+	createdAt time.Time
 }
 
 func NewHttpStatusSLO(
@@ -24,6 +25,7 @@ func NewHttpStatusSLO(
 	breachThreshold Percentile,
 	windowDuration time.Duration,
 	tags map[string]string,
+	createdAt time.Time,
 ) *HttpStatusSLO {
 	breakdown := NewHttpStateRangeBreakdown()
 	expectations := buildExpectations(
@@ -42,6 +44,7 @@ func NewHttpStatusSLO(
 		breakdown:    breakdown,
 		namespace:    "http_route_status",
 		tags:         tags,
+		createdAt:    createdAt,
 	}
 }
 
@@ -67,16 +70,19 @@ func (s *HttpStatusSLO) Check(now time.Time) []LevelsCheck {
 		return nil
 	}
 	histogram := activeWindow.Accumulator.(*metrics.TagHistogram[string])
+	uptime := now.Sub(s.createdAt)
 
 	expectedBreach, expectedMetric, expectedEventsCount, expectedBreakdown := s.expectations.checkExpectedBreach(histogram, s.window.Size)
 	unexpectedBreach, unexpectedMetric, unexpectedEventsCount, unexpectedBreakdown := s.expectations.checkUnexpectedBreach(histogram, s.window.Size)
 
 	checks := make([]LevelsCheck, 2)
 	checks = checks[:0]
+
 	if len(expectedBreakdown) > 0 {
 		checks = append(checks, LevelsCheck{
 			Namespace: s.namespace,
 			Timestamp: now,
+			Uptime:    uptime,
 			Metric: Metric{
 				Name:        expectedStateName,
 				Value:       expectedMetric,
@@ -93,6 +99,7 @@ func (s *HttpStatusSLO) Check(now time.Time) []LevelsCheck {
 		checks = append(checks, LevelsCheck{
 			Namespace: s.namespace,
 			Timestamp: now,
+			Uptime:    uptime,
 			Metric: Metric{
 				Name:        unexpectedStateName,
 				Value:       unexpectedMetric,

@@ -162,6 +162,7 @@ var _ = Describe("Service Levels Pipeline", func() {
 			Expect(integrationChecks[0]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_validation",
 				Timestamp: clock.ParseTime("2025-02-22T12:02:10.0055Z"),
+				Uptime: 5 * time.Millisecond,
 				Metric: servicelevels.Metric{
 					Name:        "valid_requests",
 					Value:       100,

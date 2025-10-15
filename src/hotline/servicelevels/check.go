@@ -9,6 +9,7 @@ type LevelsCheck struct {
 	Breakdown []Metric
 	Breach    *SLOBreach
 	Timestamp time.Time
+	Uptime    time.Duration
 }
 
 type Metric struct {
@@ -28,5 +29,4 @@ type SLOBreach struct {
 	ThresholdUnit  string
 	Operation      Operation
 	WindowDuration time.Duration
-	Uptime         time.Duration
 }
