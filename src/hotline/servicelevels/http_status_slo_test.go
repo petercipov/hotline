@@ -9,8 +9,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("State SLO", func() {
-	sut := stateslosut{}
+var _ = Describe("HTTP Status SLO", func() {
+	sut := statusSLOsut{}
 	Context("no input data", func() {
 		It("should return no metrics", func() {
 			sut.forEmptySLO()
@@ -26,7 +26,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -54,7 +54,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -90,7 +90,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -124,7 +124,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -148,7 +148,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
@@ -158,7 +158,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:        "unexpected",
+						Name:        "range_unknown",
 						Value:       25,
 						Unit:        "%",
 						EventsCount: 1,
@@ -183,7 +183,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(1))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
@@ -193,7 +193,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:        "unexpected",
+						Name:        "range_unknown",
 						Value:       100,
 						Unit:        "%",
 						EventsCount: 4,
@@ -219,7 +219,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -243,7 +243,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
@@ -253,7 +253,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:        "unexpected",
+						Name:        "range_unknown",
 						Value:       25,
 						Unit:        "%",
 						EventsCount: 1,
@@ -277,7 +277,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -301,7 +301,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
@@ -311,7 +311,7 @@ var _ = Describe("State SLO", func() {
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:        "unexpected",
+						Name:        "range_unknown",
 						Value:       25,
 						Unit:        "%",
 						EventsCount: 1,
@@ -327,7 +327,7 @@ var _ = Describe("State SLO", func() {
 		})
 
 		It("should trace unexpected state if defined and show in breakdown", func() {
-			sut.forSLOTRackingUnexpected([]string{"state1", "state2"}, []string{"timeout"})
+			sut.forSLO("state1", "state2")
 			sut.AddState("state1")
 			sut.AddState("state1")
 			sut.AddState("state1")
@@ -335,7 +335,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -359,7 +359,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
@@ -385,7 +385,7 @@ var _ = Describe("State SLO", func() {
 		})
 
 		It("should trace unexpected breakdown when added unknown", func() {
-			sut.forSLOTRackingUnexpected([]string{"state1", "state2"}, []string{"timeout"})
+			sut.forSLO("state1", "state2")
 			sut.AddState("state1")
 			sut.AddState("state1")
 			sut.AddState("state1")
@@ -394,7 +394,7 @@ var _ = Describe("State SLO", func() {
 			metrics := sut.getMetrics()
 			Expect(metrics).To(HaveLen(2))
 			Expect(metrics[0]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "expected",
@@ -418,7 +418,7 @@ var _ = Describe("State SLO", func() {
 				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
-				Namespace: "test-namespace",
+				Namespace: "http_route_status",
 				Timestamp: clock.ParseTime("2025-02-22T12:04:55Z"),
 				Metric: servicelevels.Metric{
 					Name:        "unexpected",
@@ -428,13 +428,13 @@ var _ = Describe("State SLO", func() {
 				},
 				Breakdown: []servicelevels.Metric{
 					{
-						Name:        "timeout",
+						Name:        "range_unknown",
 						Value:       20,
 						Unit:        "%",
 						EventsCount: 1,
 					},
 					{
-						Name:        "unexpected",
+						Name:        "timeout",
 						Value:       20,
 						Unit:        "%",
 						EventsCount: 1,
@@ -451,31 +451,27 @@ var _ = Describe("State SLO", func() {
 	})
 })
 
-type stateslosut struct {
-	slo *servicelevels.StateSLO
+type statusSLOsut struct {
+	slo *servicelevels.HttpStatusSLO
 }
 
-func (s *stateslosut) forEmptySLO() {
+func (s *statusSLOsut) forEmptySLO() {
 	s.forSLO()
 }
 
-func (s *stateslosut) getMetrics() []servicelevels.LevelsCheck {
+func (s *statusSLOsut) getMetrics() []servicelevels.LevelsCheck {
 	now := clock.ParseTime("2025-02-22T12:04:55Z")
 	return s.slo.Check(now)
 }
 
-func (s *stateslosut) forSLO(expectedStates ...string) {
-	s.forSLOTRackingUnexpected(expectedStates, nil)
-}
-
-func (s *stateslosut) forSLOTRackingUnexpected(expectedStates []string, unexpectedStates []string) {
+func (s *statusSLOsut) forSLO(expectedStates ...string) {
 	p, failure := servicelevels.ParsePercentile(99.99)
 	Expect(failure).ToNot(HaveOccurred())
 
-	s.slo = servicelevels.NewStateSLO(expectedStates, unexpectedStates, p, 1*time.Hour, "test-namespace", nil)
+	s.slo = servicelevels.NewHttpStatusSLO(expectedStates, p, 1*time.Hour, nil)
 }
 
-func (s *stateslosut) AddState(state string) {
+func (s *statusSLOsut) AddState(state string) {
 	now := clock.ParseTime("2025-02-22T12:04:55Z")
-	s.slo.AddState(now, state)
+	s.slo.AddHttpState(now, state)
 }

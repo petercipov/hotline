@@ -232,7 +232,7 @@ var _ = Describe("Service Levels Checker", func() {
 			},
 			Breakdown: []servicelevels.Metric{
 				{
-					Name:        "unknown",
+					Name:        "range_unknown",
 					Value:       100,
 					Unit:        "%",
 					EventsCount: 1,

@@ -6,7 +6,7 @@ const httpRange3xx = "3xx"
 const httpRange4xx = "4xx"
 const httpRange5xx = "5xx"
 
-const httpRangeUnknown = "unknown"
+const httpRangeUnknown = "range_unknown"
 
 type HttpStateRangeBreakdown struct {
 	states map[string]string
@@ -100,7 +100,7 @@ func (b *HttpStateRangeBreakdown) GetRanges() []string {
 	return b.ranges
 }
 
-func (b *HttpStateRangeBreakdown) GetRange(state string) *string {
+func (b *HttpStateRangeBreakdown) ConvertStateToRange(state string) *string {
 	httpRange, found := b.states[state]
 	if !found {
 		return nil

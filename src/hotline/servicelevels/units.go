@@ -3,6 +3,7 @@ package servicelevels
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,17 @@ func (p *Percentile) Normalized() float64 {
 
 func (p *Percentile) AsPercent() float64 {
 	return p.Normalized() * 100.0
+}
+
+func (p *Percentile) RoundTo(decimals uint32) Percentile {
+	value := p.AsPercent()
+	roundedPercent := math.Round(value*math.Pow(10, float64(decimals))) / math.Pow(10, float64(decimals))
+	rounded, _ := ParsePercentile(roundedPercent)
+	return rounded
+}
+
+func (p *Percentile) Invert() Percentile {
+	return Percentile(1.0 - p.Normalized())
 }
 
 func (p *Percentile) Name() string {
