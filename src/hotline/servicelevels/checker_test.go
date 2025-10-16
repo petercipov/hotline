@@ -67,7 +67,6 @@ var _ = Describe("Service Levels Checker", func() {
 				"http_route": "RKumkv7ml0-xQ",
 			},
 			Breakdown: nil,
-			Breach:    nil,
 		}))
 		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
@@ -90,7 +89,6 @@ var _ = Describe("Service Levels Checker", func() {
 					EventsCount: 1,
 				},
 			},
-			Breach: nil,
 		}))
 	})
 
@@ -122,7 +120,6 @@ var _ = Describe("Service Levels Checker", func() {
 				"http_route": "RKjhq92VEGBI4",
 			},
 			Breakdown: nil,
-			Breach:    nil,
 		}))
 		Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 			Namespace: "http_route_status",
@@ -145,7 +142,6 @@ var _ = Describe("Service Levels Checker", func() {
 					EventsCount: 1,
 				},
 			},
-			Breach: nil,
 		}))
 	})
 
@@ -200,12 +196,6 @@ var _ = Describe("Service Levels Checker", func() {
 					EventsCount: 1,
 				},
 			},
-			Breach: &servicelevels.SLOBreach{
-				ThresholdValue: 0.1,
-				ThresholdUnit:  "%",
-				Operation:      "<",
-				WindowDuration: 1 * time.Hour,
-			},
 		}))
 	})
 
@@ -244,12 +234,6 @@ var _ = Describe("Service Levels Checker", func() {
 					EventsCount: 1,
 				},
 			},
-			Breach: &servicelevels.SLOBreach{
-				ThresholdValue: 0.1,
-				ThresholdUnit:  "%",
-				Operation:      "<",
-				WindowDuration: 1 * time.Hour,
-			},
 		}))
 	})
 
@@ -282,7 +266,6 @@ var _ = Describe("Service Levels Checker", func() {
 				"http_route": "RKROuLp_UwI5A",
 			},
 			Breakdown: nil,
-			Breach:    nil,
 		}))
 	})
 

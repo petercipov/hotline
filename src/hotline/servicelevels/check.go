@@ -7,7 +7,6 @@ type LevelsCheck struct {
 	Metric    Metric
 	Tags      map[string]string
 	Breakdown []Metric
-	Breach    *SLOBreach
 	Timestamp time.Time
 	Uptime    time.Duration
 }
@@ -17,16 +16,4 @@ type Metric struct {
 	Value       float64
 	Unit        string
 	EventsCount int64
-}
-
-type Operation string
-
-const OperationGE = Operation(">=")
-const OperationL = Operation("<")
-
-type SLOBreach struct {
-	ThresholdValue float64
-	ThresholdUnit  string
-	Operation      Operation
-	WindowDuration time.Duration
 }

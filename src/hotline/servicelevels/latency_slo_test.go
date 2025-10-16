@@ -84,13 +84,6 @@ var _ = Describe("LatencyMs SLO", func() {
 			sut.WithRandomValues(1000, 10000)
 			metrics := sut.getMetrics()
 			Expect(metrics[0].Metric.Value).Should(BeNumerically(">=", 10000))
-			Expect(metrics[0].Breach).NotTo(BeNil())
-			Expect(*metrics[0].Breach).To(Equal(servicelevels.SLOBreach{
-				ThresholdValue: 5000,
-				ThresholdUnit:  "ms",
-				Operation:      servicelevels.OperationL,
-				WindowDuration: 1 * time.Minute,
-			}))
 		})
 	})
 })

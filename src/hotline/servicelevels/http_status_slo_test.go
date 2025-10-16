@@ -144,12 +144,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						EventsCount: 3,
 					},
 				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 99.99,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationGE,
-					WindowDuration: 1 * time.Hour,
-				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
@@ -168,12 +162,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						Unit:        "%",
 						EventsCount: 1,
 					},
-				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 0.01,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationL,
-					WindowDuration: 1 * time.Hour,
 				},
 			}))
 		})
@@ -204,12 +192,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						Unit:        "%",
 						EventsCount: 4,
 					},
-				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 0.01,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationL,
-					WindowDuration: 1 * time.Hour,
 				},
 			}))
 		})
@@ -242,12 +224,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						EventsCount: 3,
 					},
 				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 99.99,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationGE,
-					WindowDuration: 1 * time.Hour,
-				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
@@ -266,12 +242,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						Unit:        "%",
 						EventsCount: 1,
 					},
-				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 0.01,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationL,
-					WindowDuration: 1 * time.Hour,
 				},
 			}))
 		})
@@ -302,12 +272,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						EventsCount: 3,
 					},
 				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 99.99,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationGE,
-					WindowDuration: 1 * time.Hour,
-				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
@@ -326,12 +290,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						Unit:        "%",
 						EventsCount: 1,
 					},
-				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 0.01,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationL,
-					WindowDuration: 1 * time.Hour,
 				},
 			}))
 		})
@@ -362,12 +320,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						EventsCount: 3,
 					},
 				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 99.99,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationGE,
-					WindowDuration: 1 * time.Hour,
-				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
@@ -386,12 +338,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						Unit:        "%",
 						EventsCount: 1,
 					},
-				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 0.01,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationL,
-					WindowDuration: 1 * time.Hour,
 				},
 			}))
 		})
@@ -423,12 +369,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						EventsCount: 3,
 					},
 				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 99.99,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationGE,
-					WindowDuration: 1 * time.Hour,
-				},
 			}))
 			Expect(metrics[1]).To(Equal(servicelevels.LevelsCheck{
 				Namespace: "http_route_status",
@@ -453,12 +393,6 @@ var _ = Describe("HTTP Status SLO", func() {
 						Unit:        "%",
 						EventsCount: 1,
 					},
-				},
-				Breach: &servicelevels.SLOBreach{
-					ThresholdValue: 0.01,
-					ThresholdUnit:  "%",
-					Operation:      servicelevels.OperationL,
-					WindowDuration: 1 * time.Hour,
 				},
 			}))
 		})

@@ -56,15 +56,6 @@ func (s *LatencySLO) Check(now time.Time) []LevelsCheck {
 		bucket, eventsCount := histogram.ComputePercentile(definition.Percentile.Normalized())
 		metric := bucket.To
 
-		var breach *SLOBreach
-		if !(metric < float64(definition.Threshold)) {
-			breach = &SLOBreach{
-				ThresholdValue: float64(definition.Threshold),
-				ThresholdUnit:  "ms",
-				Operation:      OperationL,
-				WindowDuration: s.window.Size,
-			}
-		}
 		levels[i] = LevelsCheck{
 			Namespace: s.namespace,
 			Metric: Metric{
@@ -74,7 +65,6 @@ func (s *LatencySLO) Check(now time.Time) []LevelsCheck {
 				EventsCount: eventsCount,
 			},
 			Tags:      s.tags,
-			Breach:    breach,
 			Timestamp: now,
 			Uptime:    uptime,
 		}

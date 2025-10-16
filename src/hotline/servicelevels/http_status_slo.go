@@ -72,8 +72,8 @@ func (s *HttpStatusSLO) Check(now time.Time) []LevelsCheck {
 	histogram := activeWindow.Accumulator.(*metrics.TagHistogram[string])
 	uptime := now.Sub(s.createdAt)
 
-	expectedBreach, expectedMetric, expectedEventsCount, expectedBreakdown := s.expectations.checkExpectedBreach(histogram, s.window.Size)
-	unexpectedBreach, unexpectedMetric, unexpectedEventsCount, unexpectedBreakdown := s.expectations.checkUnexpectedBreach(histogram, s.window.Size)
+	expectedMetric, expectedEventsCount, expectedBreakdown := s.expectations.checkExpectedBreach(histogram, s.window.Size)
+	unexpectedMetric, unexpectedEventsCount, unexpectedBreakdown := s.expectations.checkUnexpectedBreach(histogram, s.window.Size)
 
 	checks := make([]LevelsCheck, 2)
 	checks = checks[:0]
@@ -90,12 +90,11 @@ func (s *HttpStatusSLO) Check(now time.Time) []LevelsCheck {
 				EventsCount: expectedEventsCount,
 			},
 			Breakdown: expectedBreakdown,
-			Breach:    expectedBreach,
 			Tags:      s.tags,
 		})
 	}
 
-	if unexpectedBreach != nil {
+	if len(unexpectedBreakdown) > 0 {
 		checks = append(checks, LevelsCheck{
 			Namespace: s.namespace,
 			Timestamp: now,
@@ -107,7 +106,6 @@ func (s *HttpStatusSLO) Check(now time.Time) []LevelsCheck {
 				EventsCount: unexpectedEventsCount,
 			},
 			Breakdown: unexpectedBreakdown,
-			Breach:    unexpectedBreach,
 			Tags:      s.tags,
 		})
 	}
@@ -152,7 +150,7 @@ func (e *httpStatusExpectations) GetState(state string) string {
 	return state
 }
 
-func (e *httpStatusExpectations) checkExpectedBreach(histogram *metrics.TagHistogram[string], windowSize time.Duration) (*SLOBreach, float64, int64, []Metric) {
+func (e *httpStatusExpectations) checkExpectedBreach(histogram *metrics.TagHistogram[string], windowSize time.Duration) (float64, int64, []Metric) {
 	breakDown := make([]Metric, len(e.expected))
 	breakDown = breakDown[:0]
 	expectedSum := float64(0)
@@ -171,20 +169,10 @@ func (e *httpStatusExpectations) checkExpectedBreach(histogram *metrics.TagHisto
 			expectedSum += *metric
 		}
 	}
-	var breach *SLOBreach
-	sloHolds := expectedSum >= e.expectedThreshold
-	if !sloHolds {
-		breach = &SLOBreach{
-			ThresholdValue: e.expectedThreshold,
-			ThresholdUnit:  "%",
-			Operation:      OperationGE,
-			WindowDuration: windowSize,
-		}
-	}
-	return breach, expectedSum, eventsSum, breakDown
+	return expectedSum, eventsSum, breakDown
 }
 
-func (e *httpStatusExpectations) checkUnexpectedBreach(histogram *metrics.TagHistogram[string], windowSize time.Duration) (*SLOBreach, float64, int64, []Metric) {
+func (e *httpStatusExpectations) checkUnexpectedBreach(histogram *metrics.TagHistogram[string], windowSize time.Duration) (float64, int64, []Metric) {
 	breakDown := make([]Metric, len(e.unexpected))
 	breakDown = breakDown[:0]
 	unexpectedSum := float64(0)
@@ -204,17 +192,7 @@ func (e *httpStatusExpectations) checkUnexpectedBreach(histogram *metrics.TagHis
 		}
 	}
 
-	var breach *SLOBreach
-	if unexpectedSum > e.unexpectedThreshold {
-		breach = &SLOBreach{
-			ThresholdValue: e.unexpectedThreshold,
-			ThresholdUnit:  "%",
-			Operation:      OperationL,
-			WindowDuration: windowSize,
-		}
-	}
-
-	return breach, unexpectedSum, eventsSum, breakDown
+	return unexpectedSum, eventsSum, breakDown
 }
 
 func buildExpectations(expectedHttpState []string, unexpectedHttpState []string, breachThreshold Percentile) *httpStatusExpectations {

@@ -63,17 +63,6 @@ func (s *ValidationSLO) Check(now time.Time) []LevelsCheck {
 
 	total := histogram.Total()
 
-	var breach *SLOBreach
-	isBreached := optFloat(successPercentage) < s.breachThreshold.AsPercent()
-	if isBreached {
-		breach = &SLOBreach{
-			ThresholdValue: s.breachThreshold.AsPercent(),
-			ThresholdUnit:  "%",
-			Operation:      OperationL,
-			WindowDuration: s.window.Size,
-		}
-	}
-
 	return []LevelsCheck{
 		{
 			Namespace: s.namespace,
@@ -104,7 +93,6 @@ func (s *ValidationSLO) Check(now time.Time) []LevelsCheck {
 					EventsCount: totalFailure,
 				},
 			},
-			Breach:    breach,
 			Timestamp: now,
 			Uptime:    uptime,
 		},

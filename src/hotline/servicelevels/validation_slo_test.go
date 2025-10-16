@@ -55,12 +55,6 @@ var _ = Describe("Validation SLO", func() {
 					EventsCount: 0,
 				},
 			},
-			Breach: &servicelevels.SLOBreach{
-				ThresholdValue: 99.9,
-				ThresholdUnit:  "%",
-				Operation:      servicelevels.OperationL,
-				WindowDuration: 1 * time.Hour,
-			},
 			Uptime:    1*time.Minute + 5*time.Millisecond + 500*time.Microsecond,
 			Timestamp: clock.ParseTime("2025-02-22T12:03:10.0055Z"),
 		}))
@@ -104,7 +98,6 @@ var _ = Describe("Validation SLO", func() {
 					EventsCount: 0,
 				},
 			},
-			Breach:    nil,
 			Uptime:    1*time.Minute + 5*time.Millisecond + 500*time.Microsecond,
 			Timestamp: clock.ParseTime("2025-02-22T12:03:10.0055Z"),
 		}))
@@ -147,12 +140,6 @@ var _ = Describe("Validation SLO", func() {
 					Unit:        "%",
 					EventsCount: 10,
 				},
-			},
-			Breach: &servicelevels.SLOBreach{
-				ThresholdValue: 99.9,
-				ThresholdUnit:  "%",
-				Operation:      servicelevels.OperationL,
-				WindowDuration: 1 * time.Hour,
 			},
 			Uptime:    1*time.Minute + 5*time.Millisecond + 500*time.Microsecond,
 			Timestamp: clock.ParseTime("2025-02-22T12:03:10.0055Z"),

@@ -126,7 +126,6 @@ func toMetrics(check servicelevels.Check) []*metricspb.Metric {
 		attributes := []*commonpb.KeyValue{
 			StringAttribute("integration_id", string(check.IntegrationID)),
 			StringAttribute("metric", level.Metric.Name),
-			BoolAttribute("breached", level.Breach != nil),
 		}
 		for key, val := range level.Tags {
 			attributes = append(attributes, StringAttribute(key, val))
@@ -178,7 +177,6 @@ func toMetrics(check servicelevels.Check) []*metricspb.Metric {
 				StringAttribute("integration_id", string(check.IntegrationID)),
 				StringAttribute("breakdown", breakdown.Name),
 				StringAttribute("metric", level.Metric.Name),
-				BoolAttribute("breached", level.Breach != nil),
 			}
 			for key, val := range level.Tags {
 				attributes = append(attributes, StringAttribute(key, val))
