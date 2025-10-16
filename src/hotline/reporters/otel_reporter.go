@@ -231,15 +231,6 @@ func StringAttribute(key string, value string) *commonpb.KeyValue {
 	}
 }
 
-func BoolAttribute(key string, value bool) *commonpb.KeyValue {
-	return &commonpb.KeyValue{
-		Key: key,
-		Value: &commonpb.AnyValue{
-			Value: &commonpb.AnyValue_BoolValue{BoolValue: value},
-		},
-	}
-}
-
 func DefaultOtelHttpClient(sleep func(t time.Duration)) *http.Client {
 	transport := &http.Transport{}
 	roundTripper := http2.WrapWithRetries(

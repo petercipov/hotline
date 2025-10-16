@@ -82,7 +82,7 @@ func (s *manualClockSUT) ForManualClock() {
 }
 
 func (s *manualClockSUT) WithAutoAdvance() {
-	s.clock = clock.NewManualClock(clock.ParseTime("2025-05-18T12:02:10Z"), 1)
+	s.clock = clock.NewDefaultManualClock()
 }
 
 func (s *manualClockSUT) Sleep() time.Time {
