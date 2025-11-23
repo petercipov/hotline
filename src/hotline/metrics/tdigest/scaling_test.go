@@ -13,7 +13,7 @@ var _ = Describe("Scaling", func() {
 
 		var maxWeights []float64
 		totalWeight := uint64(1000)
-		for quantile := 0; quantile <= 100; quantile += 1 {
+		for quantile := range 101 {
 			q := float64(quantile) / 100.0
 			maxWeight := round(scaling.MaxWeight(q, q, totalWeight), 2)
 			maxWeights = append(maxWeights, maxWeight)
