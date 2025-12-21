@@ -2,13 +2,13 @@ package metrics
 
 import "time"
 
-type Window[T any] struct {
+type Window[T any, A Accumulator[T]] struct {
 	StartTime   time.Time
 	EndTime     time.Time
-	Accumulator Accumulator[T]
+	Accumulator A
 }
 
-func (w *Window[T]) IsActive(now time.Time) bool {
+func (w *Window[T, A]) IsActive(now time.Time) bool {
 	nowSec := now.Unix()
 	startSec := w.StartTime.Unix()
 	endSec := w.EndTime.Unix()
@@ -16,7 +16,7 @@ func (w *Window[T]) IsActive(now time.Time) bool {
 	return nowSec >= startSec && nowSec < endSec
 }
 
-func (w *Window[T]) IsActiveGracePeriod(now time.Time, gracePeriod time.Duration) bool {
+func (w *Window[T, A]) IsActiveGracePeriod(now time.Time, gracePeriod time.Duration) bool {
 	graceEnd := w.EndTime
 	graceStart := w.EndTime.Add(-gracePeriod)
 
@@ -31,23 +31,23 @@ type Accumulator[T any] interface {
 	Add(value T)
 }
 
-type SlidingWindow[T any] struct {
+type SlidingWindow[T any, A Accumulator[T]] struct {
 	Size        time.Duration
 	GracePeriod time.Duration
-	windows     map[int64]*Window[T]
-	createAcc   func() Accumulator[T]
+	windows     map[int64]*Window[T, A]
+	createAcc   func() A
 }
 
-func NewSlidingWindow[T any](createAcc func() Accumulator[T], size time.Duration, gracePeriod time.Duration) *SlidingWindow[T] {
-	return &SlidingWindow[T]{
+func NewSlidingWindow[T any, A Accumulator[T]](createAcc func() A, size time.Duration, gracePeriod time.Duration) *SlidingWindow[T, A] {
+	return &SlidingWindow[T, A]{
 		Size:        size,
 		GracePeriod: gracePeriod,
 		createAcc:   createAcc,
-		windows:     make(map[int64]*Window[T]),
+		windows:     make(map[int64]*Window[T, A]),
 	}
 }
 
-func (w *SlidingWindow[T]) GetActiveWindow(now time.Time) *Window[T] {
+func (w *SlidingWindow[T, A]) GetActiveWindow(now time.Time) *Window[T, A] {
 	if len(w.windows) == 0 {
 		return nil
 	}
@@ -60,7 +60,7 @@ func (w *SlidingWindow[T]) GetActiveWindow(now time.Time) *Window[T] {
 	return nil
 }
 
-func (w *SlidingWindow[T]) pruneObsoleteWindows(now time.Time) {
+func (w *SlidingWindow[T, A]) pruneObsoleteWindows(now time.Time) {
 	for key, window := range w.windows {
 		if !window.IsActive(now) {
 			delete(w.windows, key)
@@ -68,7 +68,7 @@ func (w *SlidingWindow[T]) pruneObsoleteWindows(now time.Time) {
 	}
 }
 
-func (w *SlidingWindow[T]) AddValue(now time.Time, value T) {
+func (w *SlidingWindow[T, A]) AddValue(now time.Time, value T) {
 	w.pruneObsoleteWindows(now)
 
 	windowStart := now.Truncate(w.GracePeriod)
@@ -79,7 +79,7 @@ func (w *SlidingWindow[T]) AddValue(now time.Time, value T) {
 		key := startTime.Unix()
 		_, found := w.windows[key]
 		if !found {
-			w.windows[key] = &Window[T]{
+			w.windows[key] = &Window[T, A]{
 				StartTime:   startTime,
 				EndTime:     endTime,
 				Accumulator: w.createAcc(),

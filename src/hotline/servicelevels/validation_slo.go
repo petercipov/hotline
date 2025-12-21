@@ -14,7 +14,7 @@ const (
 )
 
 type ValidationSLO struct {
-	window          *metrics.SlidingWindow[ValidationStatus]
+	window          *metrics.SlidingWindow[ValidationStatus, *metrics.TagHistogram[ValidationStatus]]
 	namespace       string
 	tags            map[string]string
 	breachThreshold Percentile
@@ -28,7 +28,7 @@ func NewValidationSLO(
 	tags map[string]string,
 	now time.Time,
 ) *ValidationSLO {
-	window := metrics.NewSlidingWindow(func() metrics.Accumulator[ValidationStatus] {
+	window := metrics.NewSlidingWindow(func() *metrics.TagHistogram[ValidationStatus] {
 		return metrics.NewTagsHistogram([]ValidationStatus{
 			ValidationStatusSkipped,
 			ValidationStatusSuccess,
@@ -55,7 +55,7 @@ func (s *ValidationSLO) Check(now time.Time) []LevelsCheck {
 		return nil
 	}
 	uptime := now.Sub(s.createAt)
-	histogram := activeWindow.Accumulator.(*metrics.TagHistogram[ValidationStatus])
+	histogram := activeWindow.Accumulator
 
 	skippedPercentage, totalSkipped := histogram.ComputePercentile(ValidationStatusSkipped)
 	successPercentage, totalSuccess := histogram.ComputePercentile(ValidationStatusSuccess)

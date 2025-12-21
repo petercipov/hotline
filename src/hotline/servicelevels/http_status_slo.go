@@ -11,7 +11,7 @@ const unexpectedStateName = "unexpected"
 const expectedStateName = "expected"
 
 type HttpStatusSLO struct {
-	window       *metrics.SlidingWindow[string]
+	window       *metrics.SlidingWindow[string, *metrics.TagHistogram[string]]
 	breakdown    *HttpStateRangeBreakdown
 	expectations *httpStatusExpectations
 
@@ -34,7 +34,7 @@ func NewHttpStatusSLO(
 		breachThreshold,
 	)
 	allStatuses := expectations.AllStatuses()
-	window := metrics.NewSlidingWindow(func() metrics.Accumulator[string] {
+	window := metrics.NewSlidingWindow(func() *metrics.TagHistogram[string] {
 		return metrics.NewTagsHistogram(allStatuses)
 	}, windowDuration, 1*time.Minute)
 
@@ -69,7 +69,7 @@ func (s *HttpStatusSLO) Check(now time.Time) []LevelsCheck {
 	if activeWindow == nil {
 		return nil
 	}
-	histogram := activeWindow.Accumulator.(*metrics.TagHistogram[string])
+	histogram := activeWindow.Accumulator
 	uptime := now.Sub(s.createdAt)
 
 	expectedMetric, expectedEventsCount, expectedBreakdown := s.expectations.checkExpectedBreach(histogram, s.window.Size)

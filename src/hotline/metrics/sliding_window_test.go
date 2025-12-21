@@ -107,7 +107,7 @@ var _ = Describe("SlidingWindow", func() {
 })
 
 type sutslidingwindow struct {
-	slidingWindow *metrics.SlidingWindow[float64]
+	slidingWindow *metrics.SlidingWindow[float64, *float64ArrAcc]
 }
 
 func (s *sutslidingwindow) forEmptySlidingWindow() {
@@ -123,7 +123,7 @@ func parseTimePtr(nowString string) *time.Time {
 	return &now
 }
 
-func (s *sutslidingwindow) getActiveWindow(nowString string) *metrics.Window[float64] {
+func (s *sutslidingwindow) getActiveWindow(nowString string) *metrics.Window[float64, *float64ArrAcc] {
 	now := clock.ParseTime(nowString)
 	return s.slidingWindow.GetActiveWindow(now)
 }
@@ -133,14 +133,14 @@ func (s *sutslidingwindow) addValue(latency float64, nowString string) {
 	s.slidingWindow.AddValue(now, latency)
 }
 
-func (s *sutslidingwindow) windowContains(window *metrics.Window[float64], value float64) bool {
-	acc := window.Accumulator.(*arrAccumulator)
+func (s *sutslidingwindow) windowContains(window *metrics.Window[float64, *float64ArrAcc], value float64) bool {
+	acc := window.Accumulator
 	return slices.Contains(acc.values, value)
 }
 
 func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolledWindows {
 	now := clock.ParseTime(nowStr)
-	var windows []*metrics.Window[float64]
+	var windows []*metrics.Window[float64, *float64ArrAcc]
 	for i := range count {
 		tNow := now.Add(s.slidingWindow.GracePeriod * time.Duration(i))
 		window := s.slidingWindow.GetActiveWindow(tNow)
@@ -149,7 +149,7 @@ func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolle
 	return windows
 }
 
-type scrolledWindows []*metrics.Window[float64]
+type scrolledWindows []*metrics.Window[float64, *float64ArrAcc]
 
 func (s *scrolledWindows) StartTimes() []*time.Time {
 	if s == nil {
@@ -168,14 +168,14 @@ func (s *scrolledWindows) StartTimes() []*time.Time {
 	return startTimes
 }
 
-type arrAccumulator struct {
+type float64ArrAcc struct {
 	values []float64
 }
 
-func newArrAccumulator() metrics.Accumulator[float64] {
-	return &arrAccumulator{}
+func newArrAccumulator() *float64ArrAcc {
+	return &float64ArrAcc{}
 }
 
-func (a *arrAccumulator) Add(value float64) {
+func (a *float64ArrAcc) Add(value float64) {
 	a.values = append(a.values, value)
 }
