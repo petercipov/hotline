@@ -21,30 +21,30 @@ type ChecksReporter interface {
 }
 
 type Pipeline struct {
-	fanOut *concurrency.FanOut[concurrency.ScopedAction[SLOScope], SLOScope]
+	publisher concurrency.PartitionPublisher
 }
 
-func NewPipeline(scopes *concurrency.Scopes[SLOScope]) *Pipeline {
+func NewPipeline(publisher concurrency.PartitionPublisher) *Pipeline {
 	p := &Pipeline{
-		fanOut: concurrency.NewActionFanOut(scopes),
+		publisher: publisher,
 	}
 	return p
 }
 
-func (p *Pipeline) IngestHttpRequest(m *IngestRequestsMessage) {
-	p.fanOut.Send(m.GetShardingKey(), m)
+func (p *Pipeline) IngestHttpRequest(ctx context.Context, m *IngestRequestsMessage) {
+	p.publisher.PublishToPartition(ctx, m)
 }
 
-func (p *Pipeline) Check(m *CheckMessage) {
-	p.fanOut.Broadcast(m)
+func (p *Pipeline) Check(ctx context.Context, m *CheckMessage) {
+	p.publisher.PublishToPartition(ctx, m)
 }
 
-func (p *Pipeline) RouteModified(m *ModifyForRouteMessage) {
-	p.fanOut.Send(m.GetShardingKey(), m)
+func (p *Pipeline) RouteModified(ctx context.Context, m *ModifyForRouteMessage) {
+	p.publisher.PublishToPartition(ctx, m)
 }
 
-func (p *Pipeline) RequestValidated(m *RequestValidatedMessage) {
-	p.fanOut.Send(m.GetShardingKey(), m)
+func (p *Pipeline) RequestValidated(ctx context.Context, m *RequestValidatedMessage) {
+	p.publisher.PublishToPartition(ctx, m)
 }
 
 type Check struct {
@@ -96,6 +96,10 @@ type CheckMessage struct {
 	Now time.Time
 }
 
+func (message *CheckMessage) GetShardingKey() concurrency.ShardingKey {
+	return nil
+}
+
 func (message *CheckMessage) Execute(ctx context.Context, _ string, scope *SLOScope) {
 	scope.AdvanceTime(message.Now)
 
@@ -118,7 +122,7 @@ type IngestRequestsMessage struct {
 	Reqs []*HttpRequest
 }
 
-func (message *IngestRequestsMessage) GetShardingKey() []byte {
+func (message *IngestRequestsMessage) GetShardingKey() concurrency.ShardingKey {
 	return []byte(message.ID)
 }
 
@@ -172,7 +176,7 @@ func (message *ModifyForRouteMessage) Execute(ctx context.Context, _ string, sco
 	}
 }
 
-func (message *ModifyForRouteMessage) GetShardingKey() []byte {
+func (message *ModifyForRouteMessage) GetShardingKey() concurrency.ShardingKey {
 	return []byte(message.ID)
 }
 
@@ -195,7 +199,7 @@ func (m *RequestValidatedMessage) Execute(_ context.Context, _ string, scope *SL
 	slo.AddRequestValidation(scope.LastObservedTime, m.Locator, m.Status)
 }
 
-func (m *RequestValidatedMessage) GetShardingKey() []byte {
+func (m *RequestValidatedMessage) GetShardingKey() concurrency.ShardingKey {
 	return []byte(m.ID)
 }
 
@@ -203,9 +207,9 @@ type EventsHandler struct {
 	Pipeline *Pipeline
 }
 
-func (h *EventsHandler) HandleRouteModified(messages []ModifyForRouteMessage) error {
+func (h *EventsHandler) HandleRouteModified(ctx context.Context, messages []ModifyForRouteMessage) error {
 	for _, m := range messages {
-		h.Pipeline.RouteModified(&m)
+		h.Pipeline.RouteModified(ctx, &m)
 	}
 	return nil
 }

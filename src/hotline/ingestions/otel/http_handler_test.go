@@ -185,7 +185,7 @@ func (s *otelSut) forHttpIngestion() {
 	s.requests = nil
 	s.names = otel.StandardMappingNames()
 	converter := otel.NewProtoConverter()
-	s.handler = otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
+	s.handler = otel.NewTracesHandler(func(_ context.Context, requests []*ingestions.HttpRequest) {
 		s.requests = append(s.requests, requests...)
 	}, converter)
 	s.server = httptest.NewServer(s.handler)

@@ -41,6 +41,6 @@ func (h *TracesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "could not parse proto", http.StatusBadRequest)
 		return
 	}
-	h.ingestion(h.messageConverter.Convert(&reqProto))
+	h.ingestion(req.Context(), h.messageConverter.Convert(&reqProto))
 	w.WriteHeader(http.StatusCreated)
 }

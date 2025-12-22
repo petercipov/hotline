@@ -164,7 +164,7 @@ type publisherWithFailures struct {
 	errName   string
 }
 
-func (i *publisherWithFailures) HandleRouteModified(event []servicelevels.ModifyForRouteMessage) error {
+func (i *publisherWithFailures) HandleRouteModified(_ context.Context, event []servicelevels.ModifyForRouteMessage) error {
 	if i.errName == "HandleRouteModified" {
 		return ErrPublisherFailure
 	}

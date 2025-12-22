@@ -15,7 +15,7 @@ type Repository interface {
 }
 
 type RouteUpsertedPublisher interface {
-	HandleRouteModified(event []ModifyForRouteMessage) error
+	HandleRouteModified(ctx context.Context, event []ModifyForRouteMessage) error
 }
 
 type UseCase struct {
@@ -65,7 +65,7 @@ func (u *UseCase) ModifyRoute(ctx context.Context, id integrations.ID, routeDef 
 	if setErr != nil {
 		return key, setErr
 	}
-	publishErr := u.publisher.HandleRouteModified([]ModifyForRouteMessage{
+	publishErr := u.publisher.HandleRouteModified(ctx, []ModifyForRouteMessage{
 		{
 			ID:    id,
 			Route: routeDef.Route,
@@ -89,7 +89,7 @@ func (u *UseCase) DeleteRoute(ctx context.Context, id integrations.ID, routeKey 
 	if setErr != nil {
 		return setErr
 	}
-	return u.publisher.HandleRouteModified([]ModifyForRouteMessage{
+	return u.publisher.HandleRouteModified(ctx, []ModifyForRouteMessage{
 		{
 			ID:    id,
 			Route: route,
@@ -119,5 +119,5 @@ func (u *UseCase) DropServiceLevels(ctx context.Context, id integrations.ID) err
 			Route: route.Route,
 		})
 	}
-	return u.publisher.HandleRouteModified(messages)
+	return u.publisher.HandleRouteModified(ctx, messages)
 }

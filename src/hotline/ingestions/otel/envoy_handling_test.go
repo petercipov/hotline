@@ -1,6 +1,7 @@
 package otel_test
 
 import (
+	"context"
 	"hotline/clock"
 	"hotline/ingestions"
 	"hotline/ingestions/otel"
@@ -75,7 +76,7 @@ type envoySut struct {
 func (s *envoySut) forHttpIngestion() {
 	s.requests = nil
 	converter := otel.NewProtoConverter()
-	s.handler = otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
+	s.handler = otel.NewTracesHandler(func(_ context.Context, requests []*ingestions.HttpRequest) {
 		s.requests = append(s.requests, requests...)
 	}, converter)
 	s.server = httptest.NewServer(s.handler)

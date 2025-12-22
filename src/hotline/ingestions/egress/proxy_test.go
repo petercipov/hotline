@@ -155,7 +155,7 @@ func (s *proxySUT) ForRunningProxyWithRoundTripper(roundtripper http.RoundTrippe
 	s.integrationID = "integration 123"
 	s.proxyServer = httptest.NewServer(egress.New(
 		roundtripper,
-		func(req *ingestions.HttpRequest) {
+		func(_ context.Context, req *ingestions.HttpRequest) {
 			s.ingestedRequests = append(s.ingestedRequests, req)
 		},
 		s.managedTime,

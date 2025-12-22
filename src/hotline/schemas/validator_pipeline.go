@@ -139,17 +139,17 @@ type RouteValidator struct {
 }
 
 type ValidatorPipeline struct {
-	fanOut *concurrency.FanOut[concurrency.ScopedAction[ValidatorScope], ValidatorScope]
+	publisher concurrency.PartitionPublisher
 }
 
-func NewValidatorPipeline(scopes *concurrency.Scopes[ValidatorScope]) *ValidatorPipeline {
+func NewValidatorPipeline(publisher concurrency.PartitionPublisher) *ValidatorPipeline {
 	return &ValidatorPipeline{
-		fanOut: concurrency.NewActionFanOut(scopes),
+		publisher: publisher,
 	}
 }
 
-func (p *ValidatorPipeline) IngestHttpRequest(m *ValidateRequestMessage) {
-	p.fanOut.Send(m.GetShardingKey(), m)
+func (p *ValidatorPipeline) IngestHttpRequest(ctx context.Context, m *ValidateRequestMessage) {
+	p.publisher.PublishToPartition(ctx, m)
 }
 
 type RequestContent struct {
@@ -167,7 +167,7 @@ type ValidateRequestMessage struct {
 	Request RequestContent
 }
 
-func (message *ValidateRequestMessage) GetShardingKey() []byte {
+func (message *ValidateRequestMessage) GetShardingKey() concurrency.ShardingKey {
 	return []byte(message.IntegrationID)
 }
 

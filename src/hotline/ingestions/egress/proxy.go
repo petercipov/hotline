@@ -31,7 +31,7 @@ func DefaultRequestSemantics() RequestSemantics {
 type Proxy struct {
 	transport http.RoundTripper
 	timeout   time.Duration
-	ingestion func(req *ingestions.HttpRequest)
+	ingestion func(ctx context.Context, req *ingestions.HttpRequest)
 	time      clock.ManagedTime
 	v7        uuid.V7StringGenerator
 	semantics *RequestSemantics
@@ -39,7 +39,7 @@ type Proxy struct {
 
 func New(
 	transport http.RoundTripper,
-	ingestion func(req *ingestions.HttpRequest),
+	ingestion func(ctx context.Context, req *ingestions.HttpRequest),
 	time clock.ManagedTime,
 	timeout time.Duration,
 	v7 uuid.V7StringGenerator,
@@ -103,14 +103,14 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			log.Printf("Error proxying request: timeout")
 			rw.WriteHeader(http.StatusGatewayTimeout)
 			ingestedRequest.ErrorType = "timeout"
-			p.ingestion(ingestedRequest)
+			p.ingestion(reqCtx, ingestedRequest)
 			return
 		}
 
 		log.Printf("Error proxying request: %s", respErr.Error())
 		rw.WriteHeader(http.StatusBadGateway)
 		ingestedRequest.ErrorType = "unknown"
-		p.ingestion(ingestedRequest)
+		p.ingestion(reqCtx, ingestedRequest)
 		return
 	}
 	defer func() {
@@ -124,13 +124,13 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if copyErr != nil {
 		log.Printf("Error copying response, http status already sent,: %s", copyErr.Error())
 		ingestedRequest.ErrorType = "proxy_copy_err"
-		p.ingestion(ingestedRequest)
+		p.ingestion(reqCtx, ingestedRequest)
 		return
 	}
 
 	ingestedRequest.StatusCode = strconv.Itoa(resp.StatusCode)
 	ingestedRequest.EndTime = p.time.Now()
-	p.ingestion(ingestedRequest)
+	p.ingestion(reqCtx, ingestedRequest)
 }
 
 var errIntegrationNotFound = errors.New("integration id not found")

@@ -2,6 +2,7 @@ package setup
 
 import (
 	"app/setup/config"
+	"context"
 	"hotline/clock"
 	"hotline/concurrency"
 	"hotline/ingestions"
@@ -88,14 +89,16 @@ func NewApp(
 			return servicelevels.NewEmptyIntegrationsScope(serviceLevelsUseCase, reporter)
 		},
 	)
-	sloPipeline := servicelevels.NewPipeline(sloPipelineScopes)
+	sloPipelinePublisher := concurrency.NewFanoutPublisher(concurrency.NewFanoutWithMessagesConsumer(sloPipelineScopes))
+
+	sloPipeline := servicelevels.NewPipeline(sloPipelinePublisher)
 	eventsHandler.Pipeline = sloPipeline
 
 	converter := otel.NewProtoConverter()
-	otelHandler := otel.NewTracesHandler(func(requests []*ingestions.HttpRequest) {
+	otelHandler := otel.NewTracesHandler(func(ctx context.Context, requests []*ingestions.HttpRequest) {
 		sloRequests := ingestions.ToSLORequestMessage(requests, managedTime.Now())
 		for _, req := range sloRequests {
-			sloPipeline.IngestHttpRequest(req)
+			sloPipeline.IngestHttpRequest(ctx, req)
 		}
 	}, converter)
 
@@ -103,9 +106,9 @@ func NewApp(
 	defaultSemantics := egress.DefaultRequestSemantics()
 	egressHandler := egress.New(
 		&http.Transport{},
-		func(req *ingestions.HttpRequest) {
+		func(ctx context.Context, req *ingestions.HttpRequest) {
 			sloRequest := ingestions.ToSLOSingleRequestMessage(req, managedTime.Now())
-			sloPipeline.IngestHttpRequest(sloRequest)
+			sloPipeline.IngestHttpRequest(ctx, sloRequest)
 		},
 		managedTime,
 		60*time.Second,
@@ -143,7 +146,7 @@ func (a *App) Start() {
 		checkPeriod = a.cfg.SloPipeline.CheckPeriod
 	}
 	a.stopTick = a.managedTime.TickPeriodically(checkPeriod, func(currentTime time.Time) {
-		a.sloPipeline.Check(&servicelevels.CheckMessage{
+		a.sloPipeline.Check(context.Background(), &servicelevels.CheckMessage{
 			Now: currentTime,
 		})
 		slog.Info("Finished check of metrics ", slog.Time("now", currentTime))

@@ -61,12 +61,35 @@ func (f *FanOut[M, S]) Close() {
 	f.scopes = nil
 }
 
-type ScopedAction[S any] interface {
-	Execute(ctx context.Context, scopeID string, scope *S)
+type InMessageConsumer[S any] struct {
+	PartitionConsumer[S]
 }
 
-func NewActionFanOut[S any](scopes *Scopes[S]) *FanOut[ScopedAction[S], S] {
-	return NewFanOut(scopes, func(ctx context.Context, queueID string, action ScopedAction[S], scope *S) {
-		action.Execute(ctx, queueID, scope)
-	})
+func (m *InMessageConsumer[S]) ConsumeFromPartition(ctx context.Context, partitionID string, message Message, scope *S) {
+	action := message.(ScopedAction[S])
+	action.Execute(ctx, partitionID, scope)
+}
+
+func NewFanoutWithMessagesConsumer[S any](scopes *Scopes[S]) *FanOut[Message, S] {
+	c := &InMessageConsumer[S]{}
+	f := NewFanOut(scopes, c.ConsumeFromPartition)
+	return f
+}
+
+type FanoutPublisher[S any] struct {
+	PartitionPublisher
+	fanout *FanOut[Message, S]
+}
+
+func NewFanoutPublisher[S any](fanout *FanOut[Message, S]) *FanoutPublisher[S] {
+	return &FanoutPublisher[S]{fanout: fanout}
+}
+
+func (p *FanoutPublisher[S]) PublishToPartition(_ context.Context, message Message) {
+	key := message.GetShardingKey()
+	if key != nil {
+		p.fanout.Send(key, message)
+	} else {
+		p.fanout.Broadcast(message)
+	}
 }

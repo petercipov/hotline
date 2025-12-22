@@ -157,7 +157,11 @@ func (s *validationPipelineSut) forPipelineWithoutDefinition() {
 			)
 		},
 	)
-	s.pipeline = schemas.NewValidatorPipeline(scopes)
+
+	fanOut := concurrency.NewFanoutWithMessagesConsumer(scopes)
+	publisher := concurrency.NewFanoutPublisher(fanOut)
+
+	s.pipeline = schemas.NewValidatorPipeline(publisher)
 	Expect(s.schemaUseCase.ListSchemas(context.Background())).To(BeEmpty())
 }
 
@@ -223,7 +227,7 @@ func (s *validationPipelineSut) validateValidRequest() schemas.ValidationResult 
 }
 
 func (s *validationPipelineSut) validateRequest(message *schemas.ValidateRequestMessage) schemas.ValidationResult {
-	s.pipeline.IngestHttpRequest(message)
+	s.pipeline.IngestHttpRequest(context.Background(), message)
 
 	count := 0
 	for {

@@ -1,6 +1,7 @@
 package ingestions
 
 import (
+	"context"
 	"hotline/http"
 	"hotline/integrations"
 	"hotline/servicelevels"
@@ -9,7 +10,7 @@ import (
 	"time"
 )
 
-type IngestHttpRequests func(req []*HttpRequest)
+type IngestHttpRequests func(ctx context.Context, req []*HttpRequest)
 
 type HttpRequest struct {
 	ID              http.RequestID

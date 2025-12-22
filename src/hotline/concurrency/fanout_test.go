@@ -67,8 +67,9 @@ var _ = Describe("Fan Out", func() {
 })
 
 type fanOutSut struct {
-	scopes *concurrency.Scopes[singleWriterScope]
-	fanOut *concurrency.FanOut[concurrency.ScopedAction[singleWriterScope], singleWriterScope]
+	scopes    *concurrency.Scopes[singleWriterScope]
+	fanOut    *concurrency.FanOut[concurrency.Message, singleWriterScope]
+	publisher *concurrency.FanoutPublisher[singleWriterScope]
 }
 
 type singleWriterScope struct {
@@ -83,7 +84,8 @@ func (f *fanOutSut) forFanOut(numberOfQueues int) {
 	f.scopes = concurrency.NewScopes(concurrency.GenerateScopeIds("fan", numberOfQueues), func() *singleWriterScope {
 		return &singleWriterScope{}
 	})
-	f.fanOut = concurrency.NewActionFanOut(f.scopes)
+	f.fanOut = concurrency.NewFanoutWithMessagesConsumer(f.scopes)
+	f.publisher = concurrency.NewFanoutPublisher(f.fanOut)
 }
 
 func (f *fanOutSut) forEmptyFanOut() {
@@ -100,14 +102,15 @@ func (f *fanOutSut) scheduleMessage() {
 }
 
 func (f *fanOutSut) sendMessageWithId(id string) {
-	f.fanOut.Send([]byte(id), &sutMessage{
+	f.publisher.PublishToPartition(context.Background(), &sutMessage{
 		id: id,
 	})
 }
 
 func (f *fanOutSut) broadcastMessageWithId(id string) {
-	f.fanOut.Broadcast(&sutMessage{
-		id: id,
+	f.publisher.PublishToPartition(context.Background(), &sutMessage{
+		id:        id,
+		broadcast: true,
 	})
 }
 
@@ -127,9 +130,17 @@ func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
 type sutMessage struct {
 	id        string
 	processId string
+	broadcast bool
 }
 
 func (m *sutMessage) Execute(_ context.Context, scopeID string, scope *singleWriterScope) {
 	m.processId = scopeID
 	scope.messages = append(scope.messages, *m)
+}
+
+func (m *sutMessage) GetShardingKey() concurrency.ShardingKey {
+	if m.broadcast {
+		return nil
+	}
+	return []byte(m.id)
 }

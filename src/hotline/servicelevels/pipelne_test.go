@@ -225,8 +225,11 @@ func (s *sloPipelineSUT) forPipeline() {
 	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.SLOScope {
 		return servicelevels.NewEmptyIntegrationsScope(s.useCase, s.sloReporter)
 	})
+	fanOut := concurrency.NewFanoutWithMessagesConsumer(scopes)
+	publisher := concurrency.NewFanoutPublisher(fanOut)
+
 	s.pipeline = servicelevels.NewPipeline(
-		scopes,
+		publisher,
 	)
 	s.eventsHandler.Pipeline = s.pipeline
 }
@@ -254,7 +257,7 @@ func (s *sloPipelineSUT) EmptyConfigPresent() {
 
 func (s *sloPipelineSUT) Report() servicelevels.ReportArr {
 	now := s.manualClock.Now()
-	s.pipeline.Check(&servicelevels.CheckMessage{
+	s.pipeline.Check(context.Background(), &servicelevels.CheckMessage{
 		Now: now,
 	})
 
@@ -282,7 +285,7 @@ func (s *sloPipelineSUT) IngestOKRequestForPath(path string) {
 
 func (s *sloPipelineSUT) IngestOKRequestForIntegrationAndPath(id integrations.ID, path string) {
 	now := s.manualClock.Now()
-	s.pipeline.IngestHttpRequest(&servicelevels.IngestRequestsMessage{
+	s.pipeline.IngestHttpRequest(context.Background(), &servicelevels.IngestRequestsMessage{
 		ID:  id,
 		Now: now,
 		Reqs: []*servicelevels.HttpRequest{
@@ -367,7 +370,7 @@ func (s *sloPipelineSUT) forConfigWithRequestValidation() {
 }
 
 func (s *sloPipelineSUT) IngestValidationMessage() {
-	s.pipeline.RequestValidated(&servicelevels.RequestValidatedMessage{
+	s.pipeline.RequestValidated(context.Background(), &servicelevels.RequestValidatedMessage{
 		ID:  "known_integration_id",
 		Now: s.manualClock.Now(),
 		Locator: http.RequestLocator{
