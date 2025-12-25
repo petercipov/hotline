@@ -39,10 +39,6 @@ func (p *Pipeline) Check(ctx context.Context, m *CheckMessage) {
 	_ = p.publisher.PublishToPartition(ctx, m)
 }
 
-func (p *Pipeline) RouteModified(ctx context.Context, m *ModifyForRouteMessage) {
-	_ = p.publisher.PublishToPartition(ctx, m)
-}
-
 func (p *Pipeline) RequestValidated(ctx context.Context, m *RequestValidatedMessage) {
 	_ = p.publisher.PublishToPartition(ctx, m)
 }
