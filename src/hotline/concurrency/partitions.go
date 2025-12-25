@@ -9,7 +9,7 @@ type Message interface {
 }
 
 type PartitionPublisher interface {
-	PublishToPartition(ctx context.Context, message Message)
+	PublishToPartition(ctx context.Context, message Message) error
 }
 
 type PartitionConsumer[S any] interface {

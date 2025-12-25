@@ -201,7 +201,6 @@ type sloPipelineSUT struct {
 	pipeline      *servicelevels.Pipeline
 	sloRepository *servicelevels.InMemoryRepository
 	sloReporter   *servicelevels.InMemorySLOReporter
-	eventsHandler *servicelevels.EventsHandler
 
 	useCase        *servicelevels.UseCase
 	manualClock    *clock.ManualClock
@@ -214,12 +213,10 @@ func (s *sloPipelineSUT) forPipeline() {
 	queueIDs := concurrency.GenerateScopeIds("queue", s.numberOfQueues)
 	s.sloRepository = &servicelevels.InMemoryRepository{}
 	s.sloReporter = &servicelevels.InMemorySLOReporter{}
-	s.eventsHandler = &servicelevels.EventsHandler{}
 
 	s.useCase = servicelevels.NewUseCase(
 		s.sloRepository,
 		s.manualClock.Now,
-		s.eventsHandler,
 	)
 
 	scopes := concurrency.NewScopes(queueIDs, func() *servicelevels.SLOScope {
@@ -231,7 +228,8 @@ func (s *sloPipelineSUT) forPipeline() {
 	s.pipeline = servicelevels.NewPipeline(
 		publisher,
 	)
-	s.eventsHandler.Pipeline = s.pipeline
+
+	s.useCase.SetPublisher(publisher)
 }
 
 func (s *sloPipelineSUT) NoConfigPresentForIntegration(id integrations.ID) {
@@ -336,7 +334,6 @@ func (s *sloPipelineSUT) Close() {
 	s.sloReporter = nil
 	s.manualClock = nil
 	s.useCase = nil
-	s.eventsHandler = nil
 	s.numberOfQueues = 0
 }
 

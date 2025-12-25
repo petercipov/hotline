@@ -55,8 +55,8 @@ var _ = Describe("Fan Out", func() {
 		Expect(received).To(HaveLen(8 * 100))
 
 		byProcessId := map[string][]sutMessage{}
-		for _, message := range received {
-			byProcessId[message.processId] = append(byProcessId[message.processId], message)
+		for _, r := range received {
+			byProcessId[r.processId] = append(byProcessId[r.processId], *r.message)
 		}
 		Expect(byProcessId).To(HaveLen(8))
 		for _, messages := range byProcessId {
@@ -73,7 +73,7 @@ type fanOutSut struct {
 }
 
 type singleWriterScope struct {
-	messages []sutMessage
+	messages []sutReceivend
 }
 
 func (f *fanOutSut) forSingleFanOut() {
@@ -102,21 +102,21 @@ func (f *fanOutSut) scheduleMessage() {
 }
 
 func (f *fanOutSut) sendMessageWithId(id string) {
-	f.publisher.PublishToPartition(context.Background(), &sutMessage{
+	_ = f.publisher.PublishToPartition(context.Background(), &sutMessage{
 		id: id,
 	})
 }
 
 func (f *fanOutSut) broadcastMessageWithId(id string) {
-	f.publisher.PublishToPartition(context.Background(), &sutMessage{
+	_ = f.publisher.PublishToPartition(context.Background(), &sutMessage{
 		id:        id,
 		broadcast: true,
 	})
 }
 
-func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
+func (f *fanOutSut) expectMessageReceived(count int) []sutReceivend {
 	for {
-		var allMessages []sutMessage
+		var allMessages []sutReceivend
 		for _, scope := range f.scopes.ForEachScope() {
 			allMessages = append(allMessages, scope.Value.messages...)
 		}
@@ -129,13 +129,19 @@ func (f *fanOutSut) expectMessageReceived(count int) []sutMessage {
 
 type sutMessage struct {
 	id        string
-	processId string
 	broadcast bool
 }
 
+type sutReceivend struct {
+	message   *sutMessage
+	processId string
+}
+
 func (m *sutMessage) Execute(_ context.Context, scopeID string, scope *singleWriterScope) {
-	m.processId = scopeID
-	scope.messages = append(scope.messages, *m)
+	scope.messages = append(scope.messages, sutReceivend{
+		message:   m,
+		processId: scopeID,
+	})
 }
 
 func (m *sutMessage) GetShardingKey() concurrency.ShardingKey {

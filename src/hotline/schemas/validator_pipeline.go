@@ -149,7 +149,7 @@ func NewValidatorPipeline(publisher concurrency.PartitionPublisher) *ValidatorPi
 }
 
 func (p *ValidatorPipeline) IngestHttpRequest(ctx context.Context, m *ValidateRequestMessage) {
-	p.publisher.PublishToPartition(ctx, m)
+	_ = p.publisher.PublishToPartition(ctx, m)
 }
 
 type RequestContent struct {

@@ -32,19 +32,19 @@ func NewPipeline(publisher concurrency.PartitionPublisher) *Pipeline {
 }
 
 func (p *Pipeline) IngestHttpRequest(ctx context.Context, m *IngestRequestsMessage) {
-	p.publisher.PublishToPartition(ctx, m)
+	_ = p.publisher.PublishToPartition(ctx, m)
 }
 
 func (p *Pipeline) Check(ctx context.Context, m *CheckMessage) {
-	p.publisher.PublishToPartition(ctx, m)
+	_ = p.publisher.PublishToPartition(ctx, m)
 }
 
 func (p *Pipeline) RouteModified(ctx context.Context, m *ModifyForRouteMessage) {
-	p.publisher.PublishToPartition(ctx, m)
+	_ = p.publisher.PublishToPartition(ctx, m)
 }
 
 func (p *Pipeline) RequestValidated(ctx context.Context, m *RequestValidatedMessage) {
-	p.publisher.PublishToPartition(ctx, m)
+	_ = p.publisher.PublishToPartition(ctx, m)
 }
 
 type Check struct {
@@ -201,15 +201,4 @@ func (m *RequestValidatedMessage) Execute(_ context.Context, _ string, scope *SL
 
 func (m *RequestValidatedMessage) GetShardingKey() concurrency.ShardingKey {
 	return []byte(m.ID)
-}
-
-type EventsHandler struct {
-	Pipeline *Pipeline
-}
-
-func (h *EventsHandler) HandleRouteModified(ctx context.Context, messages []ModifyForRouteMessage) error {
-	for _, m := range messages {
-		h.Pipeline.RouteModified(ctx, &m)
-	}
-	return nil
 }

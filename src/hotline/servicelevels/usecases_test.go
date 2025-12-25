@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"hotline/clock"
+	"hotline/concurrency"
 	"hotline/http"
 	"hotline/integrations"
 	"hotline/servicelevels"
@@ -93,8 +94,8 @@ func (u *usecaseSut) forEmptyUseCase() {
 	u.usecase = servicelevels.NewUseCase(
 		u.repo,
 		u.manualClock.Now,
-		u.publisher,
 	)
+	u.usecase.SetPublisher(u.publisher)
 }
 
 func (u *usecaseSut) withErrors(repoErrName string, publisherErrName string) {
@@ -164,7 +165,7 @@ type publisherWithFailures struct {
 	errName   string
 }
 
-func (i *publisherWithFailures) HandleRouteModified(_ context.Context, event []servicelevels.ModifyForRouteMessage) error {
+func (i *publisherWithFailures) PublishToPartition(_ context.Context, event concurrency.Message) error {
 	if i.errName == "HandleRouteModified" {
 		return ErrPublisherFailure
 	}

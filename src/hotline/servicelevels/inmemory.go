@@ -2,6 +2,7 @@ package servicelevels
 
 import (
 	"context"
+	"hotline/concurrency"
 	"hotline/integrations"
 	"sync"
 )
@@ -59,14 +60,14 @@ func (f *InMemorySLOReporter) GetReports() ReportArr {
 }
 
 type InMemoryEventPublisher struct {
-	arr []ModifyForRouteMessage
+	arr []concurrency.Message
 	mux sync.Mutex
 }
 
-func (p *InMemoryEventPublisher) HandleRouteModified(event []ModifyForRouteMessage) error {
+func (p *InMemoryEventPublisher) HandleRouteModified(event concurrency.Message) error {
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	p.arr = append(p.arr, event...)
+	p.arr = append(p.arr, event)
 	return nil
 }
 

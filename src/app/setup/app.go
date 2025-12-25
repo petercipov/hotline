@@ -76,11 +76,9 @@ func NewApp(
 	}
 	reporter := reporters.NewScopedOtelReporter(otelReporterScopes, managedTime.Sleep, reporterCfg, 100)
 
-	eventsHandler := &servicelevels.EventsHandler{}
 	serviceLevelsUseCase := servicelevels.NewUseCase(
 		serviceLevelsRepository,
 		managedTime.Now,
-		eventsHandler,
 	)
 
 	sloPipelineScopes := concurrency.NewScopes(
@@ -92,7 +90,7 @@ func NewApp(
 	sloPipelinePublisher := concurrency.NewFanoutPublisher(concurrency.NewFanoutWithMessagesConsumer(sloPipelineScopes))
 
 	sloPipeline := servicelevels.NewPipeline(sloPipelinePublisher)
-	eventsHandler.Pipeline = sloPipeline
+	serviceLevelsUseCase.SetPublisher(sloPipelinePublisher)
 
 	converter := otel.NewProtoConverter()
 	otelHandler := otel.NewTracesHandler(func(ctx context.Context, requests []*ingestions.HttpRequest) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"hotline/clock"
+	"hotline/concurrency"
 	"hotline/http"
 	"hotline/integrations"
 )
@@ -14,22 +15,21 @@ type Repository interface {
 	Drop(ctx context.Context, id integrations.ID) error
 }
 
-type RouteUpsertedPublisher interface {
-	HandleRouteModified(ctx context.Context, event []ModifyForRouteMessage) error
-}
-
 type UseCase struct {
 	repo      Repository
 	nowFunc   clock.NowFunc
-	publisher RouteUpsertedPublisher
+	publisher concurrency.PartitionPublisher
 }
 
-func NewUseCase(repo Repository, nowFunc clock.NowFunc, publisher RouteUpsertedPublisher) *UseCase {
+func NewUseCase(repo Repository, nowFunc clock.NowFunc) *UseCase {
 	return &UseCase{
-		repo:      repo,
-		nowFunc:   nowFunc,
-		publisher: publisher,
+		repo:    repo,
+		nowFunc: nowFunc,
 	}
+}
+
+func (u *UseCase) SetPublisher(publisher concurrency.PartitionPublisher) {
+	u.publisher = publisher
 }
 
 func (u *UseCase) GetServiceLevels(ctx context.Context, id integrations.ID) (ApiServiceLevels, error) {
@@ -65,12 +65,10 @@ func (u *UseCase) ModifyRoute(ctx context.Context, id integrations.ID, routeDef 
 	if setErr != nil {
 		return key, setErr
 	}
-	publishErr := u.publisher.HandleRouteModified(ctx, []ModifyForRouteMessage{
-		{
-			ID:    id,
-			Route: routeDef.Route,
-			Now:   now,
-		},
+	publishErr := u.publisher.PublishToPartition(ctx, &ModifyForRouteMessage{
+		ID:    id,
+		Route: routeDef.Route,
+		Now:   now,
 	})
 	return key, publishErr
 }
@@ -89,12 +87,10 @@ func (u *UseCase) DeleteRoute(ctx context.Context, id integrations.ID, routeKey 
 	if setErr != nil {
 		return setErr
 	}
-	return u.publisher.HandleRouteModified(ctx, []ModifyForRouteMessage{
-		{
-			ID:    id,
-			Route: route,
-			Now:   now,
-		},
+	return u.publisher.PublishToPartition(ctx, &ModifyForRouteMessage{
+		ID:    id,
+		Route: route,
+		Now:   now,
 	})
 }
 
@@ -111,13 +107,15 @@ func (u *UseCase) DropServiceLevels(ctx context.Context, id integrations.ID) err
 	if setErr != nil {
 		return setErr
 	}
-	var messages []ModifyForRouteMessage
 	for _, route := range levels.Routes {
-		messages = append(messages, ModifyForRouteMessage{
+		publishErr := u.publisher.PublishToPartition(ctx, &ModifyForRouteMessage{
 			ID:    id,
 			Now:   now,
 			Route: route.Route,
 		})
+		if publishErr != nil {
+			return publishErr
+		}
 	}
-	return u.publisher.HandleRouteModified(ctx, messages)
+	return nil
 }

@@ -85,11 +85,12 @@ func NewFanoutPublisher[S any](fanout *FanOut[Message, S]) *FanoutPublisher[S] {
 	return &FanoutPublisher[S]{fanout: fanout}
 }
 
-func (p *FanoutPublisher[S]) PublishToPartition(_ context.Context, message Message) {
+func (p *FanoutPublisher[S]) PublishToPartition(_ context.Context, message Message) error {
 	key := message.GetShardingKey()
 	if key != nil {
 		p.fanout.Send(key, message)
 	} else {
 		p.fanout.Broadcast(message)
 	}
+	return nil
 }
