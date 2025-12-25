@@ -87,7 +87,7 @@ func (s *workersSUT) forWorker(count int) {
 	})
 	s.workers = concurrency.NewScopeWorkers(
 		s.scopes,
-		func(_ string, scope *workerSUTScope) *workerSUTWorker {
+		func(_ concurrency.ScopeID, scope *workerSUTScope) *workerSUTWorker {
 			return &workerSUTWorker{}
 		},
 		func(ctx context.Context, queueID string, scope *workerSUTScope, worker *workerSUTWorker, message *workerSUTMessage) {

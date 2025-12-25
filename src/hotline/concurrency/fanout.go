@@ -17,13 +17,13 @@ func NewFanOut[M any, S any](scopes *Scopes[S], queueProcessor func(ctx context.
 	}
 
 	i := 0
-	for queueID, scope := range scopes.ForEachScope() {
+	for _, scope := range scopes.ForEachScope() {
 		go func(messages chan M, id string, queueScope *S) {
 			runContext := context.Background()
 			for message := range messages {
 				queueProcessor(runContext, id, message, queueScope)
 			}
-		}(channels[i], queueID, scope.Value)
+		}(channels[i], string(scope.ID), scope.Value)
 		i++
 	}
 

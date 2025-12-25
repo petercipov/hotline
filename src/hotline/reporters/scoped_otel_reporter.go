@@ -35,7 +35,7 @@ func NewScopedOtelReporter(
 ) *ScopedOtelReporter {
 	workers := concurrency.NewScopeWorkers(
 		scopes,
-		func(queueID string, scope *OtelReporterScope) *OtelReporter {
+		func(queueID concurrency.ScopeID, scope *OtelReporterScope) *OtelReporter {
 			scope.client = DefaultOtelHttpClient(sleep)
 			scope.gzip = gzip.NewWriter(io.Discard)
 

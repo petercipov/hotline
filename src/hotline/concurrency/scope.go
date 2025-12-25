@@ -2,46 +2,43 @@ package concurrency
 
 import (
 	"fmt"
-	"iter"
-	"maps"
 )
 
+type ScopeID string
 type Scope[S any] struct {
 	Value *S
-	name  string
+	ID    ScopeID
 }
 
 type Scopes[S any] struct {
-	names  []string
-	scopes map[string]*Scope[S]
+	scopes []Scope[S]
 }
 
-func GenerateScopeIds(prefix string, n int) []string {
-	var scopeIDs []string
+func GenerateScopeIds(prefix string, n int) []ScopeID {
+	var scopeIDs []ScopeID
 	for i := range n {
-		scopeIDs = append(scopeIDs, fmt.Sprintf("%s-%d", prefix, i))
+		scopeIDs = append(scopeIDs, ScopeID(fmt.Sprintf("%s-%d", prefix, i)))
 	}
 	return scopeIDs
 }
 
-func NewScopes[S any](names []string, createScope func() *S) *Scopes[S] {
-	scopes := make(map[string]*Scope[S], len(names))
-	for _, name := range names {
-		scopes[name] = &Scope[S]{
+func NewScopes[S any](names []ScopeID, createScope func() *S) *Scopes[S] {
+	scopes := make([]Scope[S], len(names))
+	for i, name := range names {
+		scopes[i] = Scope[S]{
 			Value: createScope(),
-			name:  name,
+			ID:    name,
 		}
 	}
 	return &Scopes[S]{
-		names:  names,
 		scopes: scopes,
 	}
 }
 
 func (s *Scopes[S]) Len() int {
-	return len(s.names)
+	return len(s.scopes)
 }
 
-func (s *Scopes[S]) ForEachScope() iter.Seq2[string, *Scope[S]] {
-	return maps.All(s.scopes)
+func (s *Scopes[S]) ForEachScope() []Scope[S] {
+	return s.scopes
 }
