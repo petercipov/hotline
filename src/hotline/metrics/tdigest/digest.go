@@ -2,7 +2,6 @@ package tdigest
 
 import (
 	"math"
-	"math/rand/v2"
 	"sort"
 )
 
@@ -23,13 +22,19 @@ type Centroid struct {
 	Weight uint64
 }
 
-type CentroidList []Centroid
+func (c *Centroid) UpdateCentroid(mean float64, weight uint64) {
+	newWeight := c.Weight + weight
+	c.Mean = (c.Mean*float64(c.Weight) + mean*float64(weight)) / float64(newWeight)
+	c.Weight = newWeight
+}
 
-func (l CentroidList) Swap(i, j int) {
+type CentroidBuffer []Centroid
+
+func (l CentroidBuffer) Swap(i, j int) {
 	l[i], l[j] = l[j], l[i]
 }
 
-func (l CentroidList) TotalWeight() uint64 {
+func (l CentroidBuffer) TotalWeight() uint64 {
 	totalWeight := uint64(0)
 	for _, v := range l {
 		totalWeight += v.Weight
@@ -70,50 +75,6 @@ func (c *Centroids) ToList() []Centroid {
 		})
 	}
 	return list
-}
-
-func (c *Centroids) UpdateCentroid(index int, mean float64, count uint64) bool {
-	if index+1 > c.Size() {
-		return false
-	}
-
-	oldCount := c.weight[index]
-	oldMean := c.mean[index]
-	newCount := oldCount + count
-	newMean := (mean*float64(count) + oldMean*float64(oldCount)) / float64(newCount)
-	c.mean[index] = newMean
-	c.weight[index] = newCount
-	c.totalWeight += count
-	return true
-}
-
-func (c *Centroids) MinimumDistanceCentroid(value float64) (int, bool) {
-	if len(c.mean) == 0 {
-		return 0, false
-	}
-
-	var minimumDistance = math.MaxFloat64
-	var minimumDistanceIndex int
-	var found = false
-	for index, mean := range c.mean {
-		distance := math.Abs(mean - value)
-		if distance <= minimumDistance {
-			minimumDistanceIndex = index
-			minimumDistance = distance
-			found = true
-		}
-	}
-	return minimumDistanceIndex, found
-}
-
-func (c *Centroids) ComputeCentroidQuantiles(index int) (float64, float64) {
-	var weightUpToIndex uint64
-	for i := range index {
-		weightUpToIndex += c.weight[i]
-	}
-	q0 := float64(weightUpToIndex) / float64(c.totalWeight)
-	q1 := float64(weightUpToIndex+c.weight[index]) / float64(c.totalWeight)
-	return q0, q1
 }
 
 func (c *Centroids) CentroidAt(index int) Centroid {
@@ -157,8 +118,7 @@ type TDigest struct {
 	capacity           int
 	bufferSize         int
 
-	unprocessed CentroidList
-	randomizer  *rand.Rand
+	unprocessed CentroidBuffer
 }
 
 func (d *TDigest) AddToBuffer(mean float64, weight uint64) {
@@ -173,38 +133,44 @@ func (d *TDigest) AddToBuffer(mean float64, weight uint64) {
 }
 
 func (d *TDigest) processBuffer() {
-	d.randomizer.Shuffle(len(d.unprocessed), d.unprocessed.Swap)
-
-	d.unprocessed.TotalWeight()
-	for _, centroid := range d.unprocessed {
-		d.addEntry(centroid.Mean, centroid.Weight)
+	if len(d.unprocessed) == 0 {
+		return
 	}
+
+	d.centroids = d.greedyCompress(append(d.centroids.ToList(), d.unprocessed...))
 	d.unprocessed = d.unprocessed[:0]
 }
 
-func (d *TDigest) addEntry(mean float64, weight uint64) {
-	if d.centroids.Size() == 0 {
-		d.centroids.AddCentroid(mean, weight)
-		return
+func (d *TDigest) greedyCompress(values CentroidBuffer) *Centroids {
+	if len(values) == 0 {
+		return NewCentroids(d.capacity)
+	}
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].Mean < values[j].Mean
+	})
+
+	totalWeight := values.TotalWeight()
+	compressed := NewCentroids(d.capacity)
+	current := values[0]
+	cumulativeWeight := uint64(0)
+
+	for _, candidate := range values[1:] {
+		q0 := float64(cumulativeWeight) / float64(totalWeight)
+		q2 := float64(cumulativeWeight+current.Weight+candidate.Weight) / float64(totalWeight)
+		weightThreshold := d.quantileMaxWeights(q0, q2, totalWeight)
+
+		if current.Mean == candidate.Mean || float64(current.Weight+candidate.Weight) <= weightThreshold {
+			current.UpdateCentroid(candidate.Mean, candidate.Weight)
+			continue
+		}
+
+		compressed.AddCentroid(current.Mean, current.Weight)
+		cumulativeWeight += current.Weight
+		current = candidate
 	}
 
-	index, _ := d.centroids.MinimumDistanceCentroid(mean)
-	minimumDistanceCentroid := d.centroids.CentroidAt(index)
-	isSameValueCentroid := minimumDistanceCentroid.Mean == mean
-
-	if isSameValueCentroid {
-		d.centroids.UpdateCentroid(index, mean, weight)
-		return
-	}
-
-	q1, q2 := d.centroids.ComputeCentroidQuantiles(index)
-	weightThreshold := d.quantileMaxWeights(q1, q2, d.centroids.TotalWeight())
-	underWeightThreshold := minimumDistanceCentroid.Weight+weight <= uint64(weightThreshold)
-	if underWeightThreshold {
-		d.centroids.UpdateCentroid(index, mean, weight)
-	} else {
-		d.centroids.AddCentroid(mean, weight)
-	}
+	compressed.AddCentroid(current.Mean, current.Weight)
+	return compressed
 }
 
 func (d *TDigest) ToCentroids() []Centroid {
@@ -246,15 +212,14 @@ func (d *TDigest) Quantile(percentile float64) float64 {
 	return linearlyApproximateQuantile
 }
 
-func NewTDigestWeightScaled(capacity int, bufferSize int, randomizer *rand.Rand) *TDigest {
+func NewTDigestWeightScaled(capacity int, bufferSize int) *TDigest {
 	centroids := NewCentroids(capacity)
 	scaling := NewWeightScaling(capacity)
 	return &TDigest{
 		capacity:           capacity,
 		centroids:          centroids,
 		quantileMaxWeights: scaling.MaxWeight,
-		unprocessed:        make(CentroidList, 0, bufferSize),
-		randomizer:         randomizer,
+		unprocessed:        make(CentroidBuffer, 0, bufferSize),
 		bufferSize:         bufferSize,
 	}
 }

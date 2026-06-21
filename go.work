@@ -2,5 +2,6 @@ go 1.25.2
 
 use (
 	./src/hotline
-	./src/app
+	./src/otel-hotline
+	./src/otelcol-dev
 )

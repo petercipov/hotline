@@ -71,7 +71,12 @@ var _ = Describe("TDigest", func() {
 			sut.AddRandomEntries(100_000)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(HaveLen(103))
+			Expect(centroids).To(HaveLen(57))
+
+			Expect(sut.Quantile(0.70)).To(Equal(7.356594988103647))
+			Expect(sut.Quantile(0.80)).To(Equal(8.368116168239936))
+			Expect(sut.Quantile(0.90)).To(Equal(9.416024900604626))
+			Expect(sut.Quantile(0.99)).To(Equal(10.362849014104123))
 
 			totalWeight := uint64(0)
 			for _, centroid := range centroids {
@@ -86,7 +91,7 @@ var _ = Describe("TDigest", func() {
 			sut.AddIncreasingEntries(100_000)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(HaveLen(330))
+			Expect(centroids).To(HaveLen(66))
 
 			totalWeight := uint64(0)
 			for _, centroid := range centroids {
@@ -101,7 +106,7 @@ var _ = Describe("TDigest", func() {
 			sut.AddDescreasingEntries(100_000)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(HaveLen(330))
+			Expect(centroids).To(HaveLen(69))
 
 			totalWeight := uint64(0)
 			for _, centroid := range centroids {
@@ -224,124 +229,11 @@ var _ = Describe("TDigest", func() {
 			}))
 		})
 
-		It("should update centroid and update weight", func() {
-			sut.forCentroids()
-			sut.WithDataset()
-
-			sut.centroids.UpdateCentroid(2, 3.140, 10)
-
-			list := sut.toList()
-			Expect(list[2]).To(Equal(tdigest.Centroid{
-				Mean: 3.140, Weight: 25,
-			}))
-		})
-
-		It("should update centroids and change mean and total size", func() {
-			sut.forCentroids()
-			sut.WithDataset()
-
-			sizeBefore := sut.centroids.TotalWeight()
-			updated := sut.updateCentroid(2)
-			sizeAfter := sut.centroids.TotalWeight()
-
-			list := sut.toList()
-			Expect(list[2]).To(Equal(tdigest.Centroid{
-				Mean: 3.13, Weight: 20,
-			}))
-			Expect(updated).To(BeTrue())
-			Expect(sizeBefore).NotTo(Equal(sizeAfter))
-			Expect(sizeAfter - sizeBefore).To(Equal(uint64(5)))
-		})
-
-		It("should NOT update centroids and change mean when changing not existing quantile", func() {
-			sut.forCentroids()
-			sut.WithDataset()
-
-			updated := sut.updateCentroid(100)
-
-			list := sut.toList()
-			Expect(list[2]).To(Equal(tdigest.Centroid{
-				Mean: 3.140, Weight: 15,
-			}))
-			Expect(updated).To(BeFalse())
-		})
-
 		It("computes total sum of all weights", func() {
 			sut.forCentroids()
 			sut.WithDataset()
 
 			Expect(sut.centroids.TotalWeight()).To(Equal(uint64(373)))
-		})
-
-		It("computes quantile from centroids", func() {
-			sut.forCentroids()
-			sut.WithDataset()
-
-			var quantiles [][]float64
-			for index := range sut.centroids.Size() {
-				q0, q1 := sut.centroids.ComputeCentroidQuantiles(index)
-				quantiles = append(quantiles, []float64{round(q0, 2), round(q1, 2)})
-			}
-
-			Expect(quantiles).To(Equal([][]float64{
-				{0, 0.01},
-				{0.01, 0.03},
-				{0.03, 0.07},
-				{0.07, 0.18},
-				{0.18, 0.26},
-				{0.26, 0.46},
-				{0.46, 0.57},
-				{0.57, 0.73},
-				{0.73, 0.99},
-				{0.99, 1.00},
-			}))
-		})
-
-		It("finds no minimum distance for an empty centroids", func() {
-			sut.forCentroids()
-			sut.noMinimumDistance(3.14)
-		})
-
-		It("finds minimum distance centroid for single centroid dataset", func() {
-			sut.forCentroids()
-			sut.WithSingleCentroid()
-
-			index := sut.minimumDistanceCentroid(3.14)
-			Expect(index).To(BeZero())
-		})
-
-		It("finds minimum distance centroid, exact match", func() {
-			sut.forCentroids()
-			sut.WithDataset()
-
-			index := sut.minimumDistanceCentroid(3.140)
-			Expect(index).NotTo(BeZero())
-
-			list := sut.toList()
-			Expect(list).NotTo(BeEmpty())
-
-			Expect(list[index]).To(Equal(tdigest.Centroid{
-				Mean: 3.140, Weight: 15,
-			}))
-		})
-
-		It("finds minimum distance centroid, nearest match", func() {
-			sut.forCentroids()
-			sut.WithDataset()
-
-			index := sut.minimumDistanceCentroid(3.9524)
-			indexRightNextTo := sut.minimumDistanceCentroid(3.9525)
-
-			list := sut.toList()
-			Expect(list).NotTo(BeEmpty())
-
-			Expect(list[index]).To(Equal(tdigest.Centroid{
-				Mean: 3.140, Weight: 15,
-			}))
-
-			Expect(list[indexRightNextTo]).To(Equal(tdigest.Centroid{
-				Mean: 4.765, Weight: 41,
-			}))
 		})
 
 		It("do not finds index of centroid with cumulative sum for empty", func() {
@@ -406,29 +298,15 @@ func (s *centroidsSut) WithDataset() {
 	s.centroids.AddCentroid(10.635, 3)
 }
 
-func (s *centroidsSut) updateCentroid(index int) bool {
-	updated := s.centroids.UpdateCentroid(index, 3.1, 5)
-	return updated
-}
-
 func (s *centroidsSut) toList() []tdigest.Centroid {
 	return s.centroids.ToList()
 }
 
-func (s *centroidsSut) noMinimumDistance(value float64) {
-	_, found := s.centroids.MinimumDistanceCentroid(value)
-	Expect(found).To(BeFalse())
-}
 
 func (s *centroidsSut) WithSingleCentroid() {
 	s.centroids.AddCentroid(3.14, 5)
 }
 
-func (s *centroidsSut) minimumDistanceCentroid(value float64) int {
-	index, found := s.centroids.MinimumDistanceCentroid(value)
-	Expect(found).To(BeTrue())
-	return index
-}
 
 func (s *centroidsSut) centroidWithCumulativeSum(sum uint64) (uint64, int, bool) {
 	return s.centroids.FittingCumulativeWeightCentroid(sum)
@@ -442,7 +320,6 @@ func (t *tdigestSut) forTDigest() {
 	t.tdigest = tdigest.NewTDigestWeightScaled(
 		100,
 		500,
-		rand.New(rand.NewPCG(190, 89992)),
 	)
 }
 
@@ -450,7 +327,6 @@ func (t *tdigestSut) forTDigestWithHihBuffer() {
 	t.tdigest = tdigest.NewTDigestWeightScaled(
 		100,
 		10000,
-		rand.New(rand.NewPCG(190, 89992)),
 	)
 }
 

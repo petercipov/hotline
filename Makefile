@@ -1,5 +1,9 @@
 .SILENT:
 
+gen_collector:
+	~/go/bin/ocb --verbose --config ./src/otelcol-dev/builder-config.yaml
+
+
 generate:
 	cd ./src/app/setup/config && oapi-codegen -config=codegen.config.yaml config.openapi.yaml
 
