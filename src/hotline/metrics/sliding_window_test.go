@@ -1,7 +1,6 @@
 package metrics_test
 
 import (
-	"hotline/clock"
 	"hotline/metrics"
 	"slices"
 	"time"
@@ -118,18 +117,28 @@ func (s *sutslidingwindow) forEmptySlidingWindow() {
 	)
 }
 
+// parseTime replaces the deleted clock.ParseTime. That one discarded the parse
+// error and returned the zero time, which in these specs would surface as a
+// puzzling nil window rather than as a bad timestamp; this one fails the spec
+// where the mistake actually is.
+func parseTime(nowString string) time.Time {
+	now, err := time.Parse(time.RFC3339, nowString)
+	Expect(err).ToNot(HaveOccurred(), "malformed timestamp "+nowString)
+	return now
+}
+
 func parseTimePtr(nowString string) *time.Time {
-	now := clock.ParseTime(nowString)
+	now := parseTime(nowString)
 	return &now
 }
 
 func (s *sutslidingwindow) getActiveWindow(nowString string) *metrics.Window[float64, *float64ArrAcc] {
-	now := clock.ParseTime(nowString)
+	now := parseTime(nowString)
 	return s.slidingWindow.GetActiveWindow(now)
 }
 
 func (s *sutslidingwindow) addValue(latency float64, nowString string) {
-	now := clock.ParseTime(nowString)
+	now := parseTime(nowString)
 	s.slidingWindow.AddValue(now, latency)
 }
 
@@ -139,7 +148,7 @@ func (s *sutslidingwindow) windowContains(window *metrics.Window[float64, *float
 }
 
 func (s *sutslidingwindow) scrollByGracePeriod(nowStr string, count int) scrolledWindows {
-	now := clock.ParseTime(nowStr)
+	now := parseTime(nowStr)
 	var windows []*metrics.Window[float64, *float64ArrAcc]
 	for i := range count {
 		tNow := now.Add(s.slidingWindow.GracePeriod * time.Duration(i))
