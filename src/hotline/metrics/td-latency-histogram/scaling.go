@@ -1,4 +1,4 @@
-package tdigest
+package tdlatencyhistogram
 
 import "math"
 

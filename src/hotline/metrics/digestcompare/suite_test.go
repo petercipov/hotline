@@ -1,4 +1,4 @@
-package tdigest_test
+package digestcompare_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestTDigest(t *testing.T) {
+func TestDigestCompare(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "TDigest Suite")
+	RunSpecs(t, "Digest Compare Suite")
 }

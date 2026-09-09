@@ -1,8 +1,10 @@
-package tdigest
+package tdlatencyhistogram
 
 import (
 	"math"
+	"slices"
 	"sort"
+	"unsafe"
 )
 
 // Computing Extremely Accurate Quantiles Using t-Digests
@@ -102,6 +104,24 @@ func (c *Centroids) FittingCumulativeWeightCentroid(sum uint64) (uint64, int, bo
 		}
 	}
 	return endSum, len(c.weight) - 1, true
+}
+
+// Clone returns a deep copy, so a caller can compress into it without
+// disturbing the original.
+func (c *Centroids) Clone() *Centroids {
+	return &Centroids{
+		mean:        slices.Clone(c.mean),
+		weight:      slices.Clone(c.weight),
+		totalWeight: c.totalWeight,
+	}
+}
+
+// SizeInBytes is the retained footprint of the two parallel slices, counting
+// allocated capacity rather than length.
+func (c *Centroids) SizeInBytes() int {
+	return int(unsafe.Sizeof(*c)) +
+		cap(c.mean)*int(unsafe.Sizeof(float64(0))) +
+		cap(c.weight)*int(unsafe.Sizeof(uint64(0)))
 }
 
 func NewCentroids(capacity int) *Centroids {
@@ -210,6 +230,24 @@ func (d *TDigest) Quantile(percentile float64) float64 {
 	linearlyApproximateQuantile := previousCentroid.Mean + (growthFactor * (fittingCentroid.Mean - previousCentroid.Mean))
 
 	return linearlyApproximateQuantile
+}
+
+// Clone returns a deep copy including any centroids still sitting unprocessed
+// in the buffer, so the copy compresses to exactly what the original would.
+func (d *TDigest) Clone() *TDigest {
+	clone := *d
+	clone.centroids = d.centroids.Clone()
+	clone.unprocessed = slices.Clone(d.unprocessed)
+	return &clone
+}
+
+// SizeInBytes is the retained footprint: the compressed centroids plus whatever
+// is still buffered. Unlike a bucket histogram this is bounded by capacity
+// rather than by the spread of the data.
+func (d *TDigest) SizeInBytes() int {
+	return int(unsafe.Sizeof(*d)) +
+		d.centroids.SizeInBytes() +
+		cap(d.unprocessed)*int(unsafe.Sizeof(Centroid{}))
 }
 
 func NewTDigestWeightScaled(capacity int, bufferSize int) *TDigest {

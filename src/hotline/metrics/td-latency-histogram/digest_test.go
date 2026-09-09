@@ -1,8 +1,8 @@
-package tdigest_test
+package tdlatencyhistogram_test
 
 import (
 	"fmt"
-	"hotline/metrics/tdigest"
+	tdhistogram "hotline/metrics/td-latency-histogram"
 	"math"
 	"math/rand/v2"
 
@@ -29,7 +29,7 @@ var _ = Describe("TDigest", func() {
 			sut.AddEntry(3.14)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(Equal([]tdigest.Centroid{
+			Expect(centroids).To(Equal([]tdhistogram.Centroid{
 				{
 					Mean: 3.14, Weight: 2,
 				},
@@ -45,7 +45,7 @@ var _ = Describe("TDigest", func() {
 			sut.AddEntry(3.14)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(Equal([]tdigest.Centroid{
+			Expect(centroids).To(Equal([]tdhistogram.Centroid{
 				{
 					Mean: 3.14, Weight: 2,
 				},
@@ -59,7 +59,7 @@ var _ = Describe("TDigest", func() {
 			sut.AddEntry(3.16)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(Equal([]tdigest.Centroid{
+			Expect(centroids).To(Equal([]tdhistogram.Centroid{
 				{Mean: 3.14, Weight: 1},
 				{Mean: 3.15, Weight: 1},
 				{Mean: 3.16, Weight: 1},
@@ -73,10 +73,15 @@ var _ = Describe("TDigest", func() {
 			centroids := sut.ToCentroids()
 			Expect(centroids).To(HaveLen(57))
 
-			Expect(sut.Quantile(0.70)).To(Equal(7.356594988103647))
-			Expect(sut.Quantile(0.80)).To(Equal(8.368116168239936))
-			Expect(sut.Quantile(0.90)).To(Equal(9.416024900604626))
-			Expect(sut.Quantile(0.99)).To(Equal(10.362849014104123))
+			// compared with a tolerance rather than for equality: these come
+			// out of the compression and interpolation arithmetic, where float
+			// addition is not associative, so the last ulp moves across Go
+			// versions and architectures. 1e-9 still pins ten significant
+			// digits, which is far tighter than any real regression.
+			Expect(sut.Quantile(0.70)).To(BeNumerically("~", 7.356594988103647, 1e-9))
+			Expect(sut.Quantile(0.80)).To(BeNumerically("~", 8.368116168239936, 1e-9))
+			Expect(sut.Quantile(0.90)).To(BeNumerically("~", 9.416024900604626, 1e-9))
+			Expect(sut.Quantile(0.99)).To(BeNumerically("~", 10.362849014104123, 1e-9))
 
 			totalWeight := uint64(0)
 			for _, centroid := range centroids {
@@ -215,7 +220,7 @@ var _ = Describe("TDigest", func() {
 			sut.WithDataset()
 
 			list := sut.toList()
-			Expect(list).To(Equal([]tdigest.Centroid{
+			Expect(list).To(Equal([]tdhistogram.Centroid{
 				{Mean: 1.618, Weight: 3},
 				{Mean: 2.718, Weight: 8},
 				{Mean: 3.14, Weight: 15},
@@ -278,11 +283,11 @@ var _ = Describe("TDigest", func() {
 })
 
 type centroidsSut struct {
-	centroids *tdigest.Centroids
+	centroids *tdhistogram.Centroids
 }
 
 func (s *centroidsSut) forCentroids() {
-	s.centroids = tdigest.NewCentroids(100)
+	s.centroids = tdhistogram.NewCentroids(100)
 }
 
 func (s *centroidsSut) WithDataset() {
@@ -298,33 +303,31 @@ func (s *centroidsSut) WithDataset() {
 	s.centroids.AddCentroid(10.635, 3)
 }
 
-func (s *centroidsSut) toList() []tdigest.Centroid {
+func (s *centroidsSut) toList() []tdhistogram.Centroid {
 	return s.centroids.ToList()
 }
-
 
 func (s *centroidsSut) WithSingleCentroid() {
 	s.centroids.AddCentroid(3.14, 5)
 }
-
 
 func (s *centroidsSut) centroidWithCumulativeSum(sum uint64) (uint64, int, bool) {
 	return s.centroids.FittingCumulativeWeightCentroid(sum)
 }
 
 type tdigestSut struct {
-	tdigest *tdigest.TDigest
+	tdigest *tdhistogram.TDigest
 }
 
 func (t *tdigestSut) forTDigest() {
-	t.tdigest = tdigest.NewTDigestWeightScaled(
+	t.tdigest = tdhistogram.NewTDigestWeightScaled(
 		100,
 		500,
 	)
 }
 
 func (t *tdigestSut) forTDigestWithHihBuffer() {
-	t.tdigest = tdigest.NewTDigestWeightScaled(
+	t.tdigest = tdhistogram.NewTDigestWeightScaled(
 		100,
 		10000,
 	)
@@ -341,7 +344,7 @@ func (t *tdigestSut) AddSimpleDataSet() {
 	t.tdigest.AddToBuffer(3.14, 2)
 }
 
-func (t *tdigestSut) ToCentroids() []tdigest.Centroid {
+func (t *tdigestSut) ToCentroids() []tdhistogram.Centroid {
 	return t.tdigest.ToCentroids()
 }
 

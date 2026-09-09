@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
-	"hotline/metrics/tdigest"
+	tdigest "hotline/metrics/td-latency-histogram"
 )
 
 const (
