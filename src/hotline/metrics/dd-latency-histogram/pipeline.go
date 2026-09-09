@@ -31,6 +31,7 @@ var _ radixtree.Mergeable[*Sketch] = (*Sketch)(nil)
 // sketch to the tree leaf; a late event re-runs the same two steps for its
 // second, and the tree's unwind recomputes only that leaf's ancestors.
 type Pipeline struct {
+	rng  Range
 	tree *radixtree.Tree[*Sketch]
 	// open keeps per second sketches addressable for as long as corrections
 	// are accepted, so a correction merges into its second rather than
@@ -41,16 +42,37 @@ type Pipeline struct {
 	horizon     uint64
 }
 
-// NewPipeline creates a pipeline retaining maxLatenessSec seconds beyond the
-// window, which is how late a correction may arrive and still be applied.
+// NewPipeline creates a pipeline over DefaultRange, retaining maxLatenessSec
+// seconds beyond the window, which is how late a correction may arrive and
+// still be applied.
 func NewPipeline(maxLatenessSec uint64) *Pipeline {
+	pipeline, err := NewPipelineInRange(maxLatenessSec, DefaultRange())
+	if err != nil {
+		// DefaultRange is valid by construction
+		panic(err)
+	}
+	return pipeline
+}
+
+// NewPipelineInRange creates a pipeline resolving latencies over r. Every
+// sketch it builds, and every accumulator the tree folds into, carries that
+// range, so nothing inside one pipeline can mix spans.
+func NewPipelineInRange(maxLatenessSec uint64, r Range) (*Pipeline, error) {
+	if err := r.Validate(); err != nil {
+		return nil, err
+	}
+
 	return &Pipeline{
-		tree:        radixtree.New(NewSketch),
+		rng:         r,
+		tree:        radixtree.New(func() *Sketch { return NewSketchInRange(r) }),
 		open:        make(map[uint64]*Sketch),
 		dirty:       make(map[uint64]struct{}),
 		maxLateness: maxLatenessSec,
-	}
+	}, nil
 }
+
+// Range is the span every sketch in this pipeline resolves.
+func (p *Pipeline) Range() Range { return p.rng }
 
 // Tree exposes the time index, for invariant checks and structural comparison.
 func (p *Pipeline) Tree() *radixtree.Tree[*Sketch] { return p.tree }
@@ -77,6 +99,12 @@ func (p *Pipeline) AddPartial(tsSec uint64, partial *Sketch) error {
 	if tsSec < p.horizon {
 		return fmt.Errorf("%w: second %d is below horizon %d", ErrExpired, tsSec, p.horizon)
 	}
+	// a bucket index means the same under any range, but zeros and the clamp
+	// do not, so folding a foreign span in would be silent nonsense
+	if partial.rng != p.rng {
+		return fmt.Errorf("%w: partial resolves [%d, %d], pipeline resolves [%d, %d]",
+			ErrRangeMismatch, partial.rng.MinNS, partial.rng.MaxNS, p.rng.MinNS, p.rng.MaxNS)
+	}
 
 	p.secondSketch(tsSec).Merge(partial)
 	p.dirty[tsSec] = struct{}{}
@@ -86,7 +114,7 @@ func (p *Pipeline) AddPartial(tsSec uint64, partial *Sketch) error {
 func (p *Pipeline) secondSketch(tsSec uint64) *Sketch {
 	sketch, found := p.open[tsSec]
 	if !found {
-		sketch = NewSketch()
+		sketch = NewSketchInRange(p.rng)
 		p.open[tsSec] = sketch
 	}
 	return sketch
@@ -105,7 +133,7 @@ func (p *Pipeline) Seal() {
 func (p *Pipeline) Window(nowSec uint64) *Sketch {
 	p.Seal()
 	if nowSec == 0 {
-		return NewSketch()
+		return NewSketchInRange(p.rng)
 	}
 
 	from := uint64(0)

@@ -21,13 +21,6 @@ const (
 	Alpha = 0.02
 	// Gamma is the ratio between consecutive bucket bounds.
 	Gamma = (1 + Alpha) / (1 - Alpha)
-	// MinNS is the smallest value that gets its own bucket; below it values
-	// are counted as zeros.
-	MinNS = uint64(1_000)
-	// MaxNS is the largest representable value; above it values are clamped
-	// into the top bucket and counted as overflow.
-	MaxNS = uint64(100_000_000_000)
-
 	// LnGamma is the bucket width in log space. It is pinned as a literal
 	// rather than computed, because ln() differs in the last ulp across
 	// platforms and standard libraries, and since index() applies ceil, a one
@@ -39,9 +32,56 @@ const (
 // ErrNegativeLatency rejects a negative measurement.
 var ErrNegativeLatency = errors.New("ddlatencyhistogram: negative latency")
 
+// ErrInvalidRange rejects a range that cannot be mapped.
+var ErrInvalidRange = errors.New("ddlatencyhistogram: invalid range")
+
+// ErrRangeMismatch rejects folding two sketches that resolve different spans.
+var ErrRangeMismatch = errors.New("ddlatencyhistogram: sketch range mismatch")
+
+// Range is the span of latencies a sketch resolves into buckets. A measurement
+// below MinNS is counted as a zero; one above MaxNS is clamped into the top
+// bucket. Both are tallied separately, so a range that does not match the
+// traffic is visible in production rather than silently distorting the tail.
+//
+// The range does not change what a bucket index means — that depends only on
+// Gamma — so it costs nothing to widen for a new series. It does change what
+// zeros and the clamp mean, which is why sketches over different ranges must
+// not be folded together.
+type Range struct {
+	MinNS uint64
+	MaxNS uint64
+}
+
+// DefaultRange spans 1 millisecond to 15 minutes: the resolution a network
+// latency SLO is usually written against, with enough ceiling for a request
+// that has effectively hung.
+func DefaultRange() Range {
+	return Range{
+		MinNS: 1_000_000,
+		MaxNS: 15 * 60 * 1_000_000_000,
+	}
+}
+
+// Validate reports whether the range can be mapped. The lower bound must be at
+// least 1, because zero has no logarithm, and the bounds must ascend.
+func (r Range) Validate() error {
+	switch {
+	case r.MinNS < 1:
+		return fmt.Errorf("%w: MinNS must be at least 1, got %d", ErrInvalidRange, r.MinNS)
+	case r.MinNS >= r.MaxNS:
+		return fmt.Errorf("%w: MinNS %d must be below MaxNS %d", ErrInvalidRange, r.MinNS, r.MaxNS)
+	}
+	return nil
+}
+
+// Buckets is the number of bucket indexes the range spans.
+func (r Range) Buckets() int32 {
+	return Index(r.MaxNS) - Index(r.MinNS) + 1
+}
+
 // Index returns the bucket covering vNS. Bucket i covers (Gamma^(i-1), Gamma^i].
-// The caller is responsible for keeping vNS inside [MinNS, MaxNS]; Insert does
-// the clamping.
+// It depends only on Gamma, so an index means the same thing under every Range.
+// The caller is responsible for keeping vNS inside the range; Insert clamps.
 func Index(vNS uint64) int32 {
 	return int32(math.Ceil(math.Log(float64(vNS)) / LnGamma))
 }
@@ -57,6 +97,7 @@ func BucketValue(i int32) float64 {
 // independently a commutative monoid under integer +, min or max, so the struct
 // is one.
 type Sketch struct {
+	rng     Range
 	buckets map[int32]uint64
 	zeros   uint64
 	count   uint64
@@ -69,13 +110,25 @@ type Sketch struct {
 	overflowCount  uint64
 }
 
-// NewSketch returns the empty sketch, which is the identity element of Merge.
+// NewSketch returns the empty sketch over DefaultRange, which is the identity
+// element of Merge.
 func NewSketch() *Sketch {
+	return NewSketchInRange(DefaultRange())
+}
+
+// NewSketchInRange returns the empty sketch over r. Validate r first: an
+// unvalidated range still maps, but it maps values the caller did not intend.
+func NewSketchInRange(r Range) *Sketch {
 	return &Sketch{
+		rng:     r,
 		buckets: make(map[int32]uint64),
 		min:     math.MaxUint64,
 	}
 }
+
+// Range is the span this sketch resolves. Only sketches sharing a range may be
+// folded together.
+func (s *Sketch) Range() Range { return s.rng }
 
 func (s *Sketch) Count() uint64     { return s.count }
 func (s *Sketch) Sum() uint64       { return s.sum }
@@ -109,15 +162,17 @@ func (s *Sketch) Insert(vNS uint64) {
 		s.max = vNS
 	}
 
-	if vNS < MinNS {
+	// vNS == 0 is caught explicitly: zero has no logarithm, and an
+	// unvalidated range may have left MinNS at 0
+	if vNS < s.rng.MinNS || vNS == 0 {
 		s.zeros++
 		s.underflowCount++
 		return
 	}
 
 	clamped := vNS
-	if clamped > MaxNS {
-		clamped = MaxNS
+	if clamped > s.rng.MaxNS {
+		clamped = s.rng.MaxNS
 		s.overflowCount++
 	}
 	s.buckets[Index(clamped)]++
@@ -137,6 +192,11 @@ func (s *Sketch) InsertLatency(latencyNS int64) error {
 // Merge folds other into s. This is the operation the whole design rests on:
 // it is commutative, associative, has the empty sketch as a two sided identity
 // and loses nothing at any merge depth.
+//
+// Both sketches MUST share a Range. Merge cannot report otherwise — the tree
+// folds through it and has no error channel — so the range is fixed by the
+// pipeline that builds the sketches, and AddPartial is where a foreign sketch
+// is checked.
 func (s *Sketch) Merge(other *Sketch) {
 	for i, c := range other.buckets {
 		if c == 0 {
@@ -168,7 +228,8 @@ func (s *Sketch) Clone() *Sketch {
 // Equal compares every field bit exactly. Merge determinism is asserted on this,
 // never on extracted quantiles.
 func (s *Sketch) Equal(other *Sketch) bool {
-	if s.zeros != other.zeros ||
+	if s.rng != other.rng ||
+		s.zeros != other.zeros ||
 		s.count != other.count ||
 		s.sum != other.sum ||
 		s.min != other.min ||
@@ -189,8 +250,9 @@ func (s *Sketch) Equal(other *Sketch) bool {
 // SizeInBytes is the retained footprint: the fixed scalars plus the sparse
 // bucket map. mapOverheadFactor covers Go's map load factor and per bucket
 // tophash bookkeeping — the map is what actually scales, and it is why buckets
-// MUST stay sparse: at leaf level only ~50-350 of the 462 possible indexes are
-// populated, and a dense array would triple this number.
+// MUST stay sparse: at leaf level only a few dozen to a few hundred of the
+// range's indexes are ever populated, whatever the range, and a dense array
+// would pay for all of them.
 func (s *Sketch) SizeInBytes() int {
 	const mapOverheadFactor = 1.4
 	var index int32
