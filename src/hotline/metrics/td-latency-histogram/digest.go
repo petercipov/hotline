@@ -157,10 +157,10 @@ func (d *TDigest) processBuffer() {
 	d.unprocessed = d.unprocessed[:0]
 }
 
+// greedyCompress folds values into at most capacity centroids. processBuffer is
+// its only caller and returns early on an empty buffer, so values is never
+// empty here.
 func (d *TDigest) greedyCompress(values CentroidBuffer) *Centroids {
-	if len(values) == 0 {
-		return NewCentroids(d.capacity)
-	}
 	sort.Slice(values, func(i, j int) bool {
 		return values[i].Mean < values[j].Mean
 	})

@@ -205,7 +205,8 @@ var _ = Describe("Pipeline", func() {
 			withoutEviction := feed(events)
 			expected := withoutEviction.Window(now)
 
-			withEviction := ddhistogram.NewPipeline(600)
+			withEviction, err := ddhistogram.NewPipeline(600)
+			Expect(err).ToNot(HaveOccurred())
 			for _, e := range events {
 				Expect(withEviction.Add(e.timestampNS, e.latencyNS)).To(Succeed())
 				withEviction.Advance(e.timestampNS / ddhistogram.NanosPerSecond)
@@ -293,7 +294,9 @@ type pipelineSut struct {
 }
 
 func (s *pipelineSut) forPipeline(maxLatenessSec uint64) {
-	s.pipeline = ddhistogram.NewPipeline(maxLatenessSec)
+	pipeline, err := ddhistogram.NewPipeline(maxLatenessSec)
+	Expect(err).ToNot(HaveOccurred())
+	s.pipeline = pipeline
 }
 
 func (s *pipelineSut) Add(sec uint64, latencyNS int64) {
@@ -410,7 +413,8 @@ func generateEventStreamAt(from uint64, count int, medianNS int64) []event {
 }
 
 func feed(events []event) *ddhistogram.Pipeline {
-	pipeline := ddhistogram.NewPipeline(4000)
+	pipeline, err := ddhistogram.NewPipeline(4000)
+	Expect(err).ToNot(HaveOccurred())
 	for _, e := range events {
 		Expect(pipeline.Add(e.timestampNS, e.latencyNS)).To(Succeed())
 	}
@@ -437,7 +441,8 @@ func feedSharded(events []event, shards int) *ddhistogram.Pipeline {
 		Expect(sketch.InsertLatency(e.latencyNS)).To(Succeed())
 	}
 
-	pipeline := ddhistogram.NewPipeline(4000)
+	pipeline, err := ddhistogram.NewPipeline(4000)
+	Expect(err).ToNot(HaveOccurred())
 	for _, shard := range partials {
 		for sec, sketch := range shard {
 			Expect(pipeline.AddPartial(sec, sketch)).To(Succeed())

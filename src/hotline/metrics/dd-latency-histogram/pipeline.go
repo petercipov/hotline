@@ -45,13 +45,12 @@ type Pipeline struct {
 // NewPipeline creates a pipeline over DefaultRange, retaining maxLatenessSec
 // seconds beyond the window, which is how late a correction may arrive and
 // still be applied.
-func NewPipeline(maxLatenessSec uint64) *Pipeline {
-	pipeline, err := NewPipelineInRange(maxLatenessSec, DefaultRange())
-	if err != nil {
-		// DefaultRange is valid by construction
-		panic(err)
-	}
-	return pipeline
+//
+// DefaultRange is valid by construction, so the error is always nil today. It
+// is returned rather than panicked on so that a future change to DefaultRange
+// cannot turn a configuration mistake into a crash at startup.
+func NewPipeline(maxLatenessSec uint64) (*Pipeline, error) {
+	return NewPipelineInRange(maxLatenessSec, DefaultRange())
 }
 
 // NewPipelineInRange creates a pipeline resolving latencies over r. Every
@@ -70,9 +69,6 @@ func NewPipelineInRange(maxLatenessSec uint64, r Range) (*Pipeline, error) {
 		maxLateness: maxLatenessSec,
 	}, nil
 }
-
-// Range is the span every sketch in this pipeline resolves.
-func (p *Pipeline) Range() Range { return p.rng }
 
 // Tree exposes the time index, for invariant checks and structural comparison.
 func (p *Pipeline) Tree() *radixtree.Tree[*Sketch] { return p.tree }

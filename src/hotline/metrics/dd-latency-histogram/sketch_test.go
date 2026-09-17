@@ -321,6 +321,100 @@ var _ = Describe("Sketch", func() {
 	})
 })
 
+var _ = Describe("Sketch.SizeInBytes", func() {
+	sut := sketchSut{}
+
+	It("is non zero for an empty sketch, which still carries the fixed scalars", func() {
+		sut.forEmptySketch()
+		Expect(sut.sketch.SizeInBytes()).To(BeNumerically(">", 0))
+	})
+
+	It("grows with every newly populated bucket", func() {
+		// the premise: these land in different buckets
+		Expect(ddhistogram.Index(1_000_000)).ToNot(Equal(ddhistogram.Index(2_000_000)))
+
+		sut.forEmptySketch()
+		empty := sut.sketch.SizeInBytes()
+
+		sut.Insert(1_000_000)
+		one := sut.sketch.SizeInBytes()
+
+		sut.Insert(2_000_000)
+		two := sut.sketch.SizeInBytes()
+
+		Expect(one).To(BeNumerically(">", empty))
+		Expect(two).To(BeNumerically(">", one))
+	})
+
+	It("does not grow when a value lands in a bucket that already exists", func() {
+		// the premise: these share a bucket
+		Expect(ddhistogram.Index(1_000_000)).To(Equal(ddhistogram.Index(1_020_000)))
+
+		sut.forValues([]uint64{1_000_000})
+		before := sut.sketch.SizeInBytes()
+
+		sut.Insert(1_020_000)
+
+		Expect(sut.sketch.Count()).To(Equal(uint64(2)))
+		Expect(sut.sketch.SizeInBytes()).To(Equal(before))
+	})
+
+	It("does not grow for a value below the range, which is counted as a zero", func() {
+		sut.forEmptySketch()
+		empty := sut.sketch.SizeInBytes()
+
+		sut.Insert(ddhistogram.DefaultRange().MinNS - 1)
+
+		Expect(sut.sketch.Zeros()).To(Equal(uint64(1)))
+		Expect(sut.sketch.SizeInBytes()).To(Equal(empty))
+	})
+
+	It("costs one bucket however many values sit above the range, since they all clamp", func() {
+		maxNS := ddhistogram.DefaultRange().MaxNS
+
+		sut.forValues([]uint64{maxNS + 1})
+		clamped := sut.sketch.SizeInBytes()
+
+		sut.Insert(maxNS * 2)
+		sut.Insert(maxNS * 3)
+
+		Expect(sut.sketch.Overflow()).To(Equal(uint64(3)))
+		Expect(sut.sketch.SizeInBytes()).To(Equal(clamped))
+	})
+
+	It("is unchanged by a clone, which copies the same buckets", func() {
+		sut.forNormativeDataset()
+
+		Expect(sut.sketch.Clone().SizeInBytes()).To(Equal(sut.sketch.SizeInBytes()))
+	})
+
+	It("reports the union of the buckets after a merge", func() {
+		low := ddhistogram.NewSketch()
+		low.Insert(1_000_000)
+		high := ddhistogram.NewSketch()
+		high.Insert(8_000_000)
+
+		before := low.SizeInBytes()
+		low.Merge(high)
+		grown := low.SizeInBytes()
+		Expect(grown).To(BeNumerically(">", before))
+
+		// folding the same buckets in again adds no entries
+		low.Merge(high)
+		Expect(low.SizeInBytes()).To(Equal(grown))
+	})
+
+	It("depends on the buckets populated, not on the span the sketch resolves", func() {
+		wide := ddhistogram.NewSketchInRange(ddhistogram.Range{MinNS: 1, MaxNS: 1 << 40})
+		narrow := ddhistogram.NewSketchInRange(ddhistogram.Range{MinNS: 1_000_000, MaxNS: 2_000_000})
+
+		wide.Insert(1_500_000)
+		narrow.Insert(1_500_000)
+
+		Expect(wide.SizeInBytes()).To(Equal(narrow.SizeInBytes()))
+	})
+})
+
 type sketchSut struct {
 	sketch *ddhistogram.Sketch
 }
@@ -571,7 +665,8 @@ var _ = Describe("Range", func() {
 
 		It("is rejected by AddPartial rather than silently folded", func() {
 			narrow := ddhistogram.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
-			pipeline := ddhistogram.NewPipeline(600)
+			pipeline, err := ddhistogram.NewPipeline(600)
+			Expect(err).ToNot(HaveOccurred())
 
 			foreign := ddhistogram.NewSketchInRange(narrow)
 			foreign.Insert(5_000_000)
@@ -582,7 +677,8 @@ var _ = Describe("Range", func() {
 		It("accepts a partial built on the same range", func() {
 			partial := ddhistogram.NewSketch()
 			partial.Insert(5_000_000)
-			pipeline := ddhistogram.NewPipeline(600)
+			pipeline, err := ddhistogram.NewPipeline(600)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(pipeline.AddPartial(1000, partial)).To(Succeed())
 			Expect(pipeline.Window(1001).Count()).To(Equal(uint64(1)))
