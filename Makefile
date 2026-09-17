@@ -3,36 +3,25 @@
 gen_collector:
 	~/go/bin/ocb --verbose --config ./src/otelcol-dev/builder-config.yaml
 
-
-generate:
-	cd ./src/app/setup/config && oapi-codegen -config=codegen.config.yaml config.openapi.yaml
-
 test:
 	rm -f cover.out
-	rm -f cover.app.out
-	rm -f cover.app.filtered.out
 	go clean -testcache
 	go test  ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...
-	go test  ./src/app/... -coverprofile=./cover.app.out -covermode=atomic -coverpkg=./src/app/...
+	go test  ./src/otel-hotline/...
 
 clean-cache:
 	go clean -testcache
 	go clean -cache
 
 cover:
-	-go tool cover -func cover.out | grep -v "100.0"
-	cat cover.app.out | (grep -v "app/main.go" || true ) | (grep -v "gen.go" || true ) > cover.app.filtered.out
-	-go tool cover -func cover.app.filtered.out | grep -v "100.0"
-	! go tool cover -func cover.out | grep -v "100.0" || exit 1
-	#! go tool cover -func cover.app.out | grep -v "100.0" || exit 1
+	test -f cover.out || { echo "cover.out not found, run 'make test' first"; exit 1; }
+	go tool cover -func cover.out > cover.func.txt
+	-grep -v "100.0" cover.func.txt
+	! grep -q -v "100.0" cover.func.txt || exit 1
 
 deps:
 	go mod download
 
 lint:
 	golangci-lint run ./src/hotline/...
-	golangci-lint run ./src/app/...
-	vacuum lint -d --no-banner -r ./.vacuum.rules.yaml ./src/app/setup/config/config.openapi.yaml -z
-
-run-infra:
-	docker-compose -f ./examples/infra/docker-compose.yml up
+	golangci-lint run ./src/otel-hotline/...

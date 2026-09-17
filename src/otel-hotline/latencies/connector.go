@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
+
 	tdigest "hotline/metrics/td-latency-histogram"
 )
 
@@ -66,8 +67,6 @@ func spanKindLabel(kind ptrace.SpanKind) string {
 	}
 }
 
-var connectorCapabilities = consumer.Capabilities{MutatesData: false}
-
 type seriesKey struct {
 	integrationID string
 	route         string
@@ -84,9 +83,10 @@ type latenciesConnector struct {
 	mu      sync.Mutex
 	digests map[seriesKey]*tdigest.TDigest
 
-	ticker   *time.Ticker
-	doneCh   chan struct{}
-	stopOnce sync.Once
+	ticker    *time.Ticker
+	doneCh    chan struct{}
+	cancelRun context.CancelFunc
+	stopOnce  sync.Once
 }
 
 func newLatenciesConnector(set connector.Settings, cfg *Config, next consumer.Metrics) *latenciesConnector {
@@ -105,12 +105,16 @@ func newLatenciesConnector(set connector.Settings, cfg *Config, next consumer.Me
 }
 
 func (c *latenciesConnector) Capabilities() consumer.Capabilities {
-	return connectorCapabilities
+	return consumer.Capabilities{MutatesData: false}
 }
 
 func (c *latenciesConnector) Start(_ context.Context, _ component.Host) error {
 	c.ticker = time.NewTicker(c.cfg.Interval)
-	go c.run()
+	// The collector cancels the Start context once startup completes, so the
+	// emit loop is given its own context, cancelled on Shutdown instead.
+	runCtx, cancel := context.WithCancel(context.Background())
+	c.cancelRun = cancel
+	go c.run(runCtx)
 	c.logger.Info(
 		"latencies connector started",
 		zap.String("interval", c.cfg.Interval.String()),
@@ -126,16 +130,22 @@ func (c *latenciesConnector) Shutdown(ctx context.Context) error {
 		close(c.doneCh)
 	})
 	// Emit whatever has accumulated since the last tick.
-	return c.flush(ctx, time.Now())
+	err := c.flush(ctx, time.Now())
+	// Released only once the final flush is done, so shutdown never cancels a
+	// batch that is already being delivered.
+	if c.cancelRun != nil {
+		c.cancelRun()
+	}
+	return err
 }
 
-func (c *latenciesConnector) run() {
+func (c *latenciesConnector) run(ctx context.Context) {
 	for {
 		select {
 		case <-c.doneCh:
 			return
 		case now := <-c.ticker.C:
-			if err := c.flush(context.Background(), now); err != nil {
+			if err := c.flush(ctx, now); err != nil {
 				c.logger.Error("failed to emit latency metrics", zap.Error(err))
 			}
 		}
@@ -147,11 +157,11 @@ func (c *latenciesConnector) ConsumeTraces(_ context.Context, td ptrace.Traces) 
 	defer c.mu.Unlock()
 
 	resourceSpans := td.ResourceSpans()
-	for i := 0; i < resourceSpans.Len(); i++ {
+	for i := range resourceSpans.Len() {
 		scopeSpans := resourceSpans.At(i).ScopeSpans()
-		for j := 0; j < scopeSpans.Len(); j++ {
+		for j := range scopeSpans.Len() {
 			spans := scopeSpans.At(j).Spans()
-			for k := 0; k < spans.Len(); k++ {
+			for k := range spans.Len() {
 				c.recordSpan(spans.At(k))
 			}
 		}

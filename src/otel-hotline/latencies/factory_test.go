@@ -1,3 +1,6 @@
+// tumbling window can be emitted synchronously rather than waited on.
+//
+//nolint:testpackage // the specs drive the unexported flush directly, so that a
 package latencies
 
 import (
@@ -299,8 +302,8 @@ func addSpan(td ptrace.Traces, kind ptrace.SpanKind, integrationID, route, metho
 	span.Attributes().PutStr("x-integration-id", integrationID)
 	span.Attributes().PutStr("http.route", route)
 	span.Attributes().PutStr("http.request.method", method)
-	span.SetStartTimestamp(pcommon.Timestamp(start))
-	span.SetEndTimestamp(pcommon.Timestamp(start + duration))
+	span.SetStartTimestamp(pcommon.NewTimestampFromTime(time.Unix(0, int64(start))))
+	span.SetEndTimestamp(pcommon.NewTimestampFromTime(time.Unix(0, int64(start+duration))))
 }
 
 func appendSpan(td ptrace.Traces) ptrace.Span {
@@ -314,13 +317,13 @@ func metricNameOf(md pmetric.Metrics) string {
 func allDataPoints(md pmetric.Metrics) []pmetric.NumberDataPoint {
 	var dps []pmetric.NumberDataPoint
 	rms := md.ResourceMetrics()
-	for i := 0; i < rms.Len(); i++ {
+	for i := range rms.Len() {
 		sms := rms.At(i).ScopeMetrics()
-		for j := 0; j < sms.Len(); j++ {
+		for j := range sms.Len() {
 			ms := sms.At(j).Metrics()
-			for k := 0; k < ms.Len(); k++ {
+			for k := range ms.Len() {
 				g := ms.At(k).Gauge().DataPoints()
-				for l := 0; l < g.Len(); l++ {
+				for l := range g.Len() {
 					dps = append(dps, g.At(l))
 				}
 			}
