@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"sort"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -665,7 +666,7 @@ var _ = Describe("Range", func() {
 
 		It("is rejected by AddPartial rather than silently folded", func() {
 			narrow := ddhistogram.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
-			pipeline, err := ddhistogram.NewPipeline(600)
+			pipeline, err := ddhistogram.NewPipeline(ddhistogram.DefaultWindow, 10*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			foreign := ddhistogram.NewSketchInRange(narrow)
@@ -677,7 +678,7 @@ var _ = Describe("Range", func() {
 		It("accepts a partial built on the same range", func() {
 			partial := ddhistogram.NewSketch()
 			partial.Insert(5_000_000)
-			pipeline, err := ddhistogram.NewPipeline(600)
+			pipeline, err := ddhistogram.NewPipeline(ddhistogram.DefaultWindow, 10*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(pipeline.AddPartial(1000, partial)).To(Succeed())
@@ -688,7 +689,7 @@ var _ = Describe("Range", func() {
 	Context("a pipeline over a configured range", func() {
 		It("gives every sketch in the tree that range", func() {
 			microseconds := ddhistogram.Range{MinNS: 1_000, MaxNS: 100_000_000_000}
-			pipeline, err := ddhistogram.NewPipelineInRange(600, microseconds)
+			pipeline, err := ddhistogram.NewPipelineInRange(ddhistogram.DefaultWindow, 10*time.Minute, microseconds)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(pipeline.Add(1000*ddhistogram.NanosPerSecond, 500_000)).To(Succeed())
@@ -701,7 +702,7 @@ var _ = Describe("Range", func() {
 		})
 
 		It("refuses an invalid range", func() {
-			_, err := ddhistogram.NewPipelineInRange(600, ddhistogram.Range{MinNS: 0, MaxNS: 0})
+			_, err := ddhistogram.NewPipelineInRange(ddhistogram.DefaultWindow, 10*time.Minute, ddhistogram.Range{MinNS: 0, MaxNS: 0})
 			Expect(err).To(MatchError(ddhistogram.ErrInvalidRange))
 		})
 	})

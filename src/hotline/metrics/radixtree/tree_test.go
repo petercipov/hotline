@@ -136,6 +136,46 @@ var _ = Describe("Tree", func() {
 			}
 		})
 
+		It("prunes a populated block far behind the window it is asked for", func() {
+			// two bursts three hours apart, with nothing in between: the fold
+			// has to skip the old block whole while descending into the recent
+			// one, rather than counting a block that merely overlaps
+			const gap = uint64(3 * 3600)
+			sut.forEmptyTree()
+			sut.PutRange(anchorSec, 10)
+			sut.PutRange(anchorSec+gap, 5)
+
+			recent := anchorSec + gap
+			Expect(sut.AggregateRange(recent-3600, recent+4).Count()).To(Equal(uint64(5)))
+			Expect(sut.AggregateRange(anchorSec, anchorSec+9).Count()).To(Equal(uint64(10)))
+			Expect(sut.AggregateRange(anchorSec, recent+4).Count()).To(Equal(uint64(15)))
+			// the empty span between them carries nothing
+			Expect(sut.AggregateRange(anchorSec+10, recent-1).Count()).To(BeZero())
+		})
+
+		It("matches a naive fold over sparse keys with gaps", func() {
+			sut.forEmptyTree()
+			randomizer := rand.New(rand.NewPCG(17, 23))
+			seconds := make([]uint64, 0, 300)
+			sec := anchorSec
+			for range 300 {
+				// gaps of wildly different orders, so blocks are left empty at
+				// every level of the tree
+				sec += randomizer.Uint64N(5000) + 1
+				seconds = append(seconds, sec)
+				sut.Put(sec, 1_000_000)
+			}
+
+			for range 200 {
+				pick := seconds[randomizer.IntN(len(seconds))]
+				from := pick - uint64(randomizer.IntN(3600))
+				to := pick + uint64(randomizer.IntN(3600))
+
+				Expect(sut.AggregateRange(from, to).Equal(sut.naiveFold(from, to))).To(BeTrue(),
+					fmt.Sprintf("sparse window [%d, %d]", from, to))
+			}
+		})
+
 		It("survives a window straddling a /52 block boundary", func() {
 			boundary := (anchorSec >> 12 << 12) + 4096 // a /52 block is 4096 seconds
 			sut.forEmptyTree()
