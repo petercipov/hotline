@@ -1,0 +1,52 @@
+name: go-tests
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-ci:
+    name: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.1'
+          check-latest: false
+          cache-dependency-path: |
+            src/hotline/go.sum
+            src/otel-hotline/go.sum
+            src/otelcol-dev/go.sum
+            go.work.sum
+      - name: run tests
+        run: |
+          make clean-cache
+          make test
+      - name: check coverage threshold
+        run: make cover
+      - name: render coverage report
+        if: failure()
+        run: |
+          if [ -f cover.out ]; then
+            go tool cover -func=cover.out > cover.txt
+            go tool cover -html=cover.out -o cover.html
+          fi
+      - name: upload coverage report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: |
+            cover.out
+            cover.txt
+            cover.html
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: shrink build caches
+        if: always()
+        run: make clean-cache

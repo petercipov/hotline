@@ -32,10 +32,6 @@ func (c *Centroid) UpdateCentroid(mean float64, weight uint64) {
 
 type CentroidBuffer []Centroid
 
-func (l CentroidBuffer) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
-}
-
 func (l CentroidBuffer) TotalWeight() uint64 {
 	totalWeight := uint64(0)
 	for _, v := range l {

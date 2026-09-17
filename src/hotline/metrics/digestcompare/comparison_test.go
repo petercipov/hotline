@@ -276,10 +276,10 @@ func (s *comparisonSut) distinctTDigestRepartitions() int {
 
 func (s *comparisonSut) report(title string, sketch, digest []quantileResult) {
 	out := tabwriter.NewWriter(GinkgoWriter, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(out, "\n%s over %d seconds x %d events\n", title, comparisonSeconds, comparisonEventsPerSec)
-	fmt.Fprintln(out, "q\texact (ms)\tDDSketch (ms)\terr\tt-digest (ms)\terr")
+	_, _ = fmt.Fprintf(out, "\n%s over %d seconds x %d events\n", title, comparisonSeconds, comparisonEventsPerSec)
+	_, _ = fmt.Fprintln(out, "q\texact (ms)\tDDSketch (ms)\terr\tt-digest (ms)\terr")
 	for i := range sketch {
-		fmt.Fprintf(out, "%.3f\t%.2f\t%.2f\t%.4f\t%.2f\t%.4f\n",
+		_, _ = fmt.Fprintf(out, "%.3f\t%.2f\t%.2f\t%.4f\t%.2f\t%.4f\n",
 			sketch[i].q,
 			sketch[i].exact/1e6,
 			sketch[i].estimate/1e6, sketch[i].relativeError,
@@ -317,10 +317,10 @@ func (s *comparisonSut) reportMemory() {
 	}
 
 	out := tabwriter.NewWriter(GinkgoWriter, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(out, "\nmemory over %d seconds x %d events\n", comparisonSeconds, comparisonEventsPerSec)
-	fmt.Fprintln(out, "digest\tnodes\ttotal\tper node\tp99.9 err")
+	_, _ = fmt.Fprintf(out, "\nmemory over %d seconds x %d events\n", comparisonSeconds, comparisonEventsPerSec)
+	_, _ = fmt.Fprintln(out, "digest\tnodes\ttotal\tper node\tp99.9 err")
 	for _, r := range rows {
-		fmt.Fprintf(out, "%s\t%d\t%.1f KB\t%d B\t%.4f\n",
+		_, _ = fmt.Fprintf(out, "%s\t%d\t%.1f KB\t%d B\t%.4f\n",
 			r.label, r.nodes, float64(r.bytes)/1024, r.bytes/r.nodes, r.tailErr)
 	}
 	_ = out.Flush()
@@ -338,7 +338,7 @@ func tailError(results []quantileResult) float64 {
 }
 
 func (s *comparisonSut) reportRepartition(sketch, digest int) {
-	fmt.Fprintf(GinkgoWriter,
+	_, _ = fmt.Fprintf(GinkgoWriter,
 		"\nrepartition determinism over 200 trials, k in [2,9]\n  DDSketch distinct results: %d\n  t-digest distinct results: %d\n",
 		sketch, digest)
 }

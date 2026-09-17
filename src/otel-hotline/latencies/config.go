@@ -1,13 +1,30 @@
 package latencies
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"go.opentelemetry.io/collector/component"
 )
 
+// Type is the component type of this connector. component.MustNewType is a
+// function call, so this cannot be a constant.
+//
+//nolint:gochecknoglobals // the collector component API requires a package level type
 var Type = component.MustNewType("latencies")
+
+// Validation failures are static errors so a caller can match on them with
+// errors.Is rather than on the message text.
+var (
+	ErrNonPositiveInterval = errors.New("latencies: interval must be positive")
+	ErrNoPercentiles       = errors.New("latencies: at least one percentile must be configured")
+	ErrPercentileRange     = errors.New("latencies: percentile must be in the open interval (0, 1)")
+	ErrEmptyAttribute      = errors.New("latencies: attribute name must not be empty")
+	ErrNoSpanKinds         = errors.New("latencies: at least one span kind must be configured")
+	ErrUnknownSpanKind     = errors.New("latencies: unknown span kind")
+	ErrEmptyMetricName     = errors.New("latencies: metric_name must not be empty")
+)
 
 const (
 	defaultIntegrationIDAttribute = "x-integration-id"
@@ -59,35 +76,35 @@ func createDefaultConfig() component.Config {
 // Validate implements component.ConfigValidator.
 func (c *Config) Validate() error {
 	if c.Interval <= 0 {
-		return fmt.Errorf("interval must be positive, got %s", c.Interval)
+		return fmt.Errorf("%w, got %s", ErrNonPositiveInterval, c.Interval)
 	}
 	if len(c.Percentiles) == 0 {
-		return fmt.Errorf("at least one percentile must be configured")
+		return ErrNoPercentiles
 	}
 	for _, p := range c.Percentiles {
 		if p <= 0 || p >= 1 {
-			return fmt.Errorf("percentile must be in the open interval (0, 1), got %v", p)
+			return fmt.Errorf("%w, got %v", ErrPercentileRange, p)
 		}
 	}
 	if c.IntegrationIDAttribute == "" {
-		return fmt.Errorf("integration_id_attribute must not be empty")
+		return fmt.Errorf("%w: integration_id_attribute", ErrEmptyAttribute)
 	}
 	if c.RouteAttribute == "" {
-		return fmt.Errorf("route_attribute must not be empty")
+		return fmt.Errorf("%w: route_attribute", ErrEmptyAttribute)
 	}
 	if c.MethodAttribute == "" {
-		return fmt.Errorf("method_attribute must not be empty")
+		return fmt.Errorf("%w: method_attribute", ErrEmptyAttribute)
 	}
 	if len(c.SpanKinds) == 0 {
-		return fmt.Errorf("at least one span kind must be configured")
+		return ErrNoSpanKinds
 	}
 	for _, kind := range c.SpanKinds {
 		if !isKnownSpanKind(kind) {
-			return fmt.Errorf("unknown span kind %q, valid values are %v", kind, allSpanKinds())
+			return fmt.Errorf("%w %q, valid values are %v", ErrUnknownSpanKind, kind, allSpanKinds())
 		}
 	}
 	if c.MetricName == "" {
-		return fmt.Errorf("metric_name must not be empty")
+		return ErrEmptyMetricName
 	}
 	return nil
 }
