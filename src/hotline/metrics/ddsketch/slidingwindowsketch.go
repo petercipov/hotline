@@ -28,9 +28,6 @@ var ErrInvalidWindow = errors.New("ddsketch: invalid window")
 // seconds.
 var ErrInvalidLateness = errors.New("ddsketch: invalid lateness")
 
-// The tree indexes sketches, and asks nothing of them but that they merge.
-var _ radixtree.Mergeable[*Sketch] = (*Sketch)(nil)
-
 // SlidingWindowSketch turns a stream of latency measurements into quantiles
 // over a sliding window, for one series key.
 //

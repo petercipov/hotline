@@ -1,6 +1,8 @@
-// Package tdigest holds the t-digest algorithm and adapts it to the sliding
-// window sketch, so the same radix tree and the same window machinery can be
-// driven with a t-digest instead of a DDSketch, and the two compared.
+// Package tdigest holds the t-digest algorithm and the sketch that carries it,
+// as the control the DDSketch implementation is measured against. It depends on
+// nothing else in this repository: a t-digest cannot honour what the windowed
+// index promises, so this package does not reach for that index. Only
+// digestcompare puts the two side by side, and docs/tdigest.md says why.
 //
 // TDSketch is the algorithm; Sketch is the window facing payload that wraps
 // it and carries exact count, sum, min and max alongside.
@@ -11,8 +13,6 @@ import (
 	"fmt"
 	"math"
 	"unsafe"
-
-	"hotline/metrics/radixtree"
 )
 
 // ErrNegativeLatency rejects a negative measurement. Latencies are non
@@ -27,9 +27,9 @@ const (
 	DefaultBufferSize  = 500
 )
 
-// Sketch wraps this package's TDSketch so it can be indexed by the radix
-// tree in place of a DDSketch, and the two compared on precision and memory
-// over identical event streams. It is the mirror of ddsketch.Sketch.
+// Sketch wraps this package's TDSketch so the two implementations can be
+// compared on precision and memory over identical event streams. It is the
+// mirror of ddsketch.Sketch.
 //
 // It is NOT a commutative monoid, and that is the whole point of having it.
 // Merge re-clusters centroids, so it is lossy and order dependent: folding the
@@ -50,15 +50,14 @@ type Sketch struct {
 	max    uint64
 }
 
-// NewSketch returns an empty t-digest backed sketch at the default tuning. It
-// satisfies radixtree.Factory[*Sketch], so radixtree.New(NewSketch) works.
+// NewSketch returns an empty t-digest backed sketch at the default tuning.
 func NewSketch() *Sketch {
 	return NewSketchSized(DefaultCompression, DefaultBufferSize)()
 }
 
 // NewSketchSized returns a constructor at a chosen compression, for sweeping
 // the accuracy against memory tradeoff.
-func NewSketchSized(compression, bufferSize int) radixtree.Factory[*Sketch] {
+func NewSketchSized(compression, bufferSize int) func() *Sketch {
 	return func() *Sketch {
 		return &Sketch{
 			digest: NewWeightScaledTDSketch(compression, bufferSize),
@@ -174,6 +173,3 @@ func (d *Sketch) Quantiles(qs []float64) []float64 {
 func (d *Sketch) SizeInBytes() int {
 	return int(unsafe.Sizeof(*d)) + d.digest.SizeInBytes()
 }
-
-// The tree indexes sketches, and asks nothing of them but that they merge.
-var _ radixtree.Mergeable[*Sketch] = (*Sketch)(nil)
