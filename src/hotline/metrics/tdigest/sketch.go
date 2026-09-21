@@ -1,11 +1,10 @@
-// Package tdlatencyhistogram holds the t-digest algorithm and adapts it to the
-// windowed quantile pipeline, so the same radix tree and the same window
-// machinery can be driven with a t-digest instead of a DDSketch, and the two
-// compared.
+// Package tdigest holds the t-digest algorithm and adapts it to the sliding
+// window sketch, so the same radix tree and the same window machinery can be
+// driven with a t-digest instead of a DDSketch, and the two compared.
 //
-// TDigest is the algorithm; Sketch is the pipeline facing digest that wraps it
-// and carries exact count, sum, min and max alongside.
-package tdlatencyhistogram
+// TDSketch is the algorithm; Sketch is the window facing payload that wraps
+// it and carries exact count, sum, min and max alongside.
+package tdigest
 
 import (
 	"errors"
@@ -19,7 +18,7 @@ import (
 // ErrNegativeLatency rejects a negative measurement. Latencies are non
 // negative; a negative input is a bug and is rejected loudly rather than
 // silently folded in.
-var ErrNegativeLatency = errors.New("tdlatencyhistogram: negative latency")
+var ErrNegativeLatency = errors.New("tdigest: negative latency")
 
 // Default t-digest tuning. Compression 100 is the delta the size comparison in
 // the design notes was quoted against.
@@ -28,9 +27,9 @@ const (
 	DefaultBufferSize  = 500
 )
 
-// Sketch wraps the TDigest in this package so it can be indexed by the radix
+// Sketch wraps this package's TDSketch so it can be indexed by the radix
 // tree in place of a DDSketch, and the two compared on precision and memory
-// over identical event streams. It is the mirror of ddlatencyhistogram.Sketch.
+// over identical event streams. It is the mirror of ddsketch.Sketch.
 //
 // It is NOT a commutative monoid, and that is the whole point of having it.
 // Merge re-clusters centroids, so it is lossy and order dependent: folding the
@@ -44,7 +43,7 @@ const (
 // so p0 and p100 stay exact for both and the comparison isolates the interior
 // quantiles where the two actually differ.
 type Sketch struct {
-	digest *TDigest
+	digest *TDSketch
 	count  uint64
 	sum    uint64
 	min    uint64
@@ -57,12 +56,12 @@ func NewSketch() *Sketch {
 	return NewSketchSized(DefaultCompression, DefaultBufferSize)()
 }
 
-// NewTDigestSized returns a constructor at a chosen compression, for sweeping
+// NewSketchSized returns a constructor at a chosen compression, for sweeping
 // the accuracy against memory tradeoff.
 func NewSketchSized(compression, bufferSize int) radixtree.Factory[*Sketch] {
 	return func() *Sketch {
 		return &Sketch{
-			digest: NewTDigestWeightScaled(compression, bufferSize),
+			digest: NewWeightScaledTDSketch(compression, bufferSize),
 			min:    math.MaxUint64,
 		}
 	}

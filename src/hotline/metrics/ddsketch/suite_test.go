@@ -1,4 +1,4 @@
-package ddlatencyhistogram_test
+package ddsketch_test
 
 import (
 	"testing"

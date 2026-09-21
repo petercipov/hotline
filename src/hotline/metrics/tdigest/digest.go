@@ -1,4 +1,4 @@
-package tdlatencyhistogram
+package tdigest
 
 import (
 	"math"
@@ -128,7 +128,7 @@ func NewCentroids(capacity int) *Centroids {
 }
 
 type MaxWeightFunc func(quantile1, quantile2 float64, totalWeight uint64) float64
-type TDigest struct {
+type TDSketch struct {
 	centroids          *Centroids
 	quantileMaxWeights MaxWeightFunc
 	capacity           int
@@ -137,7 +137,7 @@ type TDigest struct {
 	unprocessed CentroidBuffer
 }
 
-func (d *TDigest) AddToBuffer(mean float64, weight uint64) {
+func (d *TDSketch) AddToBuffer(mean float64, weight uint64) {
 	d.unprocessed = append(d.unprocessed, Centroid{
 		Mean:   mean,
 		Weight: weight,
@@ -148,7 +148,7 @@ func (d *TDigest) AddToBuffer(mean float64, weight uint64) {
 	}
 }
 
-func (d *TDigest) processBuffer() {
+func (d *TDSketch) processBuffer() {
 	if len(d.unprocessed) == 0 {
 		return
 	}
@@ -160,7 +160,7 @@ func (d *TDigest) processBuffer() {
 // greedyCompress folds values into at most capacity centroids. processBuffer is
 // its only caller and returns early on an empty buffer, so values is never
 // empty here.
-func (d *TDigest) greedyCompress(values CentroidBuffer) *Centroids {
+func (d *TDSketch) greedyCompress(values CentroidBuffer) *Centroids {
 	sort.Slice(values, func(i, j int) bool {
 		return values[i].Mean < values[j].Mean
 	})
@@ -189,12 +189,12 @@ func (d *TDigest) greedyCompress(values CentroidBuffer) *Centroids {
 	return compressed
 }
 
-func (d *TDigest) ToCentroids() []Centroid {
+func (d *TDSketch) ToCentroids() []Centroid {
 	d.processBuffer()
 	return d.centroids.ToList()
 }
 
-func (d *TDigest) Quantile(percentile float64) float64 {
+func (d *TDSketch) Quantile(percentile float64) float64 {
 	d.processBuffer()
 
 	if percentile < 0 || percentile > 1 {
@@ -230,7 +230,7 @@ func (d *TDigest) Quantile(percentile float64) float64 {
 
 // Clone returns a deep copy including any centroids still sitting unprocessed
 // in the buffer, so the copy compresses to exactly what the original would.
-func (d *TDigest) Clone() *TDigest {
+func (d *TDSketch) Clone() *TDSketch {
 	clone := *d
 	clone.centroids = d.centroids.Clone()
 	clone.unprocessed = slices.Clone(d.unprocessed)
@@ -240,16 +240,16 @@ func (d *TDigest) Clone() *TDigest {
 // SizeInBytes is the retained footprint: the compressed centroids plus whatever
 // is still buffered. Unlike a bucket histogram this is bounded by capacity
 // rather than by the spread of the data.
-func (d *TDigest) SizeInBytes() int {
+func (d *TDSketch) SizeInBytes() int {
 	return int(unsafe.Sizeof(*d)) +
 		d.centroids.SizeInBytes() +
 		cap(d.unprocessed)*int(unsafe.Sizeof(Centroid{}))
 }
 
-func NewTDigestWeightScaled(capacity int, bufferSize int) *TDigest {
+func NewWeightScaledTDSketch(capacity int, bufferSize int) *TDSketch {
 	centroids := NewCentroids(capacity)
 	scaling := NewWeightScaling(capacity)
-	return &TDigest{
+	return &TDSketch{
 		capacity:           capacity,
 		centroids:          centroids,
 		quantileMaxWeights: scaling.MaxWeight,

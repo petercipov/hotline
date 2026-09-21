@@ -1,4 +1,4 @@
-package ddlatencyhistogram
+package ddsketch
 
 import (
 	"math"

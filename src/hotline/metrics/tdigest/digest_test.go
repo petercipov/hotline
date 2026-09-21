@@ -1,8 +1,8 @@
-package tdlatencyhistogram_test
+package tdigest_test
 
 import (
 	"fmt"
-	tdhistogram "hotline/metrics/td-latency-histogram"
+	"hotline/metrics/tdigest"
 	"math"
 	"math/rand/v2"
 
@@ -10,12 +10,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("TDigest", func() {
+var _ = Describe("TDSketch", func() {
 	Context("digest", func() {
-		sut := tdigestSut{}
+		sut := tdSketchSut{}
 
 		It("will create new centroid for entry if empty digest", func() {
-			sut.forTDigest()
+			sut.forTDSketch()
 			sut.AddEntry(3.14)
 
 			centroids := sut.ToCentroids()
@@ -23,13 +23,13 @@ var _ = Describe("TDigest", func() {
 		})
 
 		It("will update centroid same weight", func() {
-			sut.forTDigest()
+			sut.forTDSketch()
 			sut.AddEntry(3.14)
 			sut.AddEntry(10.14)
 			sut.AddEntry(3.14)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(Equal([]tdhistogram.Centroid{
+			Expect(centroids).To(Equal([]tdigest.Centroid{
 				{
 					Mean: 3.14, Weight: 2,
 				},
@@ -40,12 +40,12 @@ var _ = Describe("TDigest", func() {
 		})
 
 		It("will update last centroid if same weight exactly", func() {
-			sut.forTDigest()
+			sut.forTDSketch()
 			sut.AddEntry(3.14)
 			sut.AddEntry(3.14)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(Equal([]tdhistogram.Centroid{
+			Expect(centroids).To(Equal([]tdigest.Centroid{
 				{
 					Mean: 3.14, Weight: 2,
 				},
@@ -53,13 +53,13 @@ var _ = Describe("TDigest", func() {
 		})
 
 		It("will NOT update last centroid if NOT same weight exactly", func() {
-			sut.forTDigest()
+			sut.forTDSketch()
 			sut.AddEntry(3.14)
 			sut.AddEntry(3.15)
 			sut.AddEntry(3.16)
 
 			centroids := sut.ToCentroids()
-			Expect(centroids).To(Equal([]tdhistogram.Centroid{
+			Expect(centroids).To(Equal([]tdigest.Centroid{
 				{Mean: 3.14, Weight: 1},
 				{Mean: 3.15, Weight: 1},
 				{Mean: 3.16, Weight: 1},
@@ -67,7 +67,7 @@ var _ = Describe("TDigest", func() {
 		})
 
 		It("generate bounded centroids for 100k random numbers", func() {
-			sut.forTDigest()
+			sut.forTDSketch()
 			sut.AddRandomEntries(100_000)
 
 			centroids := sut.ToCentroids()
@@ -92,7 +92,7 @@ var _ = Describe("TDigest", func() {
 		})
 
 		It("apply increasing sequence of numbers with bounded array", func() {
-			sut.forTDigestWithHihBuffer()
+			sut.forTDSketchWithHighBuffer()
 			sut.AddIncreasingEntries(100_000)
 
 			centroids := sut.ToCentroids()
@@ -107,7 +107,7 @@ var _ = Describe("TDigest", func() {
 		})
 
 		It("apply decreasing sequence of numbers with bounded array", func() {
-			sut.forTDigestWithHihBuffer()
+			sut.forTDSketchWithHighBuffer()
 			sut.AddDescreasingEntries(100_000)
 
 			centroids := sut.ToCentroids()
@@ -123,14 +123,14 @@ var _ = Describe("TDigest", func() {
 
 		Context("Quantiles", func() {
 			It("should compute 0 for an empty tdigest", func() {
-				sut.forTDigest()
+				sut.forTDSketch()
 
 				quantile := sut.Quantile(0.99)
 				Expect(quantile).To(Equal(0.0))
 			})
 
 			It("should compute same value for a single centroid", func() {
-				sut.forTDigest()
+				sut.forTDSketch()
 				sut.AddEntry(3.14)
 
 				quantile := sut.Quantile(0.99)
@@ -138,7 +138,7 @@ var _ = Describe("TDigest", func() {
 			})
 
 			It("should use linear approximation to compute value between two centroids", func() {
-				sut.forTDigest()
+				sut.forTDSketch()
 				sut.AddSimpleDataSet()
 
 				quantile := sut.Quantile(0.90)
@@ -146,7 +146,7 @@ var _ = Describe("TDigest", func() {
 			})
 
 			It("should use same centroid for quantiles near the start", func() {
-				sut.forTDigest()
+				sut.forTDSketch()
 				sut.AddSimpleDataSet()
 
 				quantile := sut.Quantile(0.00)
@@ -154,7 +154,7 @@ var _ = Describe("TDigest", func() {
 			})
 
 			It("should return NaN for quantiles out of range [0.0, 1.0]", func() {
-				sut.forTDigest()
+				sut.forTDSketch()
 				sut.AddSimpleDataSet()
 
 				Expect(math.IsNaN(sut.Quantile(-0.01))).To(BeTrue())
@@ -162,7 +162,7 @@ var _ = Describe("TDigest", func() {
 			})
 
 			It("should cover full range of quantiles for percentiles in range [0.0, 1.0]", func() {
-				sut.forTDigest()
+				sut.forTDSketch()
 				sut.AddSimpleDataSet()
 
 				expectedValues := []struct{ percentile, value float64 }{
@@ -220,7 +220,7 @@ var _ = Describe("TDigest", func() {
 			sut.WithDataset()
 
 			list := sut.toList()
-			Expect(list).To(Equal([]tdhistogram.Centroid{
+			Expect(list).To(Equal([]tdigest.Centroid{
 				{Mean: 1.618, Weight: 3},
 				{Mean: 2.718, Weight: 8},
 				{Mean: 3.14, Weight: 15},
@@ -283,11 +283,11 @@ var _ = Describe("TDigest", func() {
 })
 
 type centroidsSut struct {
-	centroids *tdhistogram.Centroids
+	centroids *tdigest.Centroids
 }
 
 func (s *centroidsSut) forCentroids() {
-	s.centroids = tdhistogram.NewCentroids(100)
+	s.centroids = tdigest.NewCentroids(100)
 }
 
 func (s *centroidsSut) WithDataset() {
@@ -303,7 +303,7 @@ func (s *centroidsSut) WithDataset() {
 	s.centroids.AddCentroid(10.635, 3)
 }
 
-func (s *centroidsSut) toList() []tdhistogram.Centroid {
+func (s *centroidsSut) toList() []tdigest.Centroid {
 	return s.centroids.ToList()
 }
 
@@ -315,47 +315,47 @@ func (s *centroidsSut) centroidWithCumulativeSum(sum uint64) (uint64, int, bool)
 	return s.centroids.FittingCumulativeWeightCentroid(sum)
 }
 
-type tdigestSut struct {
-	tdigest *tdhistogram.TDigest
+type tdSketchSut struct {
+	sketch *tdigest.TDSketch
 }
 
-func (t *tdigestSut) forTDigest() {
-	t.tdigest = tdhistogram.NewTDigestWeightScaled(
+func (t *tdSketchSut) forTDSketch() {
+	t.sketch = tdigest.NewWeightScaledTDSketch(
 		100,
 		500,
 	)
 }
 
-func (t *tdigestSut) forTDigestWithHihBuffer() {
-	t.tdigest = tdhistogram.NewTDigestWeightScaled(
+func (t *tdSketchSut) forTDSketchWithHighBuffer() {
+	t.sketch = tdigest.NewWeightScaledTDSketch(
 		100,
 		10000,
 	)
 }
 
-func (t *tdigestSut) AddEntry(mean float64) {
-	t.tdigest.AddToBuffer(mean, 1)
+func (t *tdSketchSut) AddEntry(mean float64) {
+	t.sketch.AddToBuffer(mean, 1)
 }
 
-func (t *tdigestSut) AddSimpleDataSet() {
-	t.tdigest.AddToBuffer(1.2, 30)
-	t.tdigest.AddToBuffer(1.98, 15)
-	t.tdigest.AddToBuffer(2.81, 66)
-	t.tdigest.AddToBuffer(3.14, 2)
+func (t *tdSketchSut) AddSimpleDataSet() {
+	t.sketch.AddToBuffer(1.2, 30)
+	t.sketch.AddToBuffer(1.98, 15)
+	t.sketch.AddToBuffer(2.81, 66)
+	t.sketch.AddToBuffer(3.14, 2)
 }
 
-func (t *tdigestSut) ToCentroids() []tdhistogram.Centroid {
-	return t.tdigest.ToCentroids()
+func (t *tdSketchSut) ToCentroids() []tdigest.Centroid {
+	return t.sketch.ToCentroids()
 }
 
-func (t *tdigestSut) AddRandomEntries(count int) {
+func (t *tdSketchSut) AddRandomEntries(count int) {
 	randomizer := rand.New(rand.NewPCG(190, 89992))
 	for range count {
 		t.AddEntry(0.5 + (10 * randomizer.Float64()))
 	}
 }
 
-func (t *tdigestSut) AddDescreasingEntries(count int) {
+func (t *tdSketchSut) AddDescreasingEntries(count int) {
 	value := 1100.0
 	decrement := 1000.0 / float64(count)
 	for range count {
@@ -364,7 +364,7 @@ func (t *tdigestSut) AddDescreasingEntries(count int) {
 	}
 }
 
-func (t *tdigestSut) AddIncreasingEntries(count int) {
+func (t *tdSketchSut) AddIncreasingEntries(count int) {
 	value := 10.0
 	increment := 1000.0 / float64(count)
 	for range count {
@@ -373,8 +373,8 @@ func (t *tdigestSut) AddIncreasingEntries(count int) {
 	}
 }
 
-func (t *tdigestSut) Quantile(percentile float64) float64 {
-	return t.tdigest.Quantile(percentile)
+func (t *tdSketchSut) Quantile(percentile float64) float64 {
+	return t.sketch.Quantile(percentile)
 }
 
 func round(value float64, decimals uint32) float64 {

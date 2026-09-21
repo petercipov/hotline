@@ -7,9 +7,9 @@ import (
 	"slices"
 	"text/tabwriter"
 
-	ddhistogram "hotline/metrics/dd-latency-histogram"
+	"hotline/metrics/ddsketch"
 	"hotline/metrics/radixtree"
-	tdhistogram "hotline/metrics/td-latency-histogram"
+	"hotline/metrics/tdigest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -28,7 +28,7 @@ var _ = Describe("Digest comparison", func() {
 			sut.forLognormalWindow()
 
 			for _, result := range sut.measureSketch() {
-				Expect(result.relativeError).To(BeNumerically("<=", ddhistogram.Alpha),
+				Expect(result.relativeError).To(BeNumerically("<=", ddsketch.Alpha),
 					fmt.Sprintf("DDSketch q=%v estimated %.0f against exact %.0f",
 						result.q, result.estimate, result.exact))
 			}
@@ -37,7 +37,7 @@ var _ = Describe("Digest comparison", func() {
 		It("reports where t-digest lands against the same oracle", func() {
 			sut.forLognormalWindow()
 
-			results := sut.measureTDigest()
+			results := sut.measureDigest()
 			Expect(results).ToNot(BeEmpty())
 
 			// t-digest gives no relative error guarantee on the value, so this
@@ -48,7 +48,7 @@ var _ = Describe("Digest comparison", func() {
 		It("answers p0 and p100 exactly under both", func() {
 			sut.forLognormalWindow()
 
-			for _, results := range [][]quantileResult{sut.measureSketch(), sut.measureTDigest()} {
+			for _, results := range [][]quantileResult{sut.measureSketch(), sut.measureDigest()} {
 				for _, result := range results {
 					if result.q <= 0.0 || result.q >= 1.0 {
 						Expect(result.estimate).To(Equal(result.exact),
@@ -88,7 +88,7 @@ var _ = Describe("Digest comparison", func() {
 		It("shows t-digest changing with the shard layout", func() {
 			sut.forLognormalWindow()
 
-			distinct := sut.distinctTDigestRepartitions()
+			distinct := sut.distinctDigestRepartitions()
 			sut.reportRepartition(1, distinct)
 
 			// this is the property the design rests on, stated as a test so a
@@ -134,7 +134,7 @@ type quantileResult struct {
 
 type comparisonSut struct {
 	// values carries every measurement in the window, second by second, so
-	// both pipelines and the oracle see one identical stream
+	// both digests and the oracle see one identical stream
 	seconds [][]int64
 	all     []int64
 	built   bool
@@ -212,20 +212,20 @@ func measure[T digest[T]](s *comparisonSut, empty radixtree.Factory[T]) []quanti
 }
 
 func (s *comparisonSut) measureSketch() []quantileResult {
-	return measure(s, ddhistogram.NewSketch)
+	return measure(s, ddsketch.NewSketch)
 }
 
-func (s *comparisonSut) measureTDigest() []quantileResult {
-	return measure(s, tdhistogram.NewSketch)
+func (s *comparisonSut) measureDigest() []quantileResult {
+	return measure(s, tdigest.NewSketch)
 }
 
 func (s *comparisonSut) sketchFootprint() (int, int) {
-	tree := replay(s, ddhistogram.NewSketch)
+	tree := replay(s, ddsketch.NewSketch)
 	return tree.SizeInBytes(), tree.NodeCount()
 }
 
 func (s *comparisonSut) tdigestFootprint() (int, int) {
-	tree := replay(s, tdhistogram.NewSketch)
+	tree := replay(s, tdigest.NewSketch)
 	return tree.SizeInBytes(), tree.NodeCount()
 }
 
@@ -267,11 +267,11 @@ func distinctRepartitions[T digest[T]](s *comparisonSut, empty radixtree.Factory
 }
 
 func (s *comparisonSut) distinctSketchRepartitions() int {
-	return distinctRepartitions(s, ddhistogram.NewSketch, 200)
+	return distinctRepartitions(s, ddsketch.NewSketch, 200)
 }
 
-func (s *comparisonSut) distinctTDigestRepartitions() int {
-	return distinctRepartitions(s, tdhistogram.NewSketch, 200)
+func (s *comparisonSut) distinctDigestRepartitions() int {
+	return distinctRepartitions(s, tdigest.NewSketch, 200)
 }
 
 func (s *comparisonSut) report(title string, sketch, digest []quantileResult) {
@@ -306,7 +306,7 @@ func (s *comparisonSut) reportMemory() {
 	for _, tuning := range []struct {
 		compression, buffer int
 	}{{100, 500}, {100, 32}, {50, 32}} {
-		empty := tdhistogram.NewSketchSized(tuning.compression, tuning.buffer)
+		empty := tdigest.NewSketchSized(tuning.compression, tuning.buffer)
 		tree := replay(s, empty)
 		rows = append(rows, row{
 			label:   fmt.Sprintf("t-digest (d=%d, buf=%d)", tuning.compression, tuning.buffer),

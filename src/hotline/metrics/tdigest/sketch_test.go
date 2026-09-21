@@ -1,9 +1,9 @@
-package tdlatencyhistogram_test
+package tdigest_test
 
 import (
 	"math"
 
-	tdhistogram "hotline/metrics/td-latency-histogram"
+	"hotline/metrics/tdigest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,10 +16,10 @@ func targetQuantiles() []float64 {
 var _ = Describe("Sketch", func() {
 	sut := sketchSut{}
 
-	Context("the Digest contract", func() {
+	Context("the TDSketch contract", func() {
 		It("rejects a negative latency loudly", func() {
 			sut.forEmpty()
-			Expect(sut.digest.InsertLatency(-1)).To(MatchError(tdhistogram.ErrNegativeLatency))
+			Expect(sut.digest.InsertLatency(-1)).To(MatchError(tdigest.ErrNegativeLatency))
 		})
 
 		It("yields NaN for every quantile when empty", func() {
@@ -50,7 +50,7 @@ var _ = Describe("Sketch", func() {
 			sut.forValues(5_000_000, 1_000_000, 9_000_000)
 			before := sut.digest.Clone()
 
-			sut.digest.Merge(tdhistogram.NewSketch())
+			sut.digest.Merge(tdigest.NewSketch())
 
 			Expect(sut.digest.Equal(before)).To(BeTrue())
 		})
@@ -83,11 +83,11 @@ var _ = Describe("Sketch", func() {
 })
 
 type sketchSut struct {
-	digest *tdhistogram.Sketch
+	digest *tdigest.Sketch
 }
 
 func (s *sketchSut) forEmpty() {
-	s.digest = tdhistogram.NewSketch()
+	s.digest = tdigest.NewSketch()
 }
 
 func (s *sketchSut) forValues(valuesNS ...int64) {

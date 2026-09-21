@@ -1,8 +1,8 @@
-package ddlatencyhistogram_test
+package ddsketch_test
 
 import (
 	"fmt"
-	ddhistogram "hotline/metrics/dd-latency-histogram"
+	"hotline/metrics/ddsketch"
 	"math"
 	"math/rand/v2"
 	"sort"
@@ -26,8 +26,8 @@ var _ = Describe("Sketch", func() {
 
 	Context("mapping constants (spec 9.1)", func() {
 		It("derives gamma and ln(gamma) from alpha", func() {
-			Expect(ddhistogram.Gamma).To(Equal(1.0408163265306123))
-			Expect(ddhistogram.LnGamma).To(Equal(0.040005334613699206))
+			Expect(ddsketch.Gamma).To(Equal(1.0408163265306123))
+			Expect(ddsketch.LnGamma).To(Equal(0.040005334613699206))
 		})
 
 	})
@@ -52,20 +52,20 @@ var _ = Describe("Sketch", func() {
 
 		for _, v := range vectors {
 			It(fmt.Sprintf("maps %d ns to bucket %d", v.latency, v.index), func() {
-				Expect(ddhistogram.Index(v.latency)).To(Equal(v.index))
-				Expect(ddhistogram.BucketValue(v.index)).To(BeNumerically("~", v.reconstructed, 0.05))
+				Expect(ddsketch.Index(v.latency)).To(Equal(v.index))
+				Expect(ddsketch.BucketValue(v.index)).To(BeNumerically("~", v.reconstructed, 0.05))
 			})
 
 			It(fmt.Sprintf("keeps %d ns within alpha of its bucket representative", v.latency), func() {
-				reconstructed := ddhistogram.BucketValue(ddhistogram.Index(v.latency))
+				reconstructed := ddsketch.BucketValue(ddsketch.Index(v.latency))
 				Expect(math.Abs(reconstructed-float64(v.latency)) / float64(v.latency)).
-					To(BeNumerically("<=", ddhistogram.Alpha))
+					To(BeNumerically("<=", ddsketch.Alpha))
 			})
 		}
 
 		It("keeps both edges of bucket 438 inside bucket 438", func() {
-			Expect(ddhistogram.Index(39127310)).To(Equal(int32(438)))
-			Expect(ddhistogram.Index(40724342)).To(Equal(int32(438)))
+			Expect(ddsketch.Index(39127310)).To(Equal(int32(438)))
+			Expect(ddsketch.Index(40724342)).To(Equal(int32(438)))
 		})
 	})
 
@@ -108,10 +108,10 @@ var _ = Describe("Sketch", func() {
 
 		It("clamps values above the ceiling into the top bucket and counts the overflow", func() {
 			sut.forEmptySketch()
-			ceiling := ddhistogram.DefaultRange().MaxNS
+			ceiling := ddsketch.DefaultRange().MaxNS
 			sut.Insert(ceiling * 10)
 
-			Expect(sut.sketch.Buckets()).To(Equal(map[int32]uint64{ddhistogram.Index(ceiling): 1}))
+			Expect(sut.sketch.Buckets()).To(Equal(map[int32]uint64{ddsketch.Index(ceiling): 1}))
 			Expect(sut.sketch.Overflow()).To(Equal(uint64(1)))
 			Expect(sut.sketch.Max()).To(Equal(ceiling * 10))
 		})
@@ -174,7 +174,7 @@ var _ = Describe("Sketch", func() {
 
 				for i, q := range qs {
 					exact := float64(exactNearestRank(values, q))
-					Expect(math.Abs(got[i]-exact)).To(BeNumerically("<=", ddhistogram.Alpha*exact),
+					Expect(math.Abs(got[i]-exact)).To(BeNumerically("<=", ddsketch.Alpha*exact),
 						fmt.Sprintf("%s at q %v: got %v exact %v", distribution, q, got[i], exact))
 				}
 			}
@@ -185,7 +185,7 @@ var _ = Describe("Sketch", func() {
 			got := sut.Quantiles(0.0, 0.5, 1.0)
 
 			Expect(got[0]).To(Equal(float64(42_000_000)))
-			Expect(got[1]).To(BeNumerically("~", 42_000_000.0, ddhistogram.Alpha*42_000_000))
+			Expect(got[1]).To(BeNumerically("~", 42_000_000.0, ddsketch.Alpha*42_000_000))
 			Expect(got[2]).To(Equal(float64(42_000_000)))
 		})
 
@@ -211,10 +211,10 @@ var _ = Describe("Sketch", func() {
 			sut.forNormativeDataset()
 			original := sut.sketch.Clone()
 
-			left := ddhistogram.NewSketch()
+			left := ddsketch.NewSketch()
 			left.Merge(sut.sketch)
 			right := sut.sketch.Clone()
-			right.Merge(ddhistogram.NewSketch())
+			right.Merge(ddsketch.NewSketch())
 
 			Expect(left.Equal(original)).To(BeTrue())
 			Expect(right.Equal(original)).To(BeTrue())
@@ -256,7 +256,7 @@ var _ = Describe("Sketch", func() {
 		It("loses nothing at any merge depth", func() {
 			values := generateDistribution("lognormal", 5000)
 
-			single := ddhistogram.NewSketch()
+			single := ddsketch.NewSketch()
 			for _, v := range values {
 				single.Insert(v)
 			}
@@ -267,7 +267,7 @@ var _ = Describe("Sketch", func() {
 
 	Context("repartition determinism (spec 8.3 / 9.4)", func() {
 		It("yields exactly one distinct result over 200 random repartitions", func() {
-			single := ddhistogram.NewSketch()
+			single := ddsketch.NewSketch()
 			for _, v := range normativeDataset() {
 				single.Insert(v)
 			}
@@ -283,7 +283,7 @@ var _ = Describe("Sketch", func() {
 		It("survives repartitioning of a large mixed dataset", func() {
 			values := generateDistribution("heavytail", 20_000)
 
-			single := ddhistogram.NewSketch()
+			single := ddsketch.NewSketch()
 			for _, v := range values {
 				single.Insert(v)
 			}
@@ -299,15 +299,15 @@ var _ = Describe("Sketch", func() {
 
 	Context("edge cases (spec 8.6)", func() {
 		It("keeps values sitting exactly on a bucket boundary in one bucket", func() {
-			boundary := uint64(math.Pow(ddhistogram.Gamma, 438))
-			Expect(ddhistogram.Index(boundary)).To(BeNumerically("~", 438, 1))
+			boundary := uint64(math.Pow(ddsketch.Gamma, 438))
+			Expect(ddsketch.Index(boundary)).To(BeNumerically("~", 438, 1))
 		})
 
 		It("puts identical values into a single bucket", func() {
 			sut.forValues([]uint64{7_000_000, 7_000_000, 7_000_000, 7_000_000})
 
 			Expect(sut.sketch.Buckets()).To(HaveLen(1))
-			Expect(sut.Quantiles(0.5)[0]).To(BeNumerically("~", 7_000_000.0, ddhistogram.Alpha*7_000_000))
+			Expect(sut.Quantiles(0.5)[0]).To(BeNumerically("~", 7_000_000.0, ddsketch.Alpha*7_000_000))
 		})
 
 		It("never stores a zero count bucket", func() {
@@ -332,7 +332,7 @@ var _ = Describe("Sketch.SizeInBytes", func() {
 
 	It("grows with every newly populated bucket", func() {
 		// the premise: these land in different buckets
-		Expect(ddhistogram.Index(1_000_000)).ToNot(Equal(ddhistogram.Index(2_000_000)))
+		Expect(ddsketch.Index(1_000_000)).ToNot(Equal(ddsketch.Index(2_000_000)))
 
 		sut.forEmptySketch()
 		empty := sut.sketch.SizeInBytes()
@@ -349,7 +349,7 @@ var _ = Describe("Sketch.SizeInBytes", func() {
 
 	It("does not grow when a value lands in a bucket that already exists", func() {
 		// the premise: these share a bucket
-		Expect(ddhistogram.Index(1_000_000)).To(Equal(ddhistogram.Index(1_020_000)))
+		Expect(ddsketch.Index(1_000_000)).To(Equal(ddsketch.Index(1_020_000)))
 
 		sut.forValues([]uint64{1_000_000})
 		before := sut.sketch.SizeInBytes()
@@ -364,14 +364,14 @@ var _ = Describe("Sketch.SizeInBytes", func() {
 		sut.forEmptySketch()
 		empty := sut.sketch.SizeInBytes()
 
-		sut.Insert(ddhistogram.DefaultRange().MinNS - 1)
+		sut.Insert(ddsketch.DefaultRange().MinNS - 1)
 
 		Expect(sut.sketch.Zeros()).To(Equal(uint64(1)))
 		Expect(sut.sketch.SizeInBytes()).To(Equal(empty))
 	})
 
 	It("costs one bucket however many values sit above the range, since they all clamp", func() {
-		maxNS := ddhistogram.DefaultRange().MaxNS
+		maxNS := ddsketch.DefaultRange().MaxNS
 
 		sut.forValues([]uint64{maxNS + 1})
 		clamped := sut.sketch.SizeInBytes()
@@ -390,9 +390,9 @@ var _ = Describe("Sketch.SizeInBytes", func() {
 	})
 
 	It("reports the union of the buckets after a merge", func() {
-		low := ddhistogram.NewSketch()
+		low := ddsketch.NewSketch()
 		low.Insert(1_000_000)
-		high := ddhistogram.NewSketch()
+		high := ddsketch.NewSketch()
 		high.Insert(8_000_000)
 
 		before := low.SizeInBytes()
@@ -406,8 +406,8 @@ var _ = Describe("Sketch.SizeInBytes", func() {
 	})
 
 	It("depends on the buckets populated, not on the span the sketch resolves", func() {
-		wide := ddhistogram.NewSketchInRange(ddhistogram.Range{MinNS: 1, MaxNS: 1 << 40})
-		narrow := ddhistogram.NewSketchInRange(ddhistogram.Range{MinNS: 1_000_000, MaxNS: 2_000_000})
+		wide := ddsketch.NewSketchInRange(ddsketch.Range{MinNS: 1, MaxNS: 1 << 40})
+		narrow := ddsketch.NewSketchInRange(ddsketch.Range{MinNS: 1_000_000, MaxNS: 2_000_000})
 
 		wide.Insert(1_500_000)
 		narrow.Insert(1_500_000)
@@ -417,15 +417,15 @@ var _ = Describe("Sketch.SizeInBytes", func() {
 })
 
 type sketchSut struct {
-	sketch *ddhistogram.Sketch
+	sketch *ddsketch.Sketch
 }
 
 func (s *sketchSut) forEmptySketch() {
-	s.sketch = ddhistogram.NewSketch()
+	s.sketch = ddsketch.NewSketch()
 }
 
 func (s *sketchSut) forValues(values []uint64) {
-	s.sketch = ddhistogram.NewSketch()
+	s.sketch = ddsketch.NewSketch()
 	for _, v := range values {
 		s.sketch.Insert(v)
 	}
@@ -455,10 +455,10 @@ func (s *sketchSut) bucketTotal() uint64 {
 	return total
 }
 
-func randomSketch(seed uint64, count int) *ddhistogram.Sketch {
+func randomSketch(seed uint64, count int) *ddsketch.Sketch {
 	randomizer := rand.New(rand.NewPCG(seed, seed*7+1))
-	s := ddhistogram.NewSketch()
-	r := ddhistogram.DefaultRange()
+	s := ddsketch.NewSketch()
+	r := ddsketch.DefaultRange()
 	for i := range count {
 		// deliberately spans all three destinations: a uniform draw over the
 		// whole span would essentially never land below the 1 ms floor
@@ -474,16 +474,16 @@ func randomSketch(seed uint64, count int) *ddhistogram.Sketch {
 	return s
 }
 
-func mergeTree(values []uint64, fanout int) *ddhistogram.Sketch {
+func mergeTree(values []uint64, fanout int) *ddsketch.Sketch {
 	if len(values) <= fanout {
-		s := ddhistogram.NewSketch()
+		s := ddsketch.NewSketch()
 		for _, v := range values {
 			s.Insert(v)
 		}
 		return s
 	}
 	chunk := (len(values) + fanout - 1) / fanout
-	acc := ddhistogram.NewSketch()
+	acc := ddsketch.NewSketch()
 	for start := 0; start < len(values); start += chunk {
 		end := min(start+chunk, len(values))
 		acc.Merge(mergeTree(values[start:end], fanout))
@@ -491,10 +491,10 @@ func mergeTree(values []uint64, fanout int) *ddhistogram.Sketch {
 	return acc
 }
 
-func randomPartitionMerge(values []uint64, k int, randomizer *rand.Rand) *ddhistogram.Sketch {
-	partitions := make([]*ddhistogram.Sketch, k)
+func randomPartitionMerge(values []uint64, k int, randomizer *rand.Rand) *ddsketch.Sketch {
+	partitions := make([]*ddsketch.Sketch, k)
 	for i := range partitions {
-		partitions[i] = ddhistogram.NewSketch()
+		partitions[i] = ddsketch.NewSketch()
 	}
 	for _, v := range values {
 		partitions[randomizer.IntN(k)].Insert(v)
@@ -503,7 +503,7 @@ func randomPartitionMerge(values []uint64, k int, randomizer *rand.Rand) *ddhist
 		partitions[i], partitions[j] = partitions[j], partitions[i]
 	})
 
-	acc := ddhistogram.NewSketch()
+	acc := ddsketch.NewSketch()
 	for _, p := range partitions {
 		acc.Merge(p)
 	}
@@ -560,17 +560,17 @@ var _ = Describe("Range", func() {
 
 	Context("the default", func() {
 		It("spans 1 ms to 15 minutes", func() {
-			r := ddhistogram.DefaultRange()
+			r := ddsketch.DefaultRange()
 
 			Expect(r.MinNS).To(Equal(uint64(1_000_000)))
 			Expect(r.MaxNS).To(Equal(uint64(900_000_000_000)))
 		})
 
 		It("resolves that span into 344 buckets", func() {
-			r := ddhistogram.DefaultRange()
+			r := ddsketch.DefaultRange()
 
-			Expect(ddhistogram.Index(r.MinNS)).To(Equal(int32(346)))
-			Expect(ddhistogram.Index(r.MaxNS)).To(Equal(int32(689)))
+			Expect(ddsketch.Index(r.MinNS)).To(Equal(int32(346)))
+			Expect(ddsketch.Index(r.MaxNS)).To(Equal(int32(689)))
 			Expect(r.Buckets()).To(Equal(int32(344)))
 		})
 
@@ -596,39 +596,39 @@ var _ = Describe("Range", func() {
 
 	Context("a configured range", func() {
 		It("resolves values the default would count as zeros", func() {
-			microseconds := ddhistogram.Range{MinNS: 1_000, MaxNS: 100_000_000_000}
-			sketch := ddhistogram.NewSketchInRange(microseconds)
+			microseconds := ddsketch.Range{MinNS: 1_000, MaxNS: 100_000_000_000}
+			sketch := ddsketch.NewSketchInRange(microseconds)
 
 			sketch.Insert(500_000)
 
 			Expect(sketch.Zeros()).To(BeZero())
 			Expect(sketch.Buckets()).To(Equal(map[int32]uint64{
-				ddhistogram.Index(500_000): 1,
+				ddsketch.Index(500_000): 1,
 			}))
 		})
 
 		It("clamps at its own ceiling, not the default one", func() {
-			narrow := ddhistogram.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
-			sketch := ddhistogram.NewSketchInRange(narrow)
+			narrow := ddsketch.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
+			sketch := ddsketch.NewSketchInRange(narrow)
 
 			sketch.Insert(100_000_000_000)
 
 			Expect(sketch.Overflow()).To(Equal(uint64(1)))
 			Expect(sketch.Buckets()).To(Equal(map[int32]uint64{
-				ddhistogram.Index(10_000_000_000): 1,
+				ddsketch.Index(10_000_000_000): 1,
 			}))
 		})
 
 		It("travels with the sketch", func() {
-			narrow := ddhistogram.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
+			narrow := ddsketch.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
 
-			Expect(ddhistogram.NewSketchInRange(narrow).Range()).To(Equal(narrow))
-			Expect(ddhistogram.NewSketch().Range()).To(Equal(ddhistogram.DefaultRange()))
+			Expect(ddsketch.NewSketchInRange(narrow).Range()).To(Equal(narrow))
+			Expect(ddsketch.NewSketch().Range()).To(Equal(ddsketch.DefaultRange()))
 		})
 
 		It("survives a clone", func() {
-			narrow := ddhistogram.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
-			sketch := ddhistogram.NewSketchInRange(narrow)
+			narrow := ddsketch.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
+			sketch := ddsketch.NewSketchInRange(narrow)
 
 			Expect(sketch.Clone().Range()).To(Equal(narrow))
 		})
@@ -636,19 +636,19 @@ var _ = Describe("Range", func() {
 
 	Context("validation", func() {
 		It("rejects a zero lower bound, which has no logarithm", func() {
-			err := ddhistogram.Range{MinNS: 0, MaxNS: 1_000_000}.Validate()
-			Expect(err).To(MatchError(ddhistogram.ErrInvalidRange))
+			err := ddsketch.Range{MinNS: 0, MaxNS: 1_000_000}.Validate()
+			Expect(err).To(MatchError(ddsketch.ErrInvalidRange))
 		})
 
 		It("rejects bounds that do not ascend", func() {
-			Expect(ddhistogram.Range{MinNS: 1_000_000, MaxNS: 1_000_000}.Validate()).
-				To(MatchError(ddhistogram.ErrInvalidRange))
-			Expect(ddhistogram.Range{MinNS: 1_000_000, MaxNS: 1_000}.Validate()).
-				To(MatchError(ddhistogram.ErrInvalidRange))
+			Expect(ddsketch.Range{MinNS: 1_000_000, MaxNS: 1_000_000}.Validate()).
+				To(MatchError(ddsketch.ErrInvalidRange))
+			Expect(ddsketch.Range{MinNS: 1_000_000, MaxNS: 1_000}.Validate()).
+				To(MatchError(ddsketch.ErrInvalidRange))
 		})
 
 		It("accepts the default", func() {
-			Expect(ddhistogram.DefaultRange().Validate()).To(Succeed())
+			Expect(ddsketch.DefaultRange().Validate()).To(Succeed())
 		})
 	})
 
@@ -656,54 +656,54 @@ var _ = Describe("Range", func() {
 		// a bucket index means the same thing under any range, but zeros and
 		// the clamp do not, so folding two ranges together is silent nonsense
 		It("is distinguished by Equal", func() {
-			narrow := ddhistogram.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
+			narrow := ddsketch.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
 
-			left := ddhistogram.NewSketch()
-			right := ddhistogram.NewSketchInRange(narrow)
+			left := ddsketch.NewSketch()
+			right := ddsketch.NewSketchInRange(narrow)
 
 			Expect(left.Equal(right)).To(BeFalse())
 		})
 
 		It("is rejected by AddPartial rather than silently folded", func() {
-			narrow := ddhistogram.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
-			pipeline, err := ddhistogram.NewPipeline(ddhistogram.DefaultWindow, 10*time.Minute)
+			narrow := ddsketch.Range{MinNS: 1_000_000, MaxNS: 10_000_000_000}
+			sliding, err := ddsketch.NewSlidingWindowSketch(ddsketch.DefaultWindow, 10*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			foreign := ddhistogram.NewSketchInRange(narrow)
+			foreign := ddsketch.NewSketchInRange(narrow)
 			foreign.Insert(5_000_000)
 
-			Expect(pipeline.AddPartial(1000, foreign)).To(MatchError(ddhistogram.ErrRangeMismatch))
+			Expect(sliding.AddPartial(1000, foreign)).To(MatchError(ddsketch.ErrRangeMismatch))
 		})
 
 		It("accepts a partial built on the same range", func() {
-			partial := ddhistogram.NewSketch()
+			partial := ddsketch.NewSketch()
 			partial.Insert(5_000_000)
-			pipeline, err := ddhistogram.NewPipeline(ddhistogram.DefaultWindow, 10*time.Minute)
+			sliding, err := ddsketch.NewSlidingWindowSketch(ddsketch.DefaultWindow, 10*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(pipeline.AddPartial(1000, partial)).To(Succeed())
-			Expect(pipeline.Window(1001).Count()).To(Equal(uint64(1)))
+			Expect(sliding.AddPartial(1000, partial)).To(Succeed())
+			Expect(sliding.Window(1001).Count()).To(Equal(uint64(1)))
 		})
 	})
 
-	Context("a pipeline over a configured range", func() {
+	Context("a sliding window sketch over a configured range", func() {
 		It("gives every sketch in the tree that range", func() {
-			microseconds := ddhistogram.Range{MinNS: 1_000, MaxNS: 100_000_000_000}
-			pipeline, err := ddhistogram.NewPipelineInRange(ddhistogram.DefaultWindow, 10*time.Minute, microseconds)
+			microseconds := ddsketch.Range{MinNS: 1_000, MaxNS: 100_000_000_000}
+			sliding, err := ddsketch.NewSlidingWindowSketchInRange(ddsketch.DefaultWindow, 10*time.Minute, microseconds)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(pipeline.Add(1000*ddhistogram.NanosPerSecond, 500_000)).To(Succeed())
+			Expect(sliding.Add(1000*ddsketch.NanosPerSecond, 500_000)).To(Succeed())
 
-			window := pipeline.Window(1001)
+			window := sliding.Window(1001)
 			Expect(window.Range()).To(Equal(microseconds))
 			Expect(window.Zeros()).To(BeZero())
 			Expect(window.Count()).To(Equal(uint64(1)))
-			Expect(pipeline.Tree().CheckInvariants()).To(Succeed())
+			Expect(sliding.Tree().CheckInvariants()).To(Succeed())
 		})
 
 		It("refuses an invalid range", func() {
-			_, err := ddhistogram.NewPipelineInRange(ddhistogram.DefaultWindow, 10*time.Minute, ddhistogram.Range{MinNS: 0, MaxNS: 0})
-			Expect(err).To(MatchError(ddhistogram.ErrInvalidRange))
+			_, err := ddsketch.NewSlidingWindowSketchInRange(ddsketch.DefaultWindow, 10*time.Minute, ddsketch.Range{MinNS: 0, MaxNS: 0})
+			Expect(err).To(MatchError(ddsketch.ErrInvalidRange))
 		})
 	})
 })

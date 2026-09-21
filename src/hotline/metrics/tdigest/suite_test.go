@@ -1,4 +1,4 @@
-package tdlatencyhistogram_test
+package tdigest_test
 
 import (
 	"testing"

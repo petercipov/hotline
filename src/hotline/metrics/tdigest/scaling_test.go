@@ -1,7 +1,7 @@
-package tdlatencyhistogram_test
+package tdigest_test
 
 import (
-	tdhistogram "hotline/metrics/td-latency-histogram"
+	"hotline/metrics/tdigest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -9,7 +9,7 @@ import (
 
 var _ = Describe("Scaling", func() {
 	It("weight based scaling gives biggest capacity in the center, smallest size on the edges ", func() {
-		scaling := tdhistogram.NewWeightScaling(100)
+		scaling := tdigest.NewWeightScaling(100)
 
 		var maxWeights []float64
 		totalWeight := uint64(1000)

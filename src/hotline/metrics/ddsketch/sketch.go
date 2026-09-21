@@ -1,12 +1,12 @@
-// Package latencyhistogram computes arbitrary percentiles over a sliding window
-// of latency measurements.
+// Package ddsketch computes arbitrary percentiles over a sliding window of
+// latency measurements.
 //
 // The unit of aggregation is a DDSketch: a log-bucket histogram whose merge is
 // per-bucket integer addition, and therefore exactly associative and
 // commutative. That is what lets partial results from any number of processes,
 // per-second leaves, radix tree internal nodes and cross-shard rollups all use
 // one fold, so moving a shard boundary cannot change the answer.
-package ddlatencyhistogram
+package ddsketch
 
 import (
 	"errors"
@@ -30,13 +30,13 @@ const (
 )
 
 // ErrNegativeLatency rejects a negative measurement.
-var ErrNegativeLatency = errors.New("ddlatencyhistogram: negative latency")
+var ErrNegativeLatency = errors.New("ddsketch: negative latency")
 
 // ErrInvalidRange rejects a range that cannot be mapped.
-var ErrInvalidRange = errors.New("ddlatencyhistogram: invalid range")
+var ErrInvalidRange = errors.New("ddsketch: invalid range")
 
 // ErrRangeMismatch rejects folding two sketches that resolve different spans.
-var ErrRangeMismatch = errors.New("ddlatencyhistogram: sketch range mismatch")
+var ErrRangeMismatch = errors.New("ddsketch: sketch range mismatch")
 
 // Range is the span of latencies a sketch resolves into buckets. A measurement
 // below MinNS is counted as a zero; one above MaxNS is clamped into the top
@@ -195,7 +195,7 @@ func (s *Sketch) InsertLatency(latencyNS int64) error {
 //
 // Both sketches MUST share a Range. Merge cannot report otherwise — the tree
 // folds through it and has no error channel — so the range is fixed by the
-// pipeline that builds the sketches, and AddPartial is where a foreign sketch
+// sliding window sketch that builds them, and AddPartial is where a foreign sketch
 // is checked.
 func (s *Sketch) Merge(other *Sketch) {
 	for i, c := range other.buckets {

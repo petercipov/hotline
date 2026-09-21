@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 
-	tdigest "hotline/metrics/td-latency-histogram"
+	"hotline/metrics/tdigest"
 )
 
 const (
@@ -81,7 +81,7 @@ type latenciesConnector struct {
 	enabledKinds map[string]bool
 
 	mu      sync.Mutex
-	digests map[seriesKey]*tdigest.TDigest
+	digests map[seriesKey]*tdigest.TDSketch
 
 	ticker    *time.Ticker
 	doneCh    chan struct{}
@@ -99,7 +99,7 @@ func newLatenciesConnector(set connector.Settings, cfg *Config, next consumer.Me
 		logger:       set.Logger,
 		next:         next,
 		enabledKinds: enabledKinds,
-		digests:      make(map[seriesKey]*tdigest.TDigest),
+		digests:      make(map[seriesKey]*tdigest.TDSketch),
 		doneCh:       make(chan struct{}),
 	}
 }
@@ -197,7 +197,7 @@ func (c *latenciesConnector) recordSpan(span ptrace.Span) {
 	key := seriesKey{integrationID: integrationID, route: route, method: method, kind: kind}
 	digest, found := c.digests[key]
 	if !found {
-		digest = tdigest.NewTDigestWeightScaled(tdigestCapacity, tdigestBufferSize)
+		digest = tdigest.NewWeightScaledTDSketch(tdigestCapacity, tdigestBufferSize)
 		c.digests[key] = digest
 	}
 	digest.AddToBuffer(latencySeconds, 1)
@@ -209,7 +209,7 @@ func (c *latenciesConnector) recordSpan(span ptrace.Span) {
 func (c *latenciesConnector) flush(ctx context.Context, now time.Time) error {
 	c.mu.Lock()
 	digests := c.digests
-	c.digests = make(map[seriesKey]*tdigest.TDigest)
+	c.digests = make(map[seriesKey]*tdigest.TDSketch)
 	c.mu.Unlock()
 
 	if len(digests) == 0 {
@@ -220,7 +220,7 @@ func (c *latenciesConnector) flush(ctx context.Context, now time.Time) error {
 	return c.next.ConsumeMetrics(ctx, md)
 }
 
-func (c *latenciesConnector) buildMetrics(digests map[seriesKey]*tdigest.TDigest, now time.Time) pmetric.Metrics {
+func (c *latenciesConnector) buildMetrics(digests map[seriesKey]*tdigest.TDSketch, now time.Time) pmetric.Metrics {
 	md := pmetric.NewMetrics()
 	sm := md.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
 	metric := sm.Metrics().AppendEmpty()
