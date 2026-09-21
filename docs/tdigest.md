@@ -37,17 +37,88 @@ slot order, so a single node's fold is reproducible even for an order-dependent
 payload. It cannot fix the grouping, because the grouping is chosen by the
 query.
 
-## Why t-digest is not a monoid
+## The laws, in plain terms
 
-A t-digest merge re-clusters centroids under a scale function. It is lossy and
-it is order dependent: folding the same measurements in a different grouping or
-a different order yields a different digest, so the answer can depend on how a
-window decomposes into blocks and on the order partial results arrive.
+Three symbols carry the rest of this page.
 
-This is not a suspicion about the algorithm, it is a property the suite pins.
-[`digestcompare`](../src/hotline/metrics/digestcompare) replays one identical
-stream through both payloads under the same tree and counts how many distinct
-results 200 repartitions produce:
+**A, B, C** are digests: each one summarises a set of latency
+measurements. In this codebase a digest is usually one second of traffic — the
+leaf the tree stores — or one shard's partial result for a second.
+
+**⊕ is merge.** `A ⊕ B` is a digest summarising everything in A together with
+everything in B. In Go that is `a.Merge(b)`; in Redis it is `TDIGEST.MERGE`.
+
+**E is the empty digest**, which merges into anything without changing it.
+
+Three properties matter, and they are what "commutative monoid" names:
+
+| law | in symbols | in words |
+|---|---|---|
+| identity | `E ⊕ A = A` | merging nothing changes nothing |
+| associativity | `(A ⊕ B) ⊕ C = A ⊕ (B ⊕ C)` | the **grouping** does not matter |
+| commutativity | `A ⊕ B = B ⊕ A` | the **order** does not matter |
+
+### Why a bucket histogram obeys them
+
+A DDSketch is a map from bucket index to a count. Say three seconds of traffic
+land in buckets 3 and 9:
+
+```
+A = {3: 2}          B = {3: 1}          C = {9: 1}
+
+(A ⊕ B) ⊕ C  =  {3: 3} ⊕ {9: 1}  =  {3: 3, 9: 1}
+A ⊕ (B ⊕ C)  =  {3: 2} ⊕ {3: 1, 9: 1}  =  {3: 3, 9: 1}
+```
+
+Merge is integer addition per bucket, and addition does not care about grouping
+or order, so both give the same answer — and so does any other bracketing the
+tree happens to pick.
+
+### Why t-digest does not
+
+A t-digest stores centroids, `(mean, weight)` pairs, and each centroid may only
+grow so heavy before it must be left alone — that limit is what keeps the digest
+small. Compression fuses neighbouring centroids while the limit allows, and it
+runs whenever a merge fills the digest up, not only at the end.
+
+Two things follow. First, **fusing is lossy**: once `(10,1)` and `(12,1)` become
+`(11,2)`, the digest no longer knows there was ever a 10 or a 12. Second,
+**what gets fused depends on what is present when compression runs** — and that
+differs between groupings.
+
+Take three measurements, 10ms, 12ms and 14ms, with a limit of weight 2 per
+centroid:
+
+```
+A = [(10, 1)]       B = [(12, 1)]       C = [(14, 1)]
+
+(A ⊕ B) ⊕ C:  A⊕B fuses to [(11,2)], which is now at its limit,
+              so 14 cannot join it        →  [(11, 2), (14, 1)]
+
+A ⊕ (B ⊕ C):  B⊕C fuses to [(13,2)], which is now at its limit,
+              so 10 cannot join it        →  [(10, 1), (13, 2)]
+```
+
+Same three measurements, different surviving centroids, and the quantiles read
+off one are not the quantiles read off the other. Nothing went wrong: each
+merge did exactly what it should with the centroids it had in front of it. The
+first fuse simply foreclosed the choice the second grouping still had.
+
+(A limit of 2 stands in for t-digest's scale function, which allows more weight
+in the tails than in the middle and reads the total weight as it stands when
+compression fires. The mechanism is what matters here: fuse early, and the
+alternative grouping is gone.)
+
+That is associativity lost. Under the tree it means the answer depends on how a
+window decomposes into blocks — and the blocks are chosen by the query, not by
+the caller.
+
+## What the suite already shows
+
+None of this is a suspicion about the algorithm; it is a property the suite
+pins. [`digestcompare`](../src/hotline/metrics/digestcompare) replays one
+identical stream through both payloads under the same tree and counts how many
+distinct results 200 repartitions produce:
 
 - DDSketch: exactly one — *"a repartition MUST NOT change a DDSketch"*
 - t-digest: more than one — *"t-digest merge re-clusters, so it cannot be order
@@ -78,17 +149,17 @@ int td_merge(td_histogram_t *into, td_histogram_t *from) {
 centroids by mean before re-clustering greedily under a limit whose
 `normalizer` is `compression / (2π · total_weight · log(total_weight))`.
 
-**Associativity fails.** Clustering happens at merge time and the boundary test
-reads `total_weight` as it stands when compression fires. `(A⊕B)⊕C` and
-`A⊕(B⊕C)` compress at different fill levels against different totals, so
-different centroids survive.
+**Associativity fails**, for the reason above plus one more: the boundary test
+reads `total_weight` as it stands when compression fires, so `(A ⊕ B) ⊕ C` and
+`A ⊕ (B ⊕ C)` cluster against different totals as well as different neighbours.
 
-**Commutativity fails.** `td_merge(into, from)` is asymmetric by construction:
-it pours the source's centroids in one at a time while compression triggers on
-the destination's fill, so `merge(A,B)` and `merge(B,A)` compress at different
-points. The sort is introsort with three-way partitioning and is not stable —
-the source notes the order within a run of equal keys differs from a naive
-sort — so tied means can resolve by array layout.
+**Commutativity fails too**, which is the sharper point — `A ⊕ B` and `B ⊕ A`
+are not the same operation here. `td_merge(into, from)` pours the source's
+centroids into the destination one at a time while compression triggers on the
+destination's fill, so the two arguments are not interchangeable. The sort is
+introsort with three-way partitioning and is not stable — the source notes the
+order within a run of equal keys differs from a naive sort — so tied means can
+resolve by array layout as well.
 
 An empty digest is still an identity and merge is closed, so what Redis offers
 is a magma with identity, not a monoid. `TDIGEST.MERGE` buys accuracy, not
