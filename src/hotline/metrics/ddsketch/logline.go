@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 )
 
 // LogLineVersion is the format version written into every log line. A reader
@@ -25,16 +24,40 @@ var ErrInvalidLogLine = errors.New("ddsketch: invalid log line")
 // because its min is math.MaxUint64, which most JSON readers cannot hold
 // exactly.
 type logLine struct {
-	Version   int        `json:"v"`
-	Range     []uint64   `json:"range"`
-	Count     uint64     `json:"count"`
-	Sum       uint64     `json:"sum"`
-	Min       *uint64    `json:"min,omitempty"`
-	Max       *uint64    `json:"max,omitempty"`
-	Zeros     uint64     `json:"zeros"`
-	Underflow uint64     `json:"underflow"`
-	Overflow  uint64     `json:"overflow"`
-	Buckets   [][]uint64 `json:"buckets"`
+	Version   int         `json:"v"`
+	Range     []uint64    `json:"range"`
+	Count     uint64      `json:"count"`
+	Sum       uint64      `json:"sum"`
+	Min       *uint64     `json:"min,omitempty"`
+	Max       *uint64     `json:"max,omitempty"`
+	Zeros     uint64      `json:"zeros"`
+	Underflow uint64      `json:"underflow"`
+	Overflow  uint64      `json:"overflow"`
+	Buckets   []logBucket `json:"buckets"`
+}
+
+// logBucket is one populated bucket, written as the pair [index, count].
+type logBucket struct {
+	Index int32
+	Count uint64
+}
+
+func (b logBucket) MarshalJSON() ([]byte, error) {
+	return json.Marshal([]any{b.Index, b.Count})
+}
+
+func (b *logBucket) UnmarshalJSON(data []byte) error {
+	var pair []json.RawMessage
+	if err := json.Unmarshal(data, &pair); err != nil {
+		return err
+	}
+	if len(pair) != 2 {
+		return fmt.Errorf("%w: bucket must hold [index, count]", ErrInvalidLogLine)
+	}
+	if err := json.Unmarshal(pair[0], &b.Index); err != nil {
+		return err
+	}
+	return json.Unmarshal(pair[1], &b.Count)
 }
 
 // MarshalLogLine encodes the full internal state as a single line of JSON with
@@ -48,7 +71,7 @@ func (s *Sketch) MarshalLogLine() ([]byte, error) {
 		Zeros:     s.zeros,
 		Underflow: s.underflowCount,
 		Overflow:  s.overflowCount,
-		Buckets:   make([][]uint64, 0, len(s.buckets)),
+		Buckets:   make([]logBucket, 0, len(s.buckets)),
 	}
 	if s.count > 0 {
 		line.Min = &s.min
@@ -58,8 +81,7 @@ func (s *Sketch) MarshalLogLine() ([]byte, error) {
 		if s.buckets[i] == 0 {
 			continue
 		}
-		// indexes of a validated range are never negative, since MinNS >= 1
-		line.Buckets = append(line.Buckets, []uint64{uint64(i), s.buckets[i]})
+		line.Buckets = append(line.Buckets, logBucket{Index: i, Count: s.buckets[i]})
 	}
 	return json.Marshal(line)
 }
@@ -73,7 +95,7 @@ func ParseLogLine(data []byte) (*Sketch, error) {
 
 	var line logLine
 	if err := decoder.Decode(&line); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidLogLine, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidLogLine, err)
 	}
 	if decoder.More() {
 		return nil, fmt.Errorf("%w: trailing data after the sketch", ErrInvalidLogLine)
@@ -86,12 +108,12 @@ func ParseLogLine(data []byte) (*Sketch, error) {
 	}
 	rng := Range{MinNS: line.Range[0], MaxNS: line.Range[1]}
 	if err := rng.Validate(); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidLogLine, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidLogLine, err)
 	}
 
 	sketch := NewSketchInRange(rng)
 	if err := sketch.restore(line); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidLogLine, err)
+		return nil, err
 	}
 	return sketch, nil
 }
@@ -99,40 +121,33 @@ func ParseLogLine(data []byte) (*Sketch, error) {
 func (s *Sketch) restore(line logLine) error {
 	lowest, highest := Index(s.rng.MinNS), Index(s.rng.MaxNS)
 	total := line.Zeros
-	previous := int64(math.MinInt64)
-	for _, bucket := range line.Buckets {
-		if len(bucket) != 2 {
-			return errors.New("bucket must hold [index, count]")
+	for n, bucket := range line.Buckets {
+		switch {
+		case bucket.Index < lowest || bucket.Index > highest:
+			return fmt.Errorf("%w: bucket %d is outside the range's indexes [%d, %d]",
+				ErrInvalidLogLine, bucket.Index, lowest, highest)
+		case n > 0 && bucket.Index <= line.Buckets[n-1].Index:
+			return fmt.Errorf("%w: bucket %d is duplicated or out of order", ErrInvalidLogLine, bucket.Index)
+		case bucket.Count == 0:
+			return fmt.Errorf("%w: bucket %d is empty", ErrInvalidLogLine, bucket.Index)
+		case total+bucket.Count < total:
+			return fmt.Errorf("%w: bucket counts overflow", ErrInvalidLogLine)
 		}
-		index, count := bucket[0], bucket[1]
-		if index < uint64(lowest) || index > uint64(highest) {
-			return fmt.Errorf("bucket %d is outside the range's indexes [%d, %d]", index, lowest, highest)
-		}
-		if int64(index) <= previous {
-			return fmt.Errorf("bucket %d is duplicated or out of order", index)
-		}
-		if count == 0 {
-			return fmt.Errorf("bucket %d is empty", index)
-		}
-		if total+count < total {
-			return errors.New("bucket counts overflow")
-		}
-		previous = int64(index)
-		total += count
-		s.buckets[int32(index)] = count
+		total += bucket.Count
+		s.buckets[bucket.Index] = bucket.Count
 	}
 
 	switch {
 	case total != line.Count:
-		return fmt.Errorf("count %d does not match zeros plus buckets %d", line.Count, total)
+		return fmt.Errorf("%w: count %d does not match zeros plus buckets %d", ErrInvalidLogLine, line.Count, total)
 	case line.Underflow > line.Count || line.Overflow > line.Count:
-		return errors.New("clamp counters exceed count")
+		return fmt.Errorf("%w: clamp counters exceed count", ErrInvalidLogLine)
 	case line.Count == 0 && (line.Min != nil || line.Max != nil):
-		return errors.New("an empty sketch carries no min or max")
+		return fmt.Errorf("%w: an empty sketch carries no min or max", ErrInvalidLogLine)
 	case line.Count > 0 && (line.Min == nil || line.Max == nil):
-		return errors.New("min and max are required when count is positive")
+		return fmt.Errorf("%w: min and max are required when count is positive", ErrInvalidLogLine)
 	case line.Count > 0 && *line.Min > *line.Max:
-		return fmt.Errorf("min %d is above max %d", *line.Min, *line.Max)
+		return fmt.Errorf("%w: min %d is above max %d", ErrInvalidLogLine, *line.Min, *line.Max)
 	}
 
 	s.count = line.Count
