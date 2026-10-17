@@ -77,10 +77,8 @@ func (s *Sketch) MarshalLogLine() ([]byte, error) {
 		line.Min = &s.min
 		line.Max = &s.max
 	}
+	// Insert and Merge only ever add to a bucket, so none is ever zero
 	for _, i := range s.SortedBucketIndexes() {
-		if s.buckets[i] == 0 {
-			continue
-		}
 		line.Buckets = append(line.Buckets, logBucket{Index: i, Count: s.buckets[i]})
 	}
 	return json.Marshal(line)
