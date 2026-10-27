@@ -13,15 +13,16 @@ The proxy sits between a customer's apps and their vendors. It forwards each cal
 
 This repo works test-first (see `CLAUDE.md`):
 
-1. Write a failing Ginkgo `It` that describes one behaviour in plain words.
-2. Run `go test ./...` and see it fail for the right reason.
-3. Write the least code that makes it pass, run again, then tidy up.
+1. Before any code, list the test cases for the piece you are building: the normal cases, the edge cases and the failures, each as one plain sentence. Put them in the test file as pending specs (`PIt`) or in the plan, so they can be reviewed first.
+2. Turn one case into a failing Ginkgo `It`.
+3. Run `go test ./...` and see it fail for the right reason.
+4. Write the least code that makes it pass, run again, then tidy up. Move to the next case.
 
 Rules for tests here:
 
 - Ginkgo and Gomega only. No testify, no mocking libraries.
 - Test packages are `<pkg>_test` (black box). Use `<pkg>_internal_test.go` only when an internal detail truly needs it.
-- Coverage must stay at 100% (`make test && make cover`). Untestable code is a design smell: split it.
+- There is no fixed coverage target. Aim for every listed case to have a test; code that is hard to test is a design smell, so split it.
 - Replace the outside world with small hand-written fakes behind interfaces, or real local servers from `net/http/httptest` (also with TLS, `httptest.NewTLSServer`). Never call the real internet in unit tests.
 - Time and randomness come in through the constructor (a clock function, a reader), so tests stay deterministic.
 - Each test name reads as a sentence about the behaviour, e.g. `It("redacts unmarked query values")`.
@@ -79,7 +80,7 @@ These protect the customer's traffic. Breaking one is a bug even if tests pass.
 
 ## 8. Before you hand work back
 
-- `go test ./...` passes, coverage is 100%, `make lint` is clean.
-- New behaviour has a test that failed first.
+- `go test ./...` passes and `make lint` is clean.
+- The test cases were listed first, and each new behaviour has a test that failed first.
 - Any new module is named and justified.
 - No secret or body value can reach a log, error or record.
