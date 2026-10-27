@@ -6,7 +6,7 @@ Right now slice 1 is only test cases: pending Ginkgo specs (`PIt`, tests written
 
 ## What slice 1 covers
 
-- **Forward proxy door only.** The app puts the full vendor address in the request line (`PUT https://api.talon.one/...`), with `http` or `https`.
+- **Forward proxy ingress only.** The app puts the full vendor address in the request line (`PUT https://api.talon.one/...`), with `http` or `https`.
 - **TLS origination** (the proxy makes the `https` call to the vendor itself): on by default, off per api with `tlsOrigination: false`.
 - **Integration ID** from `Proxy-Authorization: Basic`, the user name part. A missing or unknown ID, or a host outside the integration's apis, uses the reserved `not-passed` settings.
 - **Phase timings:** DNS, connect, TLS, first byte and total, plus the vendor IP and whether the connection was reused.
@@ -23,7 +23,7 @@ The proxy judges nothing. Verdicts, thresholds and SLAs live in the control plan
 |---|---|
 | `proxy/config` | loading and checking `hotline-proxy.yaml` |
 | `proxy/spec` | reading route templates, marks and secrets from the vendor spec |
-| `proxy/door` | finding the door and reading the integration ID |
+| `proxy/ingress` | finding the ingress and reading the integration ID |
 | `proxy/forward` | the call to the vendor, certificates, the proxy's own errors |
 | `proxy/timing` | phase timings |
 | `proxy/redact` | redacting the address and choosing headers |
@@ -35,13 +35,13 @@ Run them with `go test ./src/hotline/proxy/...`. Pending specs show as pending a
 
 ## End-to-end checks
 
-The end-to-end tests reuse the client matrix from the research folder: `research/matrix-clients/go`, `research/matrix-clients/node` and the prototype proxy in `research/hotline-matrix-test`. The case numbers are those of the matrix in `egress-proxy-options.md`. Only cases 1, 2, 4 and 5 put a full address in the request line, so only they belong to slice 1. The rest arrive with the Host header door.
+The end-to-end tests reuse the client matrix from the research folder: `research/matrix-clients/go`, `research/matrix-clients/node` and the prototype proxy in `research/hotline-matrix-test`. The case numbers are those of the matrix in `egress-proxy-options.md`. Only cases 1, 2, 4 and 5 put a full address in the request line, so only they belong to slice 1. The rest arrive with the Host header ingress.
 
 Unlike the research runs, these tests never call the real Stripe. They use a local TLS test vendor whose certificate issuer is trusted through `SSL_CERT_FILE` (an environment variable Go reads on Linux to find trusted issuers), and a local fake OTLP receiver. The Java and Rust clients from the first milestone come in a later slice.
 
 ## Left for later slices
 
-- The Host header door and the vendor URL in path door (and with them HTTP/2 from apps, matrix cases 3 and 6 to 10).
+- The Host header ingress and the vendor URL in path ingress (and with them HTTP/2 from apps, matrix cases 3 and 6 to 10).
 - JSON and form body checks against the spec, and the `hotline.schema.*` fields.
 - Body fingerprints (`hotline.body.*.hmac_sha256`) and the `fingerprintKey` files.
 - Config reload without a restart, and `hotline-proxy validate`.
@@ -56,7 +56,7 @@ Unlike the research runs, these tests never call the real Stripe. They use a loc
 
 The test names point here with Q1 to Q14. Each needs an answer before its test is written.
 
-1. **Other requests on the proxy port.** Until the other doors exist, what should a path like `/https://...`, a plain path with a Host header, or a `CONNECT` get? An error answer with `Proxy-Status`, and which status code?
+1. **Other requests on the proxy port.** Until the other ingresses exist, what should a path like `/https://...`, a plain path with a Host header, or a `CONNECT` get? An error answer with `Proxy-Status`, and which status code?
 2. **Broken `Proxy-Authorization`.** A scheme other than Basic, bad base64, no colon, an empty user name, or two such headers. Treat all as "no ID sent" and record `not-passed`?
 3. **A path with no route in the spec.** Without a route the proxy can't tell which segments are values. Redact every segment of `url.full`, and leave `url.template` out?
 4. **Turning `http` into `https`.** For `http://api.x.com/...` the proxy calls port 443. For `http://api.x.com:8080/...`, keep 8080 or use 443?

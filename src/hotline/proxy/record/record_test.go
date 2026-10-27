@@ -10,7 +10,7 @@ var _ = Describe("Building the request record", func() {
 	Context("full record for a known integration", func() {
 		PIt("sets event.name to hotline.request")
 		PIt("sets hotline.integration.id to the ID read from Proxy-Authorization")
-		PIt("sets hotline.door to forward_proxy")
+		PIt("sets hotline.ingress to forward_proxy")
 		PIt("records http.request.method and http.response.status_code")
 		PIt("records the redacted address as url.full")
 		PIt("records the scheme actually sent to the vendor as url.scheme, so https when the app sent http and TLS origination was on")
@@ -27,7 +27,7 @@ var _ = Describe("Building the request record", func() {
 	})
 
 	Context("minimal record for not-passed, unknown IDs and unknown hosts", func() {
-		PIt("holds only hotline.integration.id, hotline.door, server.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields")
+		PIt("holds only hotline.integration.id, hotline.ingress, server.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields")
 		PIt("records no path, query, headers or body fingerprints")
 		PIt("records the ID not-passed when no ID was sent")
 		PIt("records the ID as sent when the ID is unknown, so typos stay visible")

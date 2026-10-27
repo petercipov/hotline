@@ -1,23 +1,23 @@
-package door_test
+package ingress_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 )
 
-// The door finder: which door a call used, who sent it and which settings
-// apply. Slice 1 builds only the forward proxy door.
-var _ = Describe("Finding the door", func() {
-	Context("forward proxy door", func() {
-		PIt("takes a full https address in the request line as the forward proxy door")
-		PIt("takes a full http address in the request line as the forward proxy door")
+// The ingress finder: which ingress a call used, who sent it and which settings
+// apply. Slice 1 builds only the forward proxy ingress.
+var _ = Describe("Finding the ingress", func() {
+	Context("forward proxy ingress", func() {
+		PIt("takes a full https address in the request line as the forward proxy ingress")
+		PIt("takes a full http address in the request line as the forward proxy ingress")
 		PIt("takes the vendor host and port from the request line, not from the Host header")
 		PIt("uses port 443 for an https address and port 80 for an http address when none is given")
 		PIt("accepts the scheme and host in upper or lower case")
 	})
 
 	Context("other requests on the proxy port in slice 1", func() {
-		PIt("does not take a path starting with /https:// as the forward proxy door; that door comes in a later slice (Q1)")
-		PIt("does not take a plain path with a Host header as the forward proxy door; that door comes in a later slice (Q1)")
+		PIt("does not take a path starting with /https:// as the forward proxy ingress; that ingress comes in a later slice (Q1)")
+		PIt("does not take a plain path with a Host header as the forward proxy ingress; that ingress comes in a later slice (Q1)")
 		PIt("refuses a CONNECT request with an error answer and a Proxy-Status header, sending nothing to the vendor (Q1)")
 		PIt("refuses a full address with any scheme other than http or https, sending nothing to the vendor")
 		PIt("refuses a full address with no host, sending nothing to the vendor")

@@ -9,8 +9,8 @@ import (
 // collects what the proxy sends. They reuse the client matrix from the
 // research folder (hotline-matrix-test and matrix-clients/go and node).
 // Matrix case numbers are those in egress-proxy-options.md. Only the cases
-// with a full address in the request line belong to the forward proxy door.
-var _ = Describe("Calling through the forward proxy door", func() {
+// with a full address in the request line belong to the forward proxy ingress.
+var _ = Describe("Calling through the forward proxy ingress", func() {
 	Context("Go client", func() {
 		PIt("case 1: sends POST https://api.stripe.com/... over plain HTTP/1.1 and gets the vendor's answer over TLS")
 		PIt("case 2: sends POST http://api.stripe.com/... through Transport.Proxy and the proxy turns it into https")
@@ -28,7 +28,7 @@ var _ = Describe("Calling through the forward proxy door", func() {
 	Context("what every case checks", func() {
 		PIt("the app gets the test vendor's status, headers and body unchanged")
 		PIt("the test vendor never sees Proxy-Authorization")
-		PIt("the fake OTLP receiver gets one hotline.request log record with door forward_proxy and the right integration ID")
+		PIt("the fake OTLP receiver gets one hotline.request log record with ingress forward_proxy and the right integration ID")
 		PIt("the fake OTLP receiver gets hotline.requests increased by one")
 		PIt("the record holds the redacted url.full and no secret")
 	})

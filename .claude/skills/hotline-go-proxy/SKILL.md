@@ -26,7 +26,7 @@ Rules for tests here:
 - Replace the outside world with small hand-written fakes behind interfaces, or real local servers from `net/http/httptest` (also with TLS, `httptest.NewTLSServer`). Never call the real internet in unit tests.
 - Time and randomness come in through the constructor (a clock function, a reader), so tests stay deterministic.
 - Each test name reads as a sentence about the behaviour, e.g. `It("redacts unmarked query values")`.
-- End-to-end tests (Java, Node, Go and Rust clients through every door) are the first milestone's finish line. Keep them separate from the fast unit tests.
+- End-to-end tests (Java, Node, Go and Rust clients through every ingress) are the first milestone's finish line. Keep them separate from the fast unit tests.
 
 ## 2. Dependencies
 
@@ -41,7 +41,7 @@ The proxy is a small core with the outside world kept behind interfaces (often c
 
 **On the call path** (must stay fast; nothing here waits on checks or exports):
 
-1. **Door finder:** works out which door the call used (forward proxy, Host header, vendor URL in path), reads and removes the integration ID, and picks the integration and api from the current config.
+1. **Ingress finder:** works out which ingress the call used (forward proxy, Host header, vendor URL in path), reads and removes the integration ID, and picks the integration and api from the current config.
 2. **Forwarder:** the standard library reverse proxy (`httputil.ReverseProxy` with its own `http.Transport`). It makes the call to the vendor, with TLS origination when set, and times each phase with `httptrace` (DNS, connect, TLS, first byte). On failure it answers with `502` or `504` and `Proxy-Status`.
 3. **Body tap:** wraps the request and response bodies, passes every byte straight on, and keeps a copy of at most 1 MiB for later.
 
@@ -63,14 +63,14 @@ The proxy is a small core with the outside world kept behind interfaces (often c
 ## 4. Layout and packages
 
 - Code lives under `src/hotline/` in module `hotline`. The program entry point goes in `src/hotline/cmd/hotline-proxy/`; it only reads flags, wires parts together and starts. All logic lives in packages it imports.
-- One package per idea, named after what it provides, short and lower case: e.g. `door`, `forward`, `tap`, `check`, `redact`, `fingerprint`, `record`, `export`, `config`, `admin`. Never `util`, `common` or `helpers`.
+- One package per idea, named after what it provides, short and lower case: e.g. `ingress`, `forward`, `tap`, `check`, `redact`, `fingerprint`, `record`, `export`, `config`, `admin`. Never `util`, `common` or `helpers`.
 - Packages depend in one direction: the forwarding path knows nothing about exporters; it hands a finished record to a small interface.
 - Keep interfaces small (one or two methods) and declare them where they are *used*, not where they are implemented. Return concrete types.
 - No package-level variables except sentinel errors, and no `init()` (the linter enforces this). Everything is passed in through constructors.
 
 ## 5. Errors
 
-- Define sentinel errors per package: `var ErrUnknownDoor = errors.New("door: unknown door")`. Add detail with `fmt.Errorf("%w: ...", ErrX, ...)`. Check with `errors.Is` or `errors.As`. The linter forbids ad hoc `errors.New` inside functions.
+- Define sentinel errors per package: `var ErrUnknownIngress = errors.New("ingress: unknown ingress")`. Add detail with `fmt.Errorf("%w: ...", ErrX, ...)`. Check with `errors.Is` or `errors.As`. The linter forbids ad hoc `errors.New` inside functions.
 - Errors carry context, never secrets: no header values, keys, tokens or body bytes in error text or logs.
 - Failures talking to the vendor become a `502` or `504` answer with an RFC 9209 `Proxy-Status` header (e.g. `hotline; error=dns_timeout`) and the same name in the record's `error.type`.
 - Never `panic` on input from apps, vendors, config or specs. A bad config at reload keeps the old config and reports why.

@@ -1,4 +1,4 @@
-package door_test
+package ingress_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestDoor(t *testing.T) {
+func TestIngress(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Proxy Door Suite")
+	RunSpecs(t, "Proxy Ingress Suite")
 }
