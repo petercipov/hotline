@@ -8,38 +8,67 @@ import (
 // package; Hotline-only fields use the hotline. prefix. Tests use a fake OTLP
 // receiver running locally.
 var _ = Describe("Sending OpenTelemetry data", func() {
-	Context("resource", func() {
-		PIt("sets service.name to hotline-proxy on every signal")
-		PIt("sets service.version and service.instance.id on every signal")
+	Context("given any signal", func() {
+		When("it is sent", func() {
+			PIt("then its resource has service.name hotline-proxy")
+			PIt("then its resource has service.version and service.instance.id")
+		})
 	})
 
-	Context("request records as logs", func() {
-		PIt("sends one OTLP log record per call with all of the record's attributes")
-		PIt("uses the semconv constants for every standard name, e.g. http.request.method and url.full")
-		PIt("uses the exact hotline. names from the spec for every other field")
-		PIt("sends numbers as numbers, true and false as booleans and header values as lists of strings")
+	Context("given a finished request record", func() {
+		When("it is sent", func() {
+			PIt("then it is one OTLP log record with all of the record's attributes")
+			PIt("then every standard name comes from the semconv constants, such as http.request.method and url.full")
+			PIt("then every other field has the exact hotline. name from the spec")
+			PIt("then numbers are numbers, true and false are booleans and header values are lists of strings")
+		})
 	})
 
-	Context("the hotline.requests counter", func() {
-		PIt("adds one per call, with unit {request}")
-		PIt("carries hotline.integration.id, url.template, http.request.method, http.response.status_code and error.type")
-		PIt("leaves url.template out for not-passed and unknown-ID calls")
-		PIt("sends cumulative totals by default")
-		PIt("sends delta totals to an exporter that sets temporality to delta")
-		PIt("sends no latency histogram")
+	Context("given the hotline.requests counter", func() {
+		When("a call ends", func() {
+			PIt("then the counter goes up by one, with unit {request}")
+			PIt("then it carries hotline.integration.id, url.template, http.request.method, http.response.status_code and error.type")
+		})
+		When("the call used the not-passed settings", func() {
+			PIt("then url.template is left out")
+		})
+		When("the exporter does not set temporality", func() {
+			PIt("then the totals are cumulative")
+		})
+		When("the exporter sets temporality to delta", func() {
+			PIt("then the totals are delta")
+		})
+		When("metrics are sent", func() {
+			PIt("then there is no latency histogram")
+		})
 	})
 
-	Context("several destinations", func() {
-		PIt("sends the same records and counts to every exporter")
-		PIt("keeps sending to the other exporters when one is down")
-		PIt("keeps a queue per exporter holding 10 000 records by default")
-		PIt("drops the oldest record when a queue is full and counts how many were dropped (Q13)")
-		PIt("never blocks or slows a call when a queue is full")
-		PIt("sends what is queued before the proxy shuts down, within a time limit")
+	Context("given several exporters", func() {
+		When("records and counts are sent", func() {
+			PIt("then every exporter gets the same data")
+		})
+		When("one exporter is down", func() {
+			PIt("then the others keep receiving")
+		})
 	})
 
-	Context("left for later slices", func() {
-		PIt("sends no trace spans in slice 1")
-		PIt("sends no proxy health data to the telemetry exporter in slice 1 (Q13)")
+	Context("given an exporter queue", func() {
+		When("nothing is set", func() {
+			PIt("then it holds 10 000 records")
+		})
+		When("it is full", func() {
+			PIt("then the oldest record is dropped and counted (Q13)")
+			PIt("then no call is blocked or slowed")
+		})
+		When("the proxy shuts down", func() {
+			PIt("then what is queued is sent first, within a time limit")
+		})
+	})
+
+	Context("given slice 1, before traces and health data exist", func() {
+		When("the proxy runs", func() {
+			PIt("then it sends no trace spans")
+			PIt("then it sends no proxy health data to the telemetry exporter (Q13)")
+		})
 	})
 })

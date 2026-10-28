@@ -2,7 +2,7 @@
 
 The proxy is built in small slices, tests first. This page says what slice 1 covers, what waits for later, and which parts of the spec need an answer before building starts. The source of truth is `proxy-spec.md` and `proxy-example/` in the `hotline-strategic` repo.
 
-Right now slice 1 is only test cases: pending Ginkgo specs (`PIt`, tests written down but not run yet) under `src/hotline/proxy/`. There is no production code yet. Each pending case becomes a real failing test, then code, once Peter has reviewed the list.
+Right now slice 1 is only test cases: pending Ginkgo specs (`PIt`, tests written down but not run yet) under `src/hotline/proxy/`. Each case is written as given, when, then: `Context("given …")`, `When("…")` and `PIt("then …")`. There is no production code yet. Each pending case becomes a real failing test, then code, once Peter has reviewed the list.
 
 ## What slice 1 covers
 

@@ -13,7 +13,7 @@ The proxy sits between a customer's apps and their vendors. It forwards each cal
 
 This repo works test-first (see `CLAUDE.md`):
 
-1. Before any code, list the test cases for the piece you are building: the normal cases, the edge cases and the failures, each as one plain sentence. Put them in the test file as pending specs (`PIt`) or in the plan, so they can be reviewed first.
+1. Before any code, list the test cases for the piece you are building: the normal cases, the edge cases and the failures, each in given, when, then form (see below). Put them in the test file as pending specs (`PIt`) or in the plan, so they can be reviewed first.
 2. Turn one case into a failing Ginkgo `It`.
 3. Run `go test ./...` and see it fail for the right reason.
 4. Write the least code that makes it pass, run again, then tidy up. Move to the next case.
@@ -25,7 +25,19 @@ Rules for tests here:
 - There is no fixed coverage target. Aim for every listed case to have a test; code that is hard to test is a design smell, so split it.
 - Replace the outside world with small hand-written fakes behind interfaces, or real local servers from `net/http/httptest` (also with TLS, `httptest.NewTLSServer`). Never call the real internet in unit tests.
 - Time and randomness come in through the constructor (a clock function, a reader), so tests stay deterministic.
-- Each test name reads as a sentence about the behaviour, e.g. `It("redacts unmarked query values")`.
+- Write every test case as **given, when, then** (Peter, 2026-10-28), using Ginkgo's containers so the report reads as one sentence:
+  - `Context("given …")` for the starting state,
+  - `When("…")` for the action,
+  - `It("then …")` for the expected result.
+
+  Several `It` blocks may share one `When`, and several `When` blocks one `Context`. Example:
+  ```go
+  Context("given a query", func() {
+      When("a value has no mark", func() {
+          It("then it is replaced with REDACTED and its name is kept", func() { ... })
+      })
+  })
+  ```
 - End-to-end tests (Java, Node, Go and Rust clients through every ingress) are the first milestone's finish line. Keep them separate from the fast unit tests.
 
 ## 2. Dependencies

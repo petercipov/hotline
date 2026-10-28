@@ -11,31 +11,55 @@ import (
 // Matrix case numbers are those in egress-proxy-options.md. Only the cases
 // with a full address in the request line belong to the forward proxy ingress.
 var _ = Describe("Calling through the forward proxy ingress", func() {
-	Context("Go client", func() {
-		PIt("case 1: sends POST https://api.stripe.com/... over plain HTTP/1.1 and gets the vendor's answer over TLS")
-		PIt("case 2: sends POST http://api.stripe.com/... through Transport.Proxy and the proxy turns it into https")
-		PIt("case 4: sends the https address over TLS to the proxy (Q14)")
-		PIt("case 5: sends the http address over TLS to the proxy through Transport.Proxy (Q14)")
+	Context("given the Go client", func() {
+		When("case 1: it sends POST https://api.stripe.com/... over plain HTTP/1.1", func() {
+			PIt("then it gets the vendor's answer, which the proxy fetched over TLS")
+		})
+		When("case 2: it sends POST http://api.stripe.com/... through Transport.Proxy", func() {
+			PIt("then the proxy calls the vendor over https")
+		})
+		When("case 4: it sends the https address over TLS to the proxy", func() {
+			PIt("then it gets the vendor's answer (Q14)")
+		})
+		When("case 5: it sends the http address over TLS to the proxy through Transport.Proxy", func() {
+			PIt("then it gets the vendor's answer (Q14)")
+		})
 	})
 
-	Context("Node.js client", func() {
-		PIt("case 1: sends POST https://api.stripe.com/... with http.request and a full URL as the path")
-		PIt("case 2: sends POST http://api.stripe.com/... and the proxy turns it into https")
-		PIt("case 4: sends the https address with https.request and servername set to the proxy (Q14)")
-		PIt("case 5: sends the http address with https.request (Q14)")
+	Context("given the Node.js client", func() {
+		When("case 1: it sends POST https://api.stripe.com/... with http.request and a full URL as the path", func() {
+			PIt("then it gets the vendor's answer, which the proxy fetched over TLS")
+		})
+		When("case 2: it sends POST http://api.stripe.com/...", func() {
+			PIt("then the proxy calls the vendor over https")
+		})
+		When("case 4: it sends the https address with https.request and servername set to the proxy", func() {
+			PIt("then it gets the vendor's answer (Q14)")
+		})
+		When("case 5: it sends the http address with https.request", func() {
+			PIt("then it gets the vendor's answer (Q14)")
+		})
 	})
 
-	Context("what every case checks", func() {
-		PIt("the app gets the test vendor's status, headers and body unchanged")
-		PIt("the test vendor never sees Proxy-Authorization")
-		PIt("the fake OTLP receiver gets one hotline.request log record with ingress forward_proxy and the right integration ID")
-		PIt("the fake OTLP receiver gets hotline.requests increased by one")
-		PIt("the record holds the redacted url.full and no secret")
+	Context("given any of the cases above", func() {
+		When("the call ends", func() {
+			PIt("then the app gets the test vendor's status, headers and body unchanged")
+			PIt("then the test vendor never saw Proxy-Authorization")
+			PIt("then the fake OTLP receiver got one hotline.request log record with ingress forward_proxy and the right integration ID")
+			PIt("then the fake OTLP receiver saw hotline.requests go up by one")
+			PIt("then the record holds the redacted url.full and no secret")
+		})
 	})
 
-	Context("failure cases", func() {
-		PIt("a call to a vendor with an untrusted certificate gets 502 with Proxy-Status and a record with error.type tls_certificate_error")
-		PIt("a call to a host that does not exist gets 502 with Proxy-Status and a record with error.type dns_error")
-		PIt("a call without Proxy-Authorization still reaches the vendor and gets a minimal record with ID not-passed")
+	Context("given a client calling through the proxy", func() {
+		When("the vendor's certificate is not trusted", func() {
+			PIt("then the app gets 502 with Proxy-Status and the record says error.type tls_certificate_error")
+		})
+		When("the vendor host does not exist", func() {
+			PIt("then the app gets 502 with Proxy-Status and the record says error.type dns_error")
+		})
+		When("the call has no Proxy-Authorization", func() {
+			PIt("then the call still reaches the vendor and gets a minimal record with ID not-passed")
+		})
 	})
 })

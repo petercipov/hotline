@@ -7,58 +7,143 @@ import (
 // The forwarder: makes the call to the vendor and hands the reply back.
 // Tests use local vendors from net/http/httptest, never the real internet.
 var _ = Describe("Forwarding a call to the vendor", func() {
-	Context("choosing http or https to the vendor", func() {
-		PIt("calls the vendor over TLS when the request line says https")
-		PIt("calls the vendor over TLS when the request line says http and TLS origination is on, which is the default")
-		PIt("uses port 443 when it turns an http address without a port into https (Q4)")
-		PIt("keeps an explicit port when it turns http into https (Q4)")
-		PIt("calls the vendor over plain http when the request line says http and the api sets tlsOrigination to false")
-		PIt("sends a not-passed call out exactly as sent: http stays http and https stays https (Q5)")
-		PIt("turns http into https for not-passed calls when the not-passed entry sets tlsOrigination to true")
+	Context("given an api with TLS origination on, the default", func() {
+		When("the request line says https", func() {
+			PIt("then the proxy calls the vendor over TLS")
+		})
+		When("the request line says http", func() {
+			PIt("then the proxy calls the vendor over TLS")
+		})
+		When("the request line says http with no port", func() {
+			PIt("then the proxy uses port 443 (Q4)")
+		})
+		When("the request line says http with an explicit port", func() {
+			PIt("then the proxy keeps that port (Q4)")
+		})
 	})
 
-	Context("the request sent to the vendor", func() {
-		PIt("passes the method, path, query and body on unchanged")
-		PIt("removes Proxy-Authorization before calling the vendor")
-		PIt("keeps Authorization and every other end-to-end header")
-		PIt("removes the headers that only apply to one hop, such as Connection and Proxy-Connection, as HTTP requires")
-		PIt("sets Host to the vendor host from the request line")
-		PIt("adds no X-Forwarded-For or Via header (Q6)")
-		PIt("streams a large request body to the vendor without waiting for all of it")
-		PIt("never retries a call that failed")
+	Context("given an api with tlsOrigination set to false", func() {
+		When("the request line says http", func() {
+			PIt("then the proxy calls the vendor over plain http")
+		})
 	})
 
-	Context("the reply sent back to the app", func() {
-		PIt("passes the status, headers and body back unchanged")
-		PIt("passes vendor errors such as 400, 429 and 503 back as they are, without a Proxy-Status header")
-		PIt("streams a large reply back without waiting for all of it")
-		PIt("talks HTTP/2 to the vendor when the vendor offers it and HTTP/1.1 otherwise")
-		PIt("accepts HTTP/1.1 from the app and answers in HTTP/1.1")
+	Context("given a not-passed call with the built-in settings", func() {
+		When("the request line says http", func() {
+			PIt("then the call goes out as plain http")
+		})
+		When("the request line says https", func() {
+			PIt("then the call goes out as https (Q5)")
+		})
 	})
 
-	Context("vendor certificates", func() {
-		PIt("accepts a certificate from an issuer in the system trust store")
-		PIt("refuses a self-signed certificate with 502 and Proxy-Status: hotline; error=tls_certificate_error")
-		PIt("refuses an expired certificate with 502 and tls_certificate_error")
-		PIt("refuses a certificate for another host name with 502 and tls_certificate_error")
-		PIt("has no setting that turns the certificate check off")
+	Context("given a not-passed entry with tlsOrigination set to true", func() {
+		When("the request line says http", func() {
+			PIt("then the proxy calls the vendor over TLS")
+		})
 	})
 
-	Context("the proxy's own errors", func() {
-		PIt("answers 502 with Proxy-Status: hotline; error=dns_error when the vendor host does not exist")
-		PIt("answers 504 with Proxy-Status: hotline; error=dns_timeout when the DNS lookup takes too long")
-		PIt("answers 502 with Proxy-Status: hotline; error=connection_refused when the vendor refuses the connection")
-		PIt("answers 504 with Proxy-Status: hotline; error=connection_timeout when connecting takes too long")
-		PIt("answers 502 with Proxy-Status: hotline; error=tls_protocol_error when the TLS handshake fails for a reason other than the certificate")
-		PIt("answers 504 with Proxy-Status: hotline; error=http_response_timeout when the vendor takes longer than vendorTimeout")
-		PIt("records error.type as http_response_incomplete when the vendor breaks off after the reply has started, and cuts the reply to the app")
-		PIt("uses the same error name in Proxy-Status and in the record's error.type")
-		PIt("never sends the vendor any part of a call it refused")
+	Context("given a call from an app", func() {
+		When("the proxy forwards it", func() {
+			PIt("then the method, path, query and body reach the vendor unchanged")
+			PIt("then Proxy-Authorization is removed")
+			PIt("then Authorization and every other end-to-end header are kept")
+			PIt("then the headers for one hop only, such as Connection and Proxy-Connection, are removed as HTTP requires")
+			PIt("then Host is set to the vendor host from the request line")
+			PIt("then no X-Forwarded-For or Via header is added (Q6)")
+		})
+		When("the request body is large", func() {
+			PIt("then it streams to the vendor without waiting for all of it")
+		})
+		When("the app talks HTTP/1.1", func() {
+			PIt("then the proxy answers in HTTP/1.1")
+		})
+		When("the call fails", func() {
+			PIt("then the proxy never retries it")
+		})
 	})
 
-	Context("when the app gives up first", func() {
-		PIt("keeps waiting for the vendor up to vendorTimeout after the app disconnects")
-		PIt("records the vendor's real status and timings for a call the app gave up on")
-		PIt("sets hotline.client.cancelled to true when the app gave up, and to false otherwise")
+	Context("given a vendor reply", func() {
+		When("it reaches the proxy", func() {
+			PIt("then the status, headers and body go back to the app unchanged")
+		})
+		When("it is an error such as 400, 429 or 503", func() {
+			PIt("then it goes back as it is, without a Proxy-Status header")
+		})
+		When("it is large", func() {
+			PIt("then it streams back without waiting for all of it")
+		})
+	})
+
+	Context("given a vendor that offers HTTP/2", func() {
+		When("the proxy calls it", func() {
+			PIt("then the proxy uses HTTP/2")
+		})
+	})
+
+	Context("given a vendor that only offers HTTP/1.1", func() {
+		When("the proxy calls it", func() {
+			PIt("then the proxy uses HTTP/1.1")
+		})
+	})
+
+	Context("given a vendor certificate", func() {
+		When("its issuer is in the system trust store", func() {
+			PIt("then the call goes through")
+		})
+		When("it is self-signed", func() {
+			PIt("then the app gets 502 with Proxy-Status: hotline; error=tls_certificate_error")
+		})
+		When("it has expired", func() {
+			PIt("then the app gets 502 with tls_certificate_error")
+		})
+		When("it is for another host name", func() {
+			PIt("then the app gets 502 with tls_certificate_error")
+		})
+		When("anyone looks for a setting to turn the check off", func() {
+			PIt("then there is none")
+		})
+	})
+
+	Context("given a call the proxy cannot complete", func() {
+		When("the vendor host does not exist", func() {
+			PIt("then the app gets 502 with Proxy-Status: hotline; error=dns_error")
+		})
+		When("the DNS lookup takes too long", func() {
+			PIt("then the app gets 504 with Proxy-Status: hotline; error=dns_timeout")
+		})
+		When("the vendor refuses the connection", func() {
+			PIt("then the app gets 502 with Proxy-Status: hotline; error=connection_refused")
+		})
+		When("connecting takes too long", func() {
+			PIt("then the app gets 504 with Proxy-Status: hotline; error=connection_timeout")
+		})
+		When("the TLS handshake fails for a reason other than the certificate", func() {
+			PIt("then the app gets 502 with Proxy-Status: hotline; error=tls_protocol_error")
+		})
+		When("the vendor takes longer than vendorTimeout", func() {
+			PIt("then the app gets 504 with Proxy-Status: hotline; error=http_response_timeout")
+		})
+		When("the vendor breaks off after the reply has started", func() {
+			PIt("then the reply to the app is cut and the record says error.type http_response_incomplete")
+		})
+		When("any of these happens", func() {
+			PIt("then the record's error.type holds the same name as Proxy-Status")
+			PIt("then the vendor never gets any part of a call the proxy refused")
+		})
+	})
+
+	Context("given an app that gives up before the vendor answers", func() {
+		When("the app disconnects", func() {
+			PIt("then the proxy keeps waiting for the vendor up to vendorTimeout")
+			PIt("then the record holds the vendor's real status and timings")
+			PIt("then the record says hotline.client.cancelled true")
+		})
+	})
+
+	Context("given an app that waits for the answer", func() {
+		When("the call ends", func() {
+			PIt("then the record says hotline.client.cancelled false")
+		})
 	})
 })
