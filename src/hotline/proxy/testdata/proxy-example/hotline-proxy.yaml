@@ -1,0 +1,41 @@
+# Full example config for the Hotline proxy (first version).
+# It points to the two specs in ./specs. See README.md here for a sample call.
+
+version: "2026-10-28"   # written by whoever changes this file; every record carries it
+listen:
+  proxy: ":8080"                  # forward proxy, Host header, vendor URL in path
+  admin: ":8081"                  # health checks and admin endpoints only
+
+exporters:                        # one or more; each gets the same data
+  - otlp:
+      endpoint: hotline-control-plane.hotline:4317    # the control plane's ingestion
+  - otlp:
+      endpoint: otel-collector.observability:4317     # the customer's own collector
+      temporality: delta
+
+telemetry:                        # the proxy's own health data, kept separate
+  otlp:
+    endpoint: otel-collector.observability:4317
+
+integrations:
+  - id: talon-shop-a              # shop A's use of Talon.One and Stripe
+    fingerprintKey: { file: /etc/hotline/keys/talon-shop-a }   # secret key for body fingerprints, from a mounted Kubernetes Secret
+    apis:
+      - hosts: [api.talon.one]
+        spec: ./specs/talon-one.openapi.yaml   # its x-hotline-redact marks say what to keep
+        vendorTimeout: 10s
+
+      - hosts: [api.stripe.com]
+        spec: ./specs/stripe.openapi.yaml      # its x-hotline-redact marks say what to keep
+        vendorTimeout: 30s
+
+  - id: talon-shop-b              # same Talon.One API, different shop and rules
+    fingerprintKey: { env: HOTLINE_KEY_TALON_SHOP_B }   # also allowed; a file is preferred
+    apis:
+      - hosts: [api.talon.one]
+        spec: ./specs/talon-one.openapi.yaml
+        vendorTimeout: 5s
+
+  - id: not-passed                # calls without a known ID
+    # no apis list: these settings apply to any host
+    tlsOrigination: true          # built-in default for not-passed is false

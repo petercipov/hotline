@@ -1,4 +1,4 @@
-# Open questions are tagged @q1 to @q14; see docs/proxy-slice-1.md.
+# Answers to the open questions are in docs/proxy-slice-1.md.
 Feature: Loading the config file
   The proxy reads one YAML file, hotline-proxy.yaml, once at start.
   Reloading without a restart comes in a later slice.
@@ -11,11 +11,12 @@ Feature: Loading the config file
     And every integration is read with its apis, their hosts and the spec each api points to
     And spec files are found relative to the folder of the config file
 
-  @q7
-  Scenario: Each loaded config gets a version
-    Given a valid config file
+  Scenario: The config's version goes into every record
+    The version is a field in the config file, written by whoever changes
+    it (Peter, 2026-10-28).
+    Given a valid config file with version 2026-10-28.1
     When the proxy loads it
-    Then the config gets a version that every record carries as hotline.config.version
+    Then every record carries hotline.config.version 2026-10-28.1
 
   Scenario: The full example loads
     Given the full example config from proxy-example
@@ -81,8 +82,15 @@ Feature: Loading the config file
 
     Examples:
       | problem                                              |
+      | the file does not exist                              |
       | the file is not valid YAML                           |
+      | there is no version                                  |
+      | there is no proxy listen address                     |
+      | an integration has no id                             |
       | there are no exporters                               |
+      | an exporter's temporality is neither cumulative nor delta |
+      | an exporter's endpoint is not a valid address        |
+      | an exporter's queueSize is zero                      |
       | two integrations have the same ID                    |
       | one integration lists the same host in two apis      |
       | an api points to a spec file that does not exist     |
@@ -92,16 +100,22 @@ Feature: Loading the config file
       | a vendorTimeout is not a duration                    |
       | an x-hotline-redact mark is not true or false        |
 
-  @q8
-  Scenario Outline: Strict checks still to be decided
+  Scenario Outline: Settings the proxy does not use start with a warning
+    The proxy starts anyway, so a typo never stops traffic, but each one is
+    named in a warning log line (Peter, 2026-10-28).
     Given a config file where <problem>
     When the proxy loads it
-    Then the config is refused
+    Then the proxy starts and logs a warning naming <name>
 
     Examples:
-      | problem                                               |
-      | the not-passed entry has an apis list                 |
-      | a field name has a typo, such as tlsOrigintion        |
+      | problem                                               | name          |
+      | the not-passed entry has an apis list                 | apis          |
+      | a field name has a typo, such as tlsOrigintion        | tlsOrigintion |
+
+  Scenario: A busy listen address
+    Given another program listens on the proxy address
+    When the proxy loads the config
+    Then the proxy does not start, and says the address is in use
 
   Scenario: Every problem is listed
     Given a config file with three problems

@@ -18,7 +18,6 @@ Feature: Reading the vendor spec
     When a call is GET /v2/customer_sessions/sess-8812
     Then there is no route, because the spec only lists PUT
 
-  @q3
   Scenario: A path the spec does not know
     Given the Talon.One spec
     When a call is PUT /v2/unknown
@@ -39,16 +38,19 @@ Feature: Reading the vendor spec
     When a call is GET /v1/items/search
     Then the route template is /v1/items/search
 
-  @q9
-  Scenario: Trailing slash
-    Given a spec with the route /v1/items/
-    When a call is GET /v1/items
-    Then the route is matched the way the spec writes it
+  Scenario Outline: A trailing slash makes no difference
+    Given a spec with the route <route>
+    When a call is GET <path>
+    Then the route template is <route>
 
-  @q9
+    Examples:
+      | route      | path       |
+      | /v1/items/ | /v1/items  |
+      | /v1/items  | /v1/items/ |
+
   Scenario: Base path in the servers address
     Given a spec whose servers address is https://api.x.com/v1 with the route /items
-    When a call is GET https://api.x.com/v1/items
+    When a call is GET /v1/items
     Then the route template is /v1/items
 
   Scenario Outline: Reading the marks

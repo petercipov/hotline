@@ -1,0 +1,65 @@
+# Our copy of the Talon.One spec, shortened to one route, with Hotline marks.
+openapi: 3.1.0
+info:
+  title: Talon.One Integration API
+  version: "2.0.0"
+servers:
+  - url: https://api.talon.one
+security:
+  - api_key_v1: []
+paths:
+  /v2/customer_sessions/{customerSessionId}:
+    put:
+      operationId: updateCustomerSession
+      parameters:
+        - name: customerSessionId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: dry
+          in: query
+          schema: { type: boolean }
+          x-hotline-redact: false       # safe to keep
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerSession]
+              properties:
+                customerSession:
+                  type: object
+                  required: [state]
+                  properties:
+                    profileId: { type: string }
+                    state: { type: string, enum: [open, closed, cancelled] }
+                    cartItems:
+                      type: array
+                      items:
+                        type: object
+                        required: [sku, quantity, price]
+                        properties:
+                          sku: { type: string }
+                          quantity: { type: integer, minimum: 1 }
+                          price: { type: number }
+      responses:
+        "200":
+          description: Session updated
+          headers:
+            X-Request-Id:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [customerSession, effects]
+                properties:
+                  customerSession: { type: object }
+                  effects: { type: array, items: { type: object } }
+components:
+  securitySchemes:
+    api_key_v1:                       # how apps log in: a key in the Authorization header; the proxy never records it
+      type: apiKey
+      in: header
+      name: Authorization

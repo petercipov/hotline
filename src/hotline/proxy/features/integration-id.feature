@@ -36,7 +36,6 @@ Feature: Reading the integration ID
     Then the not-passed settings apply
     And the record's ID is talon-shop-a
 
-  @q2
   Scenario Outline: Broken headers count as no ID
     When an app calls https://api.talon.one with <header>
     Then the not-passed settings apply
