@@ -1,0 +1,611 @@
+//go:build e2e
+
+package proxy_test
+
+import (
+	"bufio"
+	"context"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/cucumber/godog"
+)
+
+// TestEndToEnd runs the scenarios tagged @e2e against the built
+// hotline-proxy program. It runs only with the e2e build tag:
+//
+//	go test -tags e2e -run TestEndToEnd ./proxy/
+//
+// It builds the program itself, unless HOTLINE_PROXY names one already
+// built (make e2e builds one that records coverage).
+func TestEndToEnd(t *testing.T) {
+	binary := os.Getenv("HOTLINE_PROXY")
+	if binary == "" {
+		binary = filepath.Join(t.TempDir(), "hotline-proxy")
+		build := exec.CommandContext(t.Context(), "go", "build", "-o", binary, "hotline/cmd/hotline-proxy") //nolint:gosec // builds the program under test
+		if out, err := build.CombinedOutput(); err != nil {
+			t.Fatalf("building hotline-proxy failed: %v\n%s", err, out)
+		}
+	}
+	suite := godog.TestSuite{
+		Name: "hotline-proxy-e2e",
+		ScenarioInitializer: func(sc *godog.ScenarioContext) {
+			programScenario(sc, binary)
+		},
+		Options: &godog.Options{
+			Format:   "progress",
+			Paths:    []string{"features"},
+			Tags:     "@e2e && ~@later",
+			Strict:   true,
+			TestingT: t,
+		},
+	}
+	if suite.Run() != 0 {
+		t.Fatal("end-to-end feature files failed")
+	}
+}
+
+// program is one scenario's system under test: the hotline-proxy program
+// as a separate process, with a local TLS test vendor and a fake OTLP
+// receiver at its edges. It is reached only through its command line, its
+// output, its exit code and the network.
+type program struct {
+	binary   string
+	dir      string
+	issuer   *issuer
+	receiver *receiver
+	// vendor is the test vendor at localhost; untrusted is one whose
+	// certificate no issuer vouches for.
+	vendor    *vendor
+	vendorURL string
+	untrusted string
+	proxyAddr string
+	taken     net.Listener
+
+	process  *exec.Cmd
+	stdout   syncBuffer
+	stderr   syncBuffer
+	exited   chan struct{}
+	exitCode int
+	// signalled is when the last signal was sent.
+	signalled time.Time
+	exitedAt  time.Time
+
+	// release, when closed, lets a vendor that holds its answer reply.
+	release     chan struct{}
+	releaseOnce sync.Once
+	// arrived gets one value for each call that reaches a holding vendor.
+	arrived chan struct{}
+
+	resp     *http.Response
+	respBody []byte
+	respErr  error
+	answered chan struct{}
+}
+
+func programScenario(sc *godog.ScenarioContext, binary string) {
+	p := &program{}
+	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+		dir, err := os.MkdirTemp("", "hotline-proxy-e2e-")
+		*p = program{
+			binary: binary, dir: dir, issuer: newIssuer(), proxyAddr: freePort(),
+			release: make(chan struct{}), arrived: make(chan struct{}, 8),
+		}
+		return ctx, err
+	})
+	sc.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
+		p.close()
+		return ctx, err
+	})
+
+	// Running the program.
+	sc.Step(`^hotline-proxy is run with "([^"]*)"$`, func(args string) error {
+		if err := p.startProcess(strings.Fields(args)...); err != nil {
+			return err
+		}
+		return p.waitForExit(10 * time.Second)
+	})
+	sc.Step(`^the hotline-proxy program runs with integration test-shop for the test vendor$`, func() error {
+		return p.run()
+	})
+	sc.Step(`^the hotline-proxy program runs with "([^"]*)" and integration test-shop for the test vendor$`, func(flags string) error {
+		return p.run(strings.Fields(flags)...)
+	})
+	sc.Step(`^the program gets (SIGTERM|SIGINT)(?: again)?$`, p.signal)
+	sc.Step(`^it exits with code (\d+)$`, func(code int) error {
+		return p.exitsWith(code, 30*time.Second)
+	})
+	sc.Step(`^it exits with code (\d+) within (\d+) seconds$`, func(code, seconds int) error {
+		if err := p.exitsWith(code, time.Duration(seconds)*time.Second); err != nil {
+			return err
+		}
+		if took := p.exitedAt.Sub(p.signalled); took > time.Duration(seconds)*time.Second {
+			return failf("it took %s to exit after the signal", took)
+		}
+		return nil
+	})
+
+	// Its output.
+	sc.Step(`^standard output starts with "([^"]*)"$`, func(text string) error {
+		if !strings.HasPrefix(p.stdout.String(), text) {
+			return failf("standard output is %q", p.stdout.String())
+		}
+		return nil
+	})
+	sc.Step(`^standard error says "(.*)"$`, func(text string) error {
+		if !strings.Contains(p.stderr.String(), text) {
+			return failf("standard error does not say %q; it is:\n%s", text, p.stderr.String())
+		}
+		return nil
+	})
+	sc.Step(`^standard error does not say "(.*)"$`, func(text string) error {
+		if strings.Contains(p.stderr.String(), text) {
+			return failf("standard error says %q; it is:\n%s", text, p.stderr.String())
+		}
+		return nil
+	})
+	sc.Step(`^every line on standard error is a JSON object with time, level and msg$`, func() error {
+		lines := 0
+		scanner := bufio.NewScanner(strings.NewReader(p.stderr.String()))
+		for scanner.Scan() {
+			lines++
+			var line map[string]any
+			if err := json.Unmarshal(scanner.Bytes(), &line); err != nil {
+				return failf("the line %q is not JSON: %v", scanner.Text(), err)
+			}
+			if err := hasAll(line, "time", "level", "msg"); err != nil {
+				return err
+			}
+		}
+		if lines == 0 {
+			return failf("standard error is empty")
+		}
+		return nil
+	})
+
+	// Its config and trust file.
+	sc.Step(`^a valid config file$`, func() error {
+		p.writeConfig(p.config(true))
+		return nil
+	})
+	sc.Step(`^a config file with no version and no exporters$`, func() error {
+		p.writeConfig(fmt.Sprintf("listen:\n  proxy: %q\n", p.proxyAddr))
+		return nil
+	})
+	sc.Step(`^no file trust.pem$`, func() error { return nil })
+	sc.Step(`^a file trust.pem that holds no certificate$`, func() error {
+		return os.WriteFile(filepath.Join(p.dir, "trust.pem"), []byte("not a certificate\n"), 0o600)
+	})
+	sc.Step(`^something else listens on the config's proxy address$`, func() error {
+		l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", p.proxyAddr)
+		p.taken = l
+		return err
+	})
+	sc.Step(`^nothing listens on the config's proxy address$`, func() error {
+		conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", p.proxyAddr)
+		if err == nil {
+			_ = conn.Close()
+			return failf("something listens on %s", p.proxyAddr)
+		}
+		return nil
+	})
+
+	// The fakes at its edges.
+	sc.Step(`^a fake OTLP receiver$`, func() error {
+		p.receiver = newReceiver()
+		return nil
+	})
+	sc.Step(`^the test vendor holds its answer$`, func() error {
+		p.vendor.setAnswer(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = io.Copy(io.Discard, r.Body)
+			p.arrived <- struct{}{}
+			<-p.release
+			w.Header().Set("X-Request-Id", "req-5521")
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		})
+		return nil
+	})
+	sc.Step(`^an app's call is in progress and the program gets (SIGTERM|SIGINT)$`, func(name string) error {
+		p.callInBackground()
+		select {
+		case <-p.arrived:
+		case <-time.After(5 * time.Second):
+			return failf("the call did not reach the test vendor")
+		}
+		return p.signal(name)
+	})
+	sc.Step(`^the test vendor then answers$`, func() error {
+		p.releaseVendor()
+		return nil
+	})
+	sc.Step(`^the app gets the test vendor's answer$`, func() error {
+		<-p.answered
+		if p.respErr != nil {
+			return p.respErr
+		}
+		if p.resp.StatusCode != http.StatusOK || string(p.respBody) != `{"ok":true}` {
+			return failf("the app got %d %s", p.resp.StatusCode, p.respBody)
+		}
+		return nil
+	})
+	sc.Step(`^the receiver got the call's record$`, func() error {
+		records, _ := p.receiver.got()
+		if len(records) != 1 {
+			return failf("the receiver got %d records, want 1", len(records))
+		}
+		return has(records[0].attrs, "hotline.integration.id", "test-shop")
+	})
+
+	// The client matrix.
+	sc.Step(`^the Go client sends case (\d+): .*$`, func(n int) error {
+		switch n {
+		case 1:
+			p.respond(goCase1(p.proxyAddr, p.vendorURL+paymentPath, "test-shop"))
+		case 2:
+			p.respond(goCase2(p.proxyAddr, strings.Replace(p.vendorURL, "https:", "http:", 1)+paymentPath, "test-shop"))
+		default:
+			return godog.ErrPending
+		}
+		return p.respErr
+	})
+	sc.Step(`^the Go client calls (a vendor with an untrusted certificate|a host that does not exist|the test vendor without Proxy-Authorization)$`, func(target string) error {
+		switch target {
+		case "a vendor with an untrusted certificate":
+			p.respond(goCase1(p.proxyAddr, p.untrusted+paymentPath, "test-shop"))
+		case "a host that does not exist":
+			// .invalid is a name kept by RFC 6761 that never exists.
+			p.respond(goCase1(p.proxyAddr, "https://nothing.invalid"+paymentPath, "test-shop"))
+		default:
+			p.respond(goCase1(p.proxyAddr, p.vendorURL+paymentPath, ""))
+		}
+		return p.respErr
+	})
+	sc.Step(`^the app gets the test vendor's status, headers and body unchanged$`, func() error {
+		if p.resp.StatusCode != http.StatusOK || p.resp.Header.Get("X-Request-Id") != "req-5521" ||
+			string(p.respBody) != `{"ok":true}` {
+			return failf("the app got %d %v %s", p.resp.StatusCode, p.resp.Header, p.respBody)
+		}
+		return nil
+	})
+	sc.Step(`^the test vendor got the call over https and never saw Proxy-Authorization$`, func() error {
+		calls := p.vendor.received()
+		if len(calls) != 1 {
+			return failf("the test vendor got %d calls, want 1", len(calls))
+		}
+		if calls[0].scheme != "https" || calls[0].header.Get("Proxy-Authorization") != "" {
+			return failf("the test vendor got %s with headers %v", calls[0].scheme, calls[0].header)
+		}
+		if string(calls[0].body) != "amount=1000&currency=eur" {
+			return failf("the test vendor got the body %q", calls[0].body)
+		}
+		return nil
+	})
+	sc.Step(`^the receiver got one hotline.request record with hotline.ingress forward_proxy and ID test-shop$`, func() error {
+		record, err := p.record()
+		if err != nil {
+			return err
+		}
+		if err := has(record, "hotline.ingress", "forward_proxy"); err != nil {
+			return err
+		}
+		return has(record, "hotline.integration.id", "test-shop")
+	})
+	sc.Step(`^the receiver saw hotline.requests go up by one$`, func() error {
+		if err := p.stop(); err != nil {
+			return err
+		}
+		_, counts := p.receiver.got()
+		if len(counts) == 0 {
+			return failf("no count arrived")
+		}
+		if last := counts[len(counts)-1]; last.value != 1 {
+			return failf("hotline.requests is %d, want 1", last.value)
+		}
+		return nil
+	})
+	sc.Step(`^the record holds the redacted url.full and no secret$`, func() error {
+		record, err := p.record()
+		if err != nil {
+			return err
+		}
+		if err := has(record, "url.full", p.vendorURL+"/v1/payment_intents?expand=customer&customer=REDACTED"); err != nil {
+			return err
+		}
+		for key, value := range record {
+			if strings.Contains(fmt.Sprint(value), "cus_8812") || strings.Contains(fmt.Sprint(value), "test-shop:") {
+				return failf("the record keeps a secret in %s: %v", key, value)
+			}
+		}
+		return nil
+	})
+	sc.Step(`^the app gets 502 with Proxy-Status and the record's error.type is (\S+)$`, func(errorType string) error {
+		if p.resp.StatusCode != http.StatusBadGateway || !strings.Contains(p.resp.Header.Get("Proxy-Status"), "error="+errorType) {
+			return failf("the app got %d with Proxy-Status %q", p.resp.StatusCode, p.resp.Header.Get("Proxy-Status"))
+		}
+		record, err := p.record()
+		if err != nil {
+			return err
+		}
+		return has(record, "error.type", errorType)
+	})
+	sc.Step(`^the call reaches the vendor and the record is minimal with ID not-passed$`, func() error {
+		if len(p.vendor.received()) != 1 || p.resp.StatusCode != http.StatusOK {
+			return failf("the call did not reach the test vendor; the app got %d", p.resp.StatusCode)
+		}
+		record, err := p.record()
+		if err != nil {
+			return err
+		}
+		if err := has(record, "hotline.integration.id", "not-passed"); err != nil {
+			return err
+		}
+		return hasNo(record, "url.full", "url.template")
+	})
+}
+
+// paymentPath is the call the research clients make, with a customer ID
+// the spec says to redact.
+const paymentPath = "/v1/payment_intents?expand=customer&customer=cus_8812"
+
+// testVendorSpec is our copy of the test vendor's spec.
+const testVendorSpec = `openapi: 3.1.0
+servers:
+  - url: https://localhost
+paths:
+  /v1/payment_intents:
+    post:
+      parameters:
+        - { name: expand, in: query, schema: { type: string }, x-hotline-redact: false }
+        - { name: customer, in: query, schema: { type: string } }
+      responses:
+        "200": { description: A payment intent }
+`
+
+// run starts the program with the test vendor's config, trusting the test
+// issuer, and waits until its proxy port takes calls.
+func (p *program) run(flags ...string) error {
+	p.startVendors()
+	p.writeConfig(p.config(false))
+	block := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: p.issuer.cert.Raw})
+	if err := os.WriteFile(filepath.Join(p.dir, "issuer.pem"), block, 0o600); err != nil {
+		return err
+	}
+	args := append([]string{"run", "--config", "hotline-proxy.yaml", "--trust-file", "issuer.pem"}, flags...)
+	if err := p.startProcess(args...); err != nil {
+		return err
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", p.proxyAddr)
+		if err == nil {
+			return conn.Close()
+		}
+		select {
+		case <-p.exited:
+			return failf("the program exited with %d:\n%s", p.exitCode, p.stderr.String())
+		default:
+		}
+	}
+	return failf("the program did not listen on %s:\n%s", p.proxyAddr, p.stderr.String())
+}
+
+func (p *program) startVendors() {
+	p.vendor = &vendor{host: "localhost"}
+	trusted := httptest.NewUnstartedServer(p.vendor.record("https", ""))
+	trusted.EnableHTTP2 = true
+	trusted.TLS = &tls.Config{Certificates: []tls.Certificate{p.issuer.leaf("localhost", time.Now().Add(24*time.Hour), false)}}
+	trusted.StartTLS()
+	untrusted := httptest.NewUnstartedServer(p.vendor.record("https", ""))
+	untrusted.TLS = &tls.Config{Certificates: []tls.Certificate{p.issuer.leaf("localhost", time.Now().Add(24*time.Hour), true)}}
+	untrusted.StartTLS()
+	p.vendor.servers = append(p.vendor.servers, trusted, untrusted)
+	p.vendorURL = "https://localhost:" + port(trusted)
+	p.untrusted = "https://localhost:" + port(untrusted)
+}
+
+func port(s *httptest.Server) string {
+	_, port, _ := net.SplitHostPort(s.Listener.Addr().String())
+	return port
+}
+
+// config is a config for the test vendor. A config only to validate needs
+// no receiver.
+func (p *program) config(validateOnly bool) string {
+	endpoint := "127.0.0.1:4317"
+	if !validateOnly {
+		endpoint = p.receiver.endpoint
+	}
+	_ = os.MkdirAll(filepath.Join(p.dir, "specs"), 0o750)
+	_ = os.WriteFile(filepath.Join(p.dir, "specs", "test-vendor.yaml"), []byte(testVendorSpec), 0o600)
+	return fmt.Sprintf(`version: e2e-1
+listen:
+  proxy: %q
+  admin: "127.0.0.1:0"
+exporters:
+  - otlp:
+      endpoint: %s
+integrations:
+  - id: test-shop
+    apis:
+      - hosts: [localhost]
+        spec: ./specs/test-vendor.yaml
+`, p.proxyAddr, endpoint)
+}
+
+func (p *program) writeConfig(content string) {
+	_ = os.WriteFile(filepath.Join(p.dir, "hotline-proxy.yaml"), []byte(content), 0o600)
+}
+
+func (p *program) startProcess(args ...string) error {
+	p.process = exec.CommandContext(context.Background(), p.binary, args...) //nolint:gosec // the program under test
+	p.process.Dir = p.dir
+	p.process.Stdout = &p.stdout
+	p.process.Stderr = &p.stderr
+	if err := p.process.Start(); err != nil {
+		return err
+	}
+	p.exited = make(chan struct{})
+	go func() {
+		_ = p.process.Wait()
+		p.exitCode = p.process.ProcessState.ExitCode()
+		p.exitedAt = time.Now()
+		close(p.exited)
+	}()
+	return nil
+}
+
+func (p *program) waitForExit(limit time.Duration) error {
+	select {
+	case <-p.exited:
+		return nil
+	case <-time.After(limit):
+		return failf("the program did not exit within %s", limit)
+	}
+}
+
+func (p *program) exitsWith(code int, limit time.Duration) error {
+	if err := p.waitForExit(limit); err != nil {
+		return err
+	}
+	if p.exitCode != code {
+		return failf("it exited with %d, want %d; standard error:\n%s", p.exitCode, code, p.stderr.String())
+	}
+	return nil
+}
+
+func (p *program) signal(name string) error {
+	sig := syscall.SIGTERM
+	if name == "SIGINT" {
+		sig = syscall.SIGINT
+	}
+	p.signalled = time.Now()
+	return p.process.Process.Signal(sig)
+}
+
+// stop ends the program the way Kubernetes does, which sends every queued
+// record, and checks that it stopped cleanly.
+func (p *program) stop() error {
+	select {
+	case <-p.exited:
+	default:
+		if err := p.signal("SIGTERM"); err != nil {
+			return err
+		}
+	}
+	return p.exitsWith(0, 30*time.Second)
+}
+
+// record is the only record the receiver got, once the program stopped.
+func (p *program) record() (map[string]any, error) {
+	if err := p.stop(); err != nil {
+		return nil, err
+	}
+	records, _ := p.receiver.got()
+	if len(records) != 1 {
+		return nil, fmt.Errorf("%w: want exactly one record, got %d", errNoRecord, len(records))
+	}
+	if records[0].eventName != "hotline.request" {
+		return nil, failf("the record's event.name is %q", records[0].eventName)
+	}
+	return records[0].attrs, nil
+}
+
+func (p *program) respond(resp *http.Response, err error) {
+	p.resp, p.respErr = resp, err
+	if err == nil {
+		p.respBody, p.respErr = io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+	}
+}
+
+// callInBackground makes a case 2 call that the test waits for later.
+func (p *program) callInBackground() {
+	p.answered = make(chan struct{})
+	target := strings.Replace(p.vendorURL, "https:", "http:", 1) + paymentPath
+	go func() {
+		defer close(p.answered)
+		p.respond(goCase2(p.proxyAddr, target, "test-shop"))
+	}()
+}
+
+func (p *program) releaseVendor() {
+	p.releaseOnce.Do(func() { close(p.release) })
+}
+
+func (p *program) close() {
+	p.releaseVendor()
+	if p.process != nil && p.process.ProcessState == nil {
+		_ = p.process.Process.Kill()
+		<-p.exited
+	}
+	if p.vendor != nil {
+		p.vendor.close()
+	}
+	if p.receiver != nil {
+		p.receiver.stop()
+	}
+	if p.taken != nil {
+		_ = p.taken.Close()
+	}
+	_ = os.RemoveAll(p.dir)
+}
+
+// The Go client cases below are copied from research/matrix-clients/go.
+// Case numbers are those in egress-proxy-options.md.
+
+// goTransport is an HTTP/1.1-only transport: a full address in the request
+// line does not exist in HTTP/2.
+func goTransport(proxy *url.URL) *http.Transport {
+	t := &http.Transport{TLSNextProto: map[string]func(string, *tls.Conn) http.RoundTripper{}}
+	if proxy != nil {
+		t.Proxy = http.ProxyURL(proxy)
+	}
+	return t
+}
+
+func paymentRequest(target string) *http.Request {
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, target, strings.NewReader("amount=1000&currency=eur"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
+// goCase1 sends "POST https://… HTTP/1.1" over plain TCP to the proxy. Go
+// would CONNECT for an https address, so the full address goes in
+// URL.Opaque, and the dial for TLS returns a plain connection. An empty id
+// sends no Proxy-Authorization.
+func goCase1(proxyAddr, target, id string) (*http.Response, error) {
+	t := goTransport(nil)
+	t.DialTLSContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, proxyAddr)
+	}
+	defer t.CloseIdleConnections()
+	req := paymentRequest(target)
+	req.URL = &url.URL{Scheme: "https", Host: proxyAddr, Opaque: strings.TrimPrefix(target, "https:")}
+	if id != "" {
+		req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
+	}
+	return t.RoundTrip(req)
+}
+
+// goCase2 sends "POST http://… HTTP/1.1" through the standard proxy
+// setting, which also sends the ID as Proxy-Authorization.
+func goCase2(proxyAddr, target, id string) (*http.Response, error) {
+	t := goTransport(&url.URL{Scheme: "http", Host: proxyAddr, User: url.UserPassword(id, "x")})
+	defer t.CloseIdleConnections()
+	return t.RoundTrip(paymentRequest(target))
+}

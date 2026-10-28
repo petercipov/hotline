@@ -8,6 +8,18 @@ test:
 	go clean -testcache
 	go test  ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...
 	go test  ./src/otel-hotline/...
+	$(MAKE) e2e
+	tail -n +2 e2e-cover.out >> cover.out
+
+# e2e runs the @e2e scenarios against the built hotline-proxy program. The
+# program is built to record coverage, which lands in e2e-cover.out.
+e2e:
+	rm -rf e2e-cover e2e-cover.out
+	mkdir -p e2e-cover/data
+	cd src/hotline && go build -cover -covermode=atomic -coverpkg=./... -o ../../e2e-cover/hotline-proxy ./cmd/hotline-proxy
+	HOTLINE_PROXY=$(CURDIR)/e2e-cover/hotline-proxy GOCOVERDIR=$(CURDIR)/e2e-cover/data \
+		go test -tags e2e -count=1 -run TestEndToEnd ./src/hotline/proxy/
+	go tool covdata textfmt -i=e2e-cover/data -o e2e-cover.out
 
 clean-cache:
 	go clean -testcache

@@ -33,7 +33,7 @@ func (d *dialer) dial(ctx context.Context, network, address string) (net.Conn, e
 	ips := []netip.Addr{ip}
 	if err != nil {
 		trace.DNSStart(httptrace.DNSStartInfo{Host: host})
-		ips, err = d.resolver.LookupNetIP(ctx, "ip", host)
+		ips, err = d.lookup(ctx, host)
 		trace.DNSDone(httptrace.DNSDoneInfo{Err: err})
 	}
 	// Addresses are tried one after another, so their connect phases never
@@ -47,6 +47,18 @@ func (d *dialer) dial(ctx context.Context, network, address string) (net.Conn, e
 		trace.ConnectDone(network, address, err)
 	}
 	return conn, err
+}
+
+// lookup asks the resolver for the addresses of host. The real resolver
+// opens its own connections to DNS servers, and the call's trace would see
+// them as connects to the vendor. So the lookup gets a context without the
+// trace, which still ends when the call's context does.
+func (d *dialer) lookup(ctx context.Context, host string) ([]netip.Addr, error) {
+	untraced, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stop := context.AfterFunc(ctx, cancel)
+	defer stop()
+	return d.resolver.LookupNetIP(untraced, "ip", host)
 }
 
 // dialOne connects to one address, giving up after its share of the time
