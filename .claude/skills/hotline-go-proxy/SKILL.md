@@ -35,6 +35,14 @@ From [Unit tests should not mirror source code](https://journal.optivem.com/p/un
 - **Let the inside emerge.** When refactoring pulls code out into a new function, type or package, it needs no test of its own: the behaviour tests already cover it. Only give it a solitary test when it meets the rule above (stable interface, many cases of its own).
 - **Refactoring must not break tests.** If moving logic between types, renaming internals or changing an internal interface breaks a test, the test was coupled to the code: fix the test, not the refactoring.
 
+### Tests do not reach into the code
+
+From [Decoupling tests from implementation details](https://medium.com/codex/decoupling-tests-from-implementation-details-238a9ab06e4f) (Peter, 2026-10-28): a test says *what* the proxy must do, never *how* it does it.
+
+- **Test only through the proxy's own ways in and out:** the config file and specs it reads, the proxy port apps call, the vendors it calls, and the OpenTelemetry data it sends. Steps never call internal functions or read internal fields.
+- **Never change production code just to make a test possible.** No exported field, extra method, flag or hook that only a test uses: that is the quickest way to tie tests to the code. Passing the clock and the vendor transport in through the constructor is not this: the proxy needs those seams anyway (section 3).
+- **Given, When, Then is Arrange, Act, Assert.** Given arranges the starting state, When does one action, Then checks what can be seen from outside.
+
 ### Feature files
 
 Behaviour is written as Gherkin feature files (plain-language test cases in Given, When, Then form) in `src/hotline/proxy/features/`, one file per behaviour, e.g. `redaction.feature`. They are run by [godog](https://github.com/cucumber/godog), the official Cucumber tool for Go (MIT license), from `src/hotline/proxy/features_test.go` (Peter, 2026-10-28).
