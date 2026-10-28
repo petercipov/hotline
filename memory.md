@@ -19,8 +19,10 @@ Decisions already made, so a new session does not have to dig through old thread
 The proxy is built in small slices, tests first.
 
 1. **Slice 1: done** (pull request #11). Forward proxy ingress, TLS to the vendor, integration ID, phase timings, the request record with redaction, OTLP output, the proxy's own errors, config loaded once. Scope and detail: [docs/proxy-slice-1.md](docs/proxy-slice-1.md).
-2. Still to come, roughly in this order:
-   - the `hotline-proxy` program (a `main` package with flags) and the `@e2e` end-to-end tests that run it;
+2. **The `hotline-proxy` program: built** (commands, flags, stopping, exit codes, `@e2e` tests). Detail: [docs/proxy-program.md](docs/proxy-program.md).
+3. Still to come, roughly in this order:
+   - the health checks `/livez` and `/readyz` on the admin port;
+   - the Node, Java and Rust clients in the end-to-end tests;
    - TLS from apps to the proxy (`listen.tls`);
    - the other ingresses (the Host header, and the vendor URL in the path);
    - JSON and form body checks against the spec;
@@ -47,6 +49,17 @@ Full wording is at the end of [docs/proxy-slice-1.md](docs/proxy-slice-1.md).
 14. TLS from apps to the proxy waits for a later slice.
 
 Also from the review of pull request #11: `vendorTimeout` also limits how long a reply may go silent between its parts. A vendor silent for longer is cut off, recorded as `http_response_incomplete`. WebSockets are exempt.
+
+## Program decisions (Peter, 2026-10-28)
+
+Full list in [docs/proxy-program.md](docs/proxy-program.md).
+
+1. Commands `run`, `validate` and `version`. The config comes only from `--config`, with no default.
+2. Own logs: JSON, one object per line, on standard error, with `--log-level`.
+3. Stopping: up to 25 seconds (`--shutdown-timeout`); a second signal cuts it short.
+4. Exit codes: 0 clean, 1 any failure (also a stop that ran out of time), 2 wrong command line.
+5. `--trust-file` adds trusted issuers on top of the system's own, so the end-to-end tests can trust their test vendor on any computer. This changed the spec's vendor certificate rule.
+6. End-to-end tests use only the Go client for now. They run with `make e2e`, and `make test` adds their coverage to the 100% check.
 
 ## Earlier decisions
 

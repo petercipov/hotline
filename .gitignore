@@ -4,3 +4,5 @@ cover.func.txt
 .DS_Store
 /src/otelcol-dev/builder
 /src/otelcol-dev/otelcol-dev
+e2e-cover/
+e2e-cover.out

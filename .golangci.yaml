@@ -1,4 +1,8 @@
 version: "2"
+run:
+  # Lint the end-to-end tests too.
+  build-tags:
+    - e2e
 formatters:
   enable:
     - gofmt

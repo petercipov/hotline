@@ -127,6 +127,13 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	return p, nil
 }
 
+// Validate checks a config and every spec it points to, without starting
+// anything. A config with problems is refused with all of them listed.
+func Validate(configPath string) error {
+	_, err := config.Load(configPath)
+	return err
+}
+
 // Shutdown stops taking calls, lets calls in flight finish, then sends every
 // queued record, all within the time ctx allows.
 func (p *Proxy) Shutdown(ctx context.Context) error {

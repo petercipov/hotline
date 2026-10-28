@@ -1,14 +1,16 @@
 @e2e
 Feature: Calling through the forward proxy ingress, end to end
-  Real clients call the real proxy binary, which calls a local TLS test
-  vendor; a fake OTLP receiver collects what the proxy sends. The clients
-  come from the research folder (matrix-clients/go and node); case numbers
-  are those in egress-proxy-options.md. Only cases 1, 2, 4 and 5 put a full
-  address in the request line.
+  A real client calls the real hotline-proxy program, which calls a local
+  TLS test vendor; a fake OTLP receiver collects what the program sends.
+  The program trusts the test vendor's issuer through --trust-file. The Go
+  client cases are copied from the research folder (matrix-clients/go);
+  case numbers are those in egress-proxy-options.md. Only cases 1, 2, 4 and
+  5 put a full address in the request line. The Node, Java and Rust clients
+  come later (Peter, 2026-10-28).
 
   Background:
-    Given the proxy runs with integration test-shop for the test vendor
-    And a fake OTLP receiver
+    Given a fake OTLP receiver
+    And the hotline-proxy program runs with integration test-shop for the test vendor
 
   Scenario Outline: The client matrix
     When the <client> client sends case <case>: <how>
@@ -19,16 +21,24 @@ Feature: Calling through the forward proxy ingress, end to end
     And the record holds the redacted url.full and no secret
 
     Examples:
+      | client | case | how                                                  |
+      | Go     | 1    | POST https://… over plain HTTP/1.1, using URL.Opaque |
+      | Go     | 2    | POST http://… through Transport.Proxy                |
+
+  @later
+  Scenario Outline: The client matrix in other languages
+    When the <client> client sends case <case>: <how>
+    Then the app gets the test vendor's status, headers and body unchanged
+
+    Examples:
       | client | case | how                                                            |
-      | Go     | 1    | POST https://… over plain HTTP/1.1, using URL.Opaque           |
-      | Go     | 2    | POST http://… through Transport.Proxy                          |
       | Node   | 1    | POST https://… with http.request and a full URL as the path    |
       | Node   | 2    | POST http://… with http.request                                |
 
   @later
   Scenario Outline: The client matrix over TLS to the proxy
     When the <client> client sends case <case>: <how>
-    Then the app gets the test vendor's answer
+    Then the app gets the test vendor's status, headers and body unchanged
 
     Examples:
       | client | case | how                                                       |
@@ -42,7 +52,7 @@ Feature: Calling through the forward proxy ingress, end to end
     Then <result>
 
     Examples:
-      | target                                       | result                                                                    |
-      | a vendor with an untrusted certificate       | the app gets 502 with Proxy-Status and the record's error.type is tls_certificate_error |
-      | a host that does not exist                   | the app gets 502 with Proxy-Status and the record's error.type is dns_error |
-      | the test vendor without Proxy-Authorization  | the call reaches the vendor and the record is minimal with ID not-passed  |
+      | target                                      | result                                                                                   |
+      | a vendor with an untrusted certificate      | the app gets 502 with Proxy-Status and the record's error.type is tls_certificate_error |
+      | a host that does not exist                  | the app gets 502 with Proxy-Status and the record's error.type is dns_error             |
+      | the test vendor without Proxy-Authorization | the call reaches the vendor and the record is minimal with ID not-passed                |

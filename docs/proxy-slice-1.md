@@ -33,7 +33,7 @@ The proxy judges nothing. Verdicts, thresholds and SLAs live in the control plan
 | `export.feature` | sending logs and the counter over OTLP |
 | `end-to-end.feature` | real clients through the real proxy, tagged `@e2e` |
 
-Run them with `go test ./src/hotline/proxy/`. Scenarios tagged `@e2e` or `@later` are skipped for now. The proxy as a whole is the system under test: scenarios drive it the way an app does, with fake vendors and a fake OTLP receiver at its edges (see the `hotline-go-proxy` skill).
+Run them with `go test ./src/hotline/proxy/`. Scenarios tagged `@later` are skipped for now, and those tagged `@e2e` run against the built program with `make e2e` (see [proxy-program.md](proxy-program.md)). The proxy as a whole is the system under test: scenarios drive it the way an app does, with fake vendors and a fake OTLP receiver at its edges (see the `hotline-go-proxy` skill).
 
 ## End-to-end checks
 
