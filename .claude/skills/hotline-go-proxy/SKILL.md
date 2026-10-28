@@ -1,6 +1,6 @@
 ---
 name: hotline-go-proxy
-description: How to write Go code for the Hotline proxy - layout, tests first with Ginkgo, standard library HTTP, OpenTelemetry names, errors, concurrency and the proxy's hard rules. Use when designing, writing, testing or reviewing any proxy code in this repo.
+description: How to write Go code for the Hotline proxy - layout, tests first with Gherkin feature files run by godog, standard library HTTP, OpenTelemetry names, errors, concurrency and the proxy's hard rules. Use when designing, writing, testing or reviewing any proxy code in this repo.
 ---
 
 # Writing the Hotline proxy in Go
@@ -11,34 +11,45 @@ The proxy sits between a customer's apps and their vendors. It forwards each cal
 
 ## 1. Tests first, always
 
-This repo works test-first (see `CLAUDE.md`):
+This repo works test-first (see `CLAUDE.md`).
 
-1. Before any code, list the test cases for the piece you are building: the normal cases, the edge cases and the failures, each in given, when, then form (see below). Put them in the test file as pending specs (`PIt`) or in the plan, so they can be reviewed first.
-2. Turn one case into a failing Ginkgo `It`.
+### The system under test
+
+The approach follows [Unit testing: values and principles](https://medium.com/codex/unit-testing-values-and-principles-ae80d9210ca6) (Peter, 2026-10-28):
+
+- **The unit is a behaviour, not a function or a struct.** The system under test (the thing a test drives and checks) is a part of the proxy that gives value on its own. For the proxy that is mostly the proxy itself: an app sends a call, the proxy forwards it, a vendor answers, and a record goes out. Functions and types are only the way in, never the subject.
+- **Test from the outside in.** A test acts like a user of the proxy: it sends a call the way an app does and looks only at what can be seen from outside: what the app gets back, what the vendor received, what the OTLP receiver got. It knows as little as possible about how the proxy works inside.
+- **Fakes only at the edges.** The outside world is replaced at the proxy's boundary: vendors are local servers from `net/http/httptest` (with TLS: `httptest.NewTLSServer`), the OTLP destination is a fake receiver, and the clock and DNS come in through the constructor. Inside the boundary the real parts work together; never stub or mock one part of the proxy to test another. A failure should say what went wrong for the user ("the record kept the customer ID"), not that a mock was not called.
+- **No shared constants between code and tests.** Tests write the expected values out in full (`"http.request.method"`, `"REDACTED"`, `"forward_proxy"`), so a wrong constant in the code is caught instead of copied.
+- **Small solitary tests only when they pay.** A part with a stable interface and many cases of its own (for example matching a path to a route template) may get its own small Ginkgo test as well. Do this only when driving every case through the whole proxy would be slow or awkward.
+- **Tests must pay their cost.** They are deterministic, fast enough that nobody skips them, and free to survive any refactoring that keeps the behaviour. A test that breaks when the inside changes but the behaviour does not is a bad test: rewrite it.
+- **Tests are the documentation.** Anyone should be able to read the feature files and know what the proxy does.
+
+### Feature files
+
+Behaviour is written as Gherkin feature files (plain-language test cases in Given, When, Then form) in `src/hotline/proxy/features/`, one file per behaviour, e.g. `redaction.feature`. They are run by [godog](https://github.com/cucumber/godog), the official Cucumber tool for Go (MIT license), from `src/hotline/proxy/features_test.go` (Peter, 2026-10-28).
+
+- **Given** sets up the starting state (config, specs, fake vendors), **When** is what an app or vendor does, **Then** is what can be seen from outside. Use `And` to add more lines of the same kind.
+- Use `Scenario Outline` with an `Examples` table when the same behaviour has several inputs.
+- Use `Background` for setup shared by every scenario in a file.
+- Tag open questions from the slice doc (`@q3`) and end-to-end scenarios (`@e2e`). The normal `go test` run skips `@e2e`.
+- Step definitions live in Go next to `features_test.go` and drive one system under test object that owns the proxy and its fakes, so every scenario starts clean.
+
+### The loop
+
+1. Before any code, write or update the feature file for the behaviour you are building: the normal cases, the edge cases and the failures. Get it reviewed first.
+2. Add step definitions for one scenario so it runs and fails.
 3. Run `go test ./...` and see it fail for the right reason.
-4. Write the least code that makes it pass, run again, then tidy up. Move to the next case.
+4. Write the least code that makes it pass, run again, then tidy up. Move to the next scenario.
+5. While a feature file has steps with no definition, godog reports them as undefined without failing the run. Once a slice is built, turn the run strict so an undefined step fails.
 
-Rules for tests here:
+### Other rules for tests
 
-- Ginkgo and Gomega only. No testify, no mocking libraries.
-- Test packages are `<pkg>_test` (black box). Use `<pkg>_internal_test.go` only when an internal detail truly needs it.
-- There is no fixed coverage target. Aim for every listed case to have a test; code that is hard to test is a design smell, so split it.
-- Replace the outside world with small hand-written fakes behind interfaces, or real local servers from `net/http/httptest` (also with TLS, `httptest.NewTLSServer`). Never call the real internet in unit tests.
-- Time and randomness come in through the constructor (a clock function, a reader), so tests stay deterministic.
-- Write every test case as **given, when, then** (Peter, 2026-10-28), using Ginkgo's containers so the report reads as one sentence:
-  - `Context("given …")` for the starting state,
-  - `When("…")` for the action,
-  - `It("then …")` for the expected result.
-
-  Several `It` blocks may share one `When`, and several `When` blocks one `Context`. Example:
-  ```go
-  Context("given a query", func() {
-      When("a value has no mark", func() {
-          It("then it is replaced with REDACTED and its name is kept", func() { ... })
-      })
-  })
-  ```
-- End-to-end tests (Java, Node, Go and Rust clients through every ingress) are the first milestone's finish line. Keep them separate from the fast unit tests.
+- godog for behaviour, Ginkgo and Gomega for the small solitary tests. No testify, no mocking libraries.
+- Ginkgo test packages are `<pkg>_test` (black box).
+- There is no fixed coverage target. Aim for every scenario to run; code that is hard to test is a design smell, so split it.
+- Never call the real internet in tests.
+- End-to-end tests (Java, Node, Go and Rust clients through every ingress, tagged `@e2e`) are the first milestone's finish line. Keep them separate from the fast tests.
 
 ## 2. Dependencies
 

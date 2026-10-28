@@ -2,7 +2,7 @@
 
 The proxy is built in small slices, tests first. This page says what slice 1 covers, what waits for later, and which parts of the spec need an answer before building starts. The source of truth is `proxy-spec.md` and `proxy-example/` in the `hotline-strategic` repo.
 
-Right now slice 1 is only test cases: pending Ginkgo specs (`PIt`, tests written down but not run yet) under `src/hotline/proxy/`. Each case is written as given, when, then: `Context("given …")`, `When("…")` and `PIt("then …")`. There is no production code yet. Each pending case becomes a real failing test, then code, once Peter has reviewed the list.
+Right now slice 1 is only test cases: Gherkin feature files (plain-language cases in Given, When, Then form) in `src/hotline/proxy/features/`, run by godog. Their steps have no Go code behind them yet, so they show as undefined. There is no production code yet. Each scenario becomes a real failing test, then code, once Peter has reviewed the list.
 
 ## What slice 1 covers
 
@@ -19,19 +19,21 @@ The proxy judges nothing. Verdicts, thresholds and SLAs live in the control plan
 
 ## Where the test cases are
 
-| Package | What it tests |
+| File | What it describes |
 |---|---|
-| `proxy/config` | loading and checking `hotline-proxy.yaml` |
-| `proxy/spec` | reading route templates, marks and secrets from the vendor spec |
-| `proxy/ingress` | finding the ingress and reading the integration ID |
-| `proxy/forward` | the call to the vendor, certificates, the proxy's own errors |
-| `proxy/timing` | phase timings |
-| `proxy/redact` | redacting the address and choosing headers |
-| `proxy/record` | building the request record |
-| `proxy/export` | sending logs and the counter over OTLP |
-| `proxy/e2e` | real clients through the real proxy |
+| `config.feature` | loading and checking `hotline-proxy.yaml` |
+| `spec.feature` | reading route templates, marks and secrets from the vendor spec |
+| `ingress.feature` | finding the ingress |
+| `integration-id.feature` | reading the integration ID |
+| `forward.feature` | the call to the vendor, certificates, the proxy's own errors |
+| `timing.feature` | phase timings |
+| `redaction.feature` | redacting the vendor address |
+| `headers.feature` | choosing headers for the record |
+| `record.feature` | building the request record |
+| `export.feature` | sending logs and the counter over OTLP |
+| `end-to-end.feature` | real clients through the real proxy, tagged `@e2e` |
 
-Run them with `go test ./src/hotline/proxy/...`. Pending specs show as pending and do not fail the run.
+Run them with `go test ./src/hotline/proxy/`. Open questions are tagged `@q1` to `@q14`. The proxy as a whole is the system under test: scenarios drive it the way an app does, with fake vendors and a fake OTLP receiver at its edges (see the `hotline-go-proxy` skill).
 
 ## End-to-end checks
 
@@ -54,7 +56,7 @@ Unlike the research runs, these tests never call the real Stripe. They use a loc
 
 ## Open questions
 
-The test names point here with Q1 to Q14. Each needs an answer before its test is written.
+The feature files point here with the tags `@q1` to `@q14`. Each needs an answer before its test is written.
 
 1. **Other requests on the proxy port.** Until the other ingresses exist, what should a path like `/https://...`, a plain path with a Host header, or a `CONNECT` get? An error answer with `Proxy-Status`, and which status code?
 2. **Broken `Proxy-Authorization`.** A scheme other than Basic, bad base64, no colon, an empty user name, or two such headers. Treat all as "no ID sent" and record `not-passed`?
