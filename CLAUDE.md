@@ -1,5 +1,7 @@
 # Hotline Project
 
+Read [memory.md](memory.md) first: it lists decisions already made, the slice plan, and where the detail lives. Add new decisions there.
+
 ## Development Approach
 
 This project uses **Test-Driven Development (TDD)**. Write tests before writing implementation code.
