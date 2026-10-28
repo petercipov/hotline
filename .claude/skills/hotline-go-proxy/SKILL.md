@@ -37,11 +37,34 @@ From [Unit tests should not mirror source code](https://journal.optivem.com/p/un
 
 ### Tests do not reach into the code
 
-From [Decoupling tests from implementation details](https://medium.com/codex/decoupling-tests-from-implementation-details-238a9ab06e4f) (Peter, 2026-10-28): a test says *what* the proxy must do, never *how* it does it.
+From [Decoupling tests from implementation details](https://medium.com/codex/decoupling-tests-from-implementation-details-238a9ab06e4f) by Luís Soares (Peter, 2026-10-28): a test says *what* the proxy must do, never *how* it does it.
 
-- **Test only through the proxy's own ways in and out:** the config file and specs it reads, the proxy port apps call, the vendors it calls, and the OpenTelemetry data it sends. Steps never call internal functions or read internal fields.
-- **Never change production code just to make a test possible.** No exported field, extra method, flag or hook that only a test uses: that is the quickest way to tie tests to the code. Passing the clock and the vendor transport in through the constructor is not this: the proxy needs those seams anyway (section 3).
-- **Given, When, Then is Arrange, Act, Assert.** Given arranges the starting state, When does one action, Then checks what can be seen from outside.
+**Test only through a small set of ways in and out.** For the proxy these are: the config file and specs it reads, the proxy port apps call (and the admin port once it exists), the vendors it calls, and the OpenTelemetry data it sends. Steps use only these to arrange, act and check. They never call internal functions, read internal fields or know which types sit inside.
+
+**Never change production code just to make a test possible.** None of these:
+- making a function, field or constant public so a test can use it;
+- adding a return value to a function that had none, only to check it; check the effect the outside can see instead;
+- adding a function only a test calls;
+- a "test mode" flag that changes how the proxy behaves.
+
+The exception is passing in what the proxy needs from the world anyway: the clock, randomness, environment variables, DNS and the vendor transport come in through the constructor (section 3). That makes the code clearer as well as testable.
+
+**No other link between tests and code.**
+- Never redo the code's logic in a test ("I'll just recompute it here"). Write the expected value out in full.
+- Never use the code's constants or variables in a test. If a test needs a different value, such as a smaller queue, pass it in.
+- Don't test helpers on their own, even public ones: a YAML mapper, a header formatter or an OTLP converter exists only to serve a behaviour, so test that behaviour. Keep such helpers private, next to the code that uses them; shared helper packages are a smell.
+- Tests don't know about the clock, environment variables or anything else that changes between runs; those are injected.
+- Use the same way in to arrange, act and check. To check what was exported, read what the fake OTLP receiver got, not the proxy's queue.
+
+**No snapshot tests.** Don't compare a whole JSON, OTLP payload or log line against a saved copy: any harmless change (field order, a new attribute) turns it red. Check the fields the scenario is about.
+
+**Shape the code so tests see little of it.**
+- Everything is private (lower case) until something outside its package truly needs it.
+- If part A is the only user of part B, merge them: they change for the same reasons.
+- Prefer deep interfaces: a lot of work behind few, simple operations. One call rather than two that must be made in order.
+- Each operation does one thing; no modes that switch behaviour on an input.
+
+**Given, When, Then is Arrange, Act, Assert.** Given arranges the starting state, When does one action, Then checks what can be seen from outside.
 
 ### Feature files
 

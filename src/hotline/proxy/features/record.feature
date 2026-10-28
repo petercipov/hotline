@@ -16,10 +16,14 @@ Feature: Building the request record
     And hotline.client.cancelled, hotline.connection.reused and hotline.config.version are recorded
     And there is no error.type
 
-  Scenario: It matches the sample in proxy-example
+  Scenario: The sample call from proxy-example
     Given the config and specs from proxy-example
     When the Talon.One sample call ends
-    Then the record matches the sample record, apart from the schema errors that come in a later slice
+    Then hotline.integration.id is talon-shop-a
+    And hotline.ingress is forward_proxy
+    And url.full is "https://api.talon.one/v2/customer_sessions/REDACTED?dry=true"
+    And url.template is /v2/customer_sessions/{customerSessionId}
+    And http.response.header.x-request-id is req-5521
 
   Scenario: The scheme actually sent
     Given an api with TLS origination on
