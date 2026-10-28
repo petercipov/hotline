@@ -25,6 +25,16 @@ The approach follows [Unit testing: values and principles](https://medium.com/co
 - **Tests must pay their cost.** They are deterministic, fast enough that nobody skips them, and free to survive any refactoring that keeps the behaviour. A test that breaks when the inside changes but the behaviour does not is a bad test: rewrite it.
 - **Tests are the documentation.** Anyone should be able to read the feature files and know what the proxy does.
 
+### Tests do not mirror the code
+
+From [Unit tests should not mirror source code](https://journal.optivem.com/p/unit-tests-should-not-mirror-source-code-michael-azerhad) (Michaël Azerhad, with Uncle Bob's "TDD harms architecture"; Peter, 2026-10-28):
+
+- **Never one test file per source file, or one test per function.** That one-to-one match ties the tests tightly to the code's structure: every split, merge or move of code breaks tests even when the behaviour stays the same, and the tests end up freezing the design.
+- **Organise tests by behaviour.** Feature files and scenarios are named after what the proxy does (`redaction.feature`, "A secret query parameter is always redacted"), never after a package, type or function.
+- **A test may cross many types and packages.** Tests are sociable by default: they use the real parts of the proxy together. "Unit" does not mean one function, one struct, or mocking every neighbour.
+- **Let the inside emerge.** When refactoring pulls code out into a new function, type or package, it needs no test of its own: the behaviour tests already cover it. Only give it a solitary test when it meets the rule above (stable interface, many cases of its own).
+- **Refactoring must not break tests.** If moving logic between types, renaming internals or changing an internal interface breaks a test, the test was coupled to the code: fix the test, not the refactoring.
+
 ### Feature files
 
 Behaviour is written as Gherkin feature files (plain-language test cases in Given, When, Then form) in `src/hotline/proxy/features/`, one file per behaviour, e.g. `redaction.feature`. They are run by [godog](https://github.com/cucumber/godog), the official Cucumber tool for Go (MIT license), from `src/hotline/proxy/features_test.go` (Peter, 2026-10-28).
