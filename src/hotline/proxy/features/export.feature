@@ -55,19 +55,21 @@ Feature: Sending OpenTelemetry data
     When the proxy starts
     Then its queue holds 10 000 records
 
-  @q13
   Scenario: A full queue drops the oldest
-    Given an exporter whose queue is full
-    When another call ends
-    Then the oldest record is dropped and counted
-    And the call is not blocked or slowed
+    Until the proxy's own health data exists, drops are counted in a
+    warning log line, at most once a minute per destination (Peter,
+    2026-10-28).
+    Given an exporter with queueSize 3 whose destination is busy with the first record
+    When 4 more calls end
+    Then the destination gets records 1, 3, 4 and 5
+    And the proxy logs a warning that 1 record was dropped for that destination
+    And no call was blocked or slowed
 
   Scenario: Flushing on shutdown
     Given records waiting in the queue
     When the proxy shuts down
     Then they are sent first, within a time limit
 
-  @q13
   Scenario: Left for later slices
     When the proxy runs
     Then it sends no trace spans

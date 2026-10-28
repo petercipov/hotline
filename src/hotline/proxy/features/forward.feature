@@ -15,13 +15,11 @@ Feature: Forwarding a call to the vendor
       | a not-passed call with the built-in settings        | http://api.x.com/a          | http   | 80   |
       | a not-passed entry with tlsOrigination set to true  | http://api.x.com/a          | https  | 443  |
 
-  @q4
   Scenario: Upgrading an address with an explicit port
     Given an api with TLS origination on, the default
     When an app sends "GET http://api.talon.one:8080/v2/x"
     Then the proxy calls the vendor over https on port 8080
 
-  @q5
   Scenario: A not-passed https call stays https
     Given a not-passed call with the built-in settings
     When an app sends "GET https://api.x.com/a"
@@ -35,8 +33,8 @@ Feature: Forwarding a call to the vendor
     And Authorization and every other end-to-end header are kept
     And headers for one hop only, such as Connection and Proxy-Connection, are removed as HTTP requires
     And Host is set to the vendor host from the request line
+    And the proxy adds no header of its own, such as Accept-Encoding or User-Agent
 
-  @q6
   Scenario: No forwarding headers are added
     Given an app call
     When the proxy forwards it
@@ -111,6 +109,9 @@ Feature: Forwarding a call to the vendor
       | a vendor that takes too long to connect                      | 504    | connection_timeout    |
       | a TLS handshake that fails for a reason other than the certificate | 502 | tls_protocol_error |
       | a vendor slower than vendorTimeout                           | 504    | http_response_timeout |
+      | a vendor whose network cannot be reached                     | 502    | destination_unavailable |
+      | a TLS handshake that takes too long                          | 504    | connection_timeout    |
+      | a vendor that closes the connection before answering         | 502    | http_response_incomplete |
 
   Scenario: The vendor breaks off mid-reply
     Given a vendor that stops after sending half of its reply
@@ -124,8 +125,8 @@ Feature: Forwarding a call to the vendor
     Then the vendor gets no part of it
 
   Scenario: The app gives up first
-    Given a vendor that answers after 3 seconds and a vendorTimeout of 10 seconds
-    When the app disconnects after 1 second
+    Given a vendor that answers after 300 milliseconds and a vendorTimeout of 10 seconds
+    When the app disconnects after 100 milliseconds
     Then the proxy keeps waiting for the vendor
     And the record holds the vendor's real status and timings
     And the record says hotline.client.cancelled true

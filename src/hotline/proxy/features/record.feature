@@ -30,11 +30,10 @@ Feature: Building the request record
     When an app sends an http address
     Then url.scheme is https
 
-  @q3
   Scenario: No route in the spec
     Given integration talon-shop-a with an api for api.talon.one
     When a call goes to a path the spec does not know
-    Then url.template is left out
+    Then url.full and url.template are left out
 
   Scenario: Body sizes count the bytes that passed
     Given a call whose Content-Length header says 100 but whose body is 80 bytes
@@ -58,7 +57,6 @@ Feature: Building the request record
       | a call with the unknown ID talon-shop-x             | talon-shop-x |
       | a call from talon-shop-a to api.stripe.com, outside its apis | talon-shop-a |
 
-  @q12
   Scenario: Fields for later slices are left out
     Given integration talon-shop-a with an api for api.talon.one
     When the Talon.One sample call ends
@@ -71,6 +69,6 @@ Feature: Building the request record
     Then none of those values and no byte of either body appears anywhere in the record
 
   Scenario: The record never slows the call
-    Given a record builder that takes 2 seconds
+    Given an OTLP receiver that takes 2 seconds to take each export
     When an app makes a call
     Then the app gets the reply without waiting for the record

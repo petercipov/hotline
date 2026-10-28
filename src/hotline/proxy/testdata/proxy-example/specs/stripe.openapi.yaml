@@ -1,0 +1,54 @@
+# Our copy of the Stripe spec, shortened to two routes, with Hotline marks.
+openapi: 3.1.0
+info:
+  title: Stripe API
+  version: "2024-06-20"
+servers:
+  - url: https://api.stripe.com
+security:
+  - bearer_auth: []
+paths:
+  /v1/payment_intents:
+    get:
+      operationId: listPaymentIntents
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, x-hotline-redact: false }
+        - { name: starting_after, in: query, schema: { type: string }, x-hotline-redact: false }
+        - { name: customer, in: query, schema: { type: string } }   # no mark: redacted
+        - { name: Stripe-Version, in: header, schema: { type: string }, x-hotline-redact: false }
+        - { name: Idempotency-Key, in: header, schema: { type: string }, x-hotline-redact: false }
+      responses:
+        "200":
+          description: A list of payment intents
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data, has_more]
+                properties:
+                  object: { type: string, const: list }
+                  data: { type: array, items: { type: object } }
+                  has_more: { type: boolean }
+  /v1/payment_intents/{intent}:
+    get:
+      operationId: getPaymentIntent
+      parameters:
+        - { name: intent, in: path, required: true, schema: { type: string }, x-hotline-redact: false }   # the payment intent ID, e.g. pi_3Mtw...
+      responses:
+        "200":
+          description: One payment intent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, amount, currency, status]
+                properties:
+                  id: { type: string }
+                  amount: { type: integer }
+                  currency: { type: string }
+                  status: { type: string }
+components:
+  securitySchemes:
+    bearer_auth:                      # how apps log in: a bearer token in the Authorization header; the proxy never records it
+      type: http
+      scheme: bearer

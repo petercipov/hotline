@@ -20,11 +20,10 @@ Feature: Finding the ingress
     When an app sends "PUT https://api.talon.one/v2/x" with the header "Host: other.example"
     Then the vendor is api.talon.one
 
-  @q1
   Scenario Outline: Requests meant for later ingresses
     Given the proxy is running
     When an app sends <request>
-    Then the proxy answers with an error and a Proxy-Status header
+    Then the proxy answers 501 Not Implemented with a Proxy-Status header
     And nothing is sent to any vendor
 
     Examples:

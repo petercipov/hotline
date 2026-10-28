@@ -28,7 +28,6 @@ Feature: Redacting the vendor address
       | verbose                       | verbose                           |
       | customer=cus%2077             | customer=REDACTED                 |
 
-  @q11
   Scenario: Empty query values
     Given the Stripe spec
     When an app calls "https://api.stripe.com/v1/payment_intents?customer="
@@ -39,11 +38,12 @@ Feature: Redacting the vendor address
     When an app calls with "?key=abc"
     Then the query in url.full is "key=REDACTED"
 
-  @q3
   Scenario: A path the spec does not know
+    Without a route the proxy cannot tell values from fixed parts of the
+    path, so it records no address at all.
     Given the Talon.One spec
     When an app calls "https://api.talon.one/v2/unknown/abc"
-    Then url.full is "https://api.talon.one/REDACTED/REDACTED/REDACTED"
+    Then there is no url.full or url.template
 
   Scenario: User name and password inside the address
     Given the Talon.One spec

@@ -1,27 +1,98 @@
 package proxy_test
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/cucumber/godog"
+	"go.uber.org/goleak"
 )
 
 // TestFeatures runs the Gherkin files in ./features against the proxy as the
-// system under test. Steps without a definition yet are reported as
-// undefined and do not fail the run; once slice 1 is built, each step gets a
-// definition and the run turns strict.
+// system under test. The run is strict: a step without a definition fails.
+// End-to-end scenarios run on their own, and scenarios tagged @later wait
+// for a later slice.
 func TestFeatures(t *testing.T) {
 	suite := godog.TestSuite{
 		Name:                "hotline-proxy",
-		ScenarioInitializer: func(*godog.ScenarioContext) {},
+		ScenarioInitializer: initializeScenario,
 		Options: &godog.Options{
 			Format:   "progress",
 			Paths:    []string{"features"},
-			Tags:     "~@e2e",
+			Tags:     "~@e2e && ~@later",
+			Strict:   true,
 			TestingT: t,
 		},
 	}
 	if suite.Run() != 0 {
 		t.Fatal("feature files failed")
 	}
+}
+
+func initializeScenario(sc *godog.ScenarioContext) {
+	w := &world{}
+	var before goleak.Option
+	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+		before = goleak.IgnoreCurrent()
+		fresh, err := newWorld()
+		*w = *fresh
+		return ctx, err
+	})
+	sc.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
+		w.close()
+		if err == nil {
+			// Every goroutine the proxy started must be gone once it has
+			// shut down.
+			err = goleak.Find(before)
+		}
+		return ctx, err
+	})
+	configSteps(sc, w)
+	specSteps(sc, w)
+	ingressSteps(sc, w)
+	integrationSteps(sc, w)
+	forwardSteps(sc, w)
+	timingSteps(sc, w)
+	redactionSteps(sc, w)
+	headerSteps(sc, w)
+	recordSteps(sc, w)
+	exportSteps(sc, w)
+}
+
+var errCheck = errors.New("check failed")
+
+func failf(format string, args ...any) error {
+	return fmt.Errorf("%w: %s", errCheck, fmt.Sprintf(format, args...))
+}
+
+// has checks that a record holds key with exactly value.
+func has(record map[string]any, key string, value any) error {
+	got, found := record[key]
+	if !found {
+		return failf("the record has no %s; it has %v", key, record)
+	}
+	if fmt.Sprint(got) != fmt.Sprint(value) {
+		return failf("%s is %v, want %v", key, got, value)
+	}
+	return nil
+}
+
+func hasNo(record map[string]any, keys ...string) error {
+	for _, key := range keys {
+		if got, found := record[key]; found {
+			return failf("the record has %s = %v, want none", key, got)
+		}
+	}
+	return nil
+}
+
+func hasAll(record map[string]any, keys ...string) error {
+	for _, key := range keys {
+		if _, found := record[key]; !found {
+			return failf("the record has no %s; it has %v", key, record)
+		}
+	}
+	return nil
 }

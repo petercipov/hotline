@@ -1,18 +1,22 @@
-@q10
 Feature: Measuring each phase of a call
-  Phase timings come from net/http/httptrace and an injected clock, so
-  tests need no real waiting. All values are in seconds.
+  Phase timings come from net/http/httptrace and an injected clock. All
+  values are in seconds. Each timing is the length of its own phase, except
+  first_byte, which counts from when the call reached the proxy. The
+  proxy's own time is split in two: before the vendor call starts
+  (proxy_request) and after the vendor's reply ends (proxy_response).
+  (Peter, 2026-10-28)
 
   Scenario: A call on a new https connection
     Given a vendor reached over a new https connection
     When a call ends
     Then the record has hotline.timing.dns, connect, tls, first_byte and total
+    And first_byte is at least dns, connect and tls together
     And network.peer.address holds the vendor IP
     And dns.question.name holds the name looked up
     And tls.protocol.version holds the vendor's TLS version
     And tls.server.not_after holds when the vendor's certificate expires
     And network.protocol.version holds the HTTP version used to the vendor
-    And hotline.timing.proxy holds the proxy's own added time
+    And hotline.timing.proxy_request and proxy_response hold the proxy's own added time
     And hotline.connection.reused is false
 
   Scenario: Total ends with the last byte to the app
@@ -48,7 +52,8 @@ Feature: Measuring each phase of a call
       | the TLS handshake fails    | the dns and connect timings and the total        |
       | the vendor never answers   | no first_byte timing                             |
 
-  Scenario: Parallel connection attempts are not counted twice
-    Given a client that tries IPv4 and IPv6 at the same time
-    When the phases overlap
-    Then nothing is counted twice
+  Scenario: Several addresses are tried one after another
+    Given a vendor whose IPv6 address cannot be reached and whose IPv4 address can
+    When a call ends
+    Then the call goes to the IPv4 address
+    And the connect phase is counted once, from the first try until connected
