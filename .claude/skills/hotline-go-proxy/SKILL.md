@@ -180,6 +180,50 @@ These protect the customer's traffic. Breaking one is a bug even if tests pass.
 - Any new module is named and justified.
 - No secret or body value can reach a log, error or record.
 
+## 10. Reviewing proxy code
+
+Use this when asked to review a change, your own or someone else's. For a plain bug hunt, the built-in `/code-review` command works well too; this section adds what only this repo knows.
+
+### How to review
+
+1. Run `gofmt -l`, `go vet ./...` and `make lint` first, so the review is not spent on what tools already catch.
+2. Read the `go` line in `go.mod`, and only give advice that fits that Go version.
+3. Read the whole function around each change, not only the changed lines.
+4. Go through the checks below. Skip a group that the change does not touch.
+5. Before reporting, read the code again for every finding. Drop any finding you cannot point to a line for, and any that is only a different taste rather than a mistake.
+6. Report findings in three groups: **Must fix** (breaks a rule or a behaviour), **Should fix** (makes the code harder to change or read), **Nit** (small style points). Each finding names the file and line, the rule, and why it matters.
+
+### Tests (section 1)
+
+- The feature file came first, and each new behaviour has a scenario named after what the proxy does.
+- Tests drive the proxy from outside: config, the proxy port, fake vendors and the fake OTLP receiver. No step calls internal functions or reads internal fields.
+- No production code was changed only for a test: nothing made public for a test, no return value added only to check it, no function only a test calls, no test mode.
+- Expected values are written out in full; no constants from the code, no recomputed logic, no snapshot comparisons.
+- Fakes sit only at the edges. No mocks of one part of the proxy to test another, no testify, no mocking libraries.
+- No new test file that mirrors one source file or one function. A new solitary Ginkgo test meets the rule: stable interface and many cases of its own.
+- No real sleeps (the clock is injected), no calls to the real internet, and goroutine leak checks where goroutines start.
+
+### The call path (section 6)
+
+- Nothing slows or changes the call: no check, fingerprint or export runs on the call's goroutine.
+- Body copies stop at 1 MiB; queues are bounded and drop instead of block; there are no retries.
+- Streaming replies are flushed piece by piece.
+- TLS certificates are always checked; `Proxy-Authorization` is removed before the vendor call.
+- No secret, header value or body byte can reach a log, error text or record.
+
+### Go code (sections 2, 4, 5 and 7)
+
+- Every new outside module is named in the pull request, needed, and has a license that fits Apache-2.0.
+- Packages are named after what they provide; no `util` or `common`; no package-level variables except sentinel errors; no `init()`.
+- Interfaces are small and declared where they are used; constructors return concrete types; names are private unless needed outside.
+- Errors use the package's sentinel errors with `%w`; error strings are lower case with no full stop at the end; no `panic` on outside input; no error is thrown away with `_` without a reason.
+- Every goroutine has an owner and stops on `ctx.Done()`; `context.Context` comes first and is never stored in a struct; only the sender closes a channel.
+- Logs use `log/slog` with a fixed message and key-value fields, not `fmt.Sprintf` messages.
+- Naming follows Go habits: `MixedCaps`, initialisms kept in one case (`URL`, `ID`, `HTTP`), short receiver names used the same way in every method, no package name repeated in a type name (`ingress.Finder`, not `ingress.IngressFinder`).
+- Opinions about OpenTelemetry names are checked against `semconv` and the spec's tables (section 8), not memory.
+
 ## Credits
 
 Parts of sections 3 and 7 (ports and adapters, goroutine and channel rules, goroutine leak checks, the slog bridge) are adapted, in our own words, from [samber/cc-skills-golang](https://github.com/samber/cc-skills-golang) by Samuel Berthe (MIT License).
+
+Section 10 is written in our own words, with ideas taken from two Apache-2.0 skills: the review checklist in [cxuu/golang-skills](https://github.com/cxuu/golang-skills) (`go-code-review`, built from the Google and Uber Go style guides and the Go Wiki CodeReviewComments page), and the review steps in [existential-birds/beagle](https://github.com/existential-birds/beagle) (`go-code-review`: read the Go version first, read whole functions, and check every finding before reporting it).
