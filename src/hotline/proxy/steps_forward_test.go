@@ -74,6 +74,182 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the proxy adds no header of its own, such as Accept-Encoding or User-Agent$`, func() error {
 		return w.vendorHeaders(nil, []string{"Accept-Encoding", "User-Agent"})
 	})
+	sc.Step(`^a vendor with a vendorTimeout of 10 seconds whose reply goes quiet after its first part$`, func() error {
+		w.clock = &fakeClock{}
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("        vendorTimeout: 10s\n")))
+		w.quiet, w.cutOff = make(chan struct{}), make(chan struct{})
+		quiet, cutOff := w.quiet, w.cutOff
+		w.vendor("api.talon.one").setAnswer(func(rw http.ResponseWriter, r *http.Request) {
+			_, _ = io.WriteString(rw, "first part, ")
+			rw.(http.Flusher).Flush()
+			select {
+			case <-quiet:
+				_, _ = io.WriteString(rw, "last part")
+			case <-r.Context().Done():
+				close(cutOff)
+			}
+		})
+		return nil
+	})
+	sc.Step(`^the reply stays quiet for (\d+) seconds$`, func(seconds int) error {
+		if err := w.start(); err != nil {
+			return err
+		}
+		w.vendor("api.talon.one")
+		conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", w.addr)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = conn.Close() }()
+		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+		_, err = io.WriteString(conn, "GET https://api.talon.one/v2/x HTTP/1.1\r\nHost: api.talon.one\r\n"+basic("talon-shop-a:x")+"\r\n\r\n")
+		if err != nil {
+			return err
+		}
+		reader := bufio.NewReader(conn)
+		resp, err := http.ReadResponse(reader, nil)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		w.resp = resp
+		first := make([]byte, len("first part, "))
+		if _, err := io.ReadFull(w.resp.Body, first); err != nil {
+			return err
+		}
+		// Wait until the proxy waits for the next part, then let time pass.
+		for deadline := time.Now().Add(5 * time.Second); w.clock.waiting() == 0 && time.Now().Before(deadline); {
+			time.Sleep(time.Millisecond)
+		}
+		w.clock.pass(time.Duration(seconds) * time.Second)
+		// Give a proxy that gave up the time to tell the vendor, before the
+		// vendor may send the rest.
+		select {
+		case <-w.cutOff:
+		case <-time.After(100 * time.Millisecond):
+		}
+		close(w.quiet)
+		rest, err := io.ReadAll(w.resp.Body)
+		first = append(first, rest...)
+		w.respBody, w.respErr = first, err
+		return nil
+	})
+	sc.Step(`^the app gets the whole reply and the record has no error.type$`, func() error {
+		if w.respErr != nil || string(w.respBody) != "first part, last part" {
+			return failf("the app got %q and %v", w.respBody, w.respErr)
+		}
+		record, err := w.record()
+		if err != nil {
+			return err
+		}
+		return hasNo(record, "error.type")
+	})
+	sc.Step(`^the reply to the app breaks off and the record says http_response_incomplete$`, func() error {
+		if w.respErr == nil {
+			return failf("the app got the whole reply %q", w.respBody)
+		}
+		record, err := w.record()
+		if err != nil {
+			return err
+		}
+		return has(record, "error.type", "http_response_incomplete")
+	})
+	sc.Step(`^a vendor that answers 413 without reading the body$`, func() error {
+		w.vendor("api.talon.one").setAnswer(func(rw http.ResponseWriter, _ *http.Request) {
+			rw.WriteHeader(http.StatusRequestEntityTooLarge)
+		})
+		return nil
+	})
+	sc.Step(`^an app sends a body slowly, in parts$`, func() error {
+		body, send := io.Pipe()
+		go func() {
+			for range 10 {
+				if _, err := send.Write(bytes.Repeat([]byte("p"), 1024)); err != nil {
+					return
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			_ = send.Close()
+		}()
+		defer func() { _ = body.Close() }()
+		return w.send(request{
+			method:  "PUT",
+			target:  w.target,
+			headers: []string{basic("talon-shop-a:x")},
+			body:    body,
+			length:  -1,
+			chunked: true,
+		})
+	})
+	sc.Step(`^the app gets (\d+)$`, func(status int) error {
+		if w.resp == nil || w.resp.StatusCode != status {
+			return failf("the app got %v", w.resp)
+		}
+		return nil
+	})
+	sc.Step(`^a vendor that accepts a WebSocket upgrade and sends back what it gets$`, func() error {
+		w.vendor("api.talon.one").setAnswer(func(rw http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Upgrade") != "websocket" {
+				rw.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			rw.Header().Set("Connection", "Upgrade")
+			rw.Header().Set("Upgrade", "websocket")
+			rw.WriteHeader(http.StatusSwitchingProtocols)
+			conn, buf, err := http.NewResponseController(rw).Hijack()
+			if err != nil {
+				return
+			}
+			defer func() { _ = conn.Close() }()
+			got := make([]byte, 4)
+			if _, err := io.ReadFull(buf, got); err == nil {
+				_, _ = conn.Write(got)
+			}
+		})
+		return nil
+	})
+	sc.Step(`^an app opens a WebSocket through the proxy and sends "(\w+)"$`, func(message string) error {
+		if err := w.start(); err != nil {
+			return err
+		}
+		conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", w.addr)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = conn.Close() }()
+		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+		_, err = io.WriteString(conn, "GET https://api.talon.one/v2/live HTTP/1.1\r\nHost: api.talon.one\r\n"+
+			basic("talon-shop-a:x")+"\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n")
+		if err != nil {
+			return err
+		}
+		reader := bufio.NewReader(conn)
+		resp, err := http.ReadResponse(reader, nil)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		w.resp = resp
+		if _, err := io.WriteString(conn, message); err != nil {
+			return err
+		}
+		w.respBody = make([]byte, len(message))
+		_, err = io.ReadFull(reader, w.respBody)
+		return err
+	})
+	sc.Step(`^the app gets 101 Switching Protocols and "(\w+)" back$`, func(message string) error {
+		if w.resp.StatusCode != http.StatusSwitchingProtocols || string(w.respBody) != message {
+			return failf("the app got %d and %q", w.resp.StatusCode, w.respBody)
+		}
+		return nil
+	})
+	sc.Step(`^the record says http.response.status_code (\d+)$`, func(status int) error {
+		record, err := w.record()
+		if err != nil {
+			return err
+		}
+		return has(record, "http.response.status_code", status)
+	})
 	sc.Step(`^Proxy-Authorization is removed$`, func() error { return w.vendorHeaders(nil, []string{"Proxy-Authorization"}) })
 	sc.Step(`^Authorization and every other end-to-end header are kept$`, func() error {
 		return w.vendorHeaders([]string{"Authorization", "Content-Type", "X-Trace"}, nil)

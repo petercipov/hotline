@@ -74,3 +74,5 @@ Peter answered these on 2026-10-28. The feature files and the code follow them.
 12. **Fields not built yet.** The schema and fingerprint fields are left out.
 13. **Dropped records.** A warning log line, at most once a minute per destination, and always one on the final send at shutdown. Each exporter's queue holds 10 000 records unless `queueSize` says otherwise.
 14. **TLS from apps to the proxy.** A later slice. Its scenario is tagged `@later`.
+
+One more answer came from the review of the pull request (Peter, 2026-10-28): `vendorTimeout` also limits how long a reply may go quiet between its parts. A vendor that stays silent longer is cut off, and the record says `http_response_incomplete`. A WebSocket may stay quiet as long as it likes.

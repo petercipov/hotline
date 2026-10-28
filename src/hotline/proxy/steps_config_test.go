@@ -163,10 +163,15 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		if err := w.call("PUT", "https://api.talon.one/v9/other/1"); err != nil {
 			return err
 		}
-		records := w.records()
-		if len(records) != 2 || records[0].attrs["url.template"] != "/v2/customer_sessions/{customerSessionId}" ||
-			records[1].attrs["url.template"] != "/v9/other/{x}" {
-			return failf("got records %v", records)
+		// A record is made just after its reply, so the two may arrive in
+		// either order.
+		templates := map[any]any{}
+		for _, r := range w.records() {
+			templates[r.attrs["hotline.integration.id"]] = r.attrs["url.template"]
+		}
+		if len(templates) != 2 || templates["talon-shop-a"] != "/v2/customer_sessions/{customerSessionId}" ||
+			templates["talon-shop-b"] != "/v9/other/{x}" {
+			return failf("got url.template by integration %v", templates)
 		}
 		return nil
 	})
@@ -293,6 +298,12 @@ func (w *world) brokenConfig(problem string) error {
 		w.configPath, w.problem = w.dir+"/nowhere.yaml", "nowhere.yaml"
 	case "there is no version":
 		w.rawConfig, w.problem = strings.TrimPrefix(start, "version: \"1\"\n")+exporters, "there is no version"
+	case "there is no proxy listen address":
+		w.rawConfig = "version: \"1\"\nlisten:\n  admin: \"127.0.0.1:0\"\n" + exporters
+		w.problem = "there is no listen.proxy address"
+	case "an integration has no id":
+		w.rawConfig = start + exporters + "integrations:\n  - apis:\n" + w.apiFor("api.x.com", "")
+		w.problem = "an integration has no id"
 	case "there are no exporters":
 		w.rawConfig, w.problem = start, "there are no exporters"
 	case "an exporter's temporality is neither cumulative nor delta":

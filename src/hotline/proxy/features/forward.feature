@@ -35,6 +35,32 @@ Feature: Forwarding a call to the vendor
     And Host is set to the vendor host from the request line
     And the proxy adds no header of its own, such as Accept-Encoding or User-Agent
 
+  Scenario Outline: A vendor reply that goes quiet
+    vendorTimeout also limits how long a reply may go quiet between its
+    parts (Peter, 2026-10-28), so slow replies that keep coming still work.
+    Given a vendor with a vendorTimeout of 10 seconds whose reply goes quiet after its first part
+    When the reply stays quiet for <quiet> seconds
+    Then <result>
+
+    Examples:
+      | quiet | result                                                                         |
+      | 9     | the app gets the whole reply and the record has no error.type                  |
+      | 10    | the reply to the app breaks off and the record says http_response_incomplete   |
+
+  Scenario: The vendor answers before the app has finished sending
+    Given a vendor that answers 413 without reading the body
+    When an app sends a body slowly, in parts
+    Then the app gets 413
+    And the record says http.response.status_code 413
+
+  Scenario: A WebSocket upgrade passes through
+    A WebSocket is a connection that stays open and carries messages both
+    ways. The proxy passes it through; checking its messages comes later.
+    Given a vendor that accepts a WebSocket upgrade and sends back what it gets
+    When an app opens a WebSocket through the proxy and sends "ping"
+    Then the app gets 101 Switching Protocols and "ping" back
+    And the record says http.response.status_code 101
+
   Scenario: No forwarding headers are added
     Given an app call
     When the proxy forwards it

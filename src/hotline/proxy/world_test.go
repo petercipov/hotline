@@ -78,6 +78,12 @@ type world struct {
 	parameter string
 	// exportInterval is how often the proxy sends; 20ms unless set.
 	exportInterval time.Duration
+	// freed, when closed, lets the first of two calls end.
+	freed chan struct{}
+	// quiet, when closed, lets a quiet vendor send the rest of its reply.
+	quiet chan struct{}
+	// cutOff is closed when the proxy stops waiting for a quiet vendor.
+	cutOff chan struct{}
 	// exportTimeout is how long one send may take; 2s unless set, so a slow
 	// first connection under the race detector still gets through.
 	exportTimeout time.Duration
@@ -502,4 +508,14 @@ func (w *world) waitForRecords(n int) error {
 		time.Sleep(5 * time.Millisecond)
 	}
 	return failf("%d records did not arrive", n)
+}
+
+// waitForVendorCalls waits until the vendor for host got n calls.
+func (w *world) waitForVendorCalls(host string, n int) error {
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(time.Millisecond) {
+		if len(w.vendor(host).received()) >= n {
+			return nil
+		}
+	}
+	return failf("the vendor for %s did not get %d calls", host, n)
 }

@@ -128,6 +128,9 @@ func Load(path string) (*Config, error) {
 	if f.Version == "" {
 		l.problem("there is no version")
 	}
+	if f.Listen.Proxy == "" {
+		l.problem("there is no listen.proxy address")
+	}
 	if len(f.Exporters) == 0 {
 		l.problem("there are no exporters")
 	}
@@ -150,6 +153,10 @@ func Load(path string) (*Config, error) {
 	for _, in := range f.Integrations {
 		if in.ID == notPassed && len(in.APIs) > 0 {
 			c.Warnings = append(c.Warnings, "the not-passed entry applies to every host, so its apis list is ignored")
+		}
+		if in.ID == "" {
+			l.problem("an integration has no id")
+			continue
 		}
 		if in.ID == notPassed {
 			c.NotPassed = l.settings(in.ID, in.TLSOrigination, in.VendorTimeout, c.NotPassed)

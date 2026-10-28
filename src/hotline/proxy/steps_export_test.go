@@ -246,9 +246,10 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 				return err
 			}
 			w.appTook = max(w.appTook, time.Since(started))
+			// A record is queued just after its reply has gone back, so
+			// give it time to be queued before the next call.
+			time.Sleep(50 * time.Millisecond)
 		}
-		// The last record is queued just after its reply has gone back.
-		time.Sleep(100 * time.Millisecond)
 		w.receivers[0].release()
 		return nil
 	})

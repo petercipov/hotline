@@ -1,9 +1,12 @@
 package proxy_test
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -124,6 +127,55 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return w.waitForRecords(1)
 	})
+	sc.Step(`^a call that waits for a new connection while another call holds the only open one$`, func() error {
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("        tlsOrigination: false\n")))
+		w.freed = make(chan struct{})
+		freed := w.freed
+		w.vendor("api.talon.one").setAnswer(func(_ http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/first") {
+				<-freed
+				return
+			}
+			// Long enough for the background connection to finish opening.
+			time.Sleep(300 * time.Millisecond)
+		})
+		return w.start()
+	})
+	sc.Step(`^the other call ends first and frees its connection$`, func() error {
+		client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(mustURL("http://" + w.addr))}}
+		defer client.CloseIdleConnections()
+		get := func(path string) error {
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://api.talon.one/v2/"+path, nil)
+			req.Header.Set("Proxy-Authorization", basic("talon-shop-a:x")[len("Proxy-Authorization: "):])
+			resp, err := client.Do(req)
+			if err != nil {
+				return err
+			}
+			return resp.Body.Close()
+		}
+		first := make(chan error, 1)
+		go func() { first <- get("first") }()
+		if err := w.waitForVendorCalls("api.talon.one", 1); err != nil {
+			return err
+		}
+		// The waiting call's own connection takes 150ms to look up.
+		w.network.mu.Lock()
+		w.network.lookupTime = 150 * time.Millisecond
+		w.network.mu.Unlock()
+		second := make(chan error, 1)
+		go func() { second <- get("second") }()
+		time.Sleep(50 * time.Millisecond)
+		close(w.freed)
+		return errors.Join(<-first, <-second)
+	})
+	sc.Step(`^the waiting call's record says hotline.connection.reused true, with no dns, connect or tls timings$`, func() error {
+		for _, r := range w.records() {
+			if r.attrs["hotline.connection.reused"] == true {
+				return hasNo(r.attrs, "hotline.timing.dns", "hotline.timing.connect", "hotline.timing.tls")
+			}
+		}
+		return failf("no call reused a connection")
+	})
 	sc.Step(`^a call reuses it$`, func() error { return w.defaultCall() })
 	sc.Step(`^there are no dns, connect or tls timings$`, func() error {
 		record, err := w.lastRecord()
@@ -164,6 +216,34 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		w.network.names["api.talon.one"] = []netip.Addr{v6, v.ip}
 		w.network.mu.Unlock()
 		w.network.setUnreachable("[2001:db8::10]:443")
+		return nil
+	})
+	sc.Step(`^a vendor whose first address never answers, with a vendorTimeout of 10 seconds$`, func() error {
+		w.clock = &fakeClock{}
+		w.network.stuck = w.clock.passToNext
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("        vendorTimeout: 10s\n")))
+		v := w.vendor("api.talon.one")
+		dead := netip.MustParseAddr("192.0.2.77")
+		w.network.mu.Lock()
+		w.network.names["api.talon.one"] = []netip.Addr{dead, v.ip}
+		w.network.mu.Unlock()
+		w.network.setHang("192.0.2.77:443")
+		return nil
+	})
+	sc.Step(`^the call goes to its second address$`, func() error {
+		if w.resp == nil || w.resp.StatusCode != http.StatusOK {
+			return failf("the app got %v", w.resp)
+		}
+		return w.lastHas("network.peer.address", w.vendor("api.talon.one").ip.String())
+	})
+	sc.Step(`^the first address was given 5 seconds, its share of the wait$`, func() error {
+		record, err := w.lastRecord()
+		if err != nil {
+			return err
+		}
+		if connect, _ := record["hotline.timing.connect"].(float64); connect < 5 || connect > 6 {
+			return failf("connect is %v, want just over the first address's 5 seconds", connect)
+		}
 		return nil
 	})
 	sc.Step(`^the call goes to the IPv4 address$`, func() error {

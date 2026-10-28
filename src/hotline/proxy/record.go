@@ -30,8 +30,10 @@ func (c *call) finish() {
 		semconv.HTTPRequestMethodKey.String(c.in.Method),
 		semconv.HTTPResponseStatusCode(c.status),
 	}
-	if c.respBody != nil && c.respBody.err != nil {
-		c.errorType = "http_response_incomplete"
+	if c.respBody != nil {
+		if _, err := c.respBody.counts(); err != nil {
+			c.errorType = "http_response_incomplete"
+		}
 	}
 	if c.errorType != "" {
 		attrs = append(attrs, semconv.ErrorTypeKey.String(c.errorType))
@@ -82,10 +84,11 @@ func (c *call) full() []attribute.KeyValue {
 		ReplyHeaders: replyHeaders,
 	})
 	port, _ := strconv.Atoi(c.port)
+	sent, _ := c.reqBody.counts()
 	attrs := []attribute.KeyValue{
 		semconv.URLScheme(c.scheme),
 		semconv.ServerPort(port),
-		semconv.HTTPRequestBodySize(int(c.reqBody.size)),
+		semconv.HTTPRequestBodySize(int(sent)),
 		attribute.Bool("hotline.client.cancelled", c.app.gone),
 		attribute.Bool("hotline.connection.reused", c.reused),
 		attribute.String("hotline.config.version", c.h.cfg.Version),
@@ -100,9 +103,10 @@ func (c *call) full() []attribute.KeyValue {
 		attrs = append(attrs, semconv.DNSQuestionName(c.looked))
 	}
 	if c.resp != nil {
+		got, _ := c.respBody.counts()
 		attrs = append(attrs,
 			semconv.NetworkProtocolVersion(strings.TrimSuffix(strings.TrimPrefix(c.resp.Proto, "HTTP/"), ".0")),
-			semconv.HTTPResponseBodySize(int(c.respBody.size)))
+			semconv.HTTPResponseBodySize(int(got)))
 	}
 	if c.resp != nil && c.resp.TLS != nil {
 		attrs = append(attrs,

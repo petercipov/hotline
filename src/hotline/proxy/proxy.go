@@ -70,6 +70,7 @@ type Options struct {
 // Proxy is a running proxy.
 type Proxy struct {
 	server    *http.Server
+	handler   *handler
 	transport *http.Transport
 	sink      *export.Sink
 	served    chan struct{}
@@ -97,7 +98,7 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		sink:  sink,
 	}
 	h.transport = &http.Transport{
-		DialContext:         (&dialer{resolver: o.Resolver, dialer: o.Dialer}).dial,
+		DialContext:         (&dialer{resolver: o.Resolver, dialer: o.Dialer, clock: o.Clock}).dial,
 		TLSClientConfig:     &tls.Config{RootCAs: o.RootCAs, MinVersion: tls.VersionTLS12},
 		ForceAttemptHTTP2:   true,
 		DisableCompression:  true,
@@ -105,6 +106,7 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		IdleConnTimeout:     90 * time.Second,
 	}
 	p := &Proxy{
+		handler: h,
 		server: &http.Server{
 			Handler:           h,
 			ReadHeaderTimeout: 30 * time.Second,
@@ -130,6 +132,15 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 func (p *Proxy) Shutdown(ctx context.Context) error {
 	err := p.server.Shutdown(ctx)
 	<-p.served
+	finished := make(chan struct{})
+	go func() {
+		p.handler.calls.Wait()
+		close(finished)
+	}()
+	select {
+	case <-finished:
+	case <-ctx.Done():
+	}
 	p.transport.CloseIdleConnections()
 	return errors.Join(err, p.sink.Shutdown(ctx))
 }

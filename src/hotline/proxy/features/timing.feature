@@ -41,6 +41,13 @@ Feature: Measuring each phase of a call
     And there are no dns, connect or tls timings
     And network.peer.address is still recorded
 
+  Scenario: A call that gets a freed connection while its own is still being opened
+    The connection being opened goes on in the background. Its DNS and
+    connect events belong to no call, so they must not change this one.
+    Given a call that waits for a new connection while another call holds the only open one
+    When the other call ends first and frees its connection
+    Then the waiting call's record says hotline.connection.reused true, with no dns, connect or tls timings
+
   Scenario Outline: Timings of failed calls
     Given a call where <failure>
     When the call ends
@@ -57,3 +64,11 @@ Feature: Measuring each phase of a call
     When a call ends
     Then the call goes to the IPv4 address
     And the connect phase is counted once, from the first try until connected
+
+  Scenario: An address that never answers gets only its share of the wait
+    The wait is shared between the addresses still to try, as Go's own
+    dialer does, so one dead address can't use up all of vendorTimeout.
+    Given a vendor whose first address never answers, with a vendorTimeout of 10 seconds
+    When a call ends
+    Then the call goes to its second address
+    And the first address was given 5 seconds, its share of the wait

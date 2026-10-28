@@ -28,9 +28,14 @@ type handler struct {
 	clock     Clock
 	sink      *export.Sink
 	transport *http.Transport
+	// calls counts calls in flight, including upgraded ones, which the
+	// server stops tracking once they take over the connection.
+	calls sync.WaitGroup
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.calls.Add(1)
+	defer h.calls.Done()
 	start := h.clock.Now()
 	if !r.URL.IsAbs() {
 		// A path or CONNECT: meant for an ingress that later slices build.
@@ -174,6 +179,7 @@ type call struct {
 	firstByte time.Time
 	vendorIn  time.Time
 	vendorOut time.Time
+	connected bool
 	reused    bool
 	peer      string
 	looked    string
@@ -197,7 +203,7 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 	c.times = map[phase][2]time.Time{}
 	trace := &httptrace.ClientTrace{
 		GetConn:              func(string) { c.mark(func() { c.vendorIn = c.h.clock.Now(); c.phase = phaseReply }) },
-		DNSStart:             func(i httptrace.DNSStartInfo) { c.begin(phaseDNS); c.mark(func() { c.looked = i.Host }) },
+		DNSStart:             func(i httptrace.DNSStartInfo) { c.lookup(i.Host) },
 		DNSDone:              func(httptrace.DNSDoneInfo) { c.end(phaseDNS) },
 		ConnectStart:         func(string, string) { c.begin(phaseConnect) },
 		ConnectDone:          func(string, string, error) { c.end(phaseConnect) },
@@ -206,7 +212,8 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 		GotConn:              c.gotConn,
 		GotFirstResponseByte: func() { c.mark(func() { c.firstByte = c.h.clock.Now() }) },
 	}
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	ctx := context.WithValue(req.Context(), deadlineKey{}, c.h.clock.Now().Add(c.timeout))
+	req = req.WithContext(httptrace.WithClientTrace(ctx, trace))
 	timer := c.h.clock.AfterFunc(c.timeout, func() {
 		c.timedOut.Store(true)
 		c.cancel()
@@ -217,9 +224,24 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	c.respBody = &tap{ReadCloser: resp.Body, done: func() { c.mark(func() { c.vendorOut = c.h.clock.Now() }) }}
-	resp.Body = c.respBody
+	if both, ok := resp.Body.(io.Writer); ok && resp.StatusCode == http.StatusSwitchingProtocols {
+		// An upgraded connection, such as a WebSocket, carries data both
+		// ways, so the proxy must be able to write to it too. It may stay
+		// quiet for as long as both sides like.
+		resp.Body = upgraded{tap: c.respBody, Writer: both}
+	} else {
+		c.respBody.wait = c.waitForVendor
+		resp.Body = c.respBody
+	}
 	c.mark(func() { c.resp = resp; c.status = resp.StatusCode })
 	return resp, nil
+}
+
+// waitForVendor limits one wait for the next part of the reply to
+// vendorTimeout, so a vendor that goes quiet can't hold the call forever.
+// It returns the function that ends the wait.
+func (c *call) waitForVendor() func() bool {
+	return c.h.clock.AfterFunc(c.timeout, c.cancel).Stop
 }
 
 func (c *call) mark(f func()) {
@@ -230,8 +252,13 @@ func (c *call) mark(f func()) {
 
 // begin starts a phase. A phase tried again, such as connecting to the next
 // address of a host, keeps its first start, so no time is counted twice.
+// Once the call has its connection, events from a connection still being
+// opened in the background belong to no call and are ignored.
 func (c *call) begin(p phase) {
 	c.mark(func() {
+		if c.connected {
+			return
+		}
 		c.phase = p
 		if c.times[p][0].IsZero() {
 			c.times[p] = [2]time.Time{c.h.clock.Now()}
@@ -239,8 +266,20 @@ func (c *call) begin(p phase) {
 	})
 }
 
+func (c *call) lookup(host string) {
+	c.begin(phaseDNS)
+	c.mark(func() {
+		if !c.connected {
+			c.looked = host
+		}
+	})
+}
+
 func (c *call) end(p phase) {
 	c.mark(func() {
+		if c.connected {
+			return
+		}
 		t := c.times[p]
 		t[1] = c.h.clock.Now()
 		c.times[p] = t
@@ -250,7 +289,14 @@ func (c *call) end(p phase) {
 func (c *call) gotConn(info httptrace.GotConnInfo) {
 	c.mark(func() {
 		c.phase = phaseReply
+		c.connected = true
 		c.reused = info.Reused
+		if info.Reused {
+			// A lookup or connect already started was for a connection
+			// this call doesn't use.
+			c.times = map[phase][2]time.Time{}
+			c.looked = ""
+		}
 		c.peer, _, _ = net.SplitHostPort(info.Conn.RemoteAddr().String())
 	})
 }
@@ -289,22 +335,39 @@ func classify(p phase, timedOut bool, err error) (int, string) {
 	return http.StatusBadGateway, "http_response_incomplete"
 }
 
+// upgraded is the vendor's side of an upgraded connection: read through
+// the tap, written straight to the vendor.
+type upgraded struct {
+	*tap
+	io.Writer
+}
+
 // tap passes a body straight on and counts the bytes that passed. done, if
 // set, runs once when the body ends: read to the end, broken off, or closed
-// early.
+// early. The request body is read by the transport, which may still be
+// reading when the record is made, so the counts are behind a lock.
 type tap struct {
 	io.ReadCloser
 	done func()
+	// wait, if set, runs before each read and limits how long it may take.
+	wait func() func() bool
+
+	mu   sync.Mutex
 	size int64
 	err  error
 }
 
 func (t *tap) Read(p []byte) (int, error) {
+	if t.wait != nil {
+		defer t.wait()()
+	}
 	n, err := t.ReadCloser.Read(p)
+	t.mu.Lock()
 	t.size += int64(n)
 	if err != nil && !errors.Is(err, io.EOF) {
 		t.err = err
 	}
+	t.mu.Unlock()
 	if err != nil {
 		t.finish()
 	}
@@ -314,6 +377,14 @@ func (t *tap) Read(p []byte) (int, error) {
 func (t *tap) Close() error {
 	t.finish()
 	return t.ReadCloser.Close()
+}
+
+// counts says how many bytes passed so far, and why the body broke off,
+// if it did.
+func (t *tap) counts() (int64, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.size, t.err
 }
 
 func (t *tap) finish() {

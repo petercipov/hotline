@@ -85,6 +85,8 @@ Feature: Loading the config file
       | the file does not exist                              |
       | the file is not valid YAML                           |
       | there is no version                                  |
+      | there is no proxy listen address                     |
+      | an integration has no id                             |
       | there are no exporters                               |
       | an exporter's temporality is neither cumulative nor delta |
       | an exporter's endpoint is not a valid address        |

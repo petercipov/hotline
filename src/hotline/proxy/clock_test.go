@@ -44,6 +44,33 @@ func (t *fakeTimer) Stop() bool {
 	return stopped
 }
 
+// waiting says how many waits have not ended yet.
+func (c *fakeClock) waiting() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n := 0
+	for _, t := range c.timers {
+		if !t.done {
+			n++
+		}
+	}
+	return n
+}
+
+// passToNext lets time go by until the next wait ends.
+func (c *fakeClock) passToNext() {
+	c.mu.Lock()
+	next := time.Duration(-1)
+	now := time.Now().Add(c.offset)
+	for _, t := range c.timers {
+		if d := t.at.Sub(now); !t.done && (next < 0 || d < next) {
+			next = d
+		}
+	}
+	c.mu.Unlock()
+	c.pass(max(next, 0))
+}
+
 // pass lets d go by, firing every wait that ends on the way. It says how
 // many fired.
 func (c *fakeClock) pass(d time.Duration) int {
