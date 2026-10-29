@@ -145,7 +145,7 @@ type shared struct {
 }
 
 func sharedPort() shared {
-	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	l, _ := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	var once sync.Once
 	closeAll := func() { once.Do(func() { _ = l.Close() }) }
 	p := shared{
