@@ -31,8 +31,8 @@ Feature: Calling over TLS to the proxy, end to end
       | Node   | 4    | https.request with servername set to the proxy |
       | Node   | 5    | the http address with https.request            |
 
-  @later
   Scenario: The vendor URL in path ingress over TLS to the proxy
-    When the Go client sends POST to https://proxy/https://test-vendor/… over TLS to the proxy
+    When the Go client sends POST over TLS to the proxy with the https vendor address in the path
     Then the app gets the test vendor's status, headers and body unchanged
+    And the test vendor got its own name in Host
     And the receiver got one hotline.request record with hotline.ingress url_in_path and ID test-shop

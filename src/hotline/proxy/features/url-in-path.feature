@@ -1,4 +1,3 @@
-@later
 Feature: The vendor URL in path ingress
   The app puts the whole vendor address after the proxy's own address, so
   it only changes the base address it calls:
@@ -20,13 +19,13 @@ Feature: The vendor URL in path ingress
       | /HTTPS://API.TALON.ONE/v2/x                   | api.talon.one | 443  |
 
   Scenario: What the vendor receives
-    Given an app call to "/https://api.talon.one/v2/customer_sessions/1?page=2" with Proxy-Authorization, Authorization, Connection and a JSON body
-    When the proxy forwards it
-    Then the vendor gets the path /v2/customer_sessions/1 and the query page=2
-    And the method and body reach the vendor unchanged
+    Given an app call with Proxy-Authorization, Authorization, Connection and a JSON body
+    When the proxy forwards it to "/https://api.talon.one/v2/customer_sessions/sess-1?dry=true&b=%2F"
+    Then the method, path, query and body reach the vendor unchanged
     And Host is set to the vendor host from the path
     And Proxy-Authorization is removed
     And Authorization and every other end-to-end header are kept
+    And headers for one hop only, such as Connection and Proxy-Connection, are removed as HTTP requires
     And the proxy adds no header of its own, such as Accept-Encoding or User-Agent
 
   Scenario: A port in the path reaches the vendor's Host header
@@ -52,16 +51,18 @@ Feature: The vendor URL in path ingress
       | a not-passed call with the built-in settings | /https://api.x.com/a         | https  | 443  |
 
   Scenario: The record of a vendor URL in path call
-    Given the integration talon-shop-a with the Talon.One spec
-    When the app sends "GET /https://api.talon.one/v1/customer_sessions/abc" with "Host: localhost:8080" and ID talon-shop-a
+    When an app sends "PUT /https://api.talon.one/v2/customer_sessions/sess-1" with "Host: localhost:8080"
     Then the record says hotline.ingress url_in_path
-    And url.full is https://api.talon.one/v1/customer_sessions/REDACTED
-    And server.address is api.talon.one
+    And url.full is "https://api.talon.one/v2/customer_sessions/REDACTED"
+    And server.address is api.talon.one and server.port is 443
     And nothing in the record names the proxy's own address
 
   Scenario: A not-passed call gets the minimal record
-    When an app sends "GET /https://api.x.com/a" with "Host: localhost:8080" and no Proxy-Authorization
-    Then the record is minimal with ID not-passed and hotline.ingress url_in_path
+    Given a not-passed call with the built-in settings
+    When an app sends "GET /https://api.x.com/a" with "Host: localhost:8080"
+    Then the record holds only hotline.integration.id, hotline.ingress, server.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields
+    And the record's ID is not-passed
+    And the record says hotline.ingress url_in_path
 
   Scenario Outline: Damaged addresses are refused
     When an app sends "GET <path>" with "Host: localhost:8080"
@@ -78,9 +79,9 @@ Feature: The vendor URL in path ingress
       | /HTTPS:/api.talon.one/v2/x                 |
 
   Scenario: A refused call keeps its integration ID
-    When an app sends "GET /https:/api.talon.one/v2/x" with "Host: localhost:8080" and ID talon-shop-a
+    When an app sends "GET /https:/api.talon.one/v2/x" with "Host: localhost:8080"
     Then the proxy answers 400
-    And the record says ID talon-shop-a
+    And the record's ID is talon-shop-a
     And hotline.requests goes up by one
 
   Scenario: A call over TLS to the proxy

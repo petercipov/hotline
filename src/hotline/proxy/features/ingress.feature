@@ -1,6 +1,7 @@
 Feature: Finding the ingress
-  The ingress finder works out which ingress a call used. Slice 1 builds
-  only the forward proxy ingress: the full vendor address in the request line.
+  The ingress finder works out which ingress a call used. Built so far: the
+  forward proxy ingress (the full vendor address in the request line) and
+  the vendor URL in path ingress (see url-in-path.feature).
 
   Scenario Outline: A full address in the request line is the forward proxy ingress
     Given the proxy is running
@@ -28,7 +29,6 @@ Feature: Finding the ingress
 
     Examples:
       | request                                             |
-      | "GET /https://api.stripe.com/v1/payment_intents"    |
       | "GET /v1/payment_intents" with "Host: api.stripe.com" |
       | "CONNECT api.stripe.com:443"                        |
 
@@ -43,7 +43,6 @@ Feature: Finding the ingress
       | ftp://files.example/a.txt  |
       | https:///v1/no-host        |
 
-  @later
   Scenario Outline: Refused calls are still recorded
     Every request the proxy reads and refuses gets a minimal record and is
     counted (Peter, 2026-10-29).

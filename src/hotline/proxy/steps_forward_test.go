@@ -40,23 +40,9 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 
 	sc.Step(`^an app call with Proxy-Authorization, Authorization, Connection and a JSON body$`, func() error { return nil })
 	sc.Step(`^the proxy forwards it$`, func() error {
-		body := `{"customerSession":{"state":"open"}}`
-		return w.send(request{
-			method: "PUT",
-			target: "https://api.talon.one/v2/customer_sessions/sess-1?dry=true&b=%2F",
-			headers: []string{
-				basic("talon-shop-a:x"),
-				"Authorization: ApiKey-v1 c2VjcmV0",
-				"Connection: X-Hop",
-				"X-Hop: 1",
-				"Proxy-Connection: keep-alive",
-				"Content-Type: application/json",
-				"X-Trace: t-1",
-			},
-			body:   strings.NewReader(body),
-			length: len(body),
-		})
+		return w.forwardFull("https://api.talon.one/v2/customer_sessions/sess-1?dry=true&b=%2F")
 	})
+	sc.Step(`^the proxy forwards it to "([^"]+)"$`, w.forwardFull)
 	sc.Step(`^the method, path, query and body reach the vendor unchanged$`, func() error {
 		c, err := w.onlyCall("api.talon.one")
 		if err != nil {
@@ -257,7 +243,7 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^headers for one hop only, such as Connection and Proxy-Connection, are removed as HTTP requires$`, func() error {
 		return w.vendorHeaders(nil, []string{"Connection", "X-Hop", "Proxy-Connection"})
 	})
-	sc.Step(`^Host is set to the vendor host from the request line$`, func() error {
+	sc.Step(`^Host is set to the vendor host from the (?:request line|path)$`, func() error {
 		c, err := w.onlyCall("api.talon.one")
 		if err != nil {
 			return err
@@ -634,4 +620,24 @@ func sprintf(format string, args ...any) string { return fmt.Sprintf(format, arg
 // vendorTLS is a TLS setup with a trusted certificate for host.
 func (w *world) vendorTLS(host string) *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{w.issuer.leaf(host, time.Now().Add(24*time.Hour), false)}}
+}
+
+// forwardFull sends a call with an ID, secrets, hop headers and a body. A
+// target that is a path is meant for the proxy itself, so its Host is the
+// proxy's address.
+func (w *world) forwardFull(target string) error {
+	body := `{"customerSession":{"state":"open"}}`
+	headers := []string{
+		basic("talon-shop-a:x"),
+		"Authorization: ApiKey-v1 c2VjcmV0",
+		"Connection: X-Hop",
+		"X-Hop: 1",
+		"Proxy-Connection: keep-alive",
+		"Content-Type: application/json",
+		"X-Trace: t-1",
+	}
+	if strings.HasPrefix(target, "/") {
+		headers = append(headers, "Host: localhost:8080")
+	}
+	return w.send(request{method: "PUT", target: target, headers: headers, body: strings.NewReader(body), length: len(body)})
 }

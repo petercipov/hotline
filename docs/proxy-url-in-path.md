@@ -1,6 +1,6 @@
 # The vendor URL in path ingress: scope and test cases
 
-*Requirements agreed with Peter, 2026-10-29. Not built yet; building starts only when Peter says so. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
+*Agreed with Peter, 2026-10-29, and built. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
 
 ## What the feature is
 
@@ -32,8 +32,14 @@ The ingress finds two things, the integration and the vendor's real address. Aft
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/url-in-path.feature`, tagged `@later` until building starts. When it is built, the vendor URL in path row of "Requests meant for later ingresses" in `ingress.feature` is removed.
-- End to end: the Go client calls with a base address in the path, plain and over TLS to the proxy, against the built program.
+- Feature scenarios: `src/hotline/proxy/features/url-in-path.feature`, and "Refused calls are still recorded" in `ingress.feature`.
+- End to end: the Go client calls with a base address in the path, with an `https` and an `http` vendor address (`end-to-end.feature`), and over TLS to the proxy (`end-to-end-tls.feature`).
+
+## How it is built
+
+- `findIngress` in `handler.go` reads the raw request line (`RequestURI`), never the cleaned path. A target starting `/http:` or `/https:`, with the colon plain or encoded as `%3A`, in any case, is this ingress; only `/http://` and `/https://` followed by a host are parsed, the rest get `400`.
+- From there the call takes the forward proxy's path unchanged: the vendor address from the path replaces the request URL for the vendor, and `Host` is set from it.
+- A refused request (`400` or `501`) gets its minimal record from `refused` in `record.go`: ID, ingress (none for CONNECT), the vendor host when one could be read, method, status, `error.type=http_request_error` and `hotline.timing.total`. It goes through the same sink, so it is counted in `hotline.requests` too.
 
 ## Not in this slice
 
