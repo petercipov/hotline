@@ -30,6 +30,7 @@ The proxy is built in small slices, tests first.
    - each vendor api named once in the config, shared by integrations: built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md), decisions 10 and 11;
    - checks of every part of a call against the spec (path, query, headers, cookies, body; and the reply's status, headers and body). Built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md);
    - the transparent redirect ingress: built, as a Host header call with no proxy code change. Detail: [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redirect.md);
+   - AWS, starting with SQS: signed calls stay valid, actions as routes named by a header. Agreed, not built. Detail: [docs/proxy-aws.md](docs/proxy-aws.md);
    - config reload without a restart;
    - the load test, with k6.
 
@@ -138,3 +139,15 @@ Full wording in [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redi
 2. The app adds `Proxy-Authorization` itself as a default header; no new way to pass the integration ID.
 3. No separate port or record value: a redirected call is a Host header call, `hotline.ingress=host_header`.
 4. The port is always kept, port 80 too (`Host: api.x.com:80` goes to `https` on port 80); no port means 443.
+
+## AWS and SQS decisions (Peter, 2026-10-29)
+
+Full wording in [docs/proxy-aws.md](docs/proxy-aws.md).
+
+1. Signed calls stay valid: the proxy forwards `Host`, the path, the body, `Content-Length` and the app's headers unchanged; a rule with a test.
+2. The integration ID stays in `Proxy-Authorization`. The proxy never reads `Authorization` (security). No port per integration.
+3. Each AWS action is its own route in a spec we generate: `/#X-Amz-Target=AmazonSQS.SendMessage`.
+4. The action header is named in our spec (`x-hotline-action-header`), per api, never per integration or in the proxy's code.
+5. The test uses a signed request fixture made once; Hotline never depends on the AWS SDK.
+6. AWS headers to record are marked in our SQS spec; the default header list is unchanged. No patterns in `hosts`.
+7. The setup guide recommends the forward proxy for AWS, with the app's HTTP client turning `https` into `http` after signing, says vendor URL in path can't work for signed hosts, and warns about `NO_PROXY` and VPC endpoints.
