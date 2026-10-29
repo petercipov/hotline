@@ -25,6 +25,7 @@ The proxy is built in small slices, tests first.
    - the health checks `/livez` and `/readyz` on the admin port;
    - the Node, Java and Rust clients in the end-to-end tests;
    - the vendor URL in path ingress: built, with refused calls recorded on every ingress. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
+   - the guard against calls to internal addresses: requirements agreed, not built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
    - the Host header ingress, with HTTP/2 from apps;
    - JSON and form body checks against the spec;
    - config reload without a restart;
@@ -87,6 +88,14 @@ Full wording in [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md).
 4. Every request the proxy reads and refuses (`400`, `501`) still gets a minimal record and is counted, on every ingress. Plain HTTP on a TLS port stays without a record.
 5. Every record of a call that reached a vendor holds the vendor IP the proxy connected to (`network.peer.address`), minimal records too.
 6. No loop guard in this slice; the loop question moves to the Host header slice.
+
+## Internal address guard decisions (Peter, 2026-10-29)
+
+Full wording in [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md).
+
+1. Guard against server side request forgery: after DNS, the proxy refuses to connect to internal IPs (loopback, link-local with the cloud metadata address, private, shared, unspecified, multicast), on every ingress.
+2. An api can set `allowInternalIPs: true`; so can the `not-passed` entry. Calls without an ID still reach public hosts.
+3. Its own slice, before the Host header ingress. It also stops calls to the proxy itself, so there is no separate loop check.
 
 ## Earlier decisions
 
