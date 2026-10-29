@@ -150,4 +150,4 @@ Full wording in [docs/proxy-aws.md](docs/proxy-aws.md).
 4. The action header is named in our spec (`x-hotline-action-header`), per api, never per integration or in the proxy's code.
 5. The test uses a signed request fixture made once; Hotline never depends on the AWS SDK.
 6. AWS headers to record are marked in our SQS spec; the default header list is unchanged. No patterns in `hosts`.
-7. The setup guide recommends the forward proxy for AWS, says vendor URL in path can't work for signed hosts, and warns about `NO_PROXY` and VPC endpoints.
+7. The setup guide recommends the forward proxy for AWS, with the app's HTTP client turning `https` into `http` after signing, says vendor URL in path can't work for signed hosts, and warns about `NO_PROXY` and VPC endpoints.

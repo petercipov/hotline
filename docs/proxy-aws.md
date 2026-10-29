@@ -25,7 +25,25 @@ What we checked with the real SDK (`service/sqs` v1.52.7):
 6. **AWS headers in the record come from our spec** (Peter, 2026-10-29). Our SQS spec marks `x-amzn-RequestId` (AWS's request ID) and `x-amzn-query-error` (the error name) with `x-hotline-redact: false`. The default header list for all vendors does not change. `X-Amz-Target` need not be recorded, since the action is in the route.
 7. **No patterns in `hosts`** (Peter, 2026-10-29). Each region's name is listed (`sqs.eu-west-1.amazonaws.com`, `sqs.eu-central-1.amazonaws.com`, …), as for any vendor.
 8. **The setup guide for AWS** (Peter, 2026-10-29):
-   - recommends the forward proxy, with the SQS address turned into `http://` and the proxy set only on the SQS client;
+   - recommends the forward proxy, set only on the SQS client, with the app's own HTTP client turning `https` into `http` after the SDK has signed (Peter, 2026-10-29). The SDK keeps its normal address and region, and the scheme is not signed. Tested with the real SDK. The Go setup:
+     ```go
+     type toHTTP struct{ next http.RoundTripper }
+
+     func (t toHTTP) RoundTrip(r *http.Request) (*http.Response, error) {
+         r = r.Clone(r.Context())
+         r.URL.Scheme = "http" // after signing; the scheme is not signed
+         return t.next.RoundTrip(r)
+     }
+
+     proxy, _ := url.Parse("http://shop-a:x@hotline:8080")
+     transport := http.DefaultTransport.(*http.Transport).Clone()
+     transport.Proxy = http.ProxyURL(proxy)
+
+     client := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
+         o.HTTPClient = &http.Client{Transport: toHTTP{transport}}
+     })
+     ```
+     Setting `BaseEndpoint` to `http://sqs.eu-west-1.amazonaws.com`, or `HTTP_PROXY` with `NO_PROXY`, also works. `HTTPS_PROXY` with the normal `https` address does not: Go asks for a `CONNECT` tunnel and gets `501`;
    - says plainly that the vendor URL in path ingress cannot work for vendors that sign the host, such as AWS;
    - says the integration ID must be added after signing (by Go's proxy support, or a wrapper around the HTTP client), never through the SDK's own header options;
    - warns that setting `HTTP_PROXY` for the whole app also sends the SDK's own key lookups (`169.254.169.254`, `169.254.170.2`, `169.254.170.23`) to the proxy, where the internal address guard refuses them, so those go in `NO_PROXY`;
