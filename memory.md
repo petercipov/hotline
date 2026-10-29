@@ -29,6 +29,7 @@ The proxy is built in small slices, tests first.
    - the Host header ingress, with HTTP/2 from apps: built. Detail: [docs/proxy-host-header.md](docs/proxy-host-header.md);
    - each vendor api named once in the config, shared by integrations: built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md), decisions 10 and 11;
    - checks of every part of a call against the spec (path, query, headers, cookies, body; and the reply's status, headers and body). Built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md);
+   - the transparent redirect ingress: built, as a Host header call with no proxy code change. Detail: [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redirect.md);
    - config reload without a restart;
    - the load test, with k6.
 
@@ -128,3 +129,12 @@ Full wording in [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md).
 10. A broken spec is a config problem: refused at start, by `validate` and on reload.
 11. One spec is read once and shared by every integration that uses it.
 12. The config names each vendor api once in a top-level `apis` section; integrations name the apis they use, and may change only `vendorTimeout`. `not-passed` keeps its settings on itself.
+
+## Transparent redirect decisions (Peter, 2026-10-29)
+
+Full wording in [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redirect.md).
+
+1. The proxy doesn't care how the cluster redirects; the setup guide covers name lookup (`hostAliases`) and network rules in the pod; the tests fake name lookup.
+2. The app adds `Proxy-Authorization` itself as a default header; no new way to pass the integration ID.
+3. No separate port or record value: a redirected call is a Host header call, `hotline.ingress=host_header`.
+4. The port is always kept, port 80 too (`Host: api.x.com:80` goes to `https` on port 80); no port means 443.

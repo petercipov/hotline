@@ -179,9 +179,18 @@ func (w *world) vendor(host string) *vendor {
 		v.servers = append(v.servers, s)
 		w.network.route(net.JoinHostPort(v.ip.String(), port), s.Listener.Addr().String())
 	}
-	s := httptest.NewServer(v.record("http", "80"))
-	v.servers = append(v.servers, s)
-	w.network.route(net.JoinHostPort(v.ip.String(), "80"), s.Listener.Addr().String())
+	// Port 80 answers plain http and, since the proxy keeps the app's port
+	// when it turns a call into https, also https.
+	port80 := sharedPort()
+	plain := httptest.NewUnstartedServer(v.record("http", "80"))
+	plain.Listener = port80.plain
+	plain.Start()
+	secure := httptest.NewUnstartedServer(v.record("https", "80"))
+	secure.Listener = port80.tls
+	secure.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+	secure.StartTLS()
+	v.servers = append(v.servers, plain, secure)
+	w.network.route(net.JoinHostPort(v.ip.String(), "80"), port80.addr)
 	return v
 }
 

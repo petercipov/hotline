@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"bufio"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -80,8 +81,8 @@ type vendorCall struct {
 	body   []byte
 }
 
-// vendor is a fake vendor: one host that answers on https port 443 and
-// http port 80 of the fake network.
+// vendor is a fake vendor: one host that answers on https ports 443, 8443
+// and 8080, and on port 80 both http and https, of the fake network.
 type vendor struct {
 	host     string
 	notAfter time.Time
@@ -135,6 +136,88 @@ func (v *vendor) close() {
 		s.Close()
 	}
 }
+
+// shared is one local port that hands each connection to a plain or a TLS
+// listener, by the first byte the caller sends: 0x16 starts a TLS handshake.
+type shared struct {
+	addr       string
+	plain, tls *handedListener
+}
+
+func sharedPort() shared {
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	var once sync.Once
+	closeAll := func() { once.Do(func() { _ = l.Close() }) }
+	p := shared{
+		addr:  l.Addr().String(),
+		plain: &handedListener{conns: make(chan net.Conn), addr: l.Addr(), done: make(chan struct{}), closeAll: closeAll},
+		tls:   &handedListener{conns: make(chan net.Conn), addr: l.Addr(), done: make(chan struct{}), closeAll: closeAll},
+	}
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				r := bufio.NewReader(c)
+				first, err := r.Peek(1)
+				if err != nil {
+					_ = c.Close()
+					return
+				}
+				to := p.plain
+				if first[0] == 0x16 {
+					to = p.tls
+				}
+				to.hand(&peekedConn{Conn: c, r: r})
+			}()
+		}
+	}()
+	return p
+}
+
+// handedListener is a listener whose connections come from a shared port.
+type handedListener struct {
+	conns    chan net.Conn
+	addr     net.Addr
+	done     chan struct{}
+	once     sync.Once
+	closeAll func()
+}
+
+func (l *handedListener) hand(c net.Conn) {
+	select {
+	case l.conns <- c:
+	case <-l.done:
+		_ = c.Close()
+	}
+}
+
+func (l *handedListener) Accept() (net.Conn, error) {
+	select {
+	case c := <-l.conns:
+		return c, nil
+	case <-l.done:
+		return nil, net.ErrClosed
+	}
+}
+
+func (l *handedListener) Close() error {
+	l.once.Do(func() { close(l.done) })
+	l.closeAll()
+	return nil
+}
+
+func (l *handedListener) Addr() net.Addr { return l.addr }
+
+// peekedConn reads the byte the shared port peeked at before the rest.
+type peekedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c *peekedConn) Read(b []byte) (int, error) { return c.r.Read(b) }
 
 // network is the fake network between the proxy and the vendors: its own
 // DNS, and addresses that lead to local test servers.
