@@ -67,12 +67,21 @@ Feature: The vendor URL in path ingress
     When an app sends "GET <path>" with "Host: localhost:8080"
     Then the proxy answers 400 with "Proxy-Status: hotline; error=http_request_error"
     And nothing is sent to any vendor
+    And the record is minimal with hotline.ingress url_in_path, http.response.status_code 400 and error.type http_request_error
+    And the record has no server.address
 
     Examples:
       | path                                       |
       | /https:/api.talon.one/v2/x                 |
       | /https%3A%2F%2Fapi.talon.one/v2/x          |
       | /https:///v2/no-host                       |
+      | /HTTPS:/api.talon.one/v2/x                 |
+
+  Scenario: A refused call keeps its integration ID
+    When an app sends "GET /https:/api.talon.one/v2/x" with "Host: localhost:8080" and ID talon-shop-a
+    Then the proxy answers 400
+    And the record says ID talon-shop-a
+    And hotline.requests goes up by one
 
   Scenario: A call over TLS to the proxy
     Given the proxy port uses TLS with a certificate the app trusts
@@ -84,3 +93,4 @@ Feature: The vendor URL in path ingress
     When an app sends "GET /v1/payment_intents" with "Host: api.stripe.com"
     Then the proxy answers 501 Not Implemented with a Proxy-Status header
     And nothing is sent to any vendor
+    And the record is minimal with hotline.ingress host_header, server.address api.stripe.com and http.response.status_code 501

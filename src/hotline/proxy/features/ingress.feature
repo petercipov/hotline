@@ -42,3 +42,18 @@ Feature: Finding the ingress
       | address                    |
       | ftp://files.example/a.txt  |
       | https:///v1/no-host        |
+
+  @later
+  Scenario Outline: Refused calls are still recorded
+    Every request the proxy reads and refuses gets a minimal record and is
+    counted (Peter, 2026-10-29).
+    When an app sends <request>
+    Then the proxy answers <status>
+    And the record is minimal with hotline.ingress <ingress>, http.response.status_code <status> and error.type http_request_error
+    And hotline.requests goes up by one
+
+    Examples:
+      | request                                               | status | ingress       |
+      | "GET ftp://files.example/a.txt"                       | 400    | forward_proxy |
+      | "GET https:///v1/no-host"                             | 400    | forward_proxy |
+      | "GET /v1/payment_intents" with "Host: api.stripe.com" | 501    | host_header   |
