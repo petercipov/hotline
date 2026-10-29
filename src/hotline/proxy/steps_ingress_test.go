@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -122,6 +123,64 @@ func ingressSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^the app sends "([A-Z]+) ([^"]+)" over TLS to the proxy$`, func(method, target string) error {
 		return w.call(method, target, "Host: hotline-proxy")
+	})
+}
+
+func guardSteps(sc *godog.ScenarioContext, w *world) {
+	sc.Step(`^the vendor name (\S+) resolves to (\S+)$`, func(host, ip string) error {
+		w.network.resolve(host, w.vendor(host).ip, netip.MustParseAddr(ip))
+		return nil
+	})
+	sc.Step(`^the vendor name (\S+) resolves to (\S+) and to its public IP$`, func(host, ip string) error {
+		v := w.vendor(host)
+		w.network.resolve(host, v.ip, netip.MustParseAddr(ip), v.ip)
+		return nil
+	})
+	sc.Step(`^an api for api.talon.one with allowInternalIPs set to true$`, func() error {
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("        allowInternalIPs: true\n"), w.stripeAPI("")))
+		return nil
+	})
+	sc.Step(`^a not-passed entry with allowInternalIPs set to true$`, func() error {
+		w.addIntegration("  - id: not-passed\n    allowInternalIPs: true\n")
+		return nil
+	})
+	sc.Step(`^an app sends "([A-Z]+) ([^"]+)" with no Proxy-Authorization$`, func(method, target string) error {
+		w.appID = ""
+		return w.call(method, target)
+	})
+	sc.Step(`^an app sends a call whose address is the proxy's own address$`, func() error {
+		if err := w.start(); err != nil {
+			return err
+		}
+		return w.call("GET", "http://"+w.addr+"/v2/x")
+	})
+	sc.Step(`^the vendor gets the call$`, func() error {
+		var calls []vendorCall
+		for _, v := range w.vendors {
+			calls = append(calls, v.received()...)
+		}
+		if len(calls) != 1 {
+			return failf("the vendors got %d calls, want one; the app got %v", len(calls), w.resp)
+		}
+		return nil
+	})
+	sc.Step(`^the vendor gets the call on its public IP$`, func() error {
+		if _, err := w.onlyCall("api.talon.one"); err != nil {
+			return err
+		}
+		return w.lastHas("network.peer.address", w.vendor("api.talon.one").ip.String())
+	})
+	sc.Step(`^the proxy opens no connection$`, func() error {
+		if _, dials := w.network.counts(); dials > 0 {
+			return failf("the proxy opened %d connections, want none", dials)
+		}
+		return nil
+	})
+	sc.Step(`^no connection is opened to (\S+)$`, func(ip string) error {
+		if w.network.triedToDial(ip) {
+			return failf("the proxy tried to connect to %s", ip)
+		}
+		return nil
 	})
 }
 

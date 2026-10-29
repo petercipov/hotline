@@ -148,6 +148,8 @@ type network struct {
 	unreachable map[string]bool
 	lookups     int
 	dials       int
+	// dialed are the addresses the proxy tried to connect to.
+	dialed []string
 	// lookupTime is how long each answered lookup takes.
 	lookupTime time.Duration
 	// stuck runs when a lookup or a connection hangs.
@@ -185,6 +187,7 @@ func (n *network) LookupNetIP(ctx context.Context, _, host string) ([]netip.Addr
 func (n *network) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	n.mu.Lock()
 	n.dials++
+	n.dialed = append(n.dialed, address)
 	local, found := n.routes[address]
 	hang, unreachable := n.hang[address], n.unreachable[address]
 	n.mu.Unlock()
@@ -250,4 +253,30 @@ func listenLocal() net.Listener {
 
 func ipFor(n int) netip.Addr {
 	return netip.MustParseAddr(fmt.Sprintf("192.0.2.%d", n))
+}
+
+// resolve makes host resolve to ips. An IP that is also a vendor's leads to
+// that vendor, and so does any other IP when alias is a vendor's IP.
+func (n *network) resolve(host string, alias netip.Addr, ips ...netip.Addr) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.names[host] = ips
+	for _, ip := range ips {
+		for _, port := range []string{"80", "443", "8080", "8443"} {
+			if local, found := n.routes[net.JoinHostPort(alias.String(), port)]; found {
+				n.routes[net.JoinHostPort(ip.String(), port)] = local
+			}
+		}
+	}
+}
+
+func (n *network) triedToDial(ip string) bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for _, address := range n.dialed {
+		if host, _, _ := net.SplitHostPort(address); host == ip {
+			return true
+		}
+	}
+	return false
 }

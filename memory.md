@@ -25,7 +25,7 @@ The proxy is built in small slices, tests first.
    - the health checks `/livez` and `/readyz` on the admin port;
    - the Node, Java and Rust clients in the end-to-end tests;
    - the vendor URL in path ingress: built, with refused calls recorded on every ingress. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
-   - the guard against calls to internal addresses: requirements agreed, not built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
+   - the guard against calls to internal addresses: built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
    - the Host header ingress, with HTTP/2 from apps;
    - JSON and form body checks against the spec;
    - config reload without a restart;

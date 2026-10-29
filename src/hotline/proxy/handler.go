@@ -30,6 +30,8 @@ type handler struct {
 	clock     Clock
 	sink      *export.Sink
 	transport *http.Transport
+	// internal is the transport for calls that may reach internal IPs.
+	internal *http.Transport
 	// calls counts calls in flight, including upgraded ones, which the
 	// server stops tracking once they take over the connection.
 	calls sync.WaitGroup
@@ -60,19 +62,24 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if port == "" {
 		port = map[string]string{"http": "80", "https": "443"}[scheme]
 	}
+	transport := h.transport
+	if settings.AllowInternalIPs {
+		transport = h.internal
+	}
 	c := &call{
-		h:       h,
-		start:   start,
-		ingress: ingress,
-		target:  target,
-		id:      id,
-		api:     api,
-		scheme:  scheme,
-		host:    host,
-		port:    port,
-		in:      r,
-		timeout: settings.VendorTimeout,
-		reqBody: &tap{ReadCloser: r.Body},
+		h:         h,
+		start:     start,
+		ingress:   ingress,
+		target:    target,
+		id:        id,
+		api:       api,
+		scheme:    scheme,
+		host:      host,
+		port:      port,
+		in:        r,
+		timeout:   settings.VendorTimeout,
+		transport: transport,
+		reqBody:   &tap{ReadCloser: r.Body},
 	}
 	r.Body = c.reqBody
 	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
@@ -214,8 +221,10 @@ type call struct {
 	port    string
 	in      *http.Request
 	timeout time.Duration
-	cancel  context.CancelFunc
-	app     *toApp
+	// transport makes the vendor call.
+	transport *http.Transport
+	cancel    context.CancelFunc
+	app       *toApp
 
 	reqBody  *tap
 	respBody *tap
@@ -266,7 +275,7 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 		c.timedOut.Store(true)
 		c.cancel()
 	})
-	resp, err := c.h.transport.RoundTrip(req)
+	resp, err := c.transport.RoundTrip(req)
 	timer.Stop()
 	if err != nil {
 		return nil, err
@@ -363,6 +372,8 @@ func (c *call) fail(w http.ResponseWriter, _ *http.Request, err error) {
 
 func classify(p phase, timedOut bool, err error) (int, string) {
 	switch {
+	case errors.Is(err, errProhibited):
+		return http.StatusForbidden, "destination_ip_prohibited"
 	case p == phaseDNS && timedOut:
 		return http.StatusGatewayTimeout, "dns_timeout"
 	case p == phaseDNS:

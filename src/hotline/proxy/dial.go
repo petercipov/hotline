@@ -7,8 +7,12 @@ import (
 	"net"
 	"net/http/httptrace"
 	"net/netip"
+	"slices"
 	"time"
 )
+
+// errProhibited is a vendor address that resolves only to internal IPs.
+var errProhibited = errors.New("proxy: the vendor address is an internal IP")
 
 // minShare is the least time one address gets while others are left, the
 // same floor Go's own dialer uses.
@@ -24,6 +28,9 @@ type dialer struct {
 	resolver Resolver
 	dialer   Dialer
 	clock    Clock
+	// allowInternal lets it connect to internal IPs; otherwise they are
+	// left out, so nobody can use the proxy to reach them.
+	allowInternal bool
 }
 
 func (d *dialer) dial(ctx context.Context, network, address string) (net.Conn, error) {
@@ -35,6 +42,15 @@ func (d *dialer) dial(ctx context.Context, network, address string) (net.Conn, e
 		trace.DNSStart(httptrace.DNSStartInfo{Host: host})
 		ips, err = d.lookup(ctx, host)
 		trace.DNSDone(httptrace.DNSDoneInfo{Err: err})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !d.allowInternal {
+		ips = slices.DeleteFunc(ips, internal)
+		if len(ips) == 0 {
+			return nil, errProhibited
+		}
 	}
 	// Addresses are tried one after another, so their connect phases never
 	// overlap. Each gets a share of the time left, so one address that never
@@ -75,6 +91,23 @@ func (d *dialer) dialOne(ctx context.Context, network, address string, left int)
 		defer timer.Stop()
 	}
 	return d.dialer.DialContext(ctx, network, address)
+}
+
+// internal says whether an IP is one the proxy must not reach unless an
+// api allows it: loopback, link-local (which holds the cloud metadata
+// address), private, shared address space, unspecified and multicast, also
+// when an IPv4 address is written in IPv6 form.
+func internal(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	if ip.Is4() {
+		b := ip.As4()
+		if b[0] == 0 || b[0] == 100 && b[1]&0xc0 == 64 {
+			// 0.0.0.0/8 and the shared address space 100.64.0.0/10.
+			return true
+		}
+	}
+	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsPrivate() ||
+		ip.IsUnspecified() || ip.IsMulticast()
 }
 
 // isCertificateError says whether a TLS handshake failed on the vendor's
