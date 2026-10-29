@@ -626,6 +626,12 @@ func (w *world) vendorTLS(host string) *tls.Config {
 // target that is a path is meant for the proxy itself, so its Host is the
 // proxy's address.
 func (w *world) forwardFull(target string) error {
+	return w.forwardWithHost(target, "")
+}
+
+// forwardWithHost makes the full app call, with the Host header given, or
+// with the proxy's own address for a vendor URL in path call.
+func (w *world) forwardWithHost(target, host string) error {
 	body := `{"customerSession":{"state":"open"}}`
 	headers := []string{
 		basic("talon-shop-a:x"),
@@ -636,7 +642,10 @@ func (w *world) forwardFull(target string) error {
 		"Content-Type: application/json",
 		"X-Trace: t-1",
 	}
-	if strings.HasPrefix(target, "/") {
+	switch {
+	case host != "":
+		headers = append(headers, "Host: "+host)
+	case strings.HasPrefix(target, "/"):
 		headers = append(headers, "Host: localhost:8080")
 	}
 	return w.send(request{method: "PUT", target: target, headers: headers, body: strings.NewReader(body), length: len(body)})

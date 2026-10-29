@@ -26,7 +26,7 @@ The proxy is built in small slices, tests first.
    - the Node, Java and Rust clients in the end-to-end tests;
    - the vendor URL in path ingress: built, with refused calls recorded on every ingress. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
    - the guard against calls to internal addresses: built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
-   - the Host header ingress, with HTTP/2 from apps: requirements agreed, not built. Detail: [docs/proxy-host-header.md](docs/proxy-host-header.md);
+   - the Host header ingress, with HTTP/2 from apps: built. Detail: [docs/proxy-host-header.md](docs/proxy-host-header.md);
    - JSON and form body checks against the spec;
    - config reload without a restart;
    - the load test, with k6.

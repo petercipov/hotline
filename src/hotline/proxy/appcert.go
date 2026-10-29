@@ -44,12 +44,11 @@ func newAppCert(t *config.TLS, clock Clock, logger *slog.Logger) *appCert {
 }
 
 // tlsConfig is the TLS setup of the proxy port: TLS 1.2 and 1.3 with Go's
-// default ciphers, and HTTP/1.1 only, since HTTP/2 has no full address in a
-// request line.
+// default ciphers, offering HTTP/2 and HTTP/1.1.
 func (c *appCert) tlsConfig() *tls.Config {
 	return &tls.Config{
 		MinVersion:     tls.VersionTLS12,
-		NextProtos:     []string{"http/1.1"},
+		NextProtos:     []string{"h2", "http/1.1"},
 		GetCertificate: c.get,
 	}
 }

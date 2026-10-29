@@ -103,10 +103,17 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	// connection opened for them is never reused for a call that may not.
 	h.transport = newTransport(o, false)
 	h.internal = newTransport(o, true)
+	// HTTP/1.1, and HTTP/2 over TLS or plain from the first byte (prior
+	// knowledge). The older Upgrade: h2c handshake is not offered.
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetHTTP2(true)
+	protocols.SetUnencryptedHTTP2(true)
 	p := &Proxy{
 		handler: h,
 		server: &http.Server{
 			Handler:           h,
+			Protocols:         protocols,
 			ReadHeaderTimeout: 30 * time.Second,
 			ErrorLog:          log.New(serverLog{logger: o.Logger}, "", 0),
 		},
@@ -117,8 +124,6 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	serve := p.server.Serve
 	if cfg.TLS != nil {
 		p.server.TLSConfig = newAppCert(cfg.TLS, o.Clock, o.Logger).tlsConfig()
-		// An empty map turns HTTP/2 off.
-		p.server.TLSNextProto = map[string]func(*http.Server, *tls.Conn, http.Handler){}
 		serve = func(l net.Listener) error { return p.server.ServeTLS(tlsOnlyListener{Listener: l}, "", "") }
 	}
 	go func() {

@@ -1,7 +1,8 @@
 Feature: Finding the ingress
-  The ingress finder works out which ingress a call used. Built so far: the
-  forward proxy ingress (the full vendor address in the request line) and
-  the vendor URL in path ingress (see url-in-path.feature).
+  The ingress finder works out which ingress a call used: the forward proxy
+  ingress (the full vendor address in the request line), the vendor URL in
+  path ingress (see url-in-path.feature) and the Host header ingress (see
+  host-header.feature).
 
   Scenario Outline: A full address in the request line is the forward proxy ingress
     Given the proxy is running
@@ -21,16 +22,11 @@ Feature: Finding the ingress
     When an app sends "PUT https://api.talon.one/v2/x" with the header "Host: other.example"
     Then the vendor is api.talon.one
 
-  Scenario Outline: Requests meant for later ingresses
+  Scenario: CONNECT is not an ingress
     Given the proxy is running
-    When an app sends <request>
+    When an app sends "CONNECT api.stripe.com:443"
     Then the proxy answers 501 Not Implemented with a Proxy-Status header
     And nothing is sent to any vendor
-
-    Examples:
-      | request                                             |
-      | "GET /v1/payment_intents" with "Host: api.stripe.com" |
-      | "CONNECT api.stripe.com:443"                        |
 
   Scenario Outline: Addresses the proxy refuses
     Given the proxy is running
@@ -55,4 +51,3 @@ Feature: Finding the ingress
       | request                                               | status | ingress       |
       | "GET ftp://files.example/a.txt"                       | 400    | forward_proxy |
       | "GET https:///v1/no-host"                             | 400    | forward_proxy |
-      | "GET /v1/payment_intents" with "Host: api.stripe.com" | 501    | host_header   |

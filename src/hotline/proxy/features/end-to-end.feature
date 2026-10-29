@@ -1,5 +1,5 @@
 @e2e
-Feature: Calling through the forward proxy ingress, end to end
+Feature: Calling through the proxy, end to end
   A real client calls the real hotline-proxy program, which calls a local
   TLS test vendor; a fake OTLP receiver collects what the program sends.
   The program trusts the test vendor's issuer through --trust-file. The Go
@@ -58,3 +58,17 @@ Feature: Calling through the forward proxy ingress, end to end
       | scheme |
       | https  |
       | http   |
+
+  Scenario Outline: The Host header ingress
+    The app sets its base address to the proxy and names the vendor in the
+    Host header (Peter, 2026-10-29).
+    When the Go client sends POST to the proxy with the test vendor's name in Host, over <how>
+    Then the app gets the test vendor's status, headers and body unchanged
+    And the test vendor got the call over https and never saw Proxy-Authorization
+    And the test vendor got its own name in Host
+    And the receiver got one hotline.request record with hotline.ingress host_header and ID test-shop
+
+    Examples:
+      | how            |
+      | plain HTTP/1.1 |
+      | plain HTTP/2   |
