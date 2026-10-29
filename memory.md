@@ -78,4 +78,5 @@ Full wording in [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
 
 ## Earlier decisions
 
+- Say "ingress", never "door", for the ways apps reach the proxy (Peter, 2026-10-29).
 - The load test uses k6 (Peter, 2026-10-27).
