@@ -24,7 +24,8 @@ The proxy is built in small slices, tests first.
 4. Still to come, roughly in this order:
    - the health checks `/livez` and `/readyz` on the admin port;
    - the Node, Java and Rust clients in the end-to-end tests;
-   - the other ingresses (the Host header, and the vendor URL in the path);
+   - the vendor URL in path ingress: requirements agreed, not built. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
+   - the Host header ingress, with HTTP/2 from apps;
    - JSON and form body checks against the spec;
    - config reload without a restart;
    - the load test, with k6.
@@ -75,6 +76,15 @@ Full wording in [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
 8. No record field for it; the proxy's own health data says it once.
 9. A missing, broken, mismatched or expired certificate stops the proxy at start. A failed app TLS setup is a debug log line and, later, a count in health data.
 10. The warning before the proxy's own certificate expires comes with the health data.
+
+## Vendor URL in path decisions (Peter, 2026-10-29)
+
+Full wording in [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md).
+
+1. Two slices: vendor URL in path first, over HTTP/1.1; then the Host header ingress with HTTP/2 from apps.
+2. Only the clean `/http://` or `/https://` form. A squashed slash or an encoded address gets `400`.
+3. The vendor gets its own host (and port) from the path in `Host`, never the proxy's.
+4. No loop guard in this slice; the loop question moves to the Host header slice.
 
 ## Earlier decisions
 

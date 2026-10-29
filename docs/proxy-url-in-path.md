@@ -1,0 +1,39 @@
+# The vendor URL in path ingress: scope and test cases
+
+*Requirements agreed with Peter, 2026-10-29. Not built yet; building starts only when Peter says so. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
+
+## What the feature is
+
+An ingress is a way an app reaches the proxy. Slice 1 built the forward proxy ingress, where the app puts the full vendor address in the request line. This slice adds the **vendor URL in path** ingress: the app puts the whole vendor address after the proxy's own address.
+
+```http
+POST /https://api.stripe.com/v1/payment_intents?expand=customer HTTP/1.1
+Host: localhost:8080
+Proxy-Authorization: Basic dGVzdC1zaG9wOng=
+Content-Type: application/x-www-form-urlencoded
+
+amount=1000&currency=eur
+```
+
+The app only changes the base address it calls, to `http://localhost:8080/https://api.stripe.com`, which almost every vendor library allows. It is the one ingress that worked in every library we tested (`egress-proxy-options.md`, client table), so it is the one to recommend first.
+
+The ingress finds two things, the integration and the vendor's real address. After that the call takes exactly the same steps as a forward proxy call: TLS origination, timings, checks, record and export.
+
+## Requirements
+
+1. **Two slices** (Peter, 2026-10-29). This slice builds the vendor URL in path ingress over HTTP/1.1, plain or over TLS to the proxy. The Host header ingress and HTTP/2 from apps come in the next slice; until then, Host header calls keep getting `501`.
+2. **Which calls belong to it.** A path that starts with `/http://` or `/https://` (the scheme in any case, as in the forward proxy). The rest of the path, with the query, is the vendor's address: `/https://api.x.com/v1/a?b=1` calls `https://api.x.com/v1/a?b=1`, and `/https://api.x.com` calls the path `/`. The proxy reads the raw request line, since many routers merge `//` into `/`.
+3. **Damaged addresses are refused** (Peter, 2026-10-29). A squashed slash (`/https:/api.x.com/…`) or an encoded address (`/https%3A%2F%2Fapi.x.com/…`) gets `400` with `Proxy-Status: hotline; error=http_request_error`, and nothing is sent to any vendor. So does an address with no host (`/https:///v1`). The rule can be loosened later if a real client needs it.
+4. **The vendor sees its own name** (Peter, 2026-10-29). The proxy sets `Host` to the host, and the port if one was given, from the path. The app's `Host` (the proxy's own address) never reaches the vendor.
+5. **The same rules as the forward proxy** (earlier decisions): the scheme in the path is used, with TLS origination turning `http` into `https` and keeping the app's port; `not-passed` calls go out exactly as sent; `Proxy-Authorization` carries the integration ID and is always removed; the proxy adds no forwarding headers.
+6. **The record** is the same as for a forward proxy call, with `hotline.ingress` set to `url_in_path`. `url.full` and `server.address` are the vendor's, never the proxy's.
+7. **No loop guard in this slice.** A call to the proxy itself (`/http://localhost:8080/https://api.x.com/…`) passes through the proxy twice, each pass removing one address, so it ends on its own. The loop question moves to the Host header slice, where a call to the proxy itself would never end.
+
+## Tests
+
+- Feature scenarios: `src/hotline/proxy/features/url-in-path.feature`, tagged `@later` until building starts. When it is built, the vendor URL in path row of "Requests meant for later ingresses" in `ingress.feature` is removed.
+- End to end: the Go client calls with a base address in the path, plain and over TLS to the proxy, against the built program.
+
+## Not in this slice
+
+The Host header ingress; HTTP/2 from apps; accepting damaged addresses; a loop guard; the transparent redirect ingress; CONNECT.
