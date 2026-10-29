@@ -23,7 +23,7 @@ The proxy is built in small slices, tests first.
 3. Still to come, roughly in this order:
    - the health checks `/livez` and `/readyz` on the admin port;
    - the Node, Java and Rust clients in the end-to-end tests;
-   - TLS from apps to the proxy (`listen.tls`);
+   - TLS from apps to the proxy (`listen.tls`): requirements agreed, test cases written and tagged `@later`, not built. Detail: [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md);
    - the other ingresses (the Host header, and the vendor URL in the path);
    - JSON and form body checks against the spec;
    - config reload without a restart;
@@ -60,6 +60,21 @@ Full list in [docs/proxy-program.md](docs/proxy-program.md).
 4. Exit codes: 0 clean, 1 any failure (also a stop that ran out of time), 2 wrong command line.
 5. `--trust-file` adds trusted issuers on top of the system's own, so the end-to-end tests can trust their test vendor on any computer. This changed the spec's vendor certificate rule.
 6. End-to-end tests use only the Go client for now. They run with `make e2e`, and `make test` adds their coverage to the 100% check.
+
+## TLS from apps decisions (Peter, 2026-10-28)
+
+Full wording in [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
+
+1. With `listen.tls` set, the proxy port accepts only TLS.
+2. Certificate and key are PEM files; on Kubernetes a Secret, usually from cert-manager.
+3. Hotline builds nothing for apps to trust the proxy and never makes its own certificate; customers use their own issuer.
+4. The files are re-read when they change; a broken new pair keeps the old one.
+5. Client certificates (mutual TLS) come later, with caller authentication.
+6. TLS 1.2 and 1.3 only, Go's default ciphers, nothing to configure.
+7. Only HTTP/1.1 over TLS for now; HTTP/2 comes with the Host header ingress.
+8. No record field for it; the proxy's own health data says it once.
+9. A missing, broken, mismatched or expired certificate stops the proxy at start. A failed app TLS setup is a debug log line and, later, a count in health data.
+10. The warning before the proxy's own certificate expires comes with the health data.
 
 ## Earlier decisions
 
