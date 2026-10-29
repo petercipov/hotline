@@ -24,7 +24,7 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 	sc.Step(`^an api with tlsOrigination set to false$`, func() error {
-		w.addIntegration(integration("talon-shop-a", w.talonAPI("        tlsOrigination: false\n")))
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("    tlsOrigination: false\n")))
 		return nil
 	})
 	sc.Step(`^a not-passed call with the built-in settings$`, func() error {
@@ -62,7 +62,7 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^a vendor with a vendorTimeout of 10 seconds whose reply goes quiet after its first part$`, func() error {
 		w.clock = &fakeClock{}
-		w.addIntegration(integration("talon-shop-a", w.talonAPI("        vendorTimeout: 10s\n")))
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("    vendorTimeout: 10s\n")))
 		w.quiet, w.cutOff = make(chan struct{}), make(chan struct{})
 		quiet, cutOff := w.quiet, w.cutOff
 		w.vendor("api.talon.one").setAnswer(func(rw http.ResponseWriter, r *http.Request) {
@@ -364,7 +364,7 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^anyone looks for a setting to skip the certificate check$`, func() error {
 		w.addIntegration(integration("talon-shop-a", w.talonAPI(
-			"        insecureSkipVerify: true\n        tlsSkipVerify: true\n        skipCertificateCheck: true\n        verifyCertificate: false\n")))
+			"    insecureSkipVerify: true\n    tlsSkipVerify: true\n    skipCertificateCheck: true\n    verifyCertificate: false\n")))
 		return w.defaultCall()
 	})
 	sc.Step(`^there is none$`, func() error {
@@ -399,7 +399,7 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the vendor gets no part of it$`, w.nothingSent)
 
 	sc.Step(`^a vendor that answers after (\d+) milliseconds and a vendorTimeout of (\d+) seconds$`, func(after, timeout int) error {
-		w.addIntegration(integration("talon-shop-a", w.talonAPI(sprintf("        vendorTimeout: %ds\n", timeout))))
+		w.addIntegration(integration("talon-shop-a", w.talonAPI(sprintf("    vendorTimeout: %ds\n", timeout))))
 		w.vendor("api.talon.one").setAnswer(func(rw http.ResponseWriter, _ *http.Request) {
 			time.Sleep(time.Duration(after) * time.Millisecond)
 			rw.WriteHeader(http.StatusOK)
@@ -494,7 +494,7 @@ func (w *world) errorType(name string) error {
 // situation sets up one way a vendor call can fail.
 func (w *world) situation(situation string) error {
 	w.clock = &fakeClock{}
-	w.addIntegration(integration("talon-shop-a", w.talonAPI("        vendorTimeout: 10s\n")))
+	w.addIntegration(integration("talon-shop-a", w.talonAPI("    vendorTimeout: 10s\n")))
 	v := w.vendor("api.talon.one")
 	address := net.JoinHostPort(v.ip.String(), "443")
 	switch situation {

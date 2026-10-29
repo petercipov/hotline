@@ -47,6 +47,8 @@ type world struct {
 	downEndpoints []string
 	exporterExtra []string
 
+	// apis are the vendor apis of the config's apis section.
+	apis []namedAPI
 	// integrations is the YAML of the config's integrations list.
 	integrations []string
 	// noIntegrations leaves the integrations out of the config; otherwise
@@ -216,26 +218,70 @@ func (w *world) addIntegration(yaml string) {
 	w.integrations = append(w.integrations, yaml)
 }
 
-// talonAPI is the YAML of an api for api.talon.one with the Talon.One spec.
+// namedAPI is one entry of the config's apis section.
+type namedAPI struct {
+	name string
+	yaml string
+}
+
+// api adds a vendor api, written as YAML, to the config's apis section and
+// returns the line an integration uses to name it. The same YAML is added
+// only once.
+func (w *world) api(name, yaml string) string {
+	taken := map[string]bool{}
+	for _, a := range w.apis {
+		if a.yaml == yaml {
+			return "      - " + a.name + "\n"
+		}
+		taken[a.name] = true
+	}
+	base := name
+	for n := 2; taken[name]; n++ {
+		name = fmt.Sprintf("%s-%d", base, n)
+	}
+	w.apis = append(w.apis, namedAPI{name: name, yaml: yaml})
+	return "      - " + name + "\n"
+}
+
+// talonAPI adds an api for api.talon.one with the Talon.One spec.
 func (w *world) talonAPI(extra string) string {
 	w.writeFile("specs/talon-one.openapi.yaml", w.exampleFile("specs/talon-one.openapi.yaml"))
-	return "      - hosts: [api.talon.one]\n        spec: ./specs/talon-one.openapi.yaml\n" + extra
+	return w.api("talon-one", "    hosts: [api.talon.one]\n    spec: ./specs/talon-one.openapi.yaml\n"+extra)
 }
 
 func (w *world) stripeAPI(extra string) string {
 	w.writeFile("specs/stripe.openapi.yaml", w.exampleFile("specs/stripe.openapi.yaml"))
-	return "      - hosts: [api.stripe.com]\n        spec: ./specs/stripe.openapi.yaml\n" + extra
+	return w.api("stripe", "    hosts: [api.stripe.com]\n    spec: ./specs/stripe.openapi.yaml\n"+extra)
 }
 
-// specAPI is the YAML of an api for host with a spec written by the test.
+// specAPI adds an api for host with a spec written by the test.
 func (w *world) specAPI(host, spec, extra string) string {
 	name := fmt.Sprintf("specs/%s.yaml", host)
 	w.writeFile(name, spec)
-	return fmt.Sprintf("      - hosts: [%s]\n        spec: ./%s\n%s", host, name, extra)
+	return w.api(host, fmt.Sprintf("    hosts: [%s]\n    spec: ./%s\n%s", host, name, extra))
 }
 
 func integration(id string, apis ...string) string {
 	return fmt.Sprintf("  - id: %s\n    apis:\n%s", id, strings.Join(apis, ""))
+}
+
+// apisSection is the YAML of the config's apis section.
+func (w *world) apisSection() string {
+	if len(w.apis) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("apis:\n")
+	for _, a := range w.apis {
+		b.WriteString("  " + a.name + ":\n" + a.yaml)
+	}
+	return b.String()
+}
+
+// raw is a config written by a test: its head, the apis added so far and
+// the integrations.
+func (w *world) raw(head, integrations string) string {
+	return head + w.apisSection() + "integrations:\n" + integrations
 }
 
 func freePort() string {
@@ -262,6 +308,7 @@ func (w *world) config() string {
 	if w.telemetry != nil {
 		fmt.Fprintf(&b, "telemetry:\n  otlp:\n    endpoint: %s\n", w.telemetry.endpoint)
 	}
+	b.WriteString(w.apisSection())
 	if len(w.integrations) > 0 {
 		b.WriteString("integrations:\n" + strings.Join(w.integrations, ""))
 	}
@@ -551,7 +598,7 @@ func (b *syncBuffer) String() string {
 
 func sprint(v any) string { return fmt.Sprint(v) }
 
-// apiFor is the YAML of an api for host: the example specs for Talon.One and
+// apiFor adds an api for host: the example specs for Talon.One and
 // Stripe, a small spec for any other host.
 func (w *world) apiFor(host, extra string) string {
 	switch host {

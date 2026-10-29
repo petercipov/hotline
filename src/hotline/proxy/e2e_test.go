@@ -497,12 +497,14 @@ listen:
 %sexporters:
   - otlp:
       endpoint: %s
+apis:
+  test-vendor:
+    hosts: [localhost]
+    spec: ./specs/test-vendor.yaml
+    allowInternalIPs: true
 integrations:
   - id: test-shop
-    apis:
-      - hosts: [localhost]
-        spec: ./specs/test-vendor.yaml
-        allowInternalIPs: true
+    apis: [test-vendor]
   - id: not-passed
     allowInternalIPs: true
 `, p.proxyAddr, listenTLS, endpoint)

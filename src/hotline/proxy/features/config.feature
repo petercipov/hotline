@@ -8,7 +8,8 @@ Feature: Loading the config file
     When the proxy loads it
     Then the proxy listen address is read
     And every OTLP exporter is read with its endpoint
-    And every integration is read with its apis, their hosts and the spec each api points to
+    And every api is read with its hosts and the spec it points to
+    And every integration is read with the apis it names
     And spec files are found relative to the folder of the config file
 
   Scenario: The config's version goes into every record
@@ -55,6 +56,27 @@ Feature: Loading the config file
     When a call goes to api.talon.one
     Then that api is used
 
+  Scenario: Integrations share an api by name
+    Each vendor api is written once in the apis section, and integrations
+    name the apis they use (Peter, 2026-10-29).
+    Given the api talon-one with the host api.talon.one and the Talon.One spec
+    And the integrations talon-shop-a and talon-shop-b both naming talon-one
+    When either integration calls api.talon.one
+    Then both calls use the Talon.One spec
+
+  Scenario: Hundreds of integrations share one api
+    A spec is read once and shared by every integration that names its api.
+    Given 300 integrations that all name the api talon-one
+    When the proxy loads the config
+    Then calls from the first and the last of them use the Talon.One spec
+
+  Scenario: An integration may change only vendorTimeout
+    Given the api talon-one with vendorTimeout 10s
+    And talon-shop-a naming talon-one as it is
+    And talon-shop-b naming talon-one with vendorTimeout 5s
+    Then calls from talon-shop-a wait 10 seconds for the vendor
+    And calls from talon-shop-b wait 5 seconds for the vendor
+
   Scenario: Built-in not-passed settings
     Given a config file with no not-passed entry
     When the proxy loads it
@@ -65,8 +87,8 @@ Feature: Loading the config file
     When the proxy loads it
     Then not-passed calls use TLS origination
 
-  Scenario: The same host in two integrations
-    Given two integrations that both list api.talon.one, each with its own spec
+  Scenario: The same host in two apis of different integrations
+    Given two integrations that each name an api for api.talon.one, each with its own spec
     When the proxy loads the config
     Then both are accepted
 
@@ -92,7 +114,10 @@ Feature: Loading the config file
       | an exporter's endpoint is not a valid address        |
       | an exporter's queueSize is zero                      |
       | two integrations have the same ID                    |
-      | one integration lists the same host in two apis      |
+      | one integration names two apis with the same host    |
+      | an integration names an api that is not in apis      |
+      | an integration names an api with a list, not a name  |
+      | an api has no spec                                   |
       | an api points to a spec file that does not exist     |
       | a spec is not a valid OpenAPI 3 document             |
       | a vendorTimeout is zero                              |
@@ -111,6 +136,7 @@ Feature: Loading the config file
       | problem                                               | name          |
       | the not-passed entry has an apis list                 | apis          |
       | a field name has a typo, such as tlsOrigintion        | tlsOrigintion |
+      | an integration changes tlsOrigination of an api it names | tlsOrigination |
 
   Scenario: A busy listen address
     Given another program listens on the proxy address

@@ -104,7 +104,7 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 	})
 
 	sc.Step(`^a vendor reached over plain http$`, func() error {
-		w.addIntegration(integration("talon-shop-a", w.talonAPI("        tlsOrigination: false\n")))
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("    tlsOrigination: false\n")))
 		w.target = "http://api.talon.one/v2/customer_sessions/sess-8812"
 		return nil
 	})
@@ -128,7 +128,7 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		return w.waitForRecords(1)
 	})
 	sc.Step(`^a call that waits for a new connection while another call holds the only open one$`, func() error {
-		w.addIntegration(integration("talon-shop-a", w.talonAPI("        tlsOrigination: false\n")))
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("    tlsOrigination: false\n")))
 		w.freed = make(chan struct{})
 		freed := w.freed
 		w.vendor("api.talon.one").setAnswer(func(_ http.ResponseWriter, r *http.Request) {
@@ -221,7 +221,7 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^a vendor whose first address never answers, with a vendorTimeout of 10 seconds$`, func() error {
 		w.clock = &fakeClock{}
 		w.network.stuck = w.clock.passToNext
-		w.addIntegration(integration("talon-shop-a", w.talonAPI("        vendorTimeout: 10s\n")))
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("    vendorTimeout: 10s\n")))
 		v := w.vendor("api.talon.one")
 		dead := netip.MustParseAddr("192.0.2.77")
 		w.network.mu.Lock()
