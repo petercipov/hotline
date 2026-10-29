@@ -33,7 +33,7 @@ This feature encrypts the first connection. The app opens a TLS connection (an e
 4. **Renewing the certificate without a restart** (Peter, 2026-10-28). The proxy watches both files. When they change, it loads the new pair; new connections get the new certificate and open ones keep the old. A broken or mismatched pair is ignored: the old one stays and the proxy logs why. This matches how the fingerprint key files already work. cert-manager usually renews every 60 days or so, so a restart for each renewal would be a nuisance.
 5. **Client certificates (mutual TLS, where the proxy also checks a certificate from the app)** (Peter, 2026-10-28). Not in this slice. It belongs with caller authentication, which the spec puts in "later". The demo shows it is easy to add (`clientCA` file) when we get there. Peter said on 2026-10-05 it must be supported eventually, so this only orders the work.
 6. **TLS versions and ciphers** (Peter, 2026-10-28). TLS 1.2 and 1.3 only, with Go's safe defaults for ciphers. No config options for them.
-7. **HTTP/2 over TLS** (Peter, 2026-10-28). In this slice the proxy offers only HTTP/1.1 during the handshake, so clients fall back to it and every call works. Over HTTP/2 there is no full address in a request line, so those calls would need the Host header ingress, which is not built yet. HTTP/2 over TLS is switched on together with the Host header ingress.
+7. **HTTP/2 over TLS** (Peter, 2026-10-28). In this slice the proxy offers only HTTP/1.1 during the handshake, so clients fall back to it and every call works. Over HTTP/2 there is no full address in a request line, so those calls would need the Host header ingress, which is not built yet. HTTP/2 over TLS is switched on together with the Host header ingress (built 2026-10-29, see `proxy-host-header.md`).
 8. **What the record says** (Peter, 2026-10-28). No new record field. The port is all TLS or all plain, so a field on each call would repeat one fact. Whether a proxy uses TLS can go once per proxy in its own health data later.
 9. **Errors** (Peter, 2026-10-28).
    - Certificate or key missing, unreadable, not matching each other, or already expired at start: the proxy refuses to start and exits with 1, and the log line says why. `validate` reports the same. Starting while "not ready", falling back to plain HTTP, and making our own certificate were all ruled out.
@@ -43,7 +43,7 @@ This feature encrypts the first connection. The app opens a TLS connection (an e
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/tls-from-apps.feature`. A call over TLS gets through; the proxy shows its one certificate whatever name is asked for; a plain request on the TLS port gets `400`; an app that doesn't trust the proxy, or allows only TLS 1.1, fails the setup and the proxy logs it at debug level; TLS 1.2 and 1.3 both work; an app offering HTTP/2 gets HTTP/1.1; a bad certificate stops the start; renewing the files changes the certificate for new connections only; a broken renewal keeps the old one.
+- Feature scenarios: `src/hotline/proxy/features/tls-from-apps.feature`. A call over TLS gets through; the proxy shows its one certificate whatever name is asked for; a plain request on the TLS port gets `400`; an app that doesn't trust the proxy, or allows only TLS 1.1, fails the setup and the proxy logs it at debug level; TLS 1.2 and 1.3 both work; a bad certificate stops the start; renewing the files changes the certificate for new connections only; a broken renewal keeps the old one.
 - End to end: `end-to-end-tls.feature` runs the Go client's cases 4 and 5 against the built program. The Node rows wait, tagged `@later`, for the Node client. `program.feature` checks that `validate` refuses a missing key file.
 
 ## How it is built
@@ -56,4 +56,4 @@ This feature encrypts the first connection. The app opens a TLS connection (an e
 
 ## Not in this slice
 
-CONNECT and interception; client certificates; HTTP/2 over TLS (comes with the Host header ingress); a record field saying the app used TLS; the certificate expiry warning; a second listener for plain and TLS at once; certificates from a secrets manager.
+CONNECT and interception; client certificates; a record field saying the app used TLS; the certificate expiry warning; a second listener for plain and TLS at once; certificates from a secrets manager.

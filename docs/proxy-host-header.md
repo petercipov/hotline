@@ -1,6 +1,6 @@
 # The Host header ingress, with HTTP/2 from apps: scope and test cases
 
-*Requirements agreed with Peter, 2026-10-29. Not built yet; building starts only when Peter says so. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
+*Agreed with Peter and built, 2026-10-29. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
 
 ## What the feature is
 
@@ -21,7 +21,7 @@ The app's own address for the proxy (`http://localhost:8080`) only says how the 
 1. **Which calls belong to it.** Anything on the proxy port that is neither a full address in the request line, nor a path starting `/http:` or `/https:`, nor CONNECT.
 2. **The vendor is the `Host`.** `Host: api.x.com:8443` goes to port 8443; with no port, 443 for `https` and 80 for `http`. The vendor gets the `Host` the app sent, since it is already the vendor's name. A missing or empty `Host` gets `400` with `Proxy-Status: hotline; error=http_request_error`.
 3. **`https` by default.** A call with a known integration goes out over `https`, unless its api sets `tlsOrigination: false`, which sends it as plain `http` (egress-proxy-options, 2026-10-27). A `not-passed` call, one without a known integration, also goes out over `https` (Peter, 2026-10-29).
-4. **HTTP/2 is `https` only** (2026-10-05). `:scheme http` never makes a plain call to the vendor.
+4. **HTTP/2 is `https` only** (2026-10-05). `:scheme http` never makes a plain call to the vendor. This holds on both ingresses HTTP/2 can use: an HTTP/2 vendor URL in path call to `/http://…` also goes out over `https`.
 5. **HTTP/2 over TLS to the proxy** is switched on with this slice (TLS from apps, decision 7). The proxy offers both HTTP/2 and HTTP/1.1 during the TLS setup.
 6. **Plain HTTP/2 (without TLS, called h2c) by prior knowledge only** (Peter, 2026-10-29). Prior knowledge means the app starts talking HTTP/2 straight away. The older `Upgrade: h2c` handshake, dropped from the current standard (RFC 9113), is not supported: such a request is answered over HTTP/1.1 like any other.
 7. **The same steps as the other ingresses.** The integration ID comes from `Proxy-Authorization` (added as a default header by the app), which is always removed; the proxy adds no forwarding headers; the record is the same, with `hotline.ingress=host_header`; refused calls get a minimal record; the vendor IP is in every record.
@@ -31,9 +31,15 @@ The app's own address for the proxy (`http://localhost:8080`) only says how the 
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/host-header.feature`, tagged `@later` until building starts.
-- When built, the `501` rows for Host header calls in `ingress.feature` and `url-in-path.feature` are replaced by these scenarios.
-- End to end: the Go client calls with `Host` set, over plain HTTP/1.1, over plain HTTP/2 and over HTTP/2 with TLS.
+- Feature scenarios: `src/hotline/proxy/features/host-header.feature`. They replace the `501` rows for Host header calls in `ingress.feature` and `url-in-path.feature`, and the "HTTP/2 gets HTTP/1.1" scenario in `tls-from-apps.feature`.
+- End to end: the Go client calls with `Host` set, over plain HTTP/1.1 and plain HTTP/2 (`end-to-end.feature`), and over HTTP/2 with TLS (`end-to-end-tls.feature`).
+
+## How it is built
+
+- `findIngress` in `handler.go`: a request that is neither a full address, a vendor address in the path, nor CONNECT is a Host header call. Its vendor address is the `Host` (in HTTP/2, `:authority`) with the request's path and query, and no scheme. An empty host gets `400`.
+- `vendorScheme` in `handler.go` picks the scheme: `https` when TLS origination is on or the app spoke HTTP/2; otherwise the scheme the app named; a Host header call with a known api that turned TLS origination off goes as `http`; anything else as `https`.
+- The proxy server offers HTTP/1.1, HTTP/2 over TLS, and plain HTTP/2 by prior knowledge, through Go's `http.Protocols`. The TLS setup offers `h2` and `http/1.1`.
+- An `Upgrade: h2c` request is a switch on the app's own link, so the proxy drops `Upgrade` and `Connection` before calling the vendor, and the call stays HTTP/1.1.
 
 ## Not in this slice
 

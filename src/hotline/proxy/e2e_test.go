@@ -322,6 +322,21 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		}
 		return p.respErr
 	})
+	sc.Step(`^the Go client sends POST to the proxy with the test vendor's name in Host, over (plain HTTP/1.1|plain HTTP/2|HTTP/2 with TLS)$`, func(how string) error {
+		host := strings.TrimPrefix(p.vendorURL, "https://")
+		switch how {
+		case "plain HTTP/1.1":
+			p.respond(goHostHeader("http://"+p.proxyAddr+paymentPath, host, "test-shop", nil, false))
+		case "plain HTTP/2":
+			p.respond(goHostHeader("http://"+p.proxyAddr+paymentPath, host, "test-shop", nil, true))
+		default:
+			p.respond(goHostHeader("https://"+p.proxyAddr+paymentPath, host, "test-shop", p.appTLS(), true))
+		}
+		if p.respErr == nil && how != "plain HTTP/1.1" && p.resp.ProtoMajor != 2 {
+			return failf("the app used %s, want HTTP/2", p.resp.Proto)
+		}
+		return p.respErr
+	})
 	sc.Step(`^the test vendor got its own name in Host$`, func() error {
 		calls := p.vendor.received()
 		if want := strings.TrimPrefix(p.vendorURL, "https://"); len(calls) != 1 || calls[0].host != want {
@@ -329,7 +344,7 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		}
 		return nil
 	})
-	sc.Step(`^the receiver got one hotline.request record with hotline.ingress (forward_proxy|url_in_path) and ID test-shop$`, func(ingress string) error {
+	sc.Step(`^the receiver got one hotline.request record with hotline.ingress (forward_proxy|url_in_path|host_header) and ID test-shop$`, func(ingress string) error {
 		record, err := p.record()
 		if err != nil {
 			return err
@@ -705,6 +720,28 @@ func goInPath(target, id string, appTLS *tls.Config) (*http.Response, error) {
 	t.TLSClientConfig = appTLS
 	defer t.CloseIdleConnections()
 	req := paymentRequest(target)
+	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
+	return t.RoundTrip(req)
+}
+
+// goHostHeader sends the call to the proxy's own address with the vendor's
+// name in the Host header, the way an app does by changing its base address
+// and setting Host. With http2 set, it speaks HTTP/2: inside TLS when
+// appTLS is set, otherwise plain from the first byte.
+func goHostHeader(target, host, id string, appTLS *tls.Config, http2 bool) (*http.Response, error) {
+	protocols := new(http.Protocols)
+	switch {
+	case !http2:
+		protocols.SetHTTP1(true)
+	case appTLS != nil:
+		protocols.SetHTTP2(true)
+	default:
+		protocols.SetUnencryptedHTTP2(true)
+	}
+	t := &http.Transport{Protocols: protocols, TLSClientConfig: appTLS}
+	defer t.CloseIdleConnections()
+	req := paymentRequest(target)
+	req.Host = host
 	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
 	return t.RoundTrip(req)
 }

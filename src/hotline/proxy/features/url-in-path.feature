@@ -90,8 +90,3 @@ Feature: The vendor URL in path ingress
     Then the vendor gets the call over https
     And the record says hotline.ingress url_in_path
 
-  Scenario: A Host header call still waits for its slice
-    When an app sends "GET /v1/payment_intents" with "Host: api.stripe.com"
-    Then the proxy answers 501 Not Implemented with a Proxy-Status header
-    And nothing is sent to any vendor
-    And the record is minimal with hotline.ingress host_header, server.address api.stripe.com and http.response.status_code 501

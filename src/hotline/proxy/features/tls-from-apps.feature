@@ -3,7 +3,7 @@ Feature: TLS from apps to the proxy
   request inside it, with the full vendor address in the request line. The
   proxy shows its own certificate, read from the cert and key files; it
   never makes one of its own. The proxy port then accepts only TLS, versions
-  1.2 and 1.3, over HTTP/1.1. Client certificates (mutual TLS) come later
+  1.2 and 1.3, over HTTP/1.1 or HTTP/2 (see host-header.feature). Client certificates (mutual TLS) come later
   (Peter, 2026-10-28).
 
   Background:
@@ -50,12 +50,6 @@ Feature: TLS from apps to the proxy
       | version |
       | TLS 1.2 |
       | TLS 1.3 |
-
-  Scenario: An app that offers HTTP/2 gets HTTP/1.1
-    Given an app that trusts the test issuer and offers HTTP/2 and HTTP/1.1
-    When the app sends its call over TLS to the proxy
-    Then the connection uses HTTP/1.1
-    And the app gets the vendor's status, headers and body unchanged
 
   Scenario Outline: A bad certificate stops the proxy at start
     Given <problem>

@@ -356,6 +356,16 @@ func (w *world) stuck() {
 	}
 }
 
+// headerValue is the value of the first "Name: value" line for name.
+func headerValue(headers []string, name string) string {
+	for _, h := range headers {
+		if key, value, found := strings.Cut(h, ":"); found && strings.EqualFold(key, name) {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
 // hostOf is the vendor host in a request target.
 func hostOf(target string) string {
 	host := target
@@ -374,6 +384,10 @@ func (w *world) send(r request) error {
 		return err
 	}
 	host := strings.ToLower(hostOf(r.target))
+	if host == "" {
+		// A Host header call names its vendor in the Host header.
+		host = strings.ToLower(headerValue(r.headers, "Host"))
+	}
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
@@ -440,6 +454,11 @@ func (w *world) exchange(conn net.Conn, r request) error {
 		time.Sleep(r.hangUpAfter)
 		return nil
 	}
+	return w.readAnswer(conn)
+}
+
+// readAnswer reads the proxy's answer to the request just sent.
+func (w *world) readAnswer(conn net.Conn) error {
 	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
 	w.resp, w.respErr = resp, err

@@ -1,4 +1,3 @@
-@later
 Feature: The Host header ingress
   The app calls the proxy with a plain path and names the vendor in the
   Host header (in HTTP/2, the :authority field). A normal HTTP request

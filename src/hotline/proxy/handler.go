@@ -22,9 +22,10 @@ import (
 	"hotline/proxy/internal/export"
 )
 
-// handler serves the proxy port. It knows two ingresses: the forward proxy,
-// where the app puts the full vendor address in the request line, and the
-// vendor URL in path, where the app puts it after the proxy's own address.
+// handler serves the proxy port. It knows three ingresses: the forward
+// proxy, where the app puts the full vendor address in the request line;
+// the vendor URL in path, where the app puts it after the proxy's own
+// address; and the Host header, where the app names only the vendor's host.
 type handler struct {
 	cfg       *config.Config
 	clock     Clock
@@ -54,10 +55,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if api != nil {
 		settings = api.Settings
 	}
-	scheme := target.Scheme
-	if settings.TLSOrigination {
-		scheme = "https"
-	}
+	scheme := vendorScheme(r, target, api, settings)
 	port := target.Port()
 	if port == "" {
 		port = map[string]string{"http": "80", "https": "443"}[scheme]
@@ -94,6 +92,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			out.Fragment = ""
 			pr.Out.URL = &out
 			pr.Out.Host = target.Host
+			if strings.EqualFold(pr.Out.Header.Get("Upgrade"), "h2c") {
+				// A switch to HTTP/2 on the app's own link, which the
+				// proxy does not offer: the call stays HTTP/1.1.
+				pr.Out.Header.Del("Upgrade")
+				pr.Out.Header.Del("Connection")
+			}
 		},
 		Transport:     c,
 		FlushInterval: -1,
@@ -163,8 +167,28 @@ func findIngress(r *http.Request) (string, *url.URL, int) {
 		}
 		return "url_in_path", target, 0
 	}
-	// Meant for the Host header ingress, which a later slice builds.
-	return "host_header", &url.URL{Host: r.Host}, http.StatusNotImplemented
+	// The Host header ingress: the request names no scheme, so the caller
+	// picks one.
+	target := &url.URL{Host: r.Host, Path: r.URL.Path, RawPath: r.URL.RawPath, RawQuery: r.URL.RawQuery}
+	if target.Hostname() == "" {
+		return "host_header", nil, http.StatusBadRequest
+	}
+	return "host_header", target, 0
+}
+
+// vendorScheme is http or https for the vendor call. TLS origination and
+// HTTP/2 from the app always mean https. A Host header call names no
+// scheme: it goes out over https, unless its api turned TLS origination off.
+func vendorScheme(r *http.Request, target *url.URL, api *config.API, settings config.Settings) string {
+	switch {
+	case settings.TLSOrigination, r.ProtoMajor == 2:
+		return "https"
+	case target.Scheme != "":
+		return target.Scheme
+	case api != nil:
+		return "http"
+	}
+	return "https"
 }
 
 // inPath says whether a raw request target starts with a vendor address,

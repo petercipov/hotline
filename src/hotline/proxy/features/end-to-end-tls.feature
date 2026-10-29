@@ -36,3 +36,9 @@ Feature: Calling over TLS to the proxy, end to end
     Then the app gets the test vendor's status, headers and body unchanged
     And the test vendor got its own name in Host
     And the receiver got one hotline.request record with hotline.ingress url_in_path and ID test-shop
+
+  Scenario: The Host header ingress over HTTP/2 with TLS to the proxy
+    When the Go client sends POST to the proxy with the test vendor's name in Host, over HTTP/2 with TLS
+    Then the app gets the test vendor's status, headers and body unchanged
+    And the test vendor got its own name in Host
+    And the receiver got one hotline.request record with hotline.ingress host_header and ID test-shop
