@@ -3,6 +3,7 @@ package spec
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"math/big"
@@ -19,9 +20,11 @@ import (
 // compiler. Nothing is ever fetched from it.
 const specURL = "https://spec.hotline.invalid/openapi.json"
 
-// checkedFormats are the formats checked as rules (Peter, 2026-10-29). Any
-// other format is ignored.
-var checkedFormats = []string{"date-time", "date", "email", "uuid", "uri", "ipv4", "ipv6", "int32", "int64"}
+// errOutside marks a $ref to a document other than the spec.
+var errOutside = errors.New("outside the spec")
+
+// errBits marks a whole number too large for its format.
+var errBits = errors.New("does not fit")
 
 // builder turns the spec, read as plain data, into the checks of each
 // route. Its schemas are compiled once, and $ref is followed only within
@@ -39,7 +42,7 @@ type builder struct {
 type outside struct{}
 
 func (outside) Load(address string) (any, error) {
-	return nil, fmt.Errorf("%s is outside the spec", address)
+	return nil, fmt.Errorf("%w: %s", errOutside, address)
 }
 
 func newBuilder(name string, data []byte) *builder {
@@ -72,14 +75,14 @@ func newBuilder(name string, data []byte) *builder {
 }
 
 // ignoredFormats are the formats the JSON Schema library knows but the
-// proxy does not check.
+// proxy does not check. Only date-time, date, email, uuid, uri, ipv4, ipv6,
+// int32 and int64 are checked as rules (Peter, 2026-10-29).
 func ignoredFormats() []string {
-	known := []string{
+	return []string{
 		"json-pointer", "relative-json-pointer", "duration", "period", "hostname", "time",
 		"iri", "uri-reference", "iri-reference", "uri-template", "semver", "regex",
 		"idn-email", "idn-hostname",
 	}
-	return slices.DeleteFunc(known, func(f string) bool { return slices.Contains(checkedFormats, f) })
 }
 
 // bits checks that a whole number fits in a signed integer of that size.
@@ -92,7 +95,7 @@ func bits(size uint) func(any) error {
 			return nil
 		}
 		if n.Cmp(low) < 0 || n.Cmp(limit) >= 0 {
-			return fmt.Errorf("does not fit in %d bits", size)
+			return fmt.Errorf("%w in %d bits", errBits, size)
 		}
 		return nil
 	}
@@ -126,9 +129,10 @@ func (b *builder) problem(format string, args ...any) {
 	b.problems = append(b.problems, fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...)))
 }
 
-var pointerEscape = strings.NewReplacer("~", "~0", "/", "~1")
-
-func token(name string) string { return "/" + pointerEscape.Replace(name) }
+// token is one step of a JSON pointer, with / and ~ escaped.
+func token(name string) string {
+	return "/" + strings.NewReplacer("~", "~0", "/", "~1").Replace(name)
+}
 
 // at finds the value at a JSON pointer, such as /components/schemas/Order.
 func (b *builder) at(pointer string) (any, bool) {
@@ -367,4 +371,3 @@ func (b *builder) reply(m map[string]any, pointer, where, code string) *reply {
 	}
 	return r
 }
-
