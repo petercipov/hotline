@@ -27,6 +27,7 @@ The app's own address for the proxy (`http://localhost:8080`) only says how the 
 7. **The same steps as the other ingresses.** The integration ID comes from `Proxy-Authorization` (added as a default header by the app), which is always removed; the proxy adds no forwarding headers; the record is the same, with `hotline.ingress=host_header`; refused calls get a minimal record; the vendor IP is in every record.
 8. **Guarded from the start** (Peter, 2026-10-29). The internal address guard (`proxy-internal-guard.md`) applies. A call whose `Host` is the proxy itself goes to a loopback or cluster-internal IP, so it gets `403` and cannot loop.
 9. **HTTP version in the record.** `network.protocol.version` is the version used to the vendor, as today.
+10. **No HTTP/3 for now** (Peter, 2026-10-29). HTTP/3 runs over QUIC (on UDP) and gains little between an app and a proxy in the same cluster, and server side clients rarely use it to call a proxy. It is added later only if a real app needs it.
 
 ## Tests
 
