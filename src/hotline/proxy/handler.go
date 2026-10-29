@@ -20,6 +20,7 @@ import (
 
 	"hotline/proxy/internal/config"
 	"hotline/proxy/internal/export"
+	"hotline/proxy/internal/spec"
 )
 
 // handler serves the proxy port. It knows three ingresses: the forward
@@ -77,7 +78,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		in:        r,
 		timeout:   settings.VendorTimeout,
 		transport: transport,
-		reqBody:   &tap{ReadCloser: r.Body},
+		reqBody:   &tap{ReadCloser: r.Body, limit: keepFor(api)},
 	}
 	r.Body = c.reqBody
 	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
@@ -304,7 +305,7 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.respBody = &tap{ReadCloser: resp.Body, done: func() { c.mark(func() { c.vendorOut = c.h.clock.Now() }) }}
+	c.respBody = &tap{ReadCloser: resp.Body, limit: keepFor(c.api), done: func() { c.mark(func() { c.vendorOut = c.h.clock.Now() }) }}
 	if both, ok := resp.Body.(io.Writer); ok && resp.StatusCode == http.StatusSwitchingProtocols {
 		// An upgraded connection, such as a WebSocket, carries data both
 		// ways, so the proxy must be able to write to it too. It may stay
@@ -425,7 +426,20 @@ type upgraded struct {
 	io.Writer
 }
 
-// tap passes a body straight on and counts the bytes that passed. done, if
+// keptBody is how much of each body the proxy keeps for the checks.
+const keptBody = 1 << 20
+
+// keepFor is how much of a body to keep: none for a call that is not
+// checked.
+func keepFor(api *config.API) int {
+	if api == nil {
+		return 0
+	}
+	return keptBody
+}
+
+// tap passes a body straight on and counts the bytes that passed. It keeps
+// a copy of up to limit bytes for the checks. done, if
 // set, runs once when the body ends: read to the end, broken off, or closed
 // early. The request body is read by the transport, which may still be
 // reading when the record is made, so the counts are behind a lock.
@@ -435,9 +449,13 @@ type tap struct {
 	// wait, if set, runs before each read and limits how long it may take.
 	wait func() func() bool
 
+	limit int
+
 	mu   sync.Mutex
 	size int64
 	err  error
+	kept []byte
+	over bool
 }
 
 func (t *tap) Read(p []byte) (int, error) {
@@ -447,6 +465,11 @@ func (t *tap) Read(p []byte) (int, error) {
 	n, err := t.ReadCloser.Read(p)
 	t.mu.Lock()
 	t.size += int64(n)
+	if t.limit > 0 {
+		room := min(n, t.limit-len(t.kept))
+		t.kept = append(t.kept, p[:room]...)
+		t.over = t.over || room < n
+	}
 	if err != nil && !errors.Is(err, io.EOF) {
 		t.err = err
 	}
@@ -468,6 +491,13 @@ func (t *tap) counts() (int64, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.size, t.err
+}
+
+// copied is the copy of the body kept so far.
+func (t *tap) copied() spec.Body {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return spec.Body{Data: t.kept, TooLarge: t.over}
 }
 
 func (t *tap) finish() {

@@ -41,6 +41,8 @@ type route struct {
 	// ("path", "query", "header" and "reply") and then by name. Header
 	// names are lower case.
 	marks map[string]map[string]mark
+	// checks are what a call on this route is checked against.
+	checks *checks
 }
 
 type document struct {
@@ -94,9 +96,10 @@ type securityScheme struct {
 func Parse(name string, data []byte) (*Spec, error) {
 	var doc document
 	err := yaml.Unmarshal(data, &doc)
-	if err != nil || !strings.HasPrefix(doc.OpenAPI, "3.") {
-		return nil, fmt.Errorf("%w: %s is not a valid OpenAPI 3 document", ErrInvalid, name)
+	if err != nil || !strings.HasPrefix(doc.OpenAPI, "3.1.") {
+		return nil, fmt.Errorf("%w: %s is not an OpenAPI 3.1 document", ErrInvalid, name)
 	}
+	b := newBuilder(name, data)
 	s := &Spec{secretHeaders: map[string]bool{}, secretQuery: map[string]bool{}}
 	var problems []error
 	// A base path in the first servers address, such as /v1 in
@@ -107,8 +110,8 @@ func Parse(name string, data []byte) (*Spec, error) {
 			base = strings.TrimSuffix(u.Path, "/")
 		}
 	}
-	for template, item := range doc.Paths {
-		template = base + template
+	for key, item := range doc.Paths {
+		template := base + key
 		for method, op := range item.operations() {
 			r := route{
 				method:   method,
@@ -117,6 +120,7 @@ func Parse(name string, data []byte) (*Spec, error) {
 				marks:    map[string]map[string]mark{"path": {}, "query": {}, "header": {}, "reply": {}},
 			}
 			where := fmt.Sprintf("%s %s %s", name, method, template)
+			r.checks = b.checks(key, strings.ToLower(method), where)
 			// The method's own entries come last, so they win.
 			for _, p := range append(append([]parameter{}, item.Parameters...), op.Parameters...) {
 				problems = r.addMark(problems, where, p.In, p.Name, p.Redact)
@@ -137,6 +141,7 @@ func Parse(name string, data []byte) (*Spec, error) {
 			s.secretQuery[scheme.Name] = true
 		}
 	}
+	problems = append(problems, b.problems...)
 	if len(problems) > 0 {
 		return nil, errors.Join(problems...)
 	}

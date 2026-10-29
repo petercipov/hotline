@@ -119,7 +119,11 @@ Feature: Loading the config file
       | an integration names an api with a list, not a name  |
       | an api has no spec                                   |
       | an api points to a spec file that does not exist     |
-      | a spec is not a valid OpenAPI 3 document             |
+      | a spec is not an OpenAPI document                    |
+      | a spec is OpenAPI 3.0                                |
+      | a schema in a spec has the type integr               |
+      | a $ref in a spec points nowhere                      |
+      | a $ref in a spec points to another file              |
       | a vendorTimeout is zero                              |
       | a vendorTimeout is negative                          |
       | a vendorTimeout is not a duration                    |

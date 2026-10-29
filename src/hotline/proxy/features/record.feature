@@ -60,8 +60,14 @@ Feature: Building the request record
   Scenario: Fields for later slices are left out
     Given integration talon-shop-a with an api for api.talon.one
     When the Talon.One sample call ends
-    Then there are no hotline.schema.request.errors or hotline.schema.response.errors
-    And there are no hotline.body.request.hmac_sha256 or hotline.body.response.hmac_sha256
+    Then there are no hotline.body.request.hmac_sha256 or hotline.body.response.hmac_sha256
+
+  Scenario: The sample call's check result
+    The sample call sends a cart item with quantity 0, below the spec's
+    minimum of 1.
+    Given integration talon-shop-a with an api for api.talon.one
+    When the Talon.One sample call ends
+    Then the request results are body $.customerSession.cartItems[0].quantity minimum 1
 
   Scenario: No secret and no body
     Given a call with Authorization, Proxy-Authorization, a cookie, an API key and a JSON body

@@ -194,7 +194,7 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^two integrations that each name an api for api.talon.one, each with its own spec$`, func() error {
 		w.addIntegration(integration("talon-shop-a", w.talonAPI("")))
-		w.writeFile("specs/other.yaml", "openapi: 3.0.0\npaths:\n  /v9/other/{x}:\n    put: {}\n")
+		w.writeFile("specs/other.yaml", "openapi: 3.1.0\npaths:\n  /v9/other/{x}:\n    put: {}\n")
 		w.addIntegration(integration("talon-shop-b", w.api("other", "    hosts: [api.talon.one]\n    spec: specs/other.yaml\n")))
 		return nil
 	})
@@ -389,9 +389,24 @@ func (w *world) brokenConfig(problem string) error {
 	case "an api points to a spec file that does not exist":
 		w.rawConfig = w.raw(start+exporters, integration("shop", w.api("shop", "    hosts: [api.x.com]\n    spec: ./specs/missing.yaml\n")))
 		w.problem = "missing.yaml cannot be read"
-	case "a spec is not a valid OpenAPI 3 document":
+	case "a spec is not an OpenAPI document":
 		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com", "swagger: \"2.0\"\npaths: {}\n", "")))
-		w.problem = "is not a valid OpenAPI 3 document"
+		w.problem = "is not an OpenAPI 3.1 document"
+	case "a spec is OpenAPI 3.0":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com", "openapi: 3.0.3\npaths: {}\n", "")))
+		w.problem = "is not an OpenAPI 3.1 document"
+	case "a schema in a spec has the type integr":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com",
+			"openapi: 3.1.0\npaths:\n  /a:\n    get:\n      parameters:\n        - { name: q, in: query, schema: { type: integr } }\n", "")))
+		w.problem = "GET /a: the schema of query q cannot be used"
+	case "a $ref in a spec points nowhere":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com",
+			"openapi: 3.1.0\npaths:\n  /a:\n    get:\n      parameters:\n        - { $ref: \"#/components/parameters/nope\" }\n", "")))
+		w.problem = "GET /a: the $ref #/components/parameters/nope points nowhere"
+	case "a $ref in a spec points to another file":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com",
+			"openapi: 3.1.0\npaths:\n  /a:\n    get:\n      parameters:\n        - { name: q, in: query, schema: { $ref: \"other.yaml#/X\" } }\n", "")))
+		w.problem = "GET /a: the schema of query q cannot be used"
 	case "a vendorTimeout is zero":
 		w.rawConfig, w.problem = one("    vendorTimeout: 0s\n"), `vendorTimeout "0s"`
 	case "a vendorTimeout is negative":

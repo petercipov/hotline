@@ -204,7 +204,7 @@ func (w *world) routeTo(host, port string, listener net.Listener) {
 func (w *world) writeFile(name, content string) string {
 	path := filepath.Join(w.dir, name)
 	_ = os.MkdirAll(filepath.Dir(path), 0o750)
-	_ = os.WriteFile(path, []byte(content), 0o600)
+	_ = os.WriteFile(path, []byte(content), 0o600) //nolint:gosec // the test chooses its own files
 	return path
 }
 

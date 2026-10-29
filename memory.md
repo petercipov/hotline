@@ -28,7 +28,7 @@ The proxy is built in small slices, tests first.
    - the guard against calls to internal addresses: built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
    - the Host header ingress, with HTTP/2 from apps: built. Detail: [docs/proxy-host-header.md](docs/proxy-host-header.md);
    - each vendor api named once in the config, shared by integrations: built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md), decisions 10 and 11;
-   - checks of every part of a call against the spec (path, query, headers, cookies, body; and the reply's status, headers and body). Agreed, not built yet. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md);
+   - checks of every part of a call against the spec (path, query, headers, cookies, body; and the reply's status, headers and body). Built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md);
    - config reload without a restart;
    - the load test, with k6.
 
