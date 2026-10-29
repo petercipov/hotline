@@ -48,7 +48,7 @@ Feature: Building the request record
   Scenario Outline: Minimal record
     Given <call>
     When the call ends
-    Then the record holds only hotline.integration.id, hotline.ingress, server.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields
+    Then the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields
     And hotline.integration.id is <id>
 
     Examples:

@@ -36,6 +36,11 @@ func (c *call) finish() {
 	if c.errorType != "" {
 		attrs = append(attrs, semconv.ErrorTypeKey.String(c.errorType))
 	}
+	if c.peer != "" {
+		// The IP the proxy connected to, after DNS and any try at a
+		// second address. Every record has it, minimal ones too.
+		attrs = append(attrs, semconv.NetworkPeerAddress(c.peer))
+	}
 	attrs = append(attrs, c.timings(end)...)
 	if c.api != nil {
 		attrs = append(attrs, c.full()...)
@@ -119,9 +124,6 @@ func (c *call) full() []attribute.KeyValue {
 	}
 	if redacted.Template != "" {
 		attrs = append(attrs, semconv.URLFull(redacted.URLFull), semconv.URLTemplate(redacted.Template))
-	}
-	if c.peer != "" {
-		attrs = append(attrs, semconv.NetworkPeerAddress(c.peer))
 	}
 	if c.looked != "" {
 		attrs = append(attrs, semconv.DNSQuestionName(c.looked))
