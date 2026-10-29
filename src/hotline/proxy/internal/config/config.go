@@ -127,7 +127,7 @@ func (r *apiRef) UnmarshalYAML(node *yaml.Node) error {
 		return nil
 	}
 	if node.Kind != yaml.MappingNode {
-		return fmt.Errorf("line %d: an api is named by its name or by { api: name }", node.Line)
+		return fmt.Errorf("%w: line %d: an api is named by its name or by { api: name }", ErrInvalid, node.Line)
 	}
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		key, value := node.Content[i], node.Content[i+1]
