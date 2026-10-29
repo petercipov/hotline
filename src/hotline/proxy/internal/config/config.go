@@ -4,6 +4,7 @@ package config
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -22,6 +23,9 @@ var ErrInvalid = errors.New("config: invalid")
 // Config is a loaded, checked config. It never changes after Load.
 type Config struct {
 	ProxyAddr string
+	// TLS, when set, makes the proxy port accept only TLS, with this
+	// certificate.
+	TLS       *TLS
 	Exporters []Exporter
 	// NotPassed applies to calls without a known integration ID, and to
 	// calls to a host outside the integration's apis.
@@ -32,6 +36,14 @@ type Config struct {
 	// field. They do not stop the proxy.
 	Warnings     []string
 	integrations map[string]map[string]*API
+}
+
+// TLS is the proxy's own certificate for apps: the files it comes from,
+// and the pair they held when the config was loaded.
+type TLS struct {
+	CertFile    string
+	KeyFile     string
+	Certificate *tls.Certificate
 }
 
 // Exporter is one OTLP destination.
@@ -67,7 +79,10 @@ type file struct {
 	Listen  struct {
 		Proxy string `yaml:"proxy"`
 		Admin any    `yaml:"admin"`
-		TLS   any    `yaml:"tls"`
+		TLS   *struct {
+			Cert string `yaml:"cert"`
+			Key  string `yaml:"key"`
+		} `yaml:"tls"`
 	} `yaml:"listen"`
 	Telemetry any `yaml:"telemetry"`
 	Exporters []struct {
@@ -93,9 +108,10 @@ type file struct {
 
 const notPassed = "not-passed"
 
-// Load reads the config file and every spec it points to. Spec paths are
-// relative to the folder of the config file.
-func Load(path string) (*Config, error) {
+// Load reads the config file and every spec and certificate it points to.
+// Their paths are relative to the folder of the config file. A certificate
+// that has expired by now is refused.
+func Load(path string, now time.Time) (*Config, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // the operator chooses the config file
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
@@ -130,6 +146,9 @@ func Load(path string) (*Config, error) {
 	}
 	if f.Listen.Proxy == "" {
 		l.problem("there is no listen.proxy address")
+	}
+	if t := f.Listen.TLS; t != nil {
+		c.TLS = l.tls(t.Cert, t.Key, now)
 	}
 	if len(f.Exporters) == 0 {
 		l.problem("there are no exporters")
@@ -211,10 +230,48 @@ func (l *loader) settings(id string, tlsOrigination *bool, vendorTimeout *string
 	return s
 }
 
-func (l *loader) spec(id, path string) *spec.Spec {
+func (l *loader) tls(certFile, keyFile string, now time.Time) *TLS {
+	if certFile == "" || keyFile == "" {
+		l.problem("listen.tls needs both cert and key")
+		return nil
+	}
+	t := &TLS{CertFile: l.path(certFile), KeyFile: l.path(keyFile)}
+	cert, err := LoadCertificate(t.CertFile, t.KeyFile, now)
+	if err != nil {
+		l.problems = append(l.problems, err)
+	}
+	t.Certificate = cert
+	return t
+}
+
+// LoadCertificate reads a PEM certificate, with any issuers in between, and
+// its key, and checks that they match and that the certificate has not
+// expired by now.
+func LoadCertificate(certFile, keyFile string, now time.Time) (*tls.Certificate, error) {
+	certPEM, certErr := os.ReadFile(certFile) //nolint:gosec // the config names its certificate files
+	keyPEM, keyErr := os.ReadFile(keyFile)    //nolint:gosec // the config names its certificate files
+	if err := errors.Join(certErr, keyErr); err != nil {
+		return nil, fmt.Errorf("%w: listen.tls: the cert or key file cannot be read: %w", ErrInvalid, err)
+	}
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("%w: listen.tls: %s and %s are not a matching certificate and key: %w", ErrInvalid, certFile, keyFile, err)
+	}
+	if notAfter := cert.Leaf.NotAfter; now.After(notAfter) {
+		return nil, fmt.Errorf("%w: listen.tls: the certificate in %s expired on %s", ErrInvalid, certFile, notAfter.UTC().Format(time.RFC3339))
+	}
+	return &cert, nil
+}
+
+func (l *loader) path(path string) string {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(l.dir, path)
 	}
+	return path
+}
+
+func (l *loader) spec(id, path string) *spec.Spec {
+	path = l.path(path)
 	if s, read := l.specs[path]; read {
 		return s
 	}

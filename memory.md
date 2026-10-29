@@ -20,10 +20,10 @@ The proxy is built in small slices, tests first.
 
 1. **Slice 1: done** (pull request #11). Forward proxy ingress, TLS to the vendor, integration ID, phase timings, the request record with redaction, OTLP output, the proxy's own errors, config loaded once. Scope and detail: [docs/proxy-slice-1.md](docs/proxy-slice-1.md).
 2. **The `hotline-proxy` program: built** (commands, flags, stopping, exit codes, `@e2e` tests). Detail: [docs/proxy-program.md](docs/proxy-program.md).
-3. Still to come, roughly in this order:
+3. **TLS from apps to the proxy: built** (`listen.tls`, renewal without a restart, Go cases 4 and 5 end to end). Detail: [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
+4. Still to come, roughly in this order:
    - the health checks `/livez` and `/readyz` on the admin port;
    - the Node, Java and Rust clients in the end-to-end tests;
-   - TLS from apps to the proxy (`listen.tls`): requirements agreed, test cases written and tagged `@later`, not built. Detail: [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md);
    - the other ingresses (the Host header, and the vendor URL in the path);
    - JSON and form body checks against the spec;
    - config reload without a restart;
@@ -78,4 +78,5 @@ Full wording in [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
 
 ## Earlier decisions
 
+- Say "ingress", never "door", for the ways apps reach the proxy (Peter, 2026-10-29).
 - The load test uses k6 (Peter, 2026-10-27).

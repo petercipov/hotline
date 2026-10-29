@@ -24,7 +24,12 @@ import (
 	"hotline/proxy"
 )
 
-var errNoRecord = errors.New("no record arrived")
+var (
+	errNoRecord = errors.New("no record arrived")
+	// errTLSSetup is a TLS connection to the proxy that failed to set up;
+	// world.tlsErr says why.
+	errTLSSetup = errors.New("TLS to the proxy failed to set up")
+)
 
 // world is one scenario's system under test: the proxy, and the fakes at
 // its edges (vendors, network, OTLP receivers). Every scenario starts clean.
@@ -94,6 +99,21 @@ type world struct {
 	resp     *http.Response
 	respBody []byte
 	respErr  error
+
+	// listenTLS, when set, is the listen.tls line of the config.
+	listenTLS string
+	// proxyCert is the certificate the proxy's cert and key files hold.
+	proxyCert tls.Certificate
+	// appTLS, when set, makes apps open TLS to the proxy with it.
+	appTLS *tls.Config
+	// tlsState is what the app's last TLS connection agreed on, and
+	// tlsErr why setting it up failed.
+	tlsState tls.ConnectionState
+	tlsErr   error
+	// openConn is an app connection kept open between steps.
+	openConn net.Conn
+	// renewed is the certificate that replaced proxyCert in its files.
+	renewed *tls.Certificate
 }
 
 func newWorld() (*world, error) {
@@ -132,6 +152,9 @@ func (w *world) close() {
 	}
 	for _, l := range w.listeners {
 		_ = l.Close()
+	}
+	if w.openConn != nil {
+		_ = w.openConn.Close()
 	}
 	_ = os.RemoveAll(w.dir)
 }
@@ -225,6 +248,7 @@ func (w *world) config() string {
 	var b strings.Builder
 	b.WriteString("version: 2026-10-28.1\n")
 	fmt.Fprintf(&b, "listen:\n  proxy: %q\n  admin: \"127.0.0.1:0\"\n", w.addr)
+	b.WriteString(w.listenTLS)
 	b.WriteString("exporters:\n")
 	for i, r := range w.receivers {
 		fmt.Fprintf(&b, "  - otlp:\n      endpoint: %s\n", r.endpoint)
@@ -356,11 +380,39 @@ func (w *world) send(r request) error {
 	if _, err := netip.ParseAddr(host); err != nil && !w.missing[host] && host != "" {
 		w.vendor(host)
 	}
-	conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", w.addr)
+	conn, err := w.dialProxy()
+	if errors.Is(err, errTLSSetup) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	defer func() { _ = conn.Close() }()
+	return w.exchange(conn, r)
+}
+
+// dialProxy opens a connection to the proxy port, with TLS when the app
+// uses it. When TLS fails to set up, the error is errTLSSetup and tlsErr
+// says why.
+func (w *world) dialProxy() (net.Conn, error) {
+	conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", w.addr)
+	if err != nil || w.appTLS == nil {
+		return conn, err
+	}
+	client := tls.Client(conn, w.appTLS)
+	_ = client.SetDeadline(time.Now().Add(10 * time.Second))
+	w.tlsErr = client.HandshakeContext(context.Background())
+	if w.tlsErr != nil {
+		_ = conn.Close()
+		return nil, errTLSSetup
+	}
+	_ = client.SetDeadline(time.Time{})
+	w.tlsState = client.ConnectionState()
+	return client, nil
+}
+
+// exchange sends one request on an open connection and reads the answer.
+func (w *world) exchange(conn net.Conn, r request) error {
 	var head bytes.Buffer
 	fmt.Fprintf(&head, "%s %s HTTP/1.1\r\n", r.method, r.target)
 	hasHost := false

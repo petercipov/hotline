@@ -1,6 +1,6 @@
 # TLS from apps to the proxy: scope and test cases
 
-*Agreed with Peter, 2026-10-28. Not built yet; building starts only when Peter says so. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
+*Agreed with Peter, 2026-10-28, and built. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
 
 ## What the feature is
 
@@ -43,8 +43,16 @@ This feature encrypts the first connection. The app opens a TLS connection (an e
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/tls-from-apps.feature`. A call over TLS gets through; a plain request on the TLS port gets `400`; an app that doesn't trust the proxy, or uses an old TLS version, fails the setup; a bad certificate stops the start; renewing the files changes the certificate for new connections only. The whole file is tagged `@later` until building starts.
-- End to end: the `@later` matrix scenario in `end-to-end.feature` for Go, cases 4 and 5. Node joins when the Node client arrives in its own slice. The tests make a test issuer at start and give the proxy a certificate from it.
+- Feature scenarios: `src/hotline/proxy/features/tls-from-apps.feature`. A call over TLS gets through; the proxy shows its one certificate whatever name is asked for; a plain request on the TLS port gets `400`; an app that doesn't trust the proxy, or allows only TLS 1.1, fails the setup and the proxy logs it at debug level; TLS 1.2 and 1.3 both work; an app offering HTTP/2 gets HTTP/1.1; a bad certificate stops the start; renewing the files changes the certificate for new connections only; a broken renewal keeps the old one.
+- End to end: `end-to-end-tls.feature` runs the Go client's cases 4 and 5 against the built program. The Node rows wait, tagged `@later`, for the Node client. `program.feature` checks that `validate` refuses a missing key file.
+
+## How it is built
+
+- `listen.tls` is read in `internal/config`, which also checks the pair and its expiry. The same check runs at every renewal.
+- The proxy shows its certificate through `GetCertificate`. On each new app connection it looks at the two files (two quick file lookups) and loads them again only when either is a new file or was written since. A Kubernetes Secret update swaps both files at once, which this sees.
+- A small wrapper on each new connection reads the first byte: TLS always starts with `0x16`. Anything else is answered `400` with `Proxy-Status: hotline; error=http_request_error` and closed. Go's own check only catches requests whose line starts with `GET /` and the like, not the full addresses of the forward proxy ingress.
+- An app gets 30 seconds to set up TLS, so a connection that never finishes the setup cannot stay open forever. Not asked for in the requirements; added because Go's server has no such limit on its own.
+- The HTTP server's line about a failed TLS setup is logged at debug level as `app TLS setup failed`; its other lines stay warnings.
 
 ## Not in this slice
 

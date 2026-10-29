@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -78,8 +79,9 @@ type Proxy struct {
 
 // Start loads the config, listens on its proxy address and serves calls
 // until Shutdown. A config with problems is refused with all of them listed.
+// With listen.tls set, the proxy port accepts only TLS.
 func Start(ctx context.Context, o Options) (*Proxy, error) {
-	cfg, err := config.Load(o.ConfigPath)
+	cfg, err := config.Load(o.ConfigPath, o.Clock.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -110,15 +112,22 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		server: &http.Server{
 			Handler:           h,
 			ReadHeaderTimeout: 30 * time.Second,
-			ErrorLog:          slog.NewLogLogger(o.Logger.Handler(), slog.LevelWarn),
+			ErrorLog:          log.New(serverLog{logger: o.Logger}, "", 0),
 		},
 		transport: h.transport,
 		sink:      sink,
 		served:    make(chan struct{}),
 	}
+	serve := p.server.Serve
+	if cfg.TLS != nil {
+		p.server.TLSConfig = newAppCert(cfg.TLS, o.Clock, o.Logger).tlsConfig()
+		// An empty map turns HTTP/2 off.
+		p.server.TLSNextProto = map[string]func(*http.Server, *tls.Conn, http.Handler){}
+		serve = func(l net.Listener) error { return p.server.ServeTLS(tlsOnlyListener{Listener: l}, "", "") }
+	}
 	go func() {
 		defer close(p.served)
-		_ = p.server.Serve(listener)
+		_ = serve(listener)
 	}()
 	for _, w := range cfg.Warnings {
 		o.Logger.Warn("config setting ignored", "reason", w)
@@ -127,10 +136,11 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	return p, nil
 }
 
-// Validate checks a config and every spec it points to, without starting
-// anything. A config with problems is refused with all of them listed.
-func Validate(configPath string) error {
-	_, err := config.Load(configPath)
+// Validate checks a config and every spec and certificate it points to,
+// without starting anything. A config with problems is refused with all of
+// them listed.
+func Validate(configPath string, clock Clock) error {
+	_, err := config.Load(configPath, clock.Now())
 	return err
 }
 
