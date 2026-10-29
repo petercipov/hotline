@@ -1,6 +1,6 @@
 # Guarding against calls to internal addresses: scope and test cases
 
-*Requirements agreed with Peter, 2026-10-29. Not built yet; building starts only when Peter says so. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
+*Agreed with Peter and built, 2026-10-29. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
 
 ## What the feature is
 
@@ -30,9 +30,14 @@ This slice closes that on every ingress already built (forward proxy and vendor 
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/internal-guard.feature`, tagged `@later` until building starts.
+- Feature scenarios: `src/hotline/proxy/features/internal-guard.feature`.
 - The fake vendors in the tests use `192.0.2.x`, a range kept for documentation, which is not internal, so the other tests are not affected.
 - End to end: the test vendor runs on `localhost`, so the end-to-end config sets `allowInternalIPs: true` on its api and on `not-passed`.
+
+## How it is built
+
+- The check runs in the proxy's dialer, after the DNS lookup: internal IPs are dropped from the answer, and if none is left the call fails with `403`. So it covers every ingress and every redirect of DNS.
+- Calls whose api sets `allowInternalIPs: true` use their own pool of connections, so a connection opened for them is never reused by a guarded call.
 
 ## Not in this slice
 

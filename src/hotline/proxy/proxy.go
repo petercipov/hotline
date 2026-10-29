@@ -70,11 +70,11 @@ type Options struct {
 
 // Proxy is a running proxy.
 type Proxy struct {
-	server    *http.Server
-	handler   *handler
-	transport *http.Transport
-	sink      *export.Sink
-	served    chan struct{}
+	server     *http.Server
+	handler    *handler
+	transports []*http.Transport
+	sink       *export.Sink
+	served     chan struct{}
 }
 
 // Start loads the config, listens on its proxy address and serves calls
@@ -99,14 +99,10 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		clock: o.Clock,
 		sink:  sink,
 	}
-	h.transport = &http.Transport{
-		DialContext:         (&dialer{resolver: o.Resolver, dialer: o.Dialer, clock: o.Clock}).dial,
-		TLSClientConfig:     &tls.Config{RootCAs: o.RootCAs, MinVersion: tls.VersionTLS12},
-		ForceAttemptHTTP2:   true,
-		DisableCompression:  true,
-		MaxIdleConnsPerHost: 64,
-		IdleConnTimeout:     90 * time.Second,
-	}
+	// Calls that may reach internal IPs get their own connections, so a
+	// connection opened for them is never reused for a call that may not.
+	h.transport = newTransport(o, false)
+	h.internal = newTransport(o, true)
 	p := &Proxy{
 		handler: h,
 		server: &http.Server{
@@ -114,9 +110,9 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 			ReadHeaderTimeout: 30 * time.Second,
 			ErrorLog:          log.New(serverLog{logger: o.Logger}, "", 0),
 		},
-		transport: h.transport,
-		sink:      sink,
-		served:    make(chan struct{}),
+		transports: []*http.Transport{h.transport, h.internal},
+		sink:       sink,
+		served:     make(chan struct{}),
 	}
 	serve := p.server.Serve
 	if cfg.TLS != nil {
@@ -134,6 +130,18 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	}
 	o.Logger.Info("hotline proxy started", "address", listener.Addr().String(), "config_version", cfg.Version)
 	return p, nil
+}
+
+func newTransport(o Options, allowInternal bool) *http.Transport {
+	d := &dialer{resolver: o.Resolver, dialer: o.Dialer, clock: o.Clock, allowInternal: allowInternal}
+	return &http.Transport{
+		DialContext:         d.dial,
+		TLSClientConfig:     &tls.Config{RootCAs: o.RootCAs, MinVersion: tls.VersionTLS12},
+		ForceAttemptHTTP2:   true,
+		DisableCompression:  true,
+		MaxIdleConnsPerHost: 64,
+		IdleConnTimeout:     90 * time.Second,
+	}
 }
 
 // Validate checks a config and every spec and certificate it points to,
@@ -158,6 +166,8 @@ func (p *Proxy) Shutdown(ctx context.Context) error {
 	case <-finished:
 	case <-ctx.Done():
 	}
-	p.transport.CloseIdleConnections()
+	for _, t := range p.transports {
+		t.CloseIdleConnections()
+	}
 	return errors.Join(err, p.sink.Shutdown(ctx))
 }

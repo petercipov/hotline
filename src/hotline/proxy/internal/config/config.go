@@ -58,6 +58,9 @@ type Exporter struct {
 type Settings struct {
 	TLSOrigination bool
 	VendorTimeout  time.Duration
+	// AllowInternalIPs lets calls go to loopback, private and other
+	// internal IPs, which the proxy otherwise refuses.
+	AllowInternalIPs bool
 }
 
 // API is one vendor api of an integration.
@@ -93,17 +96,22 @@ type file struct {
 		} `yaml:"otlp"`
 	} `yaml:"exporters"`
 	Integrations []struct {
-		ID             string  `yaml:"id"`
-		FingerprintKey any     `yaml:"fingerprintKey"`
-		TLSOrigination *bool   `yaml:"tlsOrigination"`
-		VendorTimeout  *string `yaml:"vendorTimeout"`
+		ID             string       `yaml:"id"`
+		FingerprintKey any          `yaml:"fingerprintKey"`
+		Settings       settingsFile `yaml:",inline"`
 		APIs           []struct {
-			Hosts          []string `yaml:"hosts"`
-			Spec           string   `yaml:"spec"`
-			TLSOrigination *bool    `yaml:"tlsOrigination"`
-			VendorTimeout  *string  `yaml:"vendorTimeout"`
+			Hosts    []string     `yaml:"hosts"`
+			Spec     string       `yaml:"spec"`
+			Settings settingsFile `yaml:",inline"`
 		} `yaml:"apis"`
 	} `yaml:"integrations"`
+}
+
+// settingsFile holds the settings an api or the not-passed entry may set.
+type settingsFile struct {
+	TLSOrigination   *bool   `yaml:"tlsOrigination"`
+	VendorTimeout    *string `yaml:"vendorTimeout"`
+	AllowInternalIPs *bool   `yaml:"allowInternalIPs"`
 }
 
 const notPassed = "not-passed"
@@ -178,7 +186,7 @@ func Load(path string, now time.Time) (*Config, error) {
 			continue
 		}
 		if in.ID == notPassed {
-			c.NotPassed = l.settings(in.ID, in.TLSOrigination, in.VendorTimeout, c.NotPassed)
+			c.NotPassed = l.settings(in.ID, in.Settings, c.NotPassed)
 			continue
 		}
 		if _, seen := c.integrations[in.ID]; seen {
@@ -187,7 +195,7 @@ func Load(path string, now time.Time) (*Config, error) {
 		apis := map[string]*API{}
 		for _, a := range in.APIs {
 			api := &API{
-				Settings: l.settings(in.ID, a.TLSOrigination, a.VendorTimeout, Settings{TLSOrigination: true, VendorTimeout: time.Minute}),
+				Settings: l.settings(in.ID, a.Settings, Settings{TLSOrigination: true, VendorTimeout: time.Minute}),
 				Spec:     l.spec(in.ID, a.Spec),
 			}
 			for _, host := range a.Hosts {
@@ -216,16 +224,19 @@ func (l *loader) problem(format string, args ...any) {
 	l.problems = append(l.problems, fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...)))
 }
 
-func (l *loader) settings(id string, tlsOrigination *bool, vendorTimeout *string, s Settings) Settings {
-	if tlsOrigination != nil {
-		s.TLSOrigination = *tlsOrigination
+func (l *loader) settings(id string, f settingsFile, s Settings) Settings {
+	if f.TLSOrigination != nil {
+		s.TLSOrigination = *f.TLSOrigination
 	}
-	if vendorTimeout != nil {
-		d, err := time.ParseDuration(*vendorTimeout)
+	if f.VendorTimeout != nil {
+		d, err := time.ParseDuration(*f.VendorTimeout)
 		if err != nil || d <= 0 {
-			l.problem("integration %s: vendorTimeout %q must be a duration above zero, such as 10s", id, *vendorTimeout)
+			l.problem("integration %s: vendorTimeout %q must be a duration above zero, such as 10s", id, *f.VendorTimeout)
 		}
 		s.VendorTimeout = d
+	}
+	if f.AllowInternalIPs != nil {
+		s.AllowInternalIPs = *f.AllowInternalIPs
 	}
 	return s
 }

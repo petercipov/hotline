@@ -473,6 +473,8 @@ func (p *program) config(validateOnly bool) string {
 		_ = os.WriteFile(filepath.Join(p.dir, "tls", "key.pem"), []byte(keyPEM(cert)), 0o600)
 		listenTLS = "  tls: { cert: ./tls/cert.pem, key: ./tls/key.pem }\n"
 	}
+	// The test vendor runs on this computer, an internal address, so the
+	// config allows internal IPs.
 	return fmt.Sprintf(`version: e2e-1
 listen:
   proxy: %q
@@ -485,6 +487,9 @@ integrations:
     apis:
       - hosts: [localhost]
         spec: ./specs/test-vendor.yaml
+        allowInternalIPs: true
+  - id: not-passed
+    allowInternalIPs: true
 `, p.proxyAddr, listenTLS, endpoint)
 }
 

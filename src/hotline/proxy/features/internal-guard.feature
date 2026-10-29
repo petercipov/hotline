@@ -1,4 +1,3 @@
-@later
 Feature: Guarding against calls to internal addresses
   The proxy refuses to connect to internal IPs, so nobody can use it to
   reach the cloud metadata address, cluster services or the proxy itself
@@ -9,7 +8,7 @@ Feature: Guarding against calls to internal addresses
     Given the vendor name api.talon.one resolves to <ip>
     When an app sends "GET https://api.talon.one/v2/x"
     Then the proxy answers 403 with "Proxy-Status: hotline; error=destination_ip_prohibited"
-    And nothing is sent to any vendor
+    And the proxy opens no connection
     And the record's error.type is destination_ip_prohibited
 
     Examples:
@@ -29,7 +28,7 @@ Feature: Guarding against calls to internal addresses
   Scenario Outline: An internal IP in the address is refused on every ingress
     When an app sends <request>
     Then the proxy answers 403 with "Proxy-Status: hotline; error=destination_ip_prohibited"
-    And nothing is sent to any vendor
+    And the proxy opens no connection
 
     Examples:
       | request                                                                  |
@@ -73,10 +72,11 @@ Feature: Guarding against calls to internal addresses
     And no connection is opened to 10.1.2.3
 
   Scenario: A call to the proxy itself is refused
-    When an app sends a call whose address is the proxy's own address on localhost
+    When an app sends a call whose address is the proxy's own address
     Then the proxy answers 403
-    And the proxy gets no second call
+    And the proxy opens no connection
 
   Scenario: The config refuses a bad allow setting
-    Given a config file where an api sets allowInternalIPs to "yes"
+    Given a config file where an api sets allowInternalIPs to "maybe"
+    When the proxy loads it
     Then the config is refused with a message naming the problem

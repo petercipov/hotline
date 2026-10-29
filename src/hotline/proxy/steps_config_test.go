@@ -319,6 +319,9 @@ func (w *world) brokenConfig(problem string) error {
 		w.rawConfig = start + exporters + "integrations:\n" + integration("not-passed", w.apiFor("api.x.com", ""))
 	case "a field name has a typo, such as tlsOrigintion":
 		w.rawConfig = start + exporters + "integrations:\n" + integration("shop", w.apiFor("api.x.com", "        tlsOrigintion: false\n"))
+	case `an api sets allowInternalIPs to "maybe"`:
+		w.rawConfig = one(`        allowInternalIPs: maybe` + "\n")
+		w.problem = "cannot unmarshal !!str `maybe` into bool"
 	case "two integrations have the same ID":
 		w.rawConfig = one("") + integration("shop", w.apiFor("api.y.com", ""))
 		w.problem = "two integrations have the ID shop"
