@@ -24,7 +24,7 @@ The proxy is built in small slices, tests first.
 4. Still to come, roughly in this order:
    - the health checks `/livez` and `/readyz` on the admin port;
    - the Node, Java and Rust clients in the end-to-end tests;
-   - the vendor URL in path ingress: requirements agreed, not built. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
+   - the vendor URL in path ingress: built, with refused calls recorded on every ingress. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
    - the Host header ingress, with HTTP/2 from apps;
    - JSON and form body checks against the spec;
    - config reload without a restart;
@@ -85,7 +85,8 @@ Full wording in [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md).
 2. Only the clean `/http://` or `/https://` form. A squashed slash or an encoded address gets `400`.
 3. The vendor gets its own host (and port) from the path in `Host`, never the proxy's.
 4. Every request the proxy reads and refuses (`400`, `501`) still gets a minimal record and is counted, on every ingress. Plain HTTP on a TLS port stays without a record.
-5. No loop guard in this slice; the loop question moves to the Host header slice.
+5. Every record of a call that reached a vendor holds the vendor IP the proxy connected to (`network.peer.address`), minimal records too.
+6. No loop guard in this slice; the loop question moves to the Host header slice.
 
 ## Earlier decisions
 

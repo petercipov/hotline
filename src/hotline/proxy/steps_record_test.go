@@ -118,13 +118,13 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^the record holds only hotline.integration.id, hotline.ingress, server.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields$`, func() error {
+	sc.Step(`^the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields$`, func() error {
 		record, err := w.lastRecord()
 		if err != nil {
 			return err
 		}
 		allowed := map[string]bool{
-			"hotline.integration.id": true, "hotline.ingress": true, "server.address": true,
+			"hotline.integration.id": true, "hotline.ingress": true, "server.address": true, "network.peer.address": true,
 			"http.request.method": true, "http.response.status_code": true, "error.type": true,
 		}
 		for key := range record {
@@ -132,8 +132,13 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 				return failf("the minimal record has %s", key)
 			}
 		}
-		return hasAll(record, "hotline.integration.id", "hotline.ingress", "server.address",
-			"http.request.method", "http.response.status_code", "hotline.timing.total")
+		if err := hasAll(record, "hotline.integration.id", "hotline.ingress", "server.address",
+			"http.request.method", "http.response.status_code", "hotline.timing.total"); err != nil {
+			return err
+		}
+		// The vendor IP is the one the proxy connected to.
+		host := sprint(record["server.address"])
+		return has(record, "network.peer.address", w.vendor(host).ip.String())
 	})
 
 	sc.Step(`^a call with Authorization, Proxy-Authorization, a cookie, an API key and a JSON body$`, func() error {

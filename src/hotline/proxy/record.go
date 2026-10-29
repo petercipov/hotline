@@ -3,6 +3,8 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -19,13 +21,9 @@ func (c *call) finish() {
 	end := c.h.clock.Now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	id := c.id
-	if id == "" {
-		id = "not-passed"
-	}
 	attrs := []attribute.KeyValue{
-		attribute.String("hotline.integration.id", id),
-		attribute.String("hotline.ingress", "forward_proxy"),
+		attribute.String("hotline.integration.id", orNotPassed(c.id)),
+		attribute.String("hotline.ingress", c.ingress),
 		semconv.ServerAddress(c.host),
 		semconv.HTTPRequestMethodKey.String(c.in.Method),
 		semconv.HTTPResponseStatusCode(c.status),
@@ -38,11 +36,42 @@ func (c *call) finish() {
 	if c.errorType != "" {
 		attrs = append(attrs, semconv.ErrorTypeKey.String(c.errorType))
 	}
+	if c.peer != "" {
+		// The IP the proxy connected to, after DNS and any try at a
+		// second address. Every record has it, minimal ones too.
+		attrs = append(attrs, semconv.NetworkPeerAddress(c.peer))
+	}
 	attrs = append(attrs, c.timings(end)...)
 	if c.api != nil {
 		attrs = append(attrs, c.full()...)
 	}
 	c.h.sink.Record(context.Background(), c.start, attrs)
+}
+
+// refused records a request the proxy read but did not forward, with a
+// minimal record. The vendor host is in it only when the request named one.
+func (h *handler) refused(r *http.Request, start time.Time, ingress string, target *url.URL, status int) {
+	attrs := []attribute.KeyValue{attribute.String("hotline.integration.id", orNotPassed(integrationID(r.Header)))}
+	if ingress != "" {
+		attrs = append(attrs, attribute.String("hotline.ingress", ingress))
+	}
+	if target != nil && target.Hostname() != "" {
+		attrs = append(attrs, semconv.ServerAddress(strings.ToLower(target.Hostname())))
+	}
+	attrs = append(attrs,
+		semconv.HTTPRequestMethodKey.String(r.Method),
+		semconv.HTTPResponseStatusCode(status),
+		semconv.ErrorTypeKey.String("http_request_error"),
+		attribute.Float64("hotline.timing.total", h.clock.Now().Sub(start).Seconds()),
+	)
+	h.sink.Record(context.Background(), start, attrs)
+}
+
+func orNotPassed(id string) string {
+	if id == "" {
+		return "not-passed"
+	}
+	return id
 }
 
 // timings are the phase lengths in seconds. A phase that did not happen,
@@ -68,7 +97,7 @@ func (c *call) timings(end time.Time) []attribute.KeyValue {
 // full is the rest of the record, for calls with a known integration and api.
 func (c *call) full() []attribute.KeyValue {
 	origin := c.scheme + "://" + c.host
-	if c.in.URL.Port() != "" {
+	if c.target.Port() != "" {
 		origin += ":" + c.port
 	}
 	var replyHeaders map[string][]string
@@ -78,8 +107,8 @@ func (c *call) full() []attribute.KeyValue {
 	redacted := c.api.Spec.Redact(spec.Call{
 		Method:       c.in.Method,
 		Origin:       origin,
-		EscapedPath:  c.in.URL.EscapedPath(),
-		RawQuery:     c.in.URL.RawQuery,
+		EscapedPath:  c.target.EscapedPath(),
+		RawQuery:     c.target.RawQuery,
 		Header:       c.in.Header,
 		ReplyHeaders: replyHeaders,
 	})
@@ -95,9 +124,6 @@ func (c *call) full() []attribute.KeyValue {
 	}
 	if redacted.Template != "" {
 		attrs = append(attrs, semconv.URLFull(redacted.URLFull), semconv.URLTemplate(redacted.Template))
-	}
-	if c.peer != "" {
-		attrs = append(attrs, semconv.NetworkPeerAddress(c.peer))
 	}
 	if c.looked != "" {
 		attrs = append(attrs, semconv.DNSQuestionName(c.looked))

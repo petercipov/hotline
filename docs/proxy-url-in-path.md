@@ -1,6 +1,6 @@
 # The vendor URL in path ingress: scope and test cases
 
-*Requirements agreed with Peter, 2026-10-29. Not built yet; building starts only when Peter says so. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
+*Agreed with Peter, 2026-10-29, and built. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
 
 ## What the feature is
 
@@ -28,12 +28,19 @@ The ingress finds two things, the integration and the vendor's real address. Aft
 5. **The same rules as the forward proxy** (earlier decisions): the scheme in the path is used, with TLS origination turning `http` into `https` and keeping the app's port; `not-passed` calls go out exactly as sent; `Proxy-Authorization` carries the integration ID and is always removed; the proxy adds no forwarding headers.
 6. **The record** is the same as for a forward proxy call, with `hotline.ingress` set to `url_in_path`. `url.full` and `server.address` are the vendor's, never the proxy's.
 7. **Refused calls are recorded** (Peter, 2026-10-29). When the proxy refuses a request it has read, with `400` or `501`, it still sends a minimal record and counts the call: `hotline.integration.id`, `hotline.ingress`, `http.request.method`, `http.response.status_code`, `error.type` (`http_request_error`) and the timings, plus `server.address` when the proxy could read a vendor host. This applies to every ingress, so it also changes the forward proxy's refusals built in slice 1, and the `501` for Host header and CONNECT calls (a CONNECT record has no `hotline.ingress`, since CONNECT is not an ingress). One exception stays: plain HTTP sent to a TLS port is a failed TLS setup, not a request, so it keeps having no record and is counted in the proxy's own health data.
-8. **No loop guard in this slice.** A call to the proxy itself (`/http://localhost:8080/https://api.x.com/…`) passes through the proxy twice, each pass removing one address, so it ends on its own. The loop question moves to the Host header slice, where a call to the proxy itself would never end.
+8. **The vendor IP in every record** (Peter, 2026-10-29). Minimal records now also hold `network.peer.address`: the IP the proxy connected to, after DNS and after any try at a second address. Full records already had it. Refused calls reach no vendor, so they have none.
+9. **No loop guard in this slice.** A call to the proxy itself (`/http://localhost:8080/https://api.x.com/…`) passes through the proxy twice, each pass removing one address, so it ends on its own. The loop question moves to the Host header slice, where a call to the proxy itself would never end.
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/url-in-path.feature`, tagged `@later` until building starts. When it is built, the vendor URL in path row of "Requests meant for later ingresses" in `ingress.feature` is removed.
-- End to end: the Go client calls with a base address in the path, plain and over TLS to the proxy, against the built program.
+- Feature scenarios: `src/hotline/proxy/features/url-in-path.feature`, and "Refused calls are still recorded" in `ingress.feature`.
+- End to end: the Go client calls with a base address in the path, with an `https` and an `http` vendor address (`end-to-end.feature`), and over TLS to the proxy (`end-to-end-tls.feature`).
+
+## How it is built
+
+- `findIngress` in `handler.go` reads the raw request line (`RequestURI`), never the cleaned path. A target starting `/http:` or `/https:`, with the colon plain or encoded as `%3A`, in any case, is this ingress; only `/http://` and `/https://` followed by a host are parsed, the rest get `400`.
+- From there the call takes the forward proxy's path unchanged: the vendor address from the path replaces the request URL for the vendor, and `Host` is set from it.
+- A refused request (`400` or `501`) gets its minimal record from `refused` in `record.go`: ID, ingress (none for CONNECT), the vendor host when one could be read, method, status, `error.type=http_request_error` and `hotline.timing.total`. It goes through the same sink, so it is counted in `hotline.requests` too.
 
 ## Not in this slice
 

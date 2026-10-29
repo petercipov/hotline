@@ -45,16 +45,16 @@ Feature: Calling through the forward proxy ingress, end to end
       | a host that does not exist                  | the app gets 502 with Proxy-Status and the record's error.type is dns_error             |
       | the test vendor without Proxy-Authorization | the call reaches the vendor and the record is minimal with ID not-passed                |
 
-  @later
   Scenario Outline: The vendor URL in path ingress
     The app sets its base address to the proxy followed by the vendor's
     address (Peter, 2026-10-29).
-    When the Go client sends <how>
+    When the Go client sends POST to the proxy with the <scheme> vendor address in the path
     Then the app gets the test vendor's status, headers and body unchanged
-    And the test vendor got the call over https with its own name in Host and never saw Proxy-Authorization
+    And the test vendor got the call over https and never saw Proxy-Authorization
+    And the test vendor got its own name in Host
     And the receiver got one hotline.request record with hotline.ingress url_in_path and ID test-shop
 
     Examples:
-      | how                                                          |
-      | POST to http://proxy/https://test-vendor/… over plain HTTP   |
-      | POST to http://proxy/http://test-vendor/…, upgraded to https |
+      | scheme |
+      | https  |
+      | http   |

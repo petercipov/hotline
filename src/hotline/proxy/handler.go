@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,8 +22,9 @@ import (
 	"hotline/proxy/internal/export"
 )
 
-// handler serves the proxy port. Slice 1 knows one ingress: the forward
-// proxy, where the app puts the full vendor address in the request line.
+// handler serves the proxy port. It knows two ingresses: the forward proxy,
+// where the app puts the full vendor address in the request line, and the
+// vendor URL in path, where the app puts it after the proxy's own address.
 type handler struct {
 	cfg       *config.Config
 	clock     Clock
@@ -37,33 +39,32 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.calls.Add(1)
 	defer h.calls.Done()
 	start := h.clock.Now()
-	if !r.URL.IsAbs() {
-		// A path or CONNECT: meant for an ingress that later slices build.
-		refuse(w, http.StatusNotImplemented)
-		return
-	}
-	if r.URL.Scheme != "http" && r.URL.Scheme != "https" || r.URL.Hostname() == "" {
-		refuse(w, http.StatusBadRequest)
+	ingress, target, status := findIngress(r)
+	if status != 0 {
+		refuse(w, status)
+		h.refused(r, start, ingress, target, status)
 		return
 	}
 	id := integrationID(r.Header)
-	host := strings.ToLower(r.URL.Hostname())
+	host := strings.ToLower(target.Hostname())
 	api := h.cfg.API(id, host)
 	settings := h.cfg.NotPassed
 	if api != nil {
 		settings = api.Settings
 	}
-	scheme := r.URL.Scheme
+	scheme := target.Scheme
 	if settings.TLSOrigination {
 		scheme = "https"
 	}
-	port := r.URL.Port()
+	port := target.Port()
 	if port == "" {
 		port = map[string]string{"http": "80", "https": "443"}[scheme]
 	}
 	c := &call{
 		h:       h,
 		start:   start,
+		ingress: ingress,
+		target:  target,
 		id:      id,
 		api:     api,
 		scheme:  scheme,
@@ -80,10 +81,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer c.finish()
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.Out.URL.Scheme = scheme
-			pr.Out.URL.Host = net.JoinHostPort(host, port)
-			pr.Out.URL.Fragment = ""
-			pr.Out.Host = r.URL.Host
+			out := *target
+			out.Scheme = scheme
+			out.Host = net.JoinHostPort(host, port)
+			out.Fragment = ""
+			pr.Out.URL = &out
+			pr.Out.Host = target.Host
 		},
 		Transport:     c,
 		FlushInterval: -1,
@@ -127,6 +130,48 @@ func (a *toApp) check() {
 // Unwrap lets http.ResponseController reach the server's writer to flush.
 func (a *toApp) Unwrap() http.ResponseWriter { return a.ResponseWriter }
 
+// findIngress works out which ingress a request used and the vendor address
+// it names. A status other than 0 means the proxy refuses the request; the
+// address is then whatever part of it the proxy could read, or nil.
+func findIngress(r *http.Request) (string, *url.URL, int) {
+	switch {
+	case r.Method == http.MethodConnect:
+		// Not an ingress: the app would encrypt with the vendor itself.
+		return "", &url.URL{Host: r.Host}, http.StatusNotImplemented
+	case r.URL.IsAbs():
+		if r.URL.Scheme != "http" && r.URL.Scheme != "https" || r.URL.Hostname() == "" {
+			return "forward_proxy", r.URL, http.StatusBadRequest
+		}
+		return "forward_proxy", r.URL, 0
+	case inPath(r.RequestURI):
+		// Only the clean form is used; a squashed slash or an encoded
+		// address is refused rather than guessed at.
+		lower := strings.ToLower(r.RequestURI)
+		if !strings.HasPrefix(lower, "/http://") && !strings.HasPrefix(lower, "/https://") {
+			return "url_in_path", nil, http.StatusBadRequest
+		}
+		target, err := url.Parse(r.RequestURI[1:])
+		if err != nil || target.Hostname() == "" {
+			return "url_in_path", nil, http.StatusBadRequest
+		}
+		return "url_in_path", target, 0
+	}
+	// Meant for the Host header ingress, which a later slice builds.
+	return "host_header", &url.URL{Host: r.Host}, http.StatusNotImplemented
+}
+
+// inPath says whether a raw request target starts with a vendor address,
+// clean or damaged: /http: or /https:, the colon plain or encoded.
+func inPath(requestURI string) bool {
+	lower := strings.ToLower(requestURI)
+	for _, prefix := range []string{"/http:", "/https:", "/http%3a", "/https%3a"} {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // refuse answers a call the proxy does not forward.
 func refuse(w http.ResponseWriter, status int) {
 	w.Header().Set("Proxy-Status", "hotline; error=http_request_error")
@@ -159,6 +204,9 @@ func integrationID(h http.Header) string {
 type call struct {
 	h       *handler
 	start   time.Time
+	ingress string
+	// target is the vendor address the app named.
+	target  *url.URL
 	id      string
 	api     *config.API
 	scheme  string

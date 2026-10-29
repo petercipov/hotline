@@ -313,12 +313,28 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		}
 		return nil
 	})
-	sc.Step(`^the receiver got one hotline.request record with hotline.ingress forward_proxy and ID test-shop$`, func() error {
+	sc.Step(`^the Go client sends POST (over TLS )?to the proxy with the (https?) vendor address in the path$`, func(overTLS, scheme string) error {
+		vendor := strings.Replace(p.vendorURL, "https:", scheme+":", 1)
+		if overTLS == "" {
+			p.respond(goInPath("http://"+p.proxyAddr+"/"+vendor+paymentPath, "test-shop", nil))
+		} else {
+			p.respond(goInPath("https://"+p.proxyAddr+"/"+vendor+paymentPath, "test-shop", p.appTLS()))
+		}
+		return p.respErr
+	})
+	sc.Step(`^the test vendor got its own name in Host$`, func() error {
+		calls := p.vendor.received()
+		if want := strings.TrimPrefix(p.vendorURL, "https://"); len(calls) != 1 || calls[0].host != want {
+			return failf("the test vendor got %+v, want one call with Host %s", calls, want)
+		}
+		return nil
+	})
+	sc.Step(`^the receiver got one hotline.request record with hotline.ingress (forward_proxy|url_in_path) and ID test-shop$`, func(ingress string) error {
 		record, err := p.record()
 		if err != nil {
 			return err
 		}
-		if err := has(record, "hotline.ingress", "forward_proxy"); err != nil {
+		if err := has(record, "hotline.ingress", ingress); err != nil {
 			return err
 		}
 		return has(record, "hotline.integration.id", "test-shop")
@@ -673,4 +689,17 @@ func goCase5(proxyAddr, target, id string, appTLS *tls.Config) (*http.Response, 
 	t.TLSClientConfig = appTLS
 	defer t.CloseIdleConnections()
 	return t.RoundTrip(paymentRequest(target))
+}
+
+// goInPath sends the call to the proxy's own address with the vendor's
+// address in the path, the way an app does by changing only its base
+// address. With appTLS set, the base address is https and the app opens TLS
+// to the proxy.
+func goInPath(target, id string, appTLS *tls.Config) (*http.Response, error) {
+	t := goTransport(nil)
+	t.TLSClientConfig = appTLS
+	defer t.CloseIdleConnections()
+	req := paymentRequest(target)
+	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
+	return t.RoundTrip(req)
 }

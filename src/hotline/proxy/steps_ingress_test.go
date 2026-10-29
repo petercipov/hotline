@@ -2,8 +2,10 @@ package proxy_test
 
 import (
 	"encoding/base64"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 )
@@ -46,6 +48,113 @@ func ingressSteps(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 	sc.Step(`^nothing is sent to any vendor$`, w.nothingSent)
+
+	sc.Step(`^the call uses the vendor URL in path ingress$`, func() error {
+		return w.lastHas("hotline.ingress", "url_in_path")
+	})
+	sc.Step(`^the record says hotline.ingress (\S+)$`, func(ingress string) error {
+		return w.lastHas("hotline.ingress", ingress)
+	})
+	sc.Step(`^the vendor gets "Host: (\S+)"$`, func(host string) error {
+		c, err := w.onlyCall(strings.Split(host, ":")[0])
+		if err != nil {
+			return err
+		}
+		if c.host != host {
+			return failf("the vendor got Host %s, want %s", c.host, host)
+		}
+		return nil
+	})
+	sc.Step(`^the vendor gets the path (\S+)$`, func(path string) error {
+		c, err := w.onlyCall("api.talon.one")
+		if err != nil {
+			return err
+		}
+		if c.uri != path {
+			return failf("the vendor got %s, want %s", c.uri, path)
+		}
+		return nil
+	})
+	sc.Step(`^nothing in the record names the proxy's own address$`, func() error {
+		record, err := w.lastRecord()
+		if err != nil {
+			return err
+		}
+		_, port, _ := net.SplitHostPort(w.addr)
+		for key, value := range record {
+			if text := sprint(value); strings.Contains(text, "localhost") || strings.Contains(text, ":"+port) {
+				return failf("%s = %s names the proxy", key, text)
+			}
+		}
+		return nil
+	})
+	sc.Step(`^the proxy answers (\d+)$`, w.answered)
+	sc.Step(`^the proxy answers (\d+) with "Proxy-Status: ([^"]+)"$`, func(status int, proxyStatus string) error {
+		if err := w.answered(status); err != nil {
+			return err
+		}
+		if got := w.resp.Header.Get("Proxy-Status"); got != proxyStatus {
+			return failf("Proxy-Status is %q, want %q", got, proxyStatus)
+		}
+		return nil
+	})
+	sc.Step(`^the record is minimal with (.+)$`, w.minimalWith)
+	sc.Step(`^the record has no server.address$`, func() error {
+		record, err := w.lastRecord()
+		if err != nil {
+			return err
+		}
+		return hasNo(record, "server.address")
+	})
+	sc.Step(`^hotline.requests goes up by one$`, func() error {
+		counts := w.counts()
+		if len(counts) == 0 || counts[len(counts)-1].value != 1 {
+			return failf("got the counts %+v, want one call", counts)
+		}
+		return nil
+	})
+	sc.Step(`^the proxy port uses TLS with a certificate the app trusts$`, func() error {
+		w.proxyCert = w.issuer.leaf("hotline-proxy", time.Now().Add(24*time.Hour), false)
+		w.writeKeyPair(w.proxyCert, w.proxyCert)
+		w.listenTLS = "  tls: { cert: ./tls/cert.pem, key: ./tls/key.pem }\n"
+		w.appTLS = w.appTLSConfig()
+		return nil
+	})
+	sc.Step(`^the app sends "([A-Z]+) ([^"]+)" over TLS to the proxy$`, func(method, target string) error {
+		return w.call(method, target, "Host: hotline-proxy")
+	})
+}
+
+func (w *world) answered(status int) error {
+	if w.resp == nil || w.resp.StatusCode != status {
+		return failf("the app got %v, want %d", w.resp, status)
+	}
+	return nil
+}
+
+// minimalWith checks that the last record is minimal and holds the fields
+// listed as "key value", separated by commas and "and".
+func (w *world) minimalWith(fields string) error {
+	record, err := w.lastRecord()
+	if err != nil {
+		return err
+	}
+	allowed := map[string]bool{
+		"hotline.integration.id": true, "hotline.ingress": true, "server.address": true,
+		"http.request.method": true, "http.response.status_code": true, "error.type": true,
+	}
+	for key := range record {
+		if !allowed[key] && !strings.HasPrefix(key, "hotline.timing.") {
+			return failf("the minimal record has %s", key)
+		}
+	}
+	for _, field := range strings.FieldsFunc(strings.ReplaceAll(fields, " and ", ","), func(r rune) bool { return r == ',' }) {
+		key, value, _ := strings.Cut(strings.TrimSpace(field), " ")
+		if err := has(record, key, value); err != nil {
+			return err
+		}
+	}
+	return hasAll(record, "hotline.integration.id", "http.request.method", "hotline.timing.total")
 }
 
 func (w *world) nothingSent() error {
