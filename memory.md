@@ -26,7 +26,7 @@ The proxy is built in small slices, tests first.
    - the Node, Java and Rust clients in the end-to-end tests;
    - the vendor URL in path ingress: built, with refused calls recorded on every ingress. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
    - the guard against calls to internal addresses: built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
-   - the Host header ingress, with HTTP/2 from apps;
+   - the Host header ingress, with HTTP/2 from apps: requirements agreed, not built. Detail: [docs/proxy-host-header.md](docs/proxy-host-header.md);
    - JSON and form body checks against the spec;
    - config reload without a restart;
    - the load test, with k6.
@@ -101,3 +101,12 @@ Full wording in [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md).
 
 - Say "ingress", never "door", for the ways apps reach the proxy (Peter, 2026-10-29).
 - The load test uses k6 (Peter, 2026-10-27).
+
+## Host header ingress decisions (Peter, 2026-10-29)
+
+Full wording in [docs/proxy-host-header.md](docs/proxy-host-header.md).
+
+1. Calls without a known integration (`not-passed`) go out over `https`, since a Host header call names no scheme.
+2. Plain HTTP/2 (h2c) by prior knowledge only; no `Upgrade: h2c` handshake.
+3. Guarded from the start by the internal address guard; no separate loop check.
+4. No HTTP/3 for now; added later only if a real app needs it.
