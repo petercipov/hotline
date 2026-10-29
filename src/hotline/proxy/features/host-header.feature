@@ -35,6 +35,7 @@ Feature: The Host header ingress
       | settings                                     | host header        | scheme | port |
       | an api with TLS origination on, the default  | api.talon.one      | https  | 443  |
       | an api with TLS origination on, the default  | api.talon.one:8080 | https  | 8080 |
+      | an api with TLS origination on, the default  | api.talon.one:80   | https  | 80   |
       | an api with tlsOrigination set to false      | api.talon.one      | http   | 80   |
       | a not-passed call with the built-in settings | api.x.com          | https  | 443  |
 

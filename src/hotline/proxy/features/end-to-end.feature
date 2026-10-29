@@ -72,3 +72,19 @@ Feature: Calling through the proxy, end to end
       | how            |
       | plain HTTP/1.1 |
       | plain HTTP/2   |
+
+  Scenario Outline: The transparent redirect
+    The app keeps the vendor's own name and only turns https into http.
+    Its name lookup points the vendor's name at the proxy, as hostAliases
+    would in the app's pod, and it adds Proxy-Authorization as a default
+    header. To the proxy it is a Host header call (Peter, 2026-10-29).
+    When the Go client sends POST to the test vendor's name over http, with that name pointing at the proxy, over <how>
+    Then the app gets the test vendor's status, headers and body unchanged
+    And the test vendor got the call over https and never saw Proxy-Authorization
+    And the test vendor got its own name in Host
+    And the receiver got one hotline.request record with hotline.ingress host_header and ID test-shop
+
+    Examples:
+      | how            |
+      | plain HTTP/1.1 |
+      | plain HTTP/2   |

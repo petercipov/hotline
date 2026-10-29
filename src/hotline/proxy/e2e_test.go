@@ -337,6 +337,14 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		}
 		return p.respErr
 	})
+	sc.Step(`^the Go client sends POST to the test vendor's name over http, with that name pointing at the proxy, over (plain HTTP/1.1|plain HTTP/2)$`, func(how string) error {
+		target := strings.Replace(p.vendorURL, "https:", "http:", 1) + paymentPath
+		p.respond(goRedirected(target, p.proxyAddr, "test-shop", how == "plain HTTP/2"))
+		if p.respErr == nil && how == "plain HTTP/2" && p.resp.ProtoMajor != 2 {
+			return failf("the app used %s, want HTTP/2", p.resp.Proto)
+		}
+		return p.respErr
+	})
 	sc.Step(`^the test vendor got its own name in Host$`, func() error {
 		calls := p.vendor.received()
 		if want := strings.TrimPrefix(p.vendorURL, "https://"); len(calls) != 1 || calls[0].host != want {
@@ -744,6 +752,28 @@ func goHostHeader(target, host, id string, appTLS *tls.Config, http2 bool) (*htt
 	defer t.CloseIdleConnections()
 	req := paymentRequest(target)
 	req.Host = host
+	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
+	return t.RoundTrip(req)
+}
+
+// goRedirected calls the vendor's own address over plain http, the way an
+// app does when only https became http in its base address. Its name lookup
+// leads to the proxy, as a hostAliases entry in the app's pod would, and it
+// sends Proxy-Authorization as a default header. With http2 set, it speaks
+// HTTP/2 from the first byte.
+func goRedirected(target, proxyAddr, id string, http2 bool) (*http.Response, error) {
+	protocols := new(http.Protocols)
+	if http2 {
+		protocols.SetUnencryptedHTTP2(true)
+	} else {
+		protocols.SetHTTP1(true)
+	}
+	t := &http.Transport{Protocols: protocols}
+	t.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, proxyAddr)
+	}
+	defer t.CloseIdleConnections()
+	req := paymentRequest(target)
 	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
 	return t.RoundTrip(req)
 }
