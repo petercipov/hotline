@@ -7,8 +7,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -88,6 +90,13 @@ type file struct {
 		} `yaml:"tls"`
 	} `yaml:"listen"`
 	Telemetry any `yaml:"telemetry"`
+	// APIs are the vendor apis, each written once and named by the
+	// integrations that use it.
+	APIs map[string]struct {
+		Hosts    []string     `yaml:"hosts"`
+		Spec     string       `yaml:"spec"`
+		Settings settingsFile `yaml:",inline"`
+	} `yaml:"apis"`
 	Exporters []struct {
 		OTLP struct {
 			Endpoint    string `yaml:"endpoint"`
@@ -99,12 +108,39 @@ type file struct {
 		ID             string       `yaml:"id"`
 		FingerprintKey any          `yaml:"fingerprintKey"`
 		Settings       settingsFile `yaml:",inline"`
-		APIs           []struct {
-			Hosts    []string     `yaml:"hosts"`
-			Spec     string       `yaml:"spec"`
-			Settings settingsFile `yaml:",inline"`
-		} `yaml:"apis"`
+		APIs           []apiRef     `yaml:"apis"`
 	} `yaml:"integrations"`
+}
+
+// apiRef is an api an integration names: just its name, or
+// { api: name, vendorTimeout: 5s } to change how long its calls wait.
+type apiRef struct {
+	name          string
+	vendorTimeout *string
+	// unknown are the lines of settings an integration may not change.
+	unknown []string
+}
+
+func (r *apiRef) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		r.name = node.Value
+		return nil
+	}
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("%w: line %d: an api is named by its name or by { api: name }", ErrInvalid, node.Line)
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key, value := node.Content[i], node.Content[i+1]
+		switch key.Value {
+		case "api":
+			r.name = value.Value
+		case "vendorTimeout":
+			r.vendorTimeout = &value.Value
+		default:
+			r.unknown = append(r.unknown, fmt.Sprintf("line %d: field %s", key.Line, key.Value))
+		}
+	}
+	return nil
 }
 
 // settingsFile holds the settings an api or the not-passed entry may set.
@@ -177,6 +213,22 @@ func Load(path string, now time.Time) (*Config, error) {
 		}
 		c.Exporters = append(c.Exporters, exporter)
 	}
+	apis := map[string]*API{}
+	hosts := map[string][]string{}
+	for _, name := range slices.Sorted(maps.Keys(f.APIs)) {
+		a := f.APIs[name]
+		label := "api " + name
+		if a.Spec == "" {
+			l.problem("%s has no spec", label)
+		}
+		apis[name] = &API{
+			Settings: l.settings(label, a.Settings, Settings{TLSOrigination: true, VendorTimeout: time.Minute}),
+			Spec:     l.spec(label, a.Spec),
+		}
+		for _, host := range a.Hosts {
+			hosts[name] = append(hosts[name], strings.ToLower(host))
+		}
+	}
 	for _, in := range f.Integrations {
 		if in.ID == notPassed && len(in.APIs) > 0 {
 			c.Warnings = append(c.Warnings, "the not-passed entry applies to every host, so its apis list is ignored")
@@ -186,27 +238,35 @@ func Load(path string, now time.Time) (*Config, error) {
 			continue
 		}
 		if in.ID == notPassed {
-			c.NotPassed = l.settings(in.ID, in.Settings, c.NotPassed)
+			c.NotPassed = l.settings("integration "+in.ID, in.Settings, c.NotPassed)
 			continue
 		}
 		if _, seen := c.integrations[in.ID]; seen {
 			l.problem("two integrations have the ID %s", in.ID)
 		}
-		apis := map[string]*API{}
-		for _, a := range in.APIs {
-			api := &API{
-				Settings: l.settings(in.ID, a.Settings, Settings{TLSOrigination: true, VendorTimeout: time.Minute}),
-				Spec:     l.spec(in.ID, a.Spec),
+		byHost := map[string]*API{}
+		for _, ref := range in.APIs {
+			for _, u := range ref.unknown {
+				c.Warnings = append(c.Warnings, u+" is not a setting an integration may change, and is ignored")
 			}
-			for _, host := range a.Hosts {
-				host = strings.ToLower(host)
-				if _, seen := apis[host]; seen {
-					l.problem("integration %s lists the host %s in two apis", in.ID, host)
+			api, known := apis[ref.name]
+			if !known {
+				l.problem("integration %s names the api %s, which is not in apis", in.ID, ref.name)
+				continue
+			}
+			if ref.vendorTimeout != nil {
+				changed := *api
+				changed.Settings = l.settings("integration "+in.ID, settingsFile{VendorTimeout: ref.vendorTimeout}, api.Settings)
+				api = &changed
+			}
+			for _, host := range hosts[ref.name] {
+				if _, seen := byHost[host]; seen {
+					l.problem("integration %s names two apis with the host %s", in.ID, host)
 				}
-				apis[host] = api
+				byHost[host] = api
 			}
 		}
-		c.integrations[in.ID] = apis
+		c.integrations[in.ID] = byHost
 	}
 	if len(l.problems) > 0 {
 		return nil, errors.Join(l.problems...)
@@ -224,14 +284,14 @@ func (l *loader) problem(format string, args ...any) {
 	l.problems = append(l.problems, fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...)))
 }
 
-func (l *loader) settings(id string, f settingsFile, s Settings) Settings {
+func (l *loader) settings(label string, f settingsFile, s Settings) Settings {
 	if f.TLSOrigination != nil {
 		s.TLSOrigination = *f.TLSOrigination
 	}
 	if f.VendorTimeout != nil {
 		d, err := time.ParseDuration(*f.VendorTimeout)
 		if err != nil || d <= 0 {
-			l.problem("integration %s: vendorTimeout %q must be a duration above zero, such as 10s", id, *f.VendorTimeout)
+			l.problem("%s: vendorTimeout %q must be a duration above zero, such as 10s", label, *f.VendorTimeout)
 		}
 		s.VendorTimeout = d
 	}
@@ -281,14 +341,17 @@ func (l *loader) path(path string) string {
 	return path
 }
 
-func (l *loader) spec(id, path string) *spec.Spec {
+func (l *loader) spec(label, path string) *spec.Spec {
+	if path == "" {
+		return nil
+	}
 	path = l.path(path)
 	if s, read := l.specs[path]; read {
 		return s
 	}
 	data, err := os.ReadFile(path) //nolint:gosec // the config names its spec files
 	if err != nil {
-		l.problem("integration %s: spec %s cannot be read: %v", id, path, err)
+		l.problem("%s: spec %s cannot be read: %v", label, path, err)
 		return nil
 	}
 	s, err := spec.Parse(path, data)

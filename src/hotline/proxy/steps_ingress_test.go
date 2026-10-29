@@ -137,7 +137,7 @@ func guardSteps(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 	sc.Step(`^an api for api.talon.one with allowInternalIPs set to true$`, func() error {
-		w.addIntegration(integration("talon-shop-a", w.talonAPI("        allowInternalIPs: true\n"), w.stripeAPI("")))
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("    allowInternalIPs: true\n"), w.stripeAPI("")))
 		return nil
 	})
 	sc.Step(`^a not-passed entry with allowInternalIPs set to true$`, func() error {

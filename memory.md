@@ -27,7 +27,8 @@ The proxy is built in small slices, tests first.
    - the vendor URL in path ingress: built, with refused calls recorded on every ingress. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
    - the guard against calls to internal addresses: built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
    - the Host header ingress, with HTTP/2 from apps: built. Detail: [docs/proxy-host-header.md](docs/proxy-host-header.md);
-   - JSON and form body checks against the spec;
+   - each vendor api named once in the config, shared by integrations: built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md), decisions 10 and 11;
+   - checks of every part of a call against the spec (path, query, headers, cookies, body; and the reply's status, headers and body). Agreed, not built yet. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md);
    - config reload without a restart;
    - the load test, with k6.
 
@@ -110,3 +111,20 @@ Full wording in [docs/proxy-host-header.md](docs/proxy-host-header.md).
 2. Plain HTTP/2 (h2c) by prior knowledge only; no `Upgrade: h2c` handshake.
 3. Guarded from the start by the internal address guard; no separate loop check.
 4. No HTTP/3 for now; added later only if a real app needs it.
+
+## Spec checks and shared apis decisions (Peter, 2026-10-29)
+
+Full wording in [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md).
+
+1. Every part of a call is checked against the spec, not only the body: path, query, headers, cookies and body; in the reply, status, headers and body.
+2. Unknown query values are reported; unknown headers are ignored; extra body fields follow `additionalProperties`.
+3. Each result is structured: `part`, `place`, `rule`, `expected`. Never a value from the call.
+4. A content type the spec doesn't list, or a body where none is expected, is reported.
+5. A reply status the spec doesn't list (no `default`) is reported, and that reply is not checked further.
+6. At most 20 results per side, plus `errors_total` when more.
+7. Common formats are checked (`date-time`, `date`, `email`, `uuid`, `uri`, `ipv4`, `ipv6`, `int32`, `int64`).
+8. The login key from the security section must be present; its value is never read.
+9. Only OpenAPI 3.1; `$ref` within the same file; OpenAPI query styles; Stripe's bracket form bodies.
+10. A broken spec is a config problem: refused at start, by `validate` and on reload.
+11. One spec is read once and shared by every integration that uses it.
+12. The config names each vendor api once in a top-level `apis` section; integrations name the apis they use, and may change only `vendorTimeout`. `not-passed` keeps its settings on itself.

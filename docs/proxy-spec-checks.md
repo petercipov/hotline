@@ -1,0 +1,83 @@
+# Checking calls against the vendor's OpenAPI spec: requirements
+
+*Agreed with Peter, 2026-10-29. Decisions 10 and 11 (the shared apis in the config) are built first, on their own; the checks themselves come next.*
+
+## What the feature is
+
+The proxy checks each call against our copy of the vendor's OpenAPI spec (the vendor's published description of its API). Peter's point (2026-10-29): a check is not only about the JSON body. For each route the spec describes every part of the request, and says which parts are required:
+
+- **path values**, like `{sessionId}` in `/v1/customer_sessions/{sessionId}`;
+- **query values**, like `?page=2`;
+- **headers**, like `Idempotency-Key`;
+- **cookies** (rare in vendor APIs);
+- **the body**, in JSON or form data, with its content type.
+
+All of these take part in the check. The reply is checked the same way: its status code, its headers and its body.
+
+## Already settled by earlier decisions
+
+- **Both ways.** Requests and replies are checked (spec section 1; capabilities review item 15).
+- **Never in the way.** The call streams through untouched. Checks run after the reply has gone back to the app, so they add no delay and never block, change or refuse a call. The proxy only reports; the control plane judges.
+- **Results name the place and the rule, never the value.** They go in `hotline.schema.request.errors` and `hotline.schema.response.errors`, for example `$.amount required missing`.
+- **Skipped checks say why**, in `hotline.schema.skipped`: `body_too_large` (over 1 MiB), `no_spec_route`, `streaming`, `unsupported_content_type`, `overloaded`.
+- **Body types.** JSON and form data (`application/x-www-form-urlencoded`, as Stripe uses) are checked. Anything else is skipped with `unsupported_content_type`.
+- **Who gets checked.** Only calls with a known integration and a host in its `apis`. `not-passed` and unknown IDs get a minimal record and no checks.
+- **Spec versions.** Our example specs are OpenAPI 3.1.
+
+## Open questions
+
+None. All nine were answered; see the decisions below.
+
+## Decisions
+
+1. **Extra values not in the spec** (Peter, 2026-10-29). A query value the spec doesn't name is reported. A header the spec doesn't name is ignored, since apps and their libraries add many of their own. Extra body fields follow the schema's own rule (`additionalProperties`).
+2. **How a result names the part** (Peter, 2026-10-29; made structured the same day). Each result is a small structured entry, not a sentence, so nobody has to parse text later:
+   - `part`: `path`, `query`, `header`, `cookie`, `body` or `status`;
+   - `place`: the name (`page`, `Idempotency-Key`) or, in a body, where in it (`$.cartItems[0].quantity`); none for `status`;
+   - `rule`: one word from a fixed list, using JSON Schema's own keyword names where one exists: `required`, `type`, `format`, `minimum`, `maximum`, `enum`, `pattern`, `not_in_spec`, `content_type`, and so on;
+   - `expected`: what the spec asks for (`integer`, `1`, `uuid`). It comes from the spec, never from the call.
+   Never values from the call. In OpenTelemetry the list is a list of key and value maps, which log records allow.
+3. **A body type the spec doesn't list** (Peter, 2026-10-29). A content type the spec doesn't list for the route is reported (`part: body`, `rule: content_type`), and so is a body where the spec expects none (`part: body`, `rule: not_in_spec`). The skip reason `unsupported_content_type` stays only for formats the spec lists but the proxy can't read, like XML or file uploads.
+4. **A reply status the spec doesn't list** (Peter, 2026-10-29). With no `default` reply in the spec, it is reported as `{part: status, rule: not_in_spec}`, and the reply's headers and body are not checked, since there is no schema for them. A `default` reply matches any status.
+5. **A limit on results** (Peter, 2026-10-29). At most 20 results for the request and 20 for the reply. When there are more, the record also gives the total, in `hotline.schema.request.errors_total` and `hotline.schema.response.errors_total`.
+6. **Formats are checked** (Peter, 2026-10-29). The common, clearly defined formats are checked as rules: `date-time`, `date`, `email`, `uuid`, `uri`, `ipv4`, `ipv6`, `int32` and `int64`. Other formats are ignored. A miss is `{rule: format, expected: uuid}`.
+7. **The login key must be present** (Peter, 2026-10-29). When the spec's security section asks for a key or token, the proxy checks only that it is there, and reports a missing one as `{part: header, place: Authorization, rule: required}` (or the query or cookie it lives in). The value is never read, checked or recorded.
+8. **Spec features in the first version** (Peter, 2026-10-29). Only OpenAPI 3.1; a 3.0 spec is refused when loaded. Shared parts (`$ref`) only within the same file. Lists and objects in query values in the usual OpenAPI ways (`?tag=a&tag=b`, `?filter[status]=open`). Stripe's form bodies (`metadata[order]=…`, `items[0][price]=…`) turned into a JSON-like shape for the schema. Callbacks, webhooks and XML come later.
+9. **A broken spec is a config problem** (Peter, 2026-10-29). A schema the proxy can't use (a wrong type name, a `$ref` that points nowhere, a link to another file, an OpenAPI version other than 3.1) stops the proxy at start, is listed by `hotline-proxy validate`, and on a later reload keeps the old config.
+10. **One spec, shared by all integrations** (Peter, 2026-10-29). Many integrations can use the same vendor spec, for example hundreds of integrations all calling Talon.One. A spec file is read, checked and turned into ready-to-use schemas once, and every integration that names it uses that one copy. Memory and start time grow with the number of different spec files, not with the number of integrations. The loader already reads each spec file once by its path; the schemas built for checks follow the same rule.
+11. **Each vendor api is named once in the config** (Peter, 2026-10-29). The full example is `src/hotline/proxy/testdata/proxy-example/hotline-proxy.yaml`, a copy of `proxy-example/hotline-proxy.yaml` in the `hotline-strategic` repo.
+    ```yaml
+    apis:                              # each vendor api, once
+      talon-one:
+        hosts: [api.talon.one]
+        spec: ./specs/talon-one.openapi.yaml
+        vendorTimeout: 10s
+      stripe:
+        hosts: [api.stripe.com]
+        spec: ./specs/stripe.openapi.yaml
+
+    integrations:
+      - id: talon-shop-a
+        fingerprintKey: { file: /etc/hotline/keys/talon-shop-a }
+        apis: [talon-one, stripe]      # names from the apis section
+      - id: talon-shop-b
+        apis:
+          - { api: talon-one, vendorTimeout: 5s }   # an integration may change only vendorTimeout
+      - id: not-passed                 # calls with no ID or an unknown ID; optional
+        # no apis: these settings apply to any host, and these calls are never checked
+        tlsOrigination: true           # built-in default false
+        vendorTimeout: 30s             # built-in default 60s
+        allowInternalIPs: false        # built-in default false
+    ```
+    - `hosts`, `spec`, `tlsOrigination` and `allowInternalIPs` belong to the api; an integration may change only `vendorTimeout`.
+    - An integration naming an api that doesn't exist, or two of its apis sharing a host, is a config problem: refused at start and by `validate`.
+    - `not-passed` stays an entry under `integrations`, with its settings written on itself, since it has no apis. An `apis` list on it is ignored with a warning, as today.
+    - The old form (hosts and spec written inside each integration) is dropped, since nothing has been released yet.
+
+## What changes in the proxy spec
+
+- Section 1: "JSON checks" becomes checks of every part of the call (path, query, headers, cookies, body; and the reply's status, headers and body).
+- Section 4.1: `hotline.schema.request.errors` and `hotline.schema.response.errors` become lists of structured entries (`part`, `place`, `rule`, `expected`), at most 20 each, plus the new `hotline.schema.request.errors_total` and `hotline.schema.response.errors_total`.
+- The example record in `proxy-example/README.md` changes to the structured form.
+- Section 2: the config gains the top-level `apis` section, and integrations name their apis (decision 11). The full example in `proxy-example/hotline-proxy.yaml` changes to match.
+- The example Stripe spec gains a route with a form body (`POST /v1/payment_intents`), so form checks can be shown and tested.

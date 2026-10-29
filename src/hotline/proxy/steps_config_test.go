@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -46,11 +47,19 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^every integration is read with its apis, their hosts and the spec each api points to$`, func() error {
+	sc.Step(`^every api is read with its hosts and the spec it points to$`, func() error {
 		return w.templatesFor(map[string]string{
 			"PUT https://api.talon.one/v2/customer_sessions/1":   "/v2/customer_sessions/{customerSessionId}",
 			"GET https://api.stripe.com/v1/payment_intents/pi_1": "/v1/payment_intents/{intent}",
 		})
+	})
+	sc.Step(`^every integration is read with the apis it names$`, func() error {
+		for _, r := range w.records() {
+			if err := has(r.attrs, "hotline.integration.id", "talon-shop-a"); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	sc.Step(`^spec files are found relative to the folder of the config file$`, func() error {
 		if !strings.HasPrefix(w.configPath, w.dir) {
@@ -70,8 +79,8 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 
 	sc.Step(`^an api that (does not set tlsOrigination|sets tlsOrigination to false|does not set vendorTimeout|sets vendorTimeout to 10s)$`, func(sets string) error {
 		extra := map[string]string{
-			"sets tlsOrigination to false": "        tlsOrigination: false\n",
-			"sets vendorTimeout to 10s":    "        vendorTimeout: 10s\n",
+			"sets tlsOrigination to false": "    tlsOrigination: false\n",
+			"sets vendorTimeout to 10s":    "    vendorTimeout: 10s\n",
 		}[sets]
 		w.addIntegration(integration("talon-shop-a", w.talonAPI(extra)))
 		return nil
@@ -85,30 +94,66 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return w.calledOver("http", "80")
 	})
-	sc.Step(`^the proxy waits (\d+) seconds for the vendor$`, func(seconds int) error {
-		w.settle()
-		w.clock = &fakeClock{}
-		wait := time.Duration(seconds) * time.Second
-		early := make(chan int, 1)
-		w.vendor("api.talon.one").setAnswer(func(_ http.ResponseWriter, r *http.Request) {
-			early <- w.clock.pass(wait - time.Second)
-			w.clock.pass(time.Second)
-			<-r.Context().Done()
-		})
-		if err := w.defaultCall(); err != nil {
-			return err
-		}
-		if fired := <-early; fired > 0 {
-			return failf("the proxy gave up before %v", wait)
-		}
-		if w.resp == nil || w.resp.StatusCode != http.StatusGatewayTimeout {
-			return failf("after %v the app got %v, want 504", wait, w.resp)
+	sc.Step(`^the proxy waits (\d+) seconds for the vendor$`, w.waitsFor)
+	sc.Step(`^calls from (\S+) wait (\d+) seconds for the vendor$`, func(id string, seconds int) error {
+		w.appID = id
+		return w.waitsFor(seconds)
+	})
+
+	sc.Step(`^the api talon-one with the host api.talon.one and the Talon.One spec$`, func() error {
+		w.talonAPI("")
+		return nil
+	})
+	sc.Step(`^the api talon-one with vendorTimeout 10s$`, func() error {
+		w.talonAPI("    vendorTimeout: 10s\n")
+		return nil
+	})
+	sc.Step(`^the integrations talon-shop-a and talon-shop-b both naming talon-one$`, func() error {
+		w.addIntegration(integration("talon-shop-a", "      - talon-one\n"))
+		w.addIntegration(integration("talon-shop-b", "      - talon-one\n"))
+		return nil
+	})
+	sc.Step(`^talon-shop-a naming talon-one as it is$`, func() error {
+		w.addIntegration(integration("talon-shop-a", "      - talon-one\n"))
+		return nil
+	})
+	sc.Step(`^talon-shop-b naming talon-one with vendorTimeout 5s$`, func() error {
+		w.addIntegration(integration("talon-shop-b", "      - { api: talon-one, vendorTimeout: 5s }\n"))
+		return nil
+	})
+	sc.Step(`^either integration calls api.talon.one$`, func() error {
+		for _, id := range []string{"talon-shop-a", "talon-shop-b"} {
+			w.appID = id
+			if err := w.call("PUT", "https://api.talon.one/v2/customer_sessions/1"); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
+	sc.Step(`^both calls use the Talon.One spec$`, func() error {
+		return w.talonTemplateFor("talon-shop-a", "talon-shop-b")
+	})
+	sc.Step(`^(\d+) integrations that all name the api talon-one$`, func(n int) error {
+		w.talonAPI("")
+		for i := 1; i <= n; i++ {
+			w.addIntegration(integration(fmt.Sprintf("shop-%d", i), "      - talon-one\n"))
+		}
+		return nil
+	})
+	sc.Step(`^calls from the first and the last of them use the Talon.One spec$`, func() error {
+		last := fmt.Sprintf("shop-%d", len(w.integrations))
+		for _, id := range []string{"shop-1", last} {
+			w.appID = id
+			if err := w.call("PUT", "https://api.talon.one/v2/customer_sessions/1"); err != nil {
+				return err
+			}
+		}
+		return w.talonTemplateFor("shop-1", last)
+	})
 
 	sc.Step(`^an api that lists the hosts (\S+) and (\S+)$`, func(first, second string) error {
-		w.addIntegration(integration("talon-shop-a", strings.Replace(w.talonAPI(""), "[api.talon.one]", "["+first+", "+second+"]", 1)))
+		w.writeFile("specs/talon-one.openapi.yaml", w.exampleFile("specs/talon-one.openapi.yaml"))
+		w.addIntegration(integration("talon-shop-a", w.api("talon-one", "    hosts: ["+first+", "+second+"]\n    spec: ./specs/talon-one.openapi.yaml\n")))
 		return nil
 	})
 	sc.Step(`^calls to either host use that api$`, func() error {
@@ -118,7 +163,8 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		})
 	})
 	sc.Step(`^an api that lists the host API.Talon.One$`, func() error {
-		w.addIntegration(integration("talon-shop-a", strings.Replace(w.talonAPI(""), "[api.talon.one]", "[API.Talon.One]", 1)))
+		w.writeFile("specs/talon-one.openapi.yaml", w.exampleFile("specs/talon-one.openapi.yaml"))
+		w.addIntegration(integration("talon-shop-a", w.api("talon-one", "    hosts: [API.Talon.One]\n    spec: ./specs/talon-one.openapi.yaml\n")))
 		return nil
 	})
 	sc.Step(`^a call goes to api.talon.one$`, func() error { return w.defaultCall() })
@@ -146,10 +192,10 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return w.calledOver("https", "443")
 	})
-	sc.Step(`^two integrations that both list api.talon.one, each with its own spec$`, func() error {
+	sc.Step(`^two integrations that each name an api for api.talon.one, each with its own spec$`, func() error {
 		w.addIntegration(integration("talon-shop-a", w.talonAPI("")))
 		w.writeFile("specs/other.yaml", "openapi: 3.0.0\npaths:\n  /v9/other/{x}:\n    put: {}\n")
-		w.addIntegration(integration("talon-shop-b", "      - hosts: [api.talon.one]\n        spec: specs/other.yaml\n"))
+		w.addIntegration(integration("talon-shop-b", w.api("other", "    hosts: [api.talon.one]\n    spec: specs/other.yaml\n")))
 		return nil
 	})
 	sc.Step(`^both are accepted$`, func() error {
@@ -210,9 +256,9 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^a config file with three problems$`, func() error {
 		w.noIntegrations = true
-		w.rawConfig = "version: \"1\"\nlisten:\n  proxy: \"127.0.0.1:0\"\nintegrations:\n" +
-			integration("a", w.apiFor("api.x.com", "        vendorTimeout: 0s\n")) +
-			integration("a", w.apiFor("api.y.com", ""))
+		w.rawConfig = w.raw("version: \"1\"\nlisten:\n  proxy: \"127.0.0.1:0\"\n",
+			integration("a", w.apiFor("api.x.com", "    vendorTimeout: 0s\n"))+
+				integration("a", w.apiFor("api.y.com", "")))
 		return nil
 	})
 	sc.Step(`^all three problems are listed, not only the first one$`, func() error {
@@ -220,7 +266,7 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^a broken config file with an integration that has a fingerprint key$`, func() error {
 		key := w.writeFile("keys/shop-a", "k3y-s3cr3t-value")
-		w.addIntegration(integration("talon-shop-a", "      - hosts: [api.talon.one]\n        spec: ./specs/missing.yaml\n") +
+		w.addIntegration(integration("talon-shop-a", w.api("talon-one", "    hosts: [api.talon.one]\n    spec: ./specs/missing.yaml\n")) +
 			"    fingerprintKey: { file: " + key + " }\n")
 		return nil
 	})
@@ -289,7 +335,7 @@ func (w *world) brokenConfig(problem string) error {
 	exporters := "exporters:\n  - otlp:\n      endpoint: " + w.receivers[0].endpoint + "\n"
 	start := "version: \"1\"\nlisten:\n  proxy: \"127.0.0.1:0\"\n"
 	one := func(extra string) string {
-		return start + exporters + "integrations:\n" + integration("shop", w.apiFor("api.x.com", extra))
+		return w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", extra)))
 	}
 	switch problem {
 	case "the file is not valid YAML":
@@ -302,7 +348,7 @@ func (w *world) brokenConfig(problem string) error {
 		w.rawConfig = "version: \"1\"\nlisten:\n  admin: \"127.0.0.1:0\"\n" + exporters
 		w.problem = "there is no listen.proxy address"
 	case "an integration has no id":
-		w.rawConfig = start + exporters + "integrations:\n  - apis:\n" + w.apiFor("api.x.com", "")
+		w.rawConfig = w.raw(start+exporters, "  - apis:\n"+w.apiFor("api.x.com", ""))
 		w.problem = "an integration has no id"
 	case "there are no exporters":
 		w.rawConfig, w.problem = start, "there are no exporters"
@@ -316,36 +362,87 @@ func (w *world) brokenConfig(problem string) error {
 		w.rawConfig = start + exporters + "      queueSize: 0\n"
 		w.problem = "queueSize must be at least 1"
 	case "the not-passed entry has an apis list":
-		w.rawConfig = start + exporters + "integrations:\n" + integration("not-passed", w.apiFor("api.x.com", ""))
+		w.rawConfig = w.raw(start+exporters, integration("not-passed", w.apiFor("api.x.com", "")))
 	case "a field name has a typo, such as tlsOrigintion":
-		w.rawConfig = start + exporters + "integrations:\n" + integration("shop", w.apiFor("api.x.com", "        tlsOrigintion: false\n"))
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", "    tlsOrigintion: false\n")))
+	case "an integration changes tlsOrigination of an api it names":
+		w.apiFor("api.x.com", "")
+		w.rawConfig = w.raw(start+exporters, integration("shop", "      - { api: api.x.com, tlsOrigination: false }\n"))
 	case `an api sets allowInternalIPs to "maybe"`:
-		w.rawConfig = one(`        allowInternalIPs: maybe` + "\n")
+		w.rawConfig = one(`    allowInternalIPs: maybe` + "\n")
 		w.problem = "cannot unmarshal !!str `maybe` into bool"
 	case "two integrations have the same ID":
 		w.rawConfig = one("") + integration("shop", w.apiFor("api.y.com", ""))
 		w.problem = "two integrations have the ID shop"
-	case "one integration lists the same host in two apis":
-		w.rawConfig = one("") + w.apiFor("api.x.com", "")
-		w.problem = "integration shop lists the host api.x.com in two apis"
+	case "one integration names two apis with the same host":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", ""), w.apiFor("api.x.com", "    vendorTimeout: 5s\n")))
+		w.problem = "integration shop names two apis with the host api.x.com"
+	case "an integration names an api that is not in apis":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", ""), "      - talon-on\n"))
+		w.problem = "integration shop names the api talon-on, which is not in apis"
+	case "an integration names an api with a list, not a name":
+		w.rawConfig = w.raw(start+exporters, integration("shop", "      - [talon-one]\n"))
+		w.problem = "an api is named by its name or by { api: name }"
+	case "an api has no spec":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.api("nospec", "    hosts: [api.x.com]\n")))
+		w.problem = "api nospec has no spec"
 	case "an api points to a spec file that does not exist":
-		w.rawConfig = start + exporters + "integrations:\n" + integration("shop", "      - hosts: [api.x.com]\n        spec: ./specs/missing.yaml\n")
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.api("shop", "    hosts: [api.x.com]\n    spec: ./specs/missing.yaml\n")))
 		w.problem = "missing.yaml cannot be read"
 	case "a spec is not a valid OpenAPI 3 document":
-		w.rawConfig = start + exporters + "integrations:\n" + integration("shop", w.specAPI("api.x.com", "swagger: \"2.0\"\npaths: {}\n", ""))
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com", "swagger: \"2.0\"\npaths: {}\n", "")))
 		w.problem = "is not a valid OpenAPI 3 document"
 	case "a vendorTimeout is zero":
-		w.rawConfig, w.problem = one("        vendorTimeout: 0s\n"), `vendorTimeout "0s"`
+		w.rawConfig, w.problem = one("    vendorTimeout: 0s\n"), `vendorTimeout "0s"`
 	case "a vendorTimeout is negative":
-		w.rawConfig, w.problem = one("        vendorTimeout: -5s\n"), `vendorTimeout "-5s"`
+		w.rawConfig, w.problem = one("    vendorTimeout: -5s\n"), `vendorTimeout "-5s"`
 	case "a vendorTimeout is not a duration":
-		w.rawConfig, w.problem = one("        vendorTimeout: soon\n"), `vendorTimeout "soon"`
+		w.rawConfig, w.problem = one("    vendorTimeout: soon\n"), `vendorTimeout "soon"`
 	case "an x-hotline-redact mark is not true or false":
-		w.rawConfig = start + exporters + "integrations:\n" + integration("shop", w.specAPI("api.x.com",
-			"openapi: 3.1.0\npaths:\n  /a:\n    get:\n      parameters:\n        - { name: q, in: query, x-hotline-redact: maybe }\n", ""))
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com",
+			"openapi: 3.1.0\npaths:\n  /a:\n    get:\n      parameters:\n        - { name: q, in: query, x-hotline-redact: maybe }\n", "")))
 		w.problem = "x-hotline-redact on q must be true or false"
 	default:
 		return godog.ErrUndefined
+	}
+	return nil
+}
+
+// talonTemplateFor checks that a call from each integration got the
+// Talon.One route template.
+func (w *world) talonTemplateFor(ids ...string) error {
+	templates := map[any]any{}
+	for _, r := range w.records() {
+		templates[r.attrs["hotline.integration.id"]] = r.attrs["url.template"]
+	}
+	for _, id := range ids {
+		if templates[id] != "/v2/customer_sessions/{customerSessionId}" {
+			return failf("the call from %s got url.template %v", id, templates[id])
+		}
+	}
+	return nil
+}
+
+// waitsFor checks that a call gives up on a silent vendor after exactly
+// this many seconds.
+func (w *world) waitsFor(seconds int) error {
+	w.settle()
+	w.clock = &fakeClock{}
+	wait := time.Duration(seconds) * time.Second
+	early := make(chan int, 1)
+	w.vendor("api.talon.one").setAnswer(func(_ http.ResponseWriter, r *http.Request) {
+		early <- w.clock.pass(wait - time.Second)
+		w.clock.pass(time.Second)
+		<-r.Context().Done()
+	})
+	if err := w.defaultCall(); err != nil {
+		return err
+	}
+	if fired := <-early; fired > 0 {
+		return failf("the proxy gave up before %v", wait)
+	}
+	if w.resp == nil || w.resp.StatusCode != http.StatusGatewayTimeout {
+		return failf("after %v the app got %v, want 504", wait, w.resp)
 	}
 	return nil
 }
