@@ -2,6 +2,7 @@ package proxy_test
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,7 +21,10 @@ func checksSteps(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 	sc.Step(`^the vendor answers (\d+)(?: with "([^"]*)")?(?: and the (json )?body (.*))?$`, func(status int, headers, json, body string) error {
-		w.vendor("api.shop.test").setAnswer(func(rw http.ResponseWriter, _ *http.Request) {
+		w.vendor("api.shop.test").setAnswer(func(rw http.ResponseWriter, r *http.Request) {
+			// Read the whole request first, as a real vendor does: an answer
+			// sent before the body has arrived can cut the body short.
+			_, _ = io.Copy(io.Discard, r.Body)
 			if json != "" {
 				rw.Header().Set("Content-Type", "application/json")
 			}
