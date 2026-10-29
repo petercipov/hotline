@@ -99,7 +99,7 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 		return exitFail
 	}
 	if command == "validate" {
-		if err := proxy.Validate(*configPath); err != nil {
+		if err := proxy.Validate(*configPath, proxy.SystemClock{}); err != nil {
 			logProblems(logger, "config refused", err)
 			return exitFail
 		}

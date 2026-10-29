@@ -183,7 +183,7 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^the app gets (\d+)$`, func(status int) error {
 		if w.resp == nil || w.resp.StatusCode != status {
-			return failf("the app got %v", w.resp)
+			return failf("the app got %v (%v)", w.resp, w.respErr)
 		}
 		return nil
 	})

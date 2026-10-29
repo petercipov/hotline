@@ -35,18 +35,6 @@ Feature: Calling through the forward proxy ingress, end to end
       | Node   | 1    | POST https://… with http.request and a full URL as the path    |
       | Node   | 2    | POST http://… with http.request                                |
 
-  @later
-  Scenario Outline: The client matrix over TLS to the proxy
-    When the <client> client sends case <case>: <how>
-    Then the app gets the test vendor's status, headers and body unchanged
-
-    Examples:
-      | client | case | how                                                       |
-      | Go     | 4    | the https address over TLS to the proxy, using URL.Opaque |
-      | Go     | 5    | the http address over TLS through Transport.Proxy         |
-      | Node   | 4    | https.request with servername set to the proxy            |
-      | Node   | 5    | the http address with https.request                       |
-
   Scenario Outline: Failures end to end
     When the Go client calls <target>
     Then <result>

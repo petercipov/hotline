@@ -42,6 +42,12 @@ Feature: The hotline-proxy program
     And standard error says "config is valid"
     And nothing listens on the config's proxy address
 
+  Scenario: validate refuses a config whose TLS key file is missing
+    Given a config file whose listen.tls key file does not exist
+    When hotline-proxy is run with "validate --config hotline-proxy.yaml"
+    Then it exits with code 1
+    And standard error says "listen.tls: the cert or key file cannot be read"
+
   Scenario: validate lists every problem of a config
     Given a config file with no version and no exporters
     When hotline-proxy is run with "validate --config hotline-proxy.yaml"

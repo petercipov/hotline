@@ -77,6 +77,9 @@ type program struct {
 	untrusted string
 	proxyAddr string
 	taken     net.Listener
+	// tls makes the program's proxy port accept only TLS, with a
+	// certificate for hotline-proxy from the test issuer.
+	tls bool
 
 	process  *exec.Cmd
 	stdout   syncBuffer
@@ -122,6 +125,10 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		return p.waitForExit(10 * time.Second)
 	})
 	sc.Step(`^the hotline-proxy program runs with integration test-shop for the test vendor$`, func() error {
+		return p.run()
+	})
+	sc.Step(`^the hotline-proxy program runs with TLS on its proxy port and integration test-shop for the test vendor$`, func() error {
+		p.tls = true
 		return p.run()
 	})
 	sc.Step(`^the hotline-proxy program runs with "([^"]*)" and integration test-shop for the test vendor$`, func(flags string) error {
@@ -188,6 +195,11 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 	sc.Step(`^a config file with no version and no exporters$`, func() error {
 		p.writeConfig(fmt.Sprintf("listen:\n  proxy: %q\n", p.proxyAddr))
 		return nil
+	})
+	sc.Step(`^a config file whose listen.tls key file does not exist$`, func() error {
+		p.tls = true
+		p.writeConfig(p.config(true))
+		return os.Remove(filepath.Join(p.dir, "tls", "key.pem"))
 	})
 	sc.Step(`^no file trust.pem$`, func() error { return nil })
 	sc.Step(`^a file trust.pem that holds no certificate$`, func() error {
@@ -260,6 +272,10 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 			p.respond(goCase1(p.proxyAddr, p.vendorURL+paymentPath, "test-shop"))
 		case 2:
 			p.respond(goCase2(p.proxyAddr, strings.Replace(p.vendorURL, "https:", "http:", 1)+paymentPath, "test-shop"))
+		case 4:
+			p.respond(goCase4(p.proxyAddr, p.vendorURL+paymentPath, "test-shop", p.appTLS()))
+		case 5:
+			p.respond(goCase5(p.proxyAddr, strings.Replace(p.vendorURL, "https:", "http:", 1)+paymentPath, "test-shop", p.appTLS()))
 		default:
 			return godog.ErrPending
 		}
@@ -433,11 +449,19 @@ func (p *program) config(validateOnly bool) string {
 	}
 	_ = os.MkdirAll(filepath.Join(p.dir, "specs"), 0o750)
 	_ = os.WriteFile(filepath.Join(p.dir, "specs", "test-vendor.yaml"), []byte(testVendorSpec), 0o600)
+	listenTLS := ""
+	if p.tls {
+		cert := p.issuer.leaf("hotline-proxy", time.Now().Add(24*time.Hour), false)
+		_ = os.MkdirAll(filepath.Join(p.dir, "tls"), 0o750)
+		_ = os.WriteFile(filepath.Join(p.dir, "tls", "cert.pem"), []byte(certPEM(cert)), 0o600)
+		_ = os.WriteFile(filepath.Join(p.dir, "tls", "key.pem"), []byte(keyPEM(cert)), 0o600)
+		listenTLS = "  tls: { cert: ./tls/cert.pem, key: ./tls/key.pem }\n"
+	}
 	return fmt.Sprintf(`version: e2e-1
 listen:
   proxy: %q
   admin: "127.0.0.1:0"
-exporters:
+%sexporters:
   - otlp:
       endpoint: %s
 integrations:
@@ -445,7 +469,7 @@ integrations:
     apis:
       - hosts: [localhost]
         spec: ./specs/test-vendor.yaml
-`, p.proxyAddr, endpoint)
+`, p.proxyAddr, listenTLS, endpoint)
 }
 
 func (p *program) writeConfig(content string) {
@@ -618,6 +642,35 @@ func goCase1(proxyAddr, target, id string) (*http.Response, error) {
 // setting, which also sends the ID as Proxy-Authorization.
 func goCase2(proxyAddr, target, id string) (*http.Response, error) {
 	t := goTransport(&url.URL{Scheme: "http", Host: proxyAddr, User: url.UserPassword(id, "x")})
+	defer t.CloseIdleConnections()
+	return t.RoundTrip(paymentRequest(target))
+}
+
+// appTLS is how an app that trusts the test issuer opens TLS to the
+// program, by its name hotline-proxy.
+func (p *program) appTLS() *tls.Config {
+	return &tls.Config{RootCAs: p.issuer.pool, ServerName: "hotline-proxy", MinVersion: tls.VersionTLS12}
+}
+
+// goCase4 sends "POST https://… HTTP/1.1" inside TLS to the proxy, the same
+// way as goCase1 but with the dial for TLS opening TLS to the proxy.
+func goCase4(proxyAddr, target, id string, appTLS *tls.Config) (*http.Response, error) {
+	t := goTransport(nil)
+	t.DialTLSContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&tls.Dialer{Config: appTLS}).DialContext(ctx, network, proxyAddr)
+	}
+	defer t.CloseIdleConnections()
+	req := paymentRequest(target)
+	req.URL = &url.URL{Scheme: "https", Host: proxyAddr, Opaque: strings.TrimPrefix(target, "https:")}
+	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
+	return t.RoundTrip(req)
+}
+
+// goCase5 sends "POST http://… HTTP/1.1" through the standard proxy setting
+// with an https proxy address, so Go opens TLS to the proxy first.
+func goCase5(proxyAddr, target, id string, appTLS *tls.Config) (*http.Response, error) {
+	t := goTransport(&url.URL{Scheme: "https", Host: proxyAddr, User: url.UserPassword(id, "x")})
+	t.TLSClientConfig = appTLS
 	defer t.CloseIdleConnections()
 	return t.RoundTrip(paymentRequest(target))
 }
