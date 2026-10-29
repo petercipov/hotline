@@ -127,7 +127,8 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 	sc.Step(`^the hotline-proxy program runs with "([^"]*)" and integration test-shop for the test vendor$`, func(flags string) error {
 		return p.run(strings.Fields(flags)...)
 	})
-	sc.Step(`^the program gets (SIGTERM|SIGINT)(?: again)?$`, p.signal)
+	sc.Step(`^the program gets (SIGTERM|SIGINT)$`, p.signal)
+	sc.Step(`^the program gets (SIGTERM|SIGINT) again$`, p.signalAgain)
 	sc.Step(`^it exits with code (\d+)$`, func(code int) error {
 		return p.exitsWith(code, 30*time.Second)
 	})
@@ -495,6 +496,17 @@ func (p *program) signal(name string) error {
 	}
 	p.signalled = time.Now()
 	return p.process.Process.Signal(sig)
+}
+
+// signalAgain sends a second signal once the program has taken the first.
+// Sent sooner, the system can merge the two into one.
+func (p *program) signalAgain(name string) error {
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if strings.Contains(p.stderr.String(), "hotline proxy stopping") {
+			return p.signal(name)
+		}
+	}
+	return failf("the program did not take the first signal:\n%s", p.stderr.String())
 }
 
 // stop ends the program the way Kubernetes does, which sends every queued
