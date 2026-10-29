@@ -1,6 +1,6 @@
 # Checking calls against the vendor's OpenAPI spec: requirements
 
-*Agreed with Peter, 2026-10-29. Decisions 10 and 11 (the shared apis in the config) are built first, on their own; the checks themselves come next.*
+*Agreed with Peter, 2026-10-29. Built in two steps: the shared apis in the config (decisions 10 and 11), then the checks. Scenarios: `src/hotline/proxy/features/checks.feature`.*
 
 ## What the feature is
 
@@ -73,6 +73,12 @@ None. All nine were answered; see the decisions below.
     - An integration naming an api that doesn't exist, or two of its apis sharing a host, is a config problem: refused at start and by `validate`.
     - `not-passed` stays an entry under `integrations`, with its settings written on itself, since it has no apis. An `apis` list on it is ignored with a warning, as today.
     - The old form (hosts and spec written inside each integration) is dropped, since nothing has been released yet.
+
+## Details settled while building
+
+- A JSON body that cannot be read is reported as `{part: body, place: $, rule: json}`; a form body with a broken escape as `rule: form`.
+- Checks use the JSON Schema library `santhosh-tekuri/jsonschema` (Apache-2.0), which follows the JSON Schema version OpenAPI 3.1 uses. Formats other than the agreed list are switched off in it.
+- Checks run when the record is made, after the reply has gone back to the app. Skipping them under load (`overloaded`) comes with the checker workers.
 
 ## What changes in the proxy spec
 

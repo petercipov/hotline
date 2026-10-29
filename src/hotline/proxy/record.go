@@ -145,5 +145,50 @@ func (c *call) full() []attribute.KeyValue {
 	for name, values := range redacted.ReplyHeaders {
 		attrs = append(attrs, attribute.StringSlice("http.response.header."+name, values))
 	}
+	return append(attrs, c.checked()...)
+}
+
+// shownResults is how many results of one side a record holds at most.
+const shownResults = 20
+
+// checked checks the call against the spec and says what was found.
+func (c *call) checked() []attribute.KeyValue {
+	e := spec.Exchange{
+		Method:      c.in.Method,
+		EscapedPath: c.target.EscapedPath(),
+		RawQuery:    c.target.RawQuery,
+		Header:      c.in.Header,
+		Body:        c.reqBody.copied(),
+	}
+	if c.resp != nil {
+		e.Status, e.ReplyHeader, e.ReplyBody = c.resp.StatusCode, c.resp.Header, c.respBody.copied()
+	}
+	found := c.api.Spec.Check(e)
+	var attrs []attribute.KeyValue
+	if found.Skipped != "" {
+		attrs = append(attrs, attribute.String("hotline.schema.skipped", found.Skipped))
+	}
+	for side, results := range map[string][]spec.Result{"request": found.Request, "response": found.Reply} {
+		if len(results) == 0 {
+			continue
+		}
+		key := "hotline.schema." + side + ".errors"
+		if len(results) > shownResults {
+			attrs = append(attrs, attribute.Int(key+"_total", len(results)))
+			results = results[:shownResults]
+		}
+		values := make([]attribute.Value, len(results))
+		for i, r := range results {
+			entry := []attribute.KeyValue{attribute.String("part", r.Part), attribute.String("rule", r.Rule)}
+			if r.Place != "" {
+				entry = append(entry, attribute.String("place", r.Place))
+			}
+			if r.Expected != "" {
+				entry = append(entry, attribute.String("expected", r.Expected))
+			}
+			values[i] = attribute.MapValue(entry...)
+		}
+		attrs = append(attrs, attribute.Slice(key, values...))
+	}
 	return attrs
 }

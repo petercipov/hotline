@@ -215,6 +215,8 @@ func value(v *common.AnyValue) any {
 		return x.DoubleValue
 	case *common.AnyValue_BoolValue:
 		return x.BoolValue
+	case *common.AnyValue_KvlistValue:
+		return values(x.KvlistValue.GetValues())
 	case *common.AnyValue_ArrayValue:
 		var list []any
 		for _, item := range x.ArrayValue.GetValues() {

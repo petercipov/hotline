@@ -1,7 +1,7 @@
 Feature: Reading the vendor spec
   Our copy of a vendor's OpenAPI spec gives the route templates, the
   x-hotline-redact marks and the secrets named in its security section.
-  Body schemas are read in a later slice, together with the JSON checks.
+  What calls are checked against is in checks.feature.
 
   Scenario: Route template for a path with a value
     Given the Talon.One spec
