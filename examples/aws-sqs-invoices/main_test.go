@@ -43,9 +43,9 @@ var _ = Describe("The example program", func() {
 		Expect(job).To(HaveKeyWithValue("language", "sk"))
 		Expect(job).NotTo(HaveKey("sendTo"))
 
-		out := GinkgoT().TempDir()
+		out := filepath.Join(GinkgoT().TempDir(), "invoices")
 		Expect(run("work", "--out", out, "--once")).To(Equal(0))
-		Expect(filepath.Join(out, "A-1001.pdf")).To(BeAnExistingFile())
+		Expect(filepath.Join(out, "invoice-A-1001.pdf")).To(BeAnExistingFile())
 		Expect(fake.Waiting()).To(Equal(0))
 	})
 

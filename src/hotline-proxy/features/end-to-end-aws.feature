@@ -15,7 +15,7 @@ Feature: AWS SQS through the proxy, end to end
   Scenario: An invoice job goes through Hotline to SQS and back
     When the example app requests the invoice for order A-1001
     And the example app works through the queue once
-    Then the worker wrote A-1001.pdf
+    Then the worker wrote invoice-A-1001.pdf
     And the fake SQS has no messages left
     And the fake SQS got every call signed by the SDK, over https, without Proxy-Authorization
     And the receiver got records for SendMessage, ReceiveMessage and DeleteMessage, each with its url.template and no results

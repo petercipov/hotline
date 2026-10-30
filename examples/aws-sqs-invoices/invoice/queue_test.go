@@ -104,7 +104,7 @@ var _ = Describe("Sending and receiving invoice jobs over SQS", func() {
 
 			Expect(worker.Run(ctx, true)).To(Succeed())
 
-			pdf, err := os.ReadFile(filepath.Join(out, "A-1001.pdf")) //nolint:gosec // the test chooses its own files
+			pdf, err := os.ReadFile(filepath.Join(out, "invoice-A-1001.pdf")) //nolint:gosec // the test chooses its own files
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pdf).To(HavePrefix("%PDF-1.4"))
 			Expect(fake.Waiting()).To(Equal(0))
@@ -155,11 +155,21 @@ var _ = Describe("Sending and receiving invoice jobs over SQS", func() {
 			Expect(worker.Run(stop, false)).To(Succeed())
 		})
 
-		It("reports an output folder it can't write to", func() {
+		It("creates a missing output folder", func() {
 			worker.OutDir = filepath.Join(out, "missing", "folder")
 			_, _ = invoice.Send(ctx, client, queueURL, jobBody("A-1001", "invoice-standard-v2"))
 
-			Expect(worker.Run(ctx, true)).To(MatchError(ContainSubstring("A-1001.pdf")))
+			Expect(worker.Run(ctx, true)).To(Succeed())
+			Expect(filepath.Join(out, "missing", "folder", "invoice-A-1001.pdf")).To(BeAnExistingFile())
+		})
+
+		It("reports an output folder it can't write to", func() {
+			blocker := filepath.Join(out, "a-file")
+			Expect(os.WriteFile(blocker, nil, 0o600)).To(Succeed())
+			worker.OutDir = filepath.Join(blocker, "folder")
+			_, _ = invoice.Send(ctx, client, queueURL, jobBody("A-1001", "invoice-standard-v2"))
+
+			Expect(worker.Run(ctx, true)).To(MatchError(ContainSubstring("invoice-A-1001.pdf")))
 			Expect(fake.Waiting()).To(Equal(1))
 		})
 	})

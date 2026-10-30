@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -75,6 +76,10 @@ type Exporter struct {
 	Delta   bool
 	// QueueSize is how many records wait for the destination at most.
 	QueueSize int
+	// Resource are labels that describe where the proxy runs, sent to this
+	// destination only. They may change service.name and
+	// service.instance.id, never service.version.
+	Resource map[string]string
 }
 
 // Settings say how a call is made.
@@ -138,6 +143,7 @@ type exporterFile struct {
 	Compression string            `yaml:"compression"`
 	Temporality string            `yaml:"temporality"`
 	QueueSize   *int              `yaml:"queueSize"`
+	Resource    map[string]secret `yaml:"resource"`
 }
 
 type exporterTLSFile struct {
@@ -381,6 +387,19 @@ func (l *loader) exporter(f exporterFile, now time.Time) Exporter {
 	for _, name := range slices.Sorted(maps.Keys(f.Headers)) {
 		e.Headers[name] = l.secret(label+": header "+name, f.Headers[name])
 	}
+	for _, name := range slices.Sorted(maps.Keys(f.Resource)) {
+		switch {
+		case name == "service.version":
+			l.problem("%s: resource: service.version is the proxy's own and cannot be set", label)
+		case !resourceName.MatchString(name):
+			l.problem("%s: resource: the name %q may only hold letters, digits, dots and underscores", label, name)
+		default:
+			if e.Resource == nil {
+				e.Resource = map[string]string{}
+			}
+			e.Resource[name] = l.secret(label+": resource "+name, f.Resource[name])
+		}
+	}
 	if t := f.TLS; t != nil {
 		if e.URL != nil && e.URL.Scheme != "https" {
 			l.problem("%s: tls needs an https:// endpoint", label)
@@ -400,6 +419,9 @@ func (l *loader) exporter(f exporterFile, now time.Time) Exporter {
 	}
 	return e
 }
+
+// resourceName is what a resource label's name may hold.
+var resourceName = regexp.MustCompile(`^[A-Za-z0-9_.]+$`)
 
 // endpoint reads where an exporter sends. Over HTTP it is a URL; over gRPC
 // a host:port, or a URL with no path, whose https:// turns TLS on.

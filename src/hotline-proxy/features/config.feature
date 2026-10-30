@@ -127,6 +127,9 @@ Feature: Loading the config file
       | an exporter's header secret file does not exist      |
       | an exporter's header environment variable is not set |
       | an exporter's compression is neither gzip nor none   |
+      | an exporter's resource sets service.version          |
+      | an exporter's resource has the name "my label"       |
+      | an exporter's resource environment variable is not set |
       | two integrations have the same ID                    |
       | one integration names two apis with the same host    |
       | an integration names an api that is not in apis      |

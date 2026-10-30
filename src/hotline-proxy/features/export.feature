@@ -10,6 +10,23 @@ Feature: Sending OpenTelemetry data
     When the proxy sends any signal
     Then its resource has service.name hotline-proxy, service.version and service.instance.id
 
+  Scenario: Labels from the config
+    Each exporter may set its own resource labels, to say where the proxy
+    runs. A value is written out, or read from { env: NAME } or
+    { file: path }. service.name and service.instance.id may be changed;
+    service.version is always the proxy's own (Peter, 2026-10-30).
+    Given an exporter with the resource service.name invoices-proxy, service.instance.id from the env POD_NAME and deployment.environment.name from the file env-name
+    When the proxy sends any signal
+    Then its resource has service.name invoices-proxy, service.instance.id from POD_NAME and deployment.environment.name from the file
+    And service.version is still the proxy's own
+    And the hotline.requests counter carries the same resource
+
+  Scenario: Each exporter has its own labels
+    Given two exporters, the second with the resource deployment.environment.name staging
+    When a call ends
+    Then the first gets the proxy's own resource, with no deployment.environment.name
+    And the second gets deployment.environment.name staging
+
   Scenario: One log record per call
     When a call ends
     Then the receiver gets one OTLP log record with all of the record's attributes

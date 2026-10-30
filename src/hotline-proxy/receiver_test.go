@@ -30,8 +30,11 @@ import (
 // receivedRecord is one log record the fake OTLP receiver got.
 type receivedRecord struct {
 	eventName string
-	resource  map[string]any
-	attrs     map[string]any
+	// severityText and severityNumber are the record's level.
+	severityText   string
+	severityNumber int32
+	resource       map[string]any
+	attrs          map[string]any
 }
 
 // receivedCount is one data point of the hotline.requests counter.
@@ -39,6 +42,7 @@ type receivedCount struct {
 	unit        string
 	monotonic   bool
 	temporality metrics.AggregationTemporality
+	resource    map[string]any
 	attrs       map[string]any
 	value       int64
 }
@@ -280,9 +284,11 @@ func (r *receiver) Export(ctx context.Context, req *collogs.ExportLogsServiceReq
 		for _, sl := range rl.GetScopeLogs() {
 			for _, lr := range sl.GetLogRecords() {
 				r.records = append(r.records, receivedRecord{
-					eventName: lr.GetEventName(),
-					resource:  res,
-					attrs:     values(lr.GetAttributes()),
+					eventName:      lr.GetEventName(),
+					severityText:   lr.GetSeverityText(),
+					severityNumber: int32(lr.GetSeverityNumber()),
+					resource:       res,
+					attrs:          values(lr.GetAttributes()),
 				})
 			}
 		}
@@ -305,6 +311,7 @@ func (r *receiver) exportMetrics(ctx context.Context, req *colmetrics.ExportMetr
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, rm := range req.GetResourceMetrics() {
+		res := values(rm.GetResource().GetAttributes())
 		for _, sm := range rm.GetScopeMetrics() {
 			for _, m := range sm.GetMetrics() {
 				if m.GetHistogram() != nil || m.GetExponentialHistogram() != nil {
@@ -320,6 +327,7 @@ func (r *receiver) exportMetrics(ctx context.Context, req *colmetrics.ExportMetr
 						unit:        m.GetUnit(),
 						monotonic:   sum.GetIsMonotonic(),
 						temporality: sum.GetAggregationTemporality(),
+						resource:    res,
 						attrs:       values(dp.GetAttributes()),
 						value:       dp.GetAsInt(),
 					})

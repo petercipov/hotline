@@ -9,6 +9,8 @@ import (
 	"crypto/x509"
 	"errors"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -44,6 +46,11 @@ type Service struct {
 
 // Sink takes finished records and sends them to every destination.
 type Sink struct {
+	destinations []destination
+}
+
+// destination is one exporter's own pipeline, with its own resource.
+type destination struct {
 	logs     *sdklog.LoggerProvider
 	metrics  *sdkmetric.MeterProvider
 	logger   log.Logger
@@ -69,13 +76,7 @@ func counted(kv attribute.KeyValue) bool {
 // library never falls back to the OTEL_EXPORTER_OTLP_* environment
 // variables.
 func New(exporters []config.Exporter, roots *x509.CertPool, service Service, timing Timing, logger *slog.Logger) *Sink {
-	res := resource.NewSchemaless(
-		semconv.ServiceName("hotline-proxy"),
-		semconv.ServiceVersion(service.Version),
-		semconv.ServiceInstanceID(service.InstanceID),
-	)
-	logOptions := []sdklog.LoggerProviderOption{sdklog.WithResource(res)}
-	metricOptions := []sdkmetric.Option{sdkmetric.WithResource(res)}
+	s := &Sink{}
 	for _, e := range exporters {
 		var tlsConfig *tls.Config
 		if e.URL.Scheme == "https" {
@@ -95,19 +96,36 @@ func New(exporters []config.Exporter, roots *x509.CertPool, service Service, tim
 			senders = httpSenders
 		}
 		logs, metrics := senders(e, tlsConfig, timing, temporality)
-		logOptions = append(logOptions, sdklog.WithProcessor(newQueue(logs, e.Endpoint, e.QueueSize, timing.Interval, logger)))
-		metricOptions = append(metricOptions, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metrics,
-			sdkmetric.WithInterval(timing.Interval),
-			sdkmetric.WithTimeout(timing.Timeout))))
+		res := describe(service, e.Resource)
+		d := destination{
+			logs: sdklog.NewLoggerProvider(sdklog.WithResource(res),
+				sdklog.WithProcessor(newQueue(logs, e.Endpoint, e.QueueSize, timing.Interval, logger))),
+			metrics: sdkmetric.NewMeterProvider(sdkmetric.WithResource(res),
+				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metrics,
+					sdkmetric.WithInterval(timing.Interval),
+					sdkmetric.WithTimeout(timing.Timeout)))),
+		}
+		d.logger = d.logs.Logger("hotline-proxy")
+		// The name and unit are fixed and valid, so there is no error to handle.
+		d.requests, _ = d.metrics.Meter("hotline-proxy").Int64Counter("hotline.requests", metric.WithUnit("{request}"))
+		s.destinations = append(s.destinations, d)
 	}
-	s := &Sink{
-		logs:    sdklog.NewLoggerProvider(logOptions...),
-		metrics: sdkmetric.NewMeterProvider(metricOptions...),
-	}
-	s.logger = s.logs.Logger("hotline-proxy")
-	// The name and unit are fixed and valid, so there is no error to handle.
-	s.requests, _ = s.metrics.Meter("hotline-proxy").Int64Counter("hotline.requests", metric.WithUnit("{request}"))
 	return s
+}
+
+// describe is the resource one destination gets: the proxy's own labels,
+// with the config's labels on top. The config has refused service.version.
+func describe(service Service, labels map[string]string) *resource.Resource {
+	attrs := []attribute.KeyValue{
+		semconv.ServiceName("hotline-proxy"),
+		semconv.ServiceVersion(service.Version),
+		semconv.ServiceInstanceID(service.InstanceID),
+	}
+	for _, name := range slices.Sorted(maps.Keys(labels)) {
+		attrs = append(attrs, attribute.String(name, labels[name]))
+	}
+	// A later label with the same name wins.
+	return resource.NewSchemaless(attrs...)
 }
 
 // A busy destination is tried again, first after about a second, then at
@@ -200,6 +218,9 @@ func (s *Sink) Record(ctx context.Context, at time.Time, attrs []attribute.KeyVa
 	var r log.Record
 	r.SetEventName("hotline.request")
 	r.SetTimestamp(at)
+	severity := level(attrs)
+	r.SetSeverity(severity)
+	r.SetSeverityText(severity.String())
 	var counter []attribute.KeyValue
 	for _, kv := range attrs {
 		r.AddAttributes(kv)
@@ -207,11 +228,40 @@ func (s *Sink) Record(ctx context.Context, at time.Time, attrs []attribute.KeyVa
 			counter = append(counter, kv)
 		}
 	}
-	s.logger.Emit(ctx, r)
-	s.requests.Add(ctx, 1, metric.WithAttributes(counter...))
+	for _, d := range s.destinations {
+		d.logger.Emit(ctx, r)
+		d.requests.Add(ctx, 1, metric.WithAttributes(counter...))
+	}
+}
+
+// level is INFO unless something went wrong: WARN when the call or the reply
+// broke the spec or the vendor refused the call (a 4xx), ERROR when the
+// vendor failed (a 5xx) or the call failed in the proxy.
+func level(attrs []attribute.KeyValue) log.Severity {
+	severity := log.SeverityInfo
+	for _, kv := range attrs {
+		switch kv.Key {
+		case semconv.ErrorTypeKey:
+			return log.SeverityError
+		case semconv.HTTPResponseStatusCodeKey:
+			switch status := kv.Value.AsInt64(); {
+			case status >= 500:
+				return log.SeverityError
+			case status >= 400:
+				severity = log.SeverityWarn
+			}
+		case "hotline.schema.request.errors", "hotline.schema.response.errors":
+			severity = log.SeverityWarn
+		}
+	}
+	return severity
 }
 
 // Shutdown sends what is still queued, within the time ctx allows.
 func (s *Sink) Shutdown(ctx context.Context) error {
-	return errors.Join(s.logs.Shutdown(ctx), s.metrics.Shutdown(ctx))
+	var errs []error
+	for _, d := range s.destinations {
+		errs = append(errs, d.logs.Shutdown(ctx), d.metrics.Shutdown(ctx))
+	}
+	return errors.Join(errs...)
 }
