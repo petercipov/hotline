@@ -12,7 +12,7 @@ import (
 	"hotline-example/aws-sqs-invoices/internal/fakesqs"
 )
 
-const queue = "https://sqs.eu-west-1.amazonaws.com/123456789012/invoices"
+const queue = "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"
 
 var _ = Describe("The example program", func() {
 	var (
