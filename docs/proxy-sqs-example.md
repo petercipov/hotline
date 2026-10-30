@@ -21,7 +21,7 @@ A first proposal. Field names are open for Peter to change.
 ```json
 {
   "schemaVersion": 1,
-  "jobId": "5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10",
+  "eventId": "5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10",
   "orderId": "A-1001",
   "templateId": "invoice-standard-v2",
   "language": "en",
@@ -33,7 +33,7 @@ A first proposal. Field names are open for Peter to change.
 | Field | Required? | Rule | Why |
 |---|---|---|---|
 | `schemaVersion` | yes | whole number, exactly `1` | Lets the message change later without breaking old workers. |
-| `jobId` | yes | `uuid` | The worker uses it to notice a job it already did (SQS may deliver a message twice). |
+| `eventId` | yes | `uuid` | The ID of this event (Peter, 2026-10-30). The worker uses it to notice an event it already handled (SQS may deliver a message twice). |
 | `orderId` | yes | text like `A-1001`: a capital letter, a dash, digits | The order to make the invoice for. |
 | `templateId` | yes | text of lower-case letters, digits and dashes, such as `invoice-standard-v2` | Which template renders the PDF (Peter, 2026-10-30). The worker refuses a template it doesn't know; the schema only checks the shape. |
 | `language` | yes | one of `en`, `de`, `sk`, `cs` | The invoice's language. |
@@ -48,7 +48,7 @@ An SQS `SendMessage` body is JSON, but the message itself is a **string** inside
 
 ```json
 {"QueueUrl": "https://sqs.eu-west-1.amazonaws.com/123456789012/invoices",
- "MessageBody": "{\"schemaVersion\":1,\"jobId\":\"5f0c…\", …}"}
+ "MessageBody": "{\"schemaVersion\":1,\"eventId\":\"5f0c…\", …}"}
 ```
 
 So the check has to read the string as JSON, then check that against the job schema. OpenAPI 3.1 already has words for this, from JSON Schema: `contentMediaType` (what the string holds) and `contentSchema` (the schema for what it holds).
@@ -130,7 +130,7 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
       | a job whose orderId is a-1001               | body $.MessageBody.orderId pattern                       |
       | a job with no templateId                    | body $.MessageBody.templateId required                   |
       | a job whose templateId is Invoice Standard  | body $.MessageBody.templateId pattern                    |
-      | a job whose jobId is not a uuid             | body $.MessageBody.jobId format uuid                     |
+      | a job whose eventId is not a uuid           | body $.MessageBody.eventId format uuid                   |
       | a job in the language fr                    | body $.MessageBody.language enum en, de, sk, cs          |
       | a job with an extra field priority          | body $.MessageBody.priority additionalProperties         |
       | text that is not JSON                       | body $.MessageBody json                                  |
