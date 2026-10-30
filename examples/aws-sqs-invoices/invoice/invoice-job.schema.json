@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InvoiceJob",
+  "description": "Asks the worker to render the invoice PDF of one order. Version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "eventId", "orderId", "templateId", "language", "requestedAt"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "eventId": { "type": "string", "format": "uuid" },
+    "orderId": { "type": "string", "pattern": "^[A-Z]-[0-9]+$" },
+    "templateId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "language": { "type": "string", "enum": ["en", "de", "sk", "cs"] },
+    "requestedAt": { "type": "string", "format": "date-time" },
+    "sendTo": { "type": "string", "format": "email" }
+  }
+}

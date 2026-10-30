@@ -1,6 +1,6 @@
 # A Go app sending to AWS SQS through Hotline, with a checked message: requirements draft
 
-*Draft for Peter, 2026-10-30. Nothing here is agreed or built yet. It builds on [proxy-aws.md](proxy-aws.md) (agreed 2026-10-29, not built) and on the spec checks in [proxy-spec-checks.md](proxy-spec-checks.md) (built). Open questions are at the end, each with a recommendation.*
+*Draft for Peter, 2026-10-30. The example app is built; the proxy side is not agreed or built yet. It builds on [proxy-aws.md](proxy-aws.md) (agreed 2026-10-29, not built) and on the spec checks in [proxy-spec-checks.md](proxy-spec-checks.md) (built). Open questions are at the end, each with a recommendation.*
 
 ## What Peter asked for
 
@@ -137,12 +137,13 @@ This also builds what [proxy-aws.md](proxy-aws.md) agreed but did not build yet:
 
 ## The example app
 
-One Go program in its own folder and Go module, `examples/aws-sqs-invoices/`, so the proxy's module never depends on the AWS SDK (agreed 2026-10-29). Two commands:
+**Built** (Peter asked for it, 2026-10-30): [examples/aws-sqs-invoices](../examples/aws-sqs-invoices/README.md), its own Go module, so the proxy's module never depends on the AWS SDK. Three commands:
 
 - `request --order A-1001 --template invoice-standard-v2 --language en`: sends the invoice job to the queue.
-- `work --out ./invoices`: receives jobs, checks each one itself, writes `A-1001.pdf` to the folder, and deletes the message.
+- `send --body TEXT`: sends any text unchanged, to try Hotline's checks with a broken message.
+- `work --out ./invoices [--once]`: receives jobs, checks each one itself, writes `A-1001.pdf` to the folder, and deletes the message. A message it can't use stays on the queue, for the queue's dead letter queue.
 
-It sets up the SQS client exactly as the AWS setup guide says: the forward proxy set only on the SQS client, the HTTP client turning `https` into `http` after the SDK has signed, and the integration ID added by Go's proxy support. A `README.md` beside it shows how to run it against real AWS by hand.
+It sets up the SQS client exactly as the AWS setup guide says. Its own tests use a fake SQS that also plays the forward proxy, so they check what the app sends to Hotline. The end-to-end tests below, through the real proxy, come with the proxy changes.
 
 ## End-to-end tests
 

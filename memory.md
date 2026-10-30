@@ -11,6 +11,7 @@ Decisions already made, so a new session does not have to dig through old thread
 
 ## Code layout
 
+- Examples of apps using Hotline live in `examples/`, each its own Go module listed in `go.work`. The first is `examples/aws-sqs-invoices` (AWS SDK for Go v2, invoice PDF jobs over SQS); detail in [docs/proxy-sqs-example.md](docs/proxy-sqs-example.md) (Peter, 2026-10-30).
 - Stable vendor specs live in `specs/<vendor>/<api>/<vendor version>.openapi.yaml` (for example `specs/aws/sqs/2012-11-05.openapi.yaml`), the vendor's api only. Overlays are test or example specific and live with them, never in `specs/`. Rules: [specs/README.md](specs/README.md) (Peter, 2026-10-30).
 - The proxy is its own Go module, `hotline-proxy`, in `src/hotline-proxy/`: the `proxy` package at the top, then `cmd/` (the program), `features/`, `internal/` and `testdata/`. The metrics code stays in module `hotline`, in `src/hotline/metrics/`. Both are listed in `go.work` (Peter, 2026-10-30).
 
