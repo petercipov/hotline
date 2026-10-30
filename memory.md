@@ -7,6 +7,7 @@ Decisions already made, so a new session does not have to dig through old thread
 - How to test and the TDD loop: [CLAUDE.md](CLAUDE.md).
 - How to write, test and review proxy code in Go: the [`hotline-go-proxy` skill](.claude/skills/hotline-go-proxy/SKILL.md). It covers the system under test, testing only through the proxy's ways in and out, and no test-only code.
 - The proxy's spec and examples: `proxy-spec.md` and `proxy-example/` in the `hotline-strategic` repo.
+- What the proxy sends over OpenTelemetry, field by field: [docs/otel-export.md](docs/otel-export.md).
 
 ## Code layout
 
