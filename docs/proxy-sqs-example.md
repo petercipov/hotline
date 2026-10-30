@@ -68,29 +68,42 @@ Requirements:
 3. **The same in replies.** The worker's `ReceiveMessage` reply holds the messages in `Messages[].Body`; our spec marks those the same way, so a bad message is also reported when the worker receives it (`response body $.Messages[0].Body.orderId required`).
 4. **SQS's content type counts as JSON.** SQS sends `Content-Type: application/x-amz-json-1.0`. Today the proxy only reads `application/json` and `…+json`, so it would skip SQS bodies as `unsupported_content_type`. A spec that lists `application/x-amz-json-1.0` gets it read as JSON. (Only this exact AWS name, plus `1.1`, which other AWS services use.)
 
-### Which integration gets the job schema
+### Three integrations, three message schemas
 
-The job schema belongs to one app's use of SQS, not to SQS. The config already allows this without any change: two apis may name the same host when different integrations use them (`config.feature`, "The same host in two apis of different integrations").
+There will be three integrations, each with its own queue and its own message schema, all starting from the same SQS spec (Peter, 2026-10-30). The queues differ in the path of their queue URL: `https://sqs.eu-west-1.amazonaws.com/123456789012/invoices`, `…/123456789012/<second queue>`, and so on.
+
+One thing to know: with SQS's JSON protocol, every call goes to the path `/`. The queue URL is not in the call's path; it travels in the body, in the field `QueueUrl`. So the proxy cannot pick a route by queue, but the spec can check the field.
+
+Requirements:
+
+1. **One spec per integration.** Each is the full SQS spec with two things added: its own message schema on `MessageBody`, and its own queue URL on `QueueUrl` (an exact value, `const`). A message sent to the wrong queue is then reported as `body $.QueueUrl const`.
+2. **No config change.** The config already allows several apis on the same host, when different integrations use them (`config.feature`, "The same host in two apis of different integrations").
 
 ```yaml
 apis:
-  aws-sqs:                         # plain SQS, for any app
-    hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs.openapi.yaml
-    vendorTimeout: 25s             # above SQS's 20 second long polling
-  aws-sqs-invoices:                # SQS carrying the invoice jobs
+  aws-sqs-invoices:
     hosts: [sqs.eu-west-1.amazonaws.com]
     spec: ./specs/aws-sqs-invoices.openapi.yaml
+    vendorTimeout: 25s             # above SQS's 20 second long polling
+  aws-sqs-<second>:
+    hosts: [sqs.eu-west-1.amazonaws.com]
+    spec: ./specs/aws-sqs-<second>.openapi.yaml
+    vendorTimeout: 25s
+  aws-sqs-<third>:
+    hosts: [sqs.eu-west-1.amazonaws.com]
+    spec: ./specs/aws-sqs-<third>.openapi.yaml
     vendorTimeout: 25s
 
 integrations:
-  - id: invoice-shop
+  - id: invoices
     apis: [aws-sqs-invoices]
-  - id: invoice-worker
-    apis: [aws-sqs-invoices]
+  - id: <second>
+    apis: [aws-sqs-<second>]
+  - id: <third>
+    apis: [aws-sqs-<third>]
 ```
 
-`aws-sqs-invoices.openapi.yaml` is the full SQS spec with the job schema added to `MessageBody` (in `SendMessage`, `SendMessageBatch` and the `ReceiveMessage` reply). See question 2 for how the two files stay in step.
+The message schema and queue URL go into `MessageBody` and `QueueUrl` of `SendMessage`, `SendMessageBatch` (each entry) and the `ReceiveMessage` reply; `QueueUrl` also in every other action that names a queue. See question 2 for how the three files stay in step with the plain SQS spec.
 
 ## The complete SQS spec
 
@@ -135,6 +148,13 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
       | a job with an extra field priority          | body $.MessageBody.priority additionalProperties         |
       | text that is not JSON                       | body $.MessageBody json                                  |
 
+  Scenario: Each integration is checked against its own message and queue
+    Given the invoices integration and a second integration, each with its own SQS spec
+    When the second integration sends an invoice job to its own queue
+    Then the request results report the message against the second integration's schema
+    When the invoices integration sends an invoice job to the second integration's queue
+    Then the request results are body $.QueueUrl const
+
   Scenario: The plain SQS spec does not check the message
     Given the plain SQS spec
     When the app sends SendMessage with the message text that is not JSON
@@ -153,7 +173,7 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
 # end-to-end.feature
   Scenario: An invoice job goes through Hotline to SQS and back
     Given the fake SQS
-    And the hotline-proxy program runs with the integrations invoice-shop and invoice-worker
+    And the hotline-proxy program runs with the integration invoices, used by both the shop and the worker
     When the example app requests the invoice for order A-1001
     And the example app works through the queue
     Then the fake SQS got the job unchanged and its signature parts intact
@@ -169,8 +189,8 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
 ## Open questions, each with my recommendation
 
 1. **A fake SQS or real AWS for the tests?** I recommend a small fake SQS inside the end-to-end tests: it answers `SendMessage`, `ReceiveMessage` and `DeleteMessage` like SQS (including the MD5 hash of the message, which the SDK checks). Tests then run anywhere, offline, with no AWS account or cost. Running against real AWS stays a manual step in the example's README. (LocalStack, a local copy of AWS run in Docker, is the other choice, but it adds Docker to the tests.)
-2. **How does the job's spec stay in step with the plain SQS spec?** I recommend generating both: one small generator turns the Smithy model into `aws-sqs.openapi.yaml`, and, given the job schema file, also writes `aws-sqs-invoices.openapi.yaml`. A test fails when the committed files differ from what the generator makes. The other choice is letting the config add a schema to one field of a shared spec, which is a new config feature.
-3. **One job schema per integration, or per queue?** I recommend per integration for now (the setup above). If one integration sends different messages to different queues, the spec can choose the schema by `QueueUrl` later, using JSON Schema's `if`/`then`.
+2. **How do the three specs stay in step with the plain SQS spec?** I recommend generating them: one small generator turns the Smithy model into `aws-sqs.openapi.yaml`, and, for each integration, takes a small file with its queue URL and message schema and writes that integration's spec. A test fails when the committed files differ from what the generator makes. The other choice is letting the config add a schema to fields of a shared spec, which is a new config feature.
+3. **What are the other two messages, and should the example show all three?** I recommend the example app and its end-to-end tests cover the invoice integration fully, and `checks.feature` uses a second integration on the same host to prove each one gets only its own schema and queue. The other two message schemas can be added once you name them.
 4. **Where does the worker find the order and the template?** I recommend a small built-in list of made-up orders and two built-in templates in the example, so it needs no database or shop. The order's lines stay out of the message, which keeps the message small and the order data in one place.
 5. **Where does the PDF go?** I recommend a local folder in this step. Storing it in S3 (and its calls going through Hotline with an S3 spec) is a later step. The PDF is a plain one-page file written with a small PDF library in the example's own module.
 6. **Should the worker also refuse bad messages itself?** I recommend yes: Hotline only reports, it never blocks, so the worker checks the message against the same schema and moves a bad one aside (to a "dead letter" queue, the usual SQS place for messages that cannot be handled) instead of retrying it forever.
