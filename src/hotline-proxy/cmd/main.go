@@ -99,7 +99,7 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 		return exitFail
 	}
 	if command == "validate" {
-		if err := proxy.Validate(*configPath, proxy.SystemClock{}); err != nil {
+		if err := proxy.Validate(*configPath, proxy.SystemClock{}, os.LookupEnv); err != nil {
 			logProblems(logger, "config refused", err)
 			return exitFail
 		}
@@ -117,6 +117,7 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 		ExportTimeout:  10 * time.Second,
 		Version:        version(),
 		InstanceID:     instanceID(),
+		LookupEnv:      os.LookupEnv,
 	}, *shutdownTimeout, signals)
 }
 
@@ -150,12 +151,12 @@ func serve(logger *slog.Logger, o proxy.Options, timeout time.Duration, signals 
 }
 
 // trustPool is the system's trusted issuers plus those in the trust file,
-// or nil, which means the system's own, when there is no trust file.
+// if there is one.
 func trustPool(path string) (*x509.CertPool, error) {
-	if path == "" {
-		return nil, nil //nolint:nilnil // nil means the system's own issuers
-	}
 	pool, poolErr := x509.SystemCertPool()
+	if path == "" {
+		return pool, poolErr
+	}
 	data, readErr := os.ReadFile(path) //nolint:gosec // the operator chooses the trust file
 	if err := errors.Join(poolErr, readErr); err != nil {
 		return nil, fmt.Errorf("%w %s: %w", errTrustFile, path, err)

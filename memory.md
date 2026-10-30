@@ -37,6 +37,7 @@ The proxy is built in small slices, tests first.
    - the transparent redirect ingress: built, as a Host header call with no proxy code change. Detail: [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redirect.md);
    - AWS, starting with SQS: signed calls stay valid, actions as routes named by a header. Agreed, not built. Detail: [docs/proxy-aws.md](docs/proxy-aws.md);
    - the CONNECT ingress, with interception: the proxy poses as the vendor inside the tunnel with certificates signed by the customer's issuer. Built. Detail: [docs/proxy-connect.md](docs/proxy-connect.md);
+   - OTLP over HTTP, and TLS, login headers and gzip for both gRPC and HTTP: built. Detail: [docs/proxy-otlp-protocols.md](docs/proxy-otlp-protocols.md);
    - config reload without a restart;
    - the load test, with k6.
 

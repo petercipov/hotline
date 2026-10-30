@@ -12,6 +12,11 @@ exporters:                        # one or more; each gets the same data
   - otlp:
       endpoint: otel-collector.observability:4317     # the customer's own collector
       temporality: delta
+  # - otlp:                      # a hosted collector over HTTP, with TLS and a login token
+  #     protocol: http/protobuf   # grpc (default) or http/protobuf
+  #     endpoint: https://otel.example.com:4318
+  #     headers:
+  #       Authorization: { file: /etc/hotline/otlp/token }
 
 telemetry:                        # the proxy's own health data, kept separate
   otlp:

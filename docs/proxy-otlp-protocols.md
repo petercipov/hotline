@@ -1,0 +1,49 @@
+# Sending OpenTelemetry data over gRPC or HTTP
+
+*Agreed with Peter and built, 2026-10-30. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo.*
+
+OTLP is the OpenTelemetry protocol: the standard way to send telemetry to a collector, a server that receives it and passes it on. Before this change the proxy sent OTLP only over plain gRPC, with no TLS and no login. Many hosted collectors, and many company firewalls, take only HTTP, and nearly all of them need TLS and a login token.
+
+## Config
+
+```yaml
+exporters:
+  - otlp:                                   # gRPC, plain, as before
+      endpoint: hotline-control-plane.hotline:4317
+  - otlp:                                   # gRPC with TLS and a login token
+      endpoint: https://otel.example.com:4317
+      headers:
+        Authorization: { file: /etc/hotline/otlp/token }
+  - otlp:                                   # HTTP with TLS, a login token and mutual TLS
+      protocol: http/protobuf
+      endpoint: https://otel.example.com:4318/otlp
+      headers:
+        Authorization: { env: OTLP_TOKEN }
+        X-Tenant: shop-a
+      tls:
+        ca: /etc/hotline/otlp/ca.crt
+        cert: /etc/hotline/otlp/client.crt
+        key: /etc/hotline/otlp/client.key
+      compression: none
+```
+
+## Decisions (Peter, 2026-10-30)
+
+1. **`protocol`** is `grpc` (the default, so old configs keep working) or `http/protobuf`, the names the OpenTelemetry standard uses. JSON over HTTP is not offered: the Go library only sends protobuf (a compact binary format), and every collector that takes HTTP takes protobuf.
+2. **Endpoints.** Over HTTP, a URL with `http://` or `https://`; the proxy adds `/v1/logs` and `/v1/metrics` after its path, so `/otlp` sends to `/otlp/v1/logs`. Over gRPC, `host:port` (plain) or a URL with no path. A user name or password in the URL, or a query, is refused: login goes in `headers`.
+3. **TLS follows the scheme**, for both protocols: `https://` means TLS, checked against the system's issuers, the `--trust-file` and `tls.ca`. `tls.cert` with `tls.key` is a client certificate for mutual TLS (both sides show a certificate). `tls` on a plain endpoint is refused.
+4. **Login headers** are the same for both protocols: gRPC runs on HTTP/2, so its metadata are ordinary headers. A value is written out, or read from `{ file: path }` (preferred; a line break at the end is dropped) or `{ env: NAME }`, like `fingerprintKey`. A secret value never reaches a log line or a config message. Files are read once at start.
+5. **Compression** is gzip unless `compression: none`, for both protocols: records are wordy and hosted collectors charge by the byte.
+6. **Retries.** A busy collector (HTTP `429`, `502`, `503`, `504`, gRPC `UNAVAILABLE` and the like, or a lost connection) is tried again within the send's 10 seconds: after about a second at first, then at most every 5 seconds, honoring `Retry-After`. The library's own default waited 5 seconds first, which left room for one retry only. Any other refusal loses the batch.
+7. **Lost batches are logged** like a full queue: a warning line with the endpoint, the count and the error, at most once a minute per destination and always at shutdown. Before, a refused batch was lost without a word.
+8. **Only the config says how data is sent.** The standard `OTEL_EXPORTER_OTLP_*` environment variables are ignored: the proxy sets every option itself, so the library never falls back to them. The usual `HTTPS_PROXY` and `NO_PROXY` still apply, as for any Go program.
+9. **Library.** `otlploghttp` and `otlpmetrichttp`, from the same OpenTelemetry Go project and Apache 2.0 license as the gRPC exporters. No new outside project.
+
+## Tests
+
+`features/export-protocols.feature` drives the proxy against a fake receiver with a gRPC side and an HTTP side, plain or over TLS, which remembers paths, headers, compression and client certificates. The new config problems are rows in the broken configs table of `features/config.feature`. The end-to-end tests still send over plain gRPC only.
+
+## Later
+
+- The `telemetry` section takes the same fields once the proxy's own health data is built.
+- Reading a header secret again when its file changes, with config reload.

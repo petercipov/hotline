@@ -1,7 +1,13 @@
 package proxy_test
 
 import (
+	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"io"
+	"net"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +17,14 @@ import (
 	common "go.opentelemetry.io/proto/otlp/common/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
+	// gzip lets the gRPC side take gzipped exports.
+	_ "google.golang.org/grpc/encoding/gzip"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/stats"
+	"google.golang.org/protobuf/proto"
 )
 
 // receivedRecord is one log record the fake OTLP receiver got.
@@ -29,11 +43,45 @@ type receivedCount struct {
 	value       int64
 }
 
-// receiver is a fake OTLP destination on a local port.
+// seenRequest is one export request the receiver got, of either kind.
+type seenRequest struct {
+	logs        bool
+	path        string
+	contentType string
+	// encoding is gzip or empty.
+	encoding      string
+	authorization []string
+	// header holds every header of an HTTP request.
+	header     http.Header
+	tls        bool
+	clientCert bool
+}
+
+// answer is what the HTTP side answers a log export with, instead of
+// taking it.
+type answer struct {
+	status     int
+	retryAfter string
+}
+
+// receiverSetup says how a fake receiver listens.
+type receiverSetup struct {
+	http bool
+	// path goes in front of /v1/logs and /v1/metrics.
+	path string
+	// tls, when set, makes the receiver accept only TLS, with this setup.
+	tls *tls.Config
+}
+
+// receiver is a fake OTLP destination on a local port. It has a gRPC side
+// or an HTTP side.
 type receiver struct {
 	collogs.UnimplementedLogsServiceServer
 
-	server   *grpc.Server
+	server     *grpc.Server
+	httpServer *http.Server
+	http       bool
+	// endpoint is how the config names the receiver.
 	endpoint string
 
 	mu          sync.Mutex
@@ -48,17 +96,156 @@ type receiver struct {
 	hold chan struct{}
 	// delay slows every export down.
 	delay time.Duration
+	// seen are the export requests, in the order they came.
+	seen []seenRequest
+	// answers are given to the first log exports over HTTP, one each.
+	answers []answer
+	// encodings are the compression of each gRPC export, as the gRPC
+	// side saw it.
+	encodings []string
 }
 
 func newReceiver() *receiver {
+	return newReceiverWith(receiverSetup{})
+}
+
+func newReceiverWith(setup receiverSetup) *receiver {
 	listener := listenLocal()
-	r := &receiver{server: grpc.NewServer(), endpoint: listener.Addr().String()}
+	_, port, _ := net.SplitHostPort(listener.Addr().String())
+	r := &receiver{http: setup.http, endpoint: listener.Addr().String()}
+	if setup.tls != nil {
+		r.endpoint = "https://localhost:" + port
+	}
+	if setup.http {
+		if setup.tls == nil {
+			r.endpoint = "http://" + r.endpoint
+		}
+		r.endpoint += setup.path
+		r.httpServer = &http.Server{Handler: r, TLSConfig: setup.tls, ReadHeaderTimeout: 5 * time.Second}
+		if setup.tls != nil {
+			listener = tls.NewListener(listener, setup.tls)
+		}
+		go func() { _ = r.httpServer.Serve(listener) }()
+		return r
+	}
+	options := []grpc.ServerOption{grpc.StatsHandler(encodingHandler{r})}
+	if setup.tls != nil {
+		options = append(options, grpc.Creds(credentials.NewTLS(setup.tls)))
+	}
+	r.server = grpc.NewServer(options...)
 	collogs.RegisterLogsServiceServer(r.server, r)
 	colmetrics.RegisterMetricsServiceServer(r.server, metricsService{receiver: r})
 	coltrace.RegisterTraceServiceServer(r.server, traceService{receiver: r})
 	go func() { _ = r.server.Serve(listener) }()
 	return r
 }
+
+// ServeHTTP is the HTTP side: protobuf exports on /v1/logs and /v1/metrics,
+// after any path the endpoint has.
+func (r *receiver) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	logs := strings.HasSuffix(req.URL.Path, "/v1/logs")
+	r.mu.Lock()
+	r.seen = append(r.seen, seenRequest{
+		logs:          logs,
+		path:          req.URL.Path,
+		contentType:   req.Header.Get("Content-Type"),
+		encoding:      req.Header.Get("Content-Encoding"),
+		authorization: req.Header.Values("Authorization"),
+		header:        req.Header.Clone(),
+		tls:           req.TLS != nil,
+		clientCert:    req.TLS != nil && len(req.TLS.PeerCertificates) > 0,
+	})
+	var refuse *answer
+	if logs && len(r.answers) > 0 {
+		refuse = &r.answers[0]
+		r.answers = r.answers[1:]
+	}
+	r.mu.Unlock()
+	if refuse != nil {
+		if refuse.retryAfter != "" {
+			rw.Header().Set("Retry-After", refuse.retryAfter)
+		}
+		rw.WriteHeader(refuse.status)
+		return
+	}
+	body := io.Reader(req.Body)
+	if req.Header.Get("Content-Encoding") == "gzip" {
+		unzipped, err := gzip.NewReader(req.Body)
+		if err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		body = unzipped
+	}
+	data, _ := io.ReadAll(body)
+	var reply proto.Message
+	switch {
+	case logs:
+		in := &collogs.ExportLogsServiceRequest{}
+		if proto.Unmarshal(data, in) != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		reply, _ = r.Export(req.Context(), in)
+	case strings.HasSuffix(req.URL.Path, "/v1/metrics"):
+		in := &colmetrics.ExportMetricsServiceRequest{}
+		if proto.Unmarshal(data, in) != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		reply, _ = r.exportMetrics(req.Context(), in)
+	default:
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+	out, _ := proto.Marshal(reply)
+	rw.Header().Set("Content-Type", "application/x-protobuf")
+	_, _ = rw.Write(out)
+}
+
+// sawGRPC remembers a gRPC export request.
+func (r *receiver) sawGRPC(ctx context.Context, logs bool) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	seen := seenRequest{logs: logs, authorization: md.Get("authorization")}
+	if p, ok := peer.FromContext(ctx); ok {
+		if info, ok := p.AuthInfo.(credentials.TLSInfo); ok {
+			seen.tls = true
+			seen.clientCert = len(info.State.PeerCertificates) > 0
+		}
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.seen = append(r.seen, seen)
+}
+
+func (r *receiver) requests() []seenRequest {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	seen := append([]seenRequest(nil), r.seen...)
+	for i := range seen {
+		if !r.http && i < len(r.encodings) {
+			seen[i].encoding = r.encodings[i]
+		}
+	}
+	return seen
+}
+
+// encodingHandler sees the compression of each gRPC export.
+type encodingHandler struct{ *receiver }
+
+func (encodingHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Context { return ctx }
+
+func (h encodingHandler) HandleRPC(_ context.Context, s stats.RPCStats) {
+	if in, ok := s.(*stats.InHeader); ok {
+		h.mu.Lock()
+		h.encodings = append(h.encodings, in.Compression)
+		h.mu.Unlock()
+	}
+}
+
+func (encodingHandler) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context { return ctx }
+
+func (encodingHandler) HandleConn(context.Context, stats.ConnStats) {}
 
 func (r *receiver) wait(ctx context.Context) {
 	r.mu.Lock()
@@ -77,6 +264,9 @@ func (r *receiver) wait(ctx context.Context) {
 }
 
 func (r *receiver) Export(ctx context.Context, req *collogs.ExportLogsServiceRequest) (*collogs.ExportLogsServiceResponse, error) {
+	if !r.http {
+		r.sawGRPC(ctx, true)
+	}
 	r.mu.Lock()
 	if r.hold != nil {
 		r.logsHeld++
@@ -106,6 +296,7 @@ type metricsService struct {
 }
 
 func (m metricsService) Export(ctx context.Context, req *colmetrics.ExportMetricsServiceRequest) (*colmetrics.ExportMetricsServiceResponse, error) {
+	m.sawGRPC(ctx, false)
 	return m.exportMetrics(ctx, req)
 }
 
@@ -194,7 +385,12 @@ func (r *receiver) got() ([]receivedRecord, []receivedCount) {
 
 func (r *receiver) stop() {
 	r.release()
-	r.server.Stop()
+	if r.server != nil {
+		r.server.Stop()
+	}
+	if r.httpServer != nil {
+		_ = r.httpServer.Close()
+	}
 }
 
 func values(kvs []*common.KeyValue) map[string]any {

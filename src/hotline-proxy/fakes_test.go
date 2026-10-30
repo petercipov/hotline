@@ -48,7 +48,7 @@ func newIssuer() *issuer {
 	return &issuer{cert: cert, key: key, pool: pool}
 }
 
-// leaf makes a server certificate for host. With signer nil it signs
+// leaf makes a certificate for host, for a server or a client. With signer nil it signs
 // itself, so no issuer vouches for it.
 func (i *issuer) leaf(host string, notAfter time.Time, selfSigned bool) tls.Certificate {
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -59,7 +59,7 @@ func (i *issuer) leaf(host string, notAfter time.Time, selfSigned bool) tls.Cert
 		NotBefore:    time.Now().Add(-48 * time.Hour),
 		NotAfter:     notAfter,
 		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 	parent, signer := i.cert, i.key
 	if selfSigned {

@@ -15,11 +15,12 @@ It sends no traces and none of its own health data yet.
 
 | What | Today |
 |---|---|
-| Protocol | OTLP over gRPC only. No OTLP over HTTP. |
-| Connection to the collector | Plain, with no TLS and no login headers. |
+| Protocol | OTLP over gRPC (the default) or over HTTP as protobuf (`protocol: http/protobuf`), to `/v1/logs` and `/v1/metrics`. Detail: [proxy-otlp-protocols.md](proxy-otlp-protocols.md). |
+| Connection to the collector | Plain, or TLS with an `https://` endpoint, with `tls.ca` and a client certificate if needed. Login headers from `headers`. |
+| Compression | gzip, unless `compression: none`. |
 | Destinations | Every entry under `exporters` gets the same data. Each has its own queue, so one that is down never holds up the others or the calls. |
 | How often | Every second, or sooner once 512 records are waiting. Fixed in the program, not in the config. |
-| Time limit per send | 10 seconds, retries included. Fixed in the program. |
+| Time limit per send | 10 seconds, retries included. Fixed in the program. A busy collector is tried again after about a second at first, then at most every 5 seconds. A send the collector refuses loses its records, counted in a warning line like a full queue. |
 | Records per send | At most 512. |
 | Queue size | 10 000 records per destination, or `queueSize`. When full, the oldest record is dropped, and a warning log line gives the count, at most once a minute per destination and always once at shutdown. |
 | At shutdown | Whatever is queued is sent first, within the shutdown time limit. |
@@ -36,6 +37,11 @@ exporters:
       endpoint: otel-collector.observability:4317
       temporality: delta
       queueSize: 10000
+  - otlp:
+      protocol: http/protobuf
+      endpoint: https://otel.example.com:4318
+      headers:
+        Authorization: { file: /etc/hotline/otlp/token }
 ```
 
 ## Resource
@@ -180,9 +186,8 @@ There is no latency histogram and no pass or fail count: the control plane build
 
 ## Where the spec and the code differ
 
-1. **Connection to the collector.** The code always uses plain gRPC, with no TLS and no login headers. The spec does not say. A customer's own collector outside the cluster will likely need TLS.
-2. **Error type examples.** The spec's table gives `timeout` and `dns` as examples; the real values are longer, such as `dns_timeout` (table above).
-3. **Minimal record and status code.** The spec says every minimal record has `http.response.status_code`. A failed tunnel's record has none.
-4. **`hotline.schema.skipped=overloaded`.** In the spec's list, never set by the code.
-5. **Send timing.** One second and ten seconds are fixed in the program; the spec does not mention them and they are not in the config.
-6. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces, health data to `telemetry`, and body fingerprints.
+1. **Error type examples.** The spec's table gives `timeout` and `dns` as examples; the real values are longer, such as `dns_timeout` (table above).
+2. **Minimal record and status code.** The spec says every minimal record has `http.response.status_code`. A failed tunnel's record has none.
+3. **`hotline.schema.skipped=overloaded`.** In the spec's list, never set by the code.
+4. **Send timing.** One second and ten seconds are fixed in the program; the spec does not mention them and they are not in the config.
+5. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces, health data to `telemetry`, and body fingerprints.
