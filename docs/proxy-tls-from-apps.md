@@ -34,7 +34,7 @@ This feature encrypts the first connection. The app opens a TLS connection (an e
 5. **Client certificates (mutual TLS, where the proxy also checks a certificate from the app)** (Peter, 2026-10-28). Not in this slice. It belongs with caller authentication, which the spec puts in "later". The demo shows it is easy to add (`clientCA` file) when we get there. Peter said on 2026-10-05 it must be supported eventually, so this only orders the work.
 6. **TLS versions and ciphers** (Peter, 2026-10-28). TLS 1.2 and 1.3 only, with Go's safe defaults for ciphers. No config options for them.
 7. **HTTP/2 over TLS** (Peter, 2026-10-28). In this slice the proxy offers only HTTP/1.1 during the handshake, so clients fall back to it and every call works. Over HTTP/2 there is no full address in a request line, so those calls would need the Host header ingress, which is not built yet. HTTP/2 over TLS is switched on together with the Host header ingress (built 2026-10-29, see `proxy-host-header.md`).
-8. **What the record says** (Peter, 2026-10-28). No new record field. The port is all TLS or all plain, so a field on each call would repeat one fact. Whether a proxy uses TLS can go once per proxy in its own health data later.
+8. **What the record says** (Peter, 2026-10-28). No new record field. The port is all TLS or all plain, so a field on each call would repeat one fact. Whether a proxy uses TLS can go once per proxy in its own health data later. Changed 2026-10-29: how long the TLS setup took is recorded, as `hotline.timing.app_tls` on the first call of each connection (see [proxy-connect.md](proxy-connect.md)).
 9. **Errors** (Peter, 2026-10-28).
    - Certificate or key missing, unreadable, not matching each other, or already expired at start: the proxy refuses to start and exits with 1, and the log line says why. `validate` reports the same. Starting while "not ready", falling back to plain HTTP, and making our own certificate were all ruled out.
    - A failed handshake from an app (it doesn't trust the proxy, sends plain HTTP, or uses an old TLS version): no request was read, so there is no record and no `Proxy-Status`. A debug log line now, and a count in the proxy's own health data once that exists. Go answers a plain HTTP request on a TLS port with a short `400` by itself; we keep that.
@@ -56,4 +56,4 @@ This feature encrypts the first connection. The app opens a TLS connection (an e
 
 ## Not in this slice
 
-CONNECT and interception; client certificates; a record field saying the app used TLS; the certificate expiry warning; a second listener for plain and TLS at once; certificates from a secrets manager.
+CONNECT and interception (built later, see [proxy-connect.md](proxy-connect.md)); client certificates; a record field saying the app used TLS; the certificate expiry warning; a second listener for plain and TLS at once; certificates from a secrets manager.

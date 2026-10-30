@@ -22,7 +22,9 @@ Feature: Finding the ingress
     When an app sends "PUT https://api.talon.one/v2/x" with the header "Host: other.example"
     Then the vendor is api.talon.one
 
-  Scenario: CONNECT is not an ingress
+  Scenario: Without listen.connect, CONNECT is not an ingress
+    The CONNECT ingress needs an issuer to sign the certificates it shows
+    apps (see connect.feature).
     Given the proxy is running
     When an app sends "CONNECT api.stripe.com:443"
     Then the proxy answers 501 Not Implemented with a Proxy-Status header

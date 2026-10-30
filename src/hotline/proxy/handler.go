@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -23,17 +24,25 @@ import (
 	"hotline/proxy/internal/spec"
 )
 
-// handler serves the proxy port. It knows three ingresses: the forward
+// handler serves the proxy port. It knows four ingresses: the forward
 // proxy, where the app puts the full vendor address in the request line;
 // the vendor URL in path, where the app puts it after the proxy's own
-// address; and the Host header, where the app names only the vendor's host.
+// address; the Host header, where the app names only the vendor's host;
+// and CONNECT, where the app opens a tunnel to the vendor's host and the
+// proxy poses as the vendor inside it.
 type handler struct {
 	cfg       *config.Config
 	clock     Clock
+	logger    *slog.Logger
 	sink      *export.Sink
 	transport *http.Transport
 	// internal is the transport for calls that may reach internal IPs.
 	internal *http.Transport
+	// intercept makes the certificates shown inside tunnels; nil when
+	// CONNECT is not an ingress.
+	intercept *interceptor
+	// tunnels takes each tunnel once it is set up.
+	tunnels *tunnels
 	// calls counts calls in flight, including upgraded ones, which the
 	// server stops tracking once they take over the connection.
 	calls sync.WaitGroup
@@ -43,13 +52,27 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.calls.Add(1)
 	defer h.calls.Done()
 	start := h.clock.Now()
-	ingress, target, status := findIngress(r)
+	a := appConnOf(r)
+	var ingress string
+	var target *url.URL
+	var status int
+	id := integrationID(r.Header)
+	switch {
+	case a != nil && a.tunnel != nil:
+		// The CONNECT carried the ID for every call in its tunnel.
+		ingress, id = "connect", a.tunnel.id
+		target, status = a.tunnel.find(r, a)
+	case r.Method == http.MethodConnect && h.intercept != nil:
+		h.connect(w, r, start)
+		return
+	default:
+		ingress, target, status = findIngress(r)
+	}
 	if status != 0 {
 		refuse(w, status)
-		h.refused(r, start, ingress, target, status)
+		h.refused(r, start, ingress, id, target, status)
 		return
 	}
-	id := integrationID(r.Header)
 	host := strings.ToLower(target.Hostname())
 	api := h.cfg.API(id, host)
 	settings := h.cfg.NotPassed
@@ -80,6 +103,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		transport: transport,
 		reqBody:   &tap{ReadCloser: r.Body, limit: keepFor(api)},
 	}
+	c.appTLS, c.appTimed = a.handshakeTime()
 	r.Body = c.reqBody
 	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
 	defer cancel()
@@ -148,7 +172,8 @@ func (a *toApp) Unwrap() http.ResponseWriter { return a.ResponseWriter }
 func findIngress(r *http.Request) (string, *url.URL, int) {
 	switch {
 	case r.Method == http.MethodConnect:
-		// Not an ingress: the app would encrypt with the vendor itself.
+		// Not an ingress without listen.connect: the app would encrypt
+		// with the vendor itself.
 		return "", &url.URL{Host: r.Host}, http.StatusNotImplemented
 	case r.URL.IsAbs():
 		if r.URL.Scheme != "http" && r.URL.Scheme != "https" || r.URL.Hostname() == "" {
@@ -246,6 +271,10 @@ type call struct {
 	port    string
 	in      *http.Request
 	timeout time.Duration
+	// appTLS is how long setting up TLS with the app took, when this is
+	// the first call on its connection and appTimed is set.
+	appTLS   time.Duration
+	appTimed bool
 	// transport makes the vendor call.
 	transport *http.Transport
 	cancel    context.CancelFunc

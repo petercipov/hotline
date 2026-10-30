@@ -50,8 +50,8 @@ func (c *call) finish() {
 
 // refused records a request the proxy read but did not forward, with a
 // minimal record. The vendor host is in it only when the request named one.
-func (h *handler) refused(r *http.Request, start time.Time, ingress string, target *url.URL, status int) {
-	attrs := []attribute.KeyValue{attribute.String("hotline.integration.id", orNotPassed(integrationID(r.Header)))}
+func (h *handler) refused(r *http.Request, start time.Time, ingress, id string, target *url.URL, status int) {
+	attrs := []attribute.KeyValue{attribute.String("hotline.integration.id", orNotPassed(id))}
 	if ingress != "" {
 		attrs = append(attrs, attribute.String("hotline.ingress", ingress))
 	}
@@ -83,6 +83,9 @@ func (c *call) timings(end time.Time) []attribute.KeyValue {
 		if t := c.times[p]; !t[1].IsZero() {
 			attrs = append(attrs, attribute.Float64("hotline.timing."+string(p), seconds(t[0], t[1])))
 		}
+	}
+	if c.appTimed {
+		attrs = append(attrs, attribute.Float64("hotline.timing.app_tls", c.appTLS.Seconds()))
 	}
 	if !c.firstByte.IsZero() {
 		attrs = append(attrs, attribute.Float64("hotline.timing.first_byte", seconds(c.start, c.firstByte)))

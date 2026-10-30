@@ -70,16 +70,20 @@ type Options struct {
 
 // Proxy is a running proxy.
 type Proxy struct {
-	server     *http.Server
-	handler    *handler
-	transports []*http.Transport
-	sink       *export.Sink
-	served     chan struct{}
+	server *http.Server
+	// tunnelServer serves the calls inside tunnels opened by CONNECT.
+	tunnelServer *http.Server
+	handler      *handler
+	transports   []*http.Transport
+	sink         *export.Sink
+	served       chan struct{}
+	tunnelServed chan struct{}
 }
 
 // Start loads the config, listens on its proxy address and serves calls
 // until Shutdown. A config with problems is refused with all of them listed.
-// With listen.tls set, the proxy port accepts only TLS.
+// With listen.tls set, the proxy port accepts only TLS. With listen.connect
+// set, CONNECT is an ingress.
 func Start(ctx context.Context, o Options) (*Proxy, error) {
 	cfg, err := config.Load(o.ConfigPath, o.Clock.Now())
 	if err != nil {
@@ -95,40 +99,57 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		return nil, errors.Join(err, listener.Close())
 	}
 	h := &handler{
-		cfg:   cfg,
-		clock: o.Clock,
-		sink:  sink,
+		cfg:    cfg,
+		clock:  o.Clock,
+		logger: o.Logger,
+		sink:   sink,
+	}
+	if cfg.Connect != nil {
+		h.intercept = newInterceptor(cfg.Connect, o.Clock, o.Logger)
 	}
 	// Calls that may reach internal IPs get their own connections, so a
 	// connection opened for them is never reused for a call that may not.
 	h.transport = newTransport(o, false)
 	h.internal = newTransport(o, true)
-	// HTTP/1.1, and HTTP/2 over TLS or plain from the first byte (prior
-	// knowledge). The older Upgrade: h2c handshake is not offered.
+	// HTTP/1.1, and HTTP/2 from the first byte (prior knowledge), also
+	// after TLS, which the proxy sets up itself. The older Upgrade: h2c
+	// handshake is not offered.
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
 	protocols.SetHTTP2(true)
 	protocols.SetUnencryptedHTTP2(true)
-	p := &Proxy{
-		handler: h,
-		server: &http.Server{
+	h.tunnels = newTunnels(listener)
+	newServer := func() *http.Server {
+		return &http.Server{
 			Handler:           h,
 			Protocols:         protocols,
 			ReadHeaderTimeout: 30 * time.Second,
 			ErrorLog:          log.New(serverLog{logger: o.Logger}, "", 0),
-		},
-		transports: []*http.Transport{h.transport, h.internal},
-		sink:       sink,
-		served:     make(chan struct{}),
+			ConnContext:       connContext,
+		}
 	}
-	serve := p.server.Serve
+	p := &Proxy{
+		handler:      h,
+		server:       newServer(),
+		tunnelServer: newServer(),
+		transports:   []*http.Transport{h.transport, h.internal},
+		sink:         sink,
+		served:       make(chan struct{}),
+		tunnelServed: make(chan struct{}),
+	}
+	port := listener
 	if cfg.TLS != nil {
-		p.server.TLSConfig = newAppCert(cfg.TLS, o.Clock, o.Logger).tlsConfig()
-		serve = func(l net.Listener) error { return p.server.ServeTLS(tlsOnlyListener{Listener: l}, "", "") }
+		// The proxy sets up TLS itself, so the server sees plain
+		// connections.
+		port = tlsOnlyListener{Listener: listener, config: newAppCert(cfg.TLS, o.Clock, o.Logger).tlsConfig(), clock: o.Clock, logger: o.Logger}
 	}
 	go func() {
 		defer close(p.served)
-		_ = serve(listener)
+		_ = p.server.Serve(port)
+	}()
+	go func() {
+		defer close(p.tunnelServed)
+		_ = p.tunnelServer.Serve(h.tunnels)
 	}()
 	for _, w := range cfg.Warnings {
 		o.Logger.Warn("config setting ignored", "reason", w)
@@ -162,6 +183,9 @@ func Validate(configPath string, clock Clock) error {
 func (p *Proxy) Shutdown(ctx context.Context) error {
 	err := p.server.Shutdown(ctx)
 	<-p.served
+	// Tunnels still being set up are cut short.
+	err = errors.Join(err, p.tunnelServer.Shutdown(ctx))
+	<-p.tunnelServed
 	finished := make(chan struct{})
 	go func() {
 		p.handler.calls.Wait()
