@@ -76,22 +76,26 @@ One thing to know: with SQS's JSON protocol, every call goes to the path `/`. Th
 
 Requirements:
 
-1. **One shared SQS spec, plus a small overlay per integration** (Peter, 2026-10-30). An overlay is a small file in the official OpenAPI Overlay 1.0 format that says "in this spec, at this spot, add or change this". Overlays are worked out in their own step, before this one. Each integration's overlay adds two things: its own message schema on `MessageBody`, and its own queue URL on `QueueUrl` (an exact value, `const`). A message sent to the wrong queue is then reported as `body $.QueueUrl const`.
-2. **No config change.** The config already allows several apis on the same host, when different integrations use them (`config.feature`, "The same host in two apis of different integrations").
+1. **One shared SQS spec, plus one overlay per queue** (Peter, 2026-10-30). Overlays are built (pull request #35, [proxy-overlays.md](proxy-overlays.md)). An overlay is a short file in the official OpenAPI Overlay 1.1 format; each of its actions says "at this spot in the spec, change this". Each queue's overlay adds two things: its own message schema on `MessageBody`, and its own queue URL on `QueueUrl` (an exact value, `const`). A message sent to the wrong queue is then reported as `body $.QueueUrl const`.
+2. **Where the overlay changes the spec.** `MessageBody` and `QueueUrl` in `SendMessage`, in each entry of `SendMessageBatch`, and `Body` in each message of the `ReceiveMessage` reply; `QueueUrl` also in every other action that names a queue (`ReceiveMessage`, `DeleteMessage`, and so on).
+3. **The overlays are written by hand and checked by a test.** Each one is short. The `hotline-proxy overlay` command can also make one from the shared spec and a hand-edited copy. A test loads the example config with `validate`, so an overlay that no longer fits the shared spec (a warning) fails the test.
 
 ```yaml
 apis:
   aws-sqs-invoices:
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs-invoices.openapi.yaml
+    spec: ./specs/aws-sqs.openapi.yaml
+    overlays: [./specs/aws-sqs-invoices.overlay.yaml]
     vendorTimeout: 25s             # above SQS's 20 second long polling
   aws-sqs-<second>:
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs-<second>.openapi.yaml
+    spec: ./specs/aws-sqs.openapi.yaml
+    overlays: [./specs/aws-sqs-<second>.overlay.yaml]
     vendorTimeout: 25s
   aws-sqs-<third>:
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs-<third>.openapi.yaml
+    spec: ./specs/aws-sqs.openapi.yaml
+    overlays: [./specs/aws-sqs-<third>.overlay.yaml]
     vendorTimeout: 25s
 
 integrations:
@@ -103,7 +107,21 @@ integrations:
     apis: [aws-sqs-<third>]
 ```
 
-The message schema and queue URL go into `MessageBody` and `QueueUrl` of `SendMessage`, `SendMessageBatch` (each entry) and the `ReceiveMessage` reply; `QueueUrl` also in every other action that names a queue. See question 2 for how the three files stay in step with the plain SQS spec.
+The invoices overlay, in short:
+
+```yaml
+overlay: 1.1.0
+info: { title: Invoices queue, version: "1" }
+actions:
+  - target: $.components.schemas
+    update:
+      InvoiceJob: { type: object, additionalProperties: false, required: [schemaVersion, eventId, orderId, templateId, language, requestedAt], properties: { … } }
+  - target: $.components.schemas.SendMessageRequest.properties.QueueUrl
+    update: { const: https://sqs.eu-west-1.amazonaws.com/123456789012/invoices }
+  - target: $.components.schemas.SendMessageRequest.properties.MessageBody
+    update: { contentMediaType: application/json, contentSchema: { $ref: '#/components/schemas/InvoiceJob' } }
+  # … the same for SendMessageBatch entries, the ReceiveMessage reply and QueueUrl elsewhere
+```
 
 ## The complete SQS spec
 
@@ -189,7 +207,7 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
 ## Open questions, each with my recommendation
 
 1. **A fake SQS or real AWS for the tests?** I recommend a small fake SQS inside the end-to-end tests: it answers `SendMessage`, `ReceiveMessage` and `DeleteMessage` like SQS (including the MD5 hash of the message, which the SDK checks). Tests then run anywhere, offline, with no AWS account or cost. Running against real AWS stays a manual step in the example's README. (LocalStack, a local copy of AWS run in Docker, is the other choice, but it adds Docker to the tests.)
-2. **How do the three integrations stay in step with the SQS spec?** Settled: one SQS spec generated from the Smithy model, and a small overlay per integration, applied by the proxy when it loads (its own step).
+2. **How do the three integrations stay in step with the SQS spec?** Settled: one SQS spec generated from the Smithy model, and one overlay per queue, applied by the proxy when it loads (built in pull request #35).
 3. **What are the other two messages, and should the example show all three?** I recommend the example app and its end-to-end tests cover the invoice integration fully, and `checks.feature` uses a second integration on the same host to prove each one gets only its own schema and queue. The other two message schemas can be added once you name them.
 4. **Where does the worker find the order and the template?** I recommend a small built-in list of made-up orders and two built-in templates in the example, so it needs no database or shop. The order's lines stay out of the message, which keeps the message small and the order data in one place.
 5. **Where does the PDF go?** I recommend a local folder in this step. Storing it in S3 (and its calls going through Hotline with an S3 spec) is a later step. The PDF is a plain one-page file written with a small PDF library in the example's own module.
