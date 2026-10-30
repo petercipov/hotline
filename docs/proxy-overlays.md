@@ -55,6 +55,21 @@ apis:
 10. **Records don't change.** `url.template`, the check results and their `place` all come from the merged spec. No new record field: the config's `version`, which every record carries as `hotline.config.version`, covers overlays too, so whoever changes an overlay file changes the config version.
 11. **Reload.** Overlays are config: whenever the config is read again (the reload slice, still to come), its overlay files are read again with it.
 
+## Making an overlay from two specs (proposed, 2026-10-30)
+
+Peter asked for a way to make an overlay from two specs. A new command of the program:
+
+```
+hotline-proxy overlay --from ./specs/aws-sqs.openapi.yaml --to ./specs/aws-sqs-invoices.openapi.yaml --title "Invoices queue" > ./specs/aws-sqs-invoices.overlay.yaml
+```
+
+1. It writes an overlay (version 1.1) to standard output that turns the `--from` spec into the `--to` spec. `--title` goes into `info.title`, and `info.version` is `1`.
+2. The result is checked before it is written: applying it to `--from` must give `--to` exactly. If not, the command writes nothing and exits with 1.
+3. A file that can't be read or isn't YAML or JSON exits with 1 and a clear message, as `validate` does. A wrong command line exits with 2.
+4. The proxy itself is not involved: no config, no listening. It is a helper for whoever writes the overlays.
+
+The chosen library already has this (its `Compare`). I tried it on the SQS case: the overlay it made, applied back to the plain spec, gave the changed spec exactly. Its output says version 1.0 with a tool-specific line, so the command rewrites it as 1.1 and drops that line.
+
 ## Library
 
 Chosen by Peter, 2026-10-30: [`github.com/speakeasy-api/openapi/overlay`](https://pkg.go.dev/github.com/speakeasy-api/openapi/overlay), MIT license. It supports 1.1 with `copy`, lists each target that matches nothing (which the proxy turns into warnings), and works on `go.yaml.in/yaml/v3` nodes, the same YAML library the proxy already uses; it also uses the same JSON Schema library. I tried it on the SQS case above: the three updates landed where expected, and a target that matched nothing was named clearly. One thing to handle on our side: its own docs still call the overlay part early ("alpha"), so our tests cover each rule above.
@@ -143,6 +158,16 @@ Feature: Overlays on an api's spec
     Given an overlay whose target uses the in keyword
     When the proxy starts
     Then it refuses the config with a JSONPath problem
+
+  Scenario: An overlay made from two specs turns one into the other
+    Given the plain SQS spec and a copy with the invoices queue and message schema
+    When I run hotline-proxy overlay with --from the plain spec and --to the copy
+    Then it writes an overlay with overlay 1.1.0
+    And the proxy with that overlay checks calls exactly as with the copy
+
+  Scenario: The overlay command refuses a file that isn't a spec
+    When I run hotline-proxy overlay with --to a file that is not YAML
+    Then it exits with 1 and writes nothing to standard output
 
   Scenario: extends is ignored
     Given an overlay whose extends names another file
