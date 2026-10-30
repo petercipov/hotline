@@ -84,18 +84,18 @@ Requirements:
 apis:
   aws-sqs-invoices:
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs.openapi.yaml
-    overlays: [./specs/aws-sqs-invoices.overlay.yaml]
+    spec: ../../specs/aws/sqs/2012-11-05.openapi.yaml   # the stable shared spec
+    overlays: [./overlays/aws-sqs-invoices.overlay.yaml]
     vendorTimeout: 25s             # above SQS's 20 second long polling
   aws-sqs-<second>:
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs.openapi.yaml
-    overlays: [./specs/aws-sqs-<second>.overlay.yaml]
+    spec: ../../specs/aws/sqs/2012-11-05.openapi.yaml   # the stable shared spec
+    overlays: [./overlays/aws-sqs-<second>.overlay.yaml]
     vendorTimeout: 25s
   aws-sqs-<third>:
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs.openapi.yaml
-    overlays: [./specs/aws-sqs-<third>.overlay.yaml]
+    spec: ../../specs/aws/sqs/2012-11-05.openapi.yaml   # the stable shared spec
+    overlays: [./overlays/aws-sqs-<third>.overlay.yaml]
     vendorTimeout: 25s
 
 integrations:
@@ -124,6 +124,8 @@ actions:
 ```
 
 ## The complete SQS spec
+
+- **It lives in the new `specs/` folder** at the top of the repo (Peter, 2026-10-30): `specs/aws/sqs/2012-11-05.openapi.yaml`, named after AWS's own version of the SQS api. That folder holds stable vendor specs only; overlays stay with their tests and examples. Its rules are in [specs/README.md](../specs/README.md).
 
 - **All SQS actions**, one route each, in the agreed form `/#X-Amz-Target=AmazonSQS.SendMessage`, with `x-hotline-action-header: X-Amz-Target` at the top. Generated from AWS's Smithy model (AWS's own API description language), since AWS publishes no OpenAPI for SQS.
 - **Every reply** each action can give: `200` with its body, and SQS's error replies (`400` and `500` with `__type` and `message`).
