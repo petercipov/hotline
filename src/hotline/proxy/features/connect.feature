@@ -115,16 +115,47 @@ Feature: The CONNECT ingress, with interception
       | api.talon.one  |
       | :443           |
 
-  Scenario: CONNECT over HTTP/2 is not offered yet
-    Over HTTP/2 a tunnel is one stream of a shared connection. Clients send
-    CONNECT over HTTP/1.1, so this waits until one needs it.
-    When an app sends "CONNECT api.talon.one:443" over plain HTTP/2
-    Then the proxy answers 501
-    And nothing is sent to any vendor
-    And the record is minimal with hotline.ingress connect, http.response.status_code 501 and error.type http_request_error
+  Scenario: CONNECT over HTTP/2
+    Over HTTP/2 a tunnel is one stream of a shared connection: the app's
+    bytes travel in the stream's request body and the proxy's in its reply.
+    Inside, it works like a tunnel opened over HTTP/1.1 (Peter, 2026-10-30).
+    When the app opens a tunnel to api.talon.one:443 as integration talon-shop-a over HTTP/2
+    And sends a call inside it with Proxy-Authorization for talon-shop-b
+    Then the app gets the vendor's status, headers and body unchanged
+    And the record says hotline.ingress connect and ID talon-shop-a
+    And the test vendor never saw Proxy-Authorization
 
-  Scenario: Stopping the proxy closes a tunnel the app has not used yet
-    Given the app has opened a tunnel to api.talon.one:80 and sent nothing in it
+  Scenario: Many tunnels share one HTTP/2 connection
+    When the app opens two tunnels to api.stripe.com:443 over one HTTP/2 connection
+    Then both tunnels show the same certificate
+
+  Scenario: Plain HTTP inside a tunnel opened over HTTP/2
+    When the app opens a tunnel to api.talon.one:80 as integration talon-shop-a over HTTP/2
+    And sends a plain HTTP call inside it
+    Then the test vendor got the call over https on port 443
+    And the record says hotline.ingress connect and ID talon-shop-a
+
+  Scenario: A CONNECT over HTTP/2 the proxy refuses
+    When an app sends "CONNECT api.talon.one" over plain HTTP/2
+    Then the proxy answers 400
+    And nothing is sent to any vendor
+    And the record is minimal with hotline.ingress connect, http.response.status_code 400 and error.type http_request_error
+
+  Scenario Outline: Stopping the proxy closes a tunnel the app has not used yet
+    Given the app has opened a tunnel to api.talon.one:80 <over> and sent nothing in it
+    When the proxy stops
+    Then the tunnel is closed
+
+    Examples:
+      | over          |
+      | over HTTP/1.1 |
+      | over HTTP/2   |
+
+  Scenario: Stopping the proxy closes an HTTP/2 tunnel after its calls
+    The proxy lets calls in flight finish, then closes the tunnel, which
+    ends its stream, so the HTTP/2 connection can close too.
+    Given the app has opened a tunnel to api.talon.one:443 as integration talon-shop-a over HTTP/2
+    And sends a call inside it with the header "Host: api.talon.one"
     When the proxy stops
     Then the tunnel is closed
 

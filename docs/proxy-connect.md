@@ -17,14 +17,14 @@ Gains: no change in the app's code, the hop to the proxy is encrypted, and signe
 3. **Every host is intercepted**, as on the other ingresses. An app that pins a vendor's certificate leaves that host out with `NO_PROXY`. No blind tunnel.
 4. **The integration ID comes from the `CONNECT` request**, in `Proxy-Authorization`, and covers every call in the tunnel. A `Proxy-Authorization` inside the tunnel is removed and ignored. `CONNECT` works on a plain port and on a TLS port (`listen.tls`), where the ID travels encrypted too.
 5. **Certificates per host** are made on the first tunnel to a host, kept in memory only, valid for 24 hours, and made again when they near their end or the issuer changes.
-6. **HTTP/2 and HTTP/1.1 inside the tunnel**; the app picks.
+6. **HTTP/2 and HTTP/1.1 inside the tunnel**; the app picks. The `CONNECT` itself can come over HTTP/1.1 or HTTP/2. Over HTTP/2 the tunnel is that `CONNECT`'s own stream (one of many lanes in a shared connection), so one connection to the proxy can carry many tunnels (Peter, 2026-10-30).
 7. **Calls go to the `CONNECT` host and port.** A call for another host gets `421` and a minimal record.
 8. **Records.** One per call in the tunnel, `hotline.ingress=connect`. No record for a `CONNECT` that opens fine; a minimal one for a refused `CONNECT`. A new timing, `hotline.timing.app_tls`, holds the proxy's TLS setup with the app, on the first call of each connection, so all of the proxy's own cost is visible. An app that doesn't trust the issuer gets a minimal record with `error.type=tls_untrusted_by_app`.
 9. **The same timing on TLS from apps**: `hotline.timing.app_tls` also goes on the first call of each connection to a `listen.tls` port. This changes TLS from apps decision 8.
 10. **Keeping the signing key safe.** The issuer is made only for Hotline and trusted only by the apps that use the proxy. At start the proxy refuses files that are not an issuer, and warns when the issuer is valid for more than a year. The key is never logged or copied.
 11. **Plain HTTP inside a tunnel is allowed**, told from TLS by the first byte, and handled like a plain `http` call on the forward proxy ingress, with TLS origination.
 
-Found while building: Go's client offers HTTP/2 when it sets up TLS to an `https` proxy address, then sends `CONNECT` over HTTP/1.1 anyway. So the proxy now sets up TLS with apps itself, on its TLS port too, and tells HTTP/1.1 from HTTP/2 by the first bytes the app sends, not by what it offered. Not built yet: `CONNECT` sent over HTTP/2 (each tunnel would be one stream of a shared connection) gets `501`.
+Found while building: Go's client offers HTTP/2 when it sets up TLS to an `https` proxy address, then sends `CONNECT` over HTTP/1.1 anyway. So the proxy now sets up TLS with apps itself, on its TLS port too, and tells HTTP/1.1 from HTTP/2 by the first bytes the app sends, not by what it offered.
 
 ## Setup guide
 
@@ -85,13 +85,13 @@ Give the apps the issuer certificate (`ca.crt`, never the key), for example with
 
 ## Tests
 
-- `src/hotline/proxy/features/connect.feature`: a call through a tunnel, a signed call, the certificate shown, reuse, every host, the ID from `CONNECT`, the wrong host (`421`), HTTP/1.1 and HTTP/2 inside, plain HTTP inside, the handshake timing, an app that doesn't trust the issuer, the internal address guard, `CONNECT` on a TLS port, refused `CONNECT`s, `CONNECT` over HTTP/2 (`501`), stopping with a tunnel open, renewing the issuer, a bad issuer, and the long-lived issuer warning.
+- `src/hotline/proxy/features/connect.feature`: a call through a tunnel, a signed call, the certificate shown, reuse, every host, the ID from `CONNECT`, the wrong host (`421`), HTTP/1.1 and HTTP/2 inside, plain HTTP inside, the handshake timing, an app that doesn't trust the issuer, the internal address guard, `CONNECT` on a TLS port, refused `CONNECT`s, `CONNECT` over HTTP/2 (one tunnel, many tunnels on one connection, plain HTTP inside, refused), stopping with a tunnel open (over HTTP/1.1 and HTTP/2), renewing the issuer, a bad issuer, and the long-lived issuer warning.
 - `tls-from-apps.feature`: the handshake timing on the first call of each connection.
 - `end-to-end-connect.feature`: the real program with Go's own client and the standard proxy setting, through a plain and an https proxy address.
 
 ## How it is built
 
-- `connect.go`: the `CONNECT` handler (answers `200`, sets up TLS inside the tunnel, records a failed setup), how a call in a tunnel finds its vendor, and the interceptor that makes and keeps the per host certificates.
+- `connect.go`: the `CONNECT` handler (answers `200`, takes over the connection over HTTP/1.1 or carries the tunnel in its stream over HTTP/2, sets up TLS inside the tunnel, records a failed setup), how a call in a tunnel finds its vendor, and the interceptor that makes and keeps the per host certificates.
 - `appconn.go`: the app connection as the HTTP server sees it, with the handshake timing, and the listener that hands tunnels to a second HTTP server for their calls.
 - `appcert.go`: one type that follows a certificate and key in files, for `listen.tls` and `listen.connect`. On a TLS port the proxy now sets up TLS itself, on the server's own goroutine for the connection.
 - `internal/config`: `listen.connect`, checked by `LoadIssuer`.
