@@ -6,4 +6,5 @@ use (
 	./src/hotline-proxy
 	./src/otel-hotline
 	./src/otelcol-dev
+	./tools/aws-openapi
 )

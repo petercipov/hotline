@@ -24,6 +24,7 @@ jobs:
             src/otel-hotline/go.sum
             src/otelcol-dev/go.sum
             examples/aws-sqs-invoices/go.sum
+            tools/aws-openapi/go.sum
             go.work.sum
       - name: run tests
         run: |
