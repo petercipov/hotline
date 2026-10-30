@@ -14,8 +14,8 @@ import (
 	"net/netip"
 	"time"
 
-	"hotline/proxy/internal/config"
-	"hotline/proxy/internal/export"
+	"hotline-proxy/internal/config"
+	"hotline-proxy/internal/export"
 )
 
 // Resolver looks up the addresses of a vendor host. *net.Resolver is one.

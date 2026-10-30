@@ -2,7 +2,7 @@
 
 The proxy is built in small slices, tests first. This page says what slice 1 covers, what waits for later, and which parts of the spec need an answer before building starts. The source of truth is `proxy-spec.md` and `proxy-example/` in the `hotline-strategic` repo.
 
-Slice 1 is built. The test cases are Gherkin feature files (plain-language cases in Given, When, Then form) in `src/hotline/proxy/features/`, run by godog, and the code in `src/hotline/proxy/` makes them pass. Peter answered the 14 open questions on 2026-10-28; the answers are listed at the end of this page.
+Slice 1 is built. The test cases are Gherkin feature files (plain-language cases in Given, When, Then form) in `src/hotline-proxy/features/`, run by godog, and the code in `src/hotline-proxy/` makes them pass. Peter answered the 14 open questions on 2026-10-28; the answers are listed at the end of this page.
 
 ## What slice 1 covers
 
@@ -33,7 +33,7 @@ The proxy judges nothing. Verdicts, thresholds and SLAs live in the control plan
 | `export.feature` | sending logs and the counter over OTLP |
 | `end-to-end.feature` | real clients through the real proxy, tagged `@e2e` |
 
-Run them with `go test ./src/hotline/proxy/`. Scenarios tagged `@later` are skipped for now, and those tagged `@e2e` run against the built program with `make e2e` (see [proxy-program.md](proxy-program.md)). The proxy as a whole is the system under test: scenarios drive it the way an app does, with fake vendors and a fake OTLP receiver at its edges (see the `hotline-go-proxy` skill).
+Run them with `go test ./src/hotline-proxy/`. Scenarios tagged `@later` are skipped for now, and those tagged `@e2e` run against the built program with `make e2e` (see [proxy-program.md](proxy-program.md)). The proxy as a whole is the system under test: scenarios drive it the way an app does, with fake vendors and a fake OTLP receiver at its edges (see the `hotline-go-proxy` skill).
 
 ## End-to-end checks
 

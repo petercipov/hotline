@@ -2,6 +2,7 @@ go 1.27.1
 
 use (
 	./src/hotline
+	./src/hotline-proxy
 	./src/otel-hotline
 	./src/otelcol-dev
 )

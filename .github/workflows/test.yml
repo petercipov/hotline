@@ -20,6 +20,7 @@ jobs:
           check-latest: false
           cache-dependency-path: |
             src/hotline/go.sum
+            src/hotline-proxy/go.sum
             src/otel-hotline/go.sum
             src/otelcol-dev/go.sum
             go.work.sum

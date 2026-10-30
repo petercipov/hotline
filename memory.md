@@ -8,9 +8,13 @@ Decisions already made, so a new session does not have to dig through old thread
 - How to write, test and review proxy code in Go: the [`hotline-go-proxy` skill](.claude/skills/hotline-go-proxy/SKILL.md). It covers the system under test, testing only through the proxy's ways in and out, and no test-only code.
 - The proxy's spec and examples: `proxy-spec.md` and `proxy-example/` in the `hotline-strategic` repo.
 
+## Code layout
+
+- The proxy is its own Go module, `hotline-proxy`, in `src/hotline-proxy/`: the `proxy` package at the top, then `cmd/` (the program), `features/`, `internal/` and `testdata/`. The metrics code stays in module `hotline`, in `src/hotline/metrics/`. Both are listed in `go.work` (Peter, 2026-10-30).
+
 ## Testing, in one line each
 
-- Proxy behaviour: Gherkin feature files in `src/hotline/proxy/features/`, run by godog. Everything else: Ginkgo and Gomega.
+- Proxy behaviour: Gherkin feature files in `src/hotline-proxy/features/`, run by godog. Everything else: Ginkgo and Gomega.
 - The whole proxy is the system under test (the thing a test drives and checks), with fake vendors and a fake OTLP receiver at its edges.
 - Never change production code just so a test can reach it.
 

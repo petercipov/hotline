@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"hotline/proxy"
+	"hotline-proxy"
 )
 
 var (

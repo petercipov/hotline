@@ -20,7 +20,7 @@ import (
 	"syscall"
 	"time"
 
-	"hotline/proxy"
+	"hotline-proxy"
 )
 
 // Exit codes.

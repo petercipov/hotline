@@ -8,7 +8,7 @@ This project uses **Test-Driven Development (TDD)**. Write tests before writing 
 
 ## Testing
 
-- **Proxy behaviour**: Gherkin feature files in `src/hotline/proxy/features/`, run by [godog](https://github.com/cucumber/godog). See the `hotline-go-proxy` skill for the system under test approach.
+- **Proxy behaviour**: Gherkin feature files in `src/hotline-proxy/features/`, run by [godog](https://github.com/cucumber/godog). See the `hotline-go-proxy` skill for the system under test approach.
 - **Everything else, and small solitary tests**: [Ginkgo](https://onsi.github.io/ginkgo/) + [Gomega](https://onsi.github.io/gomega/)
 - **Run tests**: `go test ./...` from the relevant module directory
 

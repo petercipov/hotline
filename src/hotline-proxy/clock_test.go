@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"hotline/proxy"
+	"hotline-proxy"
 )
 
 // fakeClock runs with the real time, but its waits end only when the test

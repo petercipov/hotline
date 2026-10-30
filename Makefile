@@ -6,7 +6,7 @@ gen_collector:
 test:
 	rm -f cover.out
 	go clean -testcache
-	go test  ./src/hotline/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...
+	go test  ./src/hotline/... ./src/hotline-proxy/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./src/hotline/...,./src/hotline-proxy/...
 	go test  ./src/otel-hotline/...
 	$(MAKE) e2e
 	tail -n +2 e2e-cover.out >> cover.out
@@ -16,9 +16,9 @@ test:
 e2e:
 	rm -rf e2e-cover e2e-cover.out
 	mkdir -p e2e-cover/data
-	cd src/hotline && go build -cover -covermode=atomic -coverpkg=./... -o ../../e2e-cover/hotline-proxy ./cmd/hotline-proxy
+	cd src/hotline-proxy && go build -cover -covermode=atomic -coverpkg=./... -o ../../e2e-cover/hotline-proxy ./cmd
 	HOTLINE_PROXY=$(CURDIR)/e2e-cover/hotline-proxy GOCOVERDIR=$(CURDIR)/e2e-cover/data \
-		go test -tags e2e -count=1 -run TestEndToEnd ./src/hotline/proxy/
+		go test -tags e2e -count=1 -run TestEndToEnd ./src/hotline-proxy/
 	go tool covdata textfmt -i=e2e-cover/data -o e2e-cover.out
 
 clean-cache:
@@ -36,4 +36,5 @@ deps:
 
 lint:
 	golangci-lint run ./src/hotline/...
+	golangci-lint run ./src/hotline-proxy/...
 	golangci-lint run ./src/otel-hotline/...

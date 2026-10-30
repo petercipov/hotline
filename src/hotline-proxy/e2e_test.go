@@ -38,7 +38,7 @@ func TestEndToEnd(t *testing.T) {
 	binary := os.Getenv("HOTLINE_PROXY")
 	if binary == "" {
 		binary = filepath.Join(t.TempDir(), "hotline-proxy")
-		build := exec.CommandContext(t.Context(), "go", "build", "-o", binary, "hotline/cmd/hotline-proxy") //nolint:gosec // builds the program under test
+		build := exec.CommandContext(t.Context(), "go", "build", "-o", binary, "hotline-proxy/cmd") //nolint:gosec // builds the program under test
 		if out, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("building hotline-proxy failed: %v\n%s", err, out)
 		}

@@ -26,7 +26,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 
-	"hotline/proxy/internal/config"
+	"hotline-proxy/internal/config"
 )
 
 // tunnel is what a CONNECT named: the vendor host and port, and the

@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"hotline/proxy/internal/config"
-	"hotline/proxy/internal/export"
-	"hotline/proxy/internal/spec"
+	"hotline-proxy/internal/config"
+	"hotline-proxy/internal/export"
+	"hotline-proxy/internal/spec"
 )
 
 // handler serves the proxy port. It knows four ingresses: the forward

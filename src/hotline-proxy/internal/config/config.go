@@ -17,7 +17,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"hotline/proxy/internal/spec"
+	"hotline-proxy/internal/spec"
 )
 
 // ErrInvalid marks a config the proxy refuses.

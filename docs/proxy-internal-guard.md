@@ -30,7 +30,7 @@ This slice closes that on every ingress already built (forward proxy and vendor 
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/internal-guard.feature`.
+- Feature scenarios: `src/hotline-proxy/features/internal-guard.feature`.
 - The fake vendors in the tests use `192.0.2.x`, a range kept for documentation, which is not internal, so the other tests are not affected.
 - End to end: the test vendor runs on `localhost`, so the end-to-end config sets `allowInternalIPs: true` on its api and on `not-passed`.
 
