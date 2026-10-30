@@ -57,6 +57,10 @@ func newBuilder(name string, data []byte) *builder {
 	b.compiler.DefaultDraft(jsonschema.Draft2020)
 	b.compiler.UseLoader(outside{})
 	b.compiler.AssertFormat()
+	// A string holding JSON, marked with contentMediaType and
+	// contentSchema, is read and checked too (Peter, 2026-10-30).
+	b.compiler.RegisterVocabulary(jsonText())
+	b.compiler.AssertVocabs()
 	for _, f := range ignoredFormats() {
 		b.compiler.RegisterFormat(&jsonschema.Format{Name: f, Validate: func(any) error { return nil }})
 	}

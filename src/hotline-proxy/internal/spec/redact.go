@@ -3,6 +3,7 @@ package spec
 import (
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -34,7 +35,7 @@ const redacted = "REDACTED"
 // values are redacted unless marked x-hotline-redact false. Headers are kept
 // only when on the default list or marked; secrets never are.
 func (s *Spec) Redact(c Call) Redacted {
-	r := s.match(c.Method, c.EscapedPath)
+	r := s.match(c.Method, c.EscapedPath, c.Header)
 	redacted := Redacted{
 		Header:       s.headers(c.Header, r.marks["header"]),
 		ReplyHeaders: s.headers(c.ReplyHeaders, r.marks["reply"]),
@@ -56,13 +57,22 @@ func (s *Spec) Redact(c Call) Redacted {
 }
 
 // match finds the route for a call. A fixed segment wins over a templated
-// one, and a trailing slash makes no difference. With no route, it returns
-// a route with no segments and no marks.
-func (s *Spec) match(method, escapedPath string) route {
+// one, and a trailing slash makes no difference. A route named by the
+// action header matches only when the header has exactly its value, and
+// wins over the same path without one. With no route, it returns a route
+// with no segments and no marks.
+func (s *Spec) match(method, escapedPath string, header http.Header) route {
 	segments := strings.Split(strings.TrimSuffix(escapedPath, "/"), "/")
+	action := ""
+	if s.actionHeader != "" {
+		action = header.Get(s.actionHeader)
+	}
 	best := route{marks: map[string]map[string]mark{}}
 	for _, r := range s.routes {
-		if r.method == method && r.fits(segments) && r.beats(best) {
+		if r.method != method || !r.fits(segments) || r.action != "" && r.action != action {
+			continue
+		}
+		if r.beats(best) || r.action != "" && best.action == "" && slices.Equal(r.segments, best.segments) {
 			best = r
 		}
 	}

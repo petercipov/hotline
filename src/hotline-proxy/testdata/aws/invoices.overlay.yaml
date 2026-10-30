@@ -1,0 +1,36 @@
+# The invoices queue on the shared SQS spec (specs/aws/sqs/2012-11-05.openapi.yaml):
+# its own queue URL, and the invoice job inside every message. The job schema is
+# the same as examples/aws-sqs-invoices/invoice/invoice-job.schema.json.
+overlay: 1.1.0
+info:
+  title: Invoices queue
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      InvoiceJob:
+        type: object
+        additionalProperties: false
+        required: [schemaVersion, eventId, orderId, templateId, language, requestedAt]
+        properties:
+          schemaVersion: { type: integer, const: 1 }
+          eventId: { type: string, format: uuid }
+          orderId: { type: string, pattern: '^[A-Z]-[0-9]+$' }
+          templateId: { type: string, pattern: '^[a-z0-9-]+$' }
+          language: { type: string, enum: [en, de, sk, cs] }
+          requestedAt: { type: string, format: date-time }
+          sendTo: { type: string, format: email }
+  # Every action that names a queue names this one.
+  - target: $.components.schemas.*.properties.QueueUrl
+    update:
+      const: https://sqs.eu-west-1.amazonaws.com/123456789012/invoices
+  # The message is an invoice job, written as JSON text: when sent, alone or
+  # in a batch, and when received.
+  - target: $.components.schemas['SendMessageRequest','SendMessageBatchRequestEntry'].properties.MessageBody
+    update:
+      contentMediaType: application/json
+      contentSchema: { $ref: '#/components/schemas/InvoiceJob' }
+  - target: $.components.schemas.Message.properties.Body
+    update:
+      contentMediaType: application/json
+      contentSchema: { $ref: '#/components/schemas/InvoiceJob' }

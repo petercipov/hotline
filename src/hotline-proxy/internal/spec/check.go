@@ -110,7 +110,7 @@ const (
 // Check checks a finished call against the spec. A call with no route is
 // not checked.
 func (s *Spec) Check(e Exchange) Checked {
-	r := s.match(e.Method, e.EscapedPath)
+	r := s.match(e.Method, e.EscapedPath, e.Header)
 	if r.segments == nil {
 		return Checked{Skipped: "no_spec_route"}
 	}
@@ -370,7 +370,9 @@ func (b *bodySpec) find(mediaType string) *content {
 }
 
 func isJSON(mediaType string) bool {
-	return mediaType == "application/json" || strings.HasSuffix(mediaType, "+json")
+	// AWS's JSON protocol names its own versions of JSON.
+	return mediaType == "application/json" || strings.HasSuffix(mediaType, "+json") ||
+		mediaType == "application/x-amz-json-1.0" || mediaType == "application/x-amz-json-1.1"
 }
 
 // nest reads bracketed names, as Stripe writes them, into objects and
@@ -535,6 +537,9 @@ func validate(s *jsonschema.Schema, instance any, part, base string) []Result {
 			for _, name := range k.Missing {
 				results = append(results, Result{Part: part, Place: place + "." + name, Rule: "dependentRequired"})
 			}
+		case *kind.ContentMediaType:
+			// A string that should hold JSON doesn't.
+			results = append(results, Result{Part: part, Place: place, Rule: "json"})
 		default:
 			results = append(results, Result{Part: part, Place: place, Rule: rule(e.ErrorKind), Expected: expected(e.ErrorKind)})
 		}
@@ -579,6 +584,13 @@ func placeOf(base string, instance any, location []string) string {
 	var b strings.Builder
 	b.WriteString(base)
 	for _, token := range location {
+		if token == insideJSON {
+			// The value is JSON text; the place carries on inside it.
+			if text, ok := instance.(string); ok {
+				instance, _ = jsonschema.UnmarshalJSON(strings.NewReader(text))
+			}
+			continue
+		}
 		if list, ok := instance.([]any); ok {
 			i, _ := strconv.Atoi(token)
 			b.WriteString("[" + token + "]")
