@@ -130,8 +130,12 @@ type world struct {
 	tunnelProtos []string
 	// tunnel is the last tunnel opened, and tunnels all of them, closed
 	// with the world. tunnelErr says why TLS inside the last one failed.
-	tunnel    net.Conn
-	tunnels   []net.Conn
+	tunnel  net.Conn
+	tunnels []net.Conn
+	// h2 is the app's HTTP/2 connection for tunnels, and h2Reused says
+	// the last tunnel shared it.
+	h2        *http.Transport
+	h2Reused  bool
 	tunnelErr error
 	// tunnelCerts are the certificates the proxy showed in each tunnel.
 	tunnelCerts []*x509.Certificate
@@ -162,6 +166,9 @@ func newWorld() (*world, error) {
 func (w *world) close() {
 	for _, c := range w.tunnels {
 		_ = c.Close()
+	}
+	if w.h2 != nil {
+		w.h2.CloseIdleConnections()
 	}
 	if w.proxy != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"slices"
 	"strings"
@@ -60,8 +61,23 @@ func connectSteps(sc *godog.ScenarioContext, w *world) {
 		return w.openTunnel(host, port, "")
 	})
 	sc.Step(`^the app opens a tunnel to (\S+):(\d+) as integration (\S+)$`, w.openTunnel)
-	sc.Step(`^the app has opened a tunnel to (\S+):(\d+) and sent nothing in it$`, func(host, port string) error {
+	sc.Step(`^the app (?:opens|has opened) a tunnel to (\S+):(\d+) as integration (\S+) over HTTP/2$`, w.openTunnelHTTP2)
+	sc.Step(`^the app has opened a tunnel to (\S+):(\d+) over (HTTP/1.1|HTTP/2) and sent nothing in it$`, func(host, port, version string) error {
+		if version == "HTTP/2" {
+			return w.openTunnelHTTP2(host, port, "")
+		}
 		return w.openTunnel(host, port, "")
+	})
+	sc.Step(`^the app opens two tunnels to (\S+):(\d+) over one HTTP/2 connection$`, func(host, port string) error {
+		for range 2 {
+			if err := w.openTunnelHTTP2(host, port, ""); err != nil {
+				return err
+			}
+		}
+		if !w.h2Reused {
+			return failf("the second tunnel opened its own connection")
+		}
+		return nil
 	})
 	sc.Step(`^an app sends "CONNECT (\S+)" over plain HTTP/2$`, func(authority string) error {
 		return w.sendHTTP2(http.MethodConnect, "", authority)
@@ -413,9 +429,57 @@ func (w *world) openTunnel(host, port, id string) error {
 	if resp.StatusCode != http.StatusOK {
 		return failf("the proxy answered CONNECT with %d", resp.StatusCode)
 	}
+	w.secureTunnel(conn, host, port)
+	return nil
+}
+
+// openTunnelHTTP2 opens a tunnel the way it is done over HTTP/2: CONNECT
+// as one stream of a connection to the proxy, shared by every tunnel the
+// app opens this way. The app writes into the stream's request body and
+// reads its reply.
+func (w *world) openTunnelHTTP2(host, port, id string) error {
+	if err := w.start(); err != nil {
+		return err
+	}
+	w.vendor(host)
+	if w.h2 == nil {
+		protocols := new(http.Protocols)
+		protocols.SetUnencryptedHTTP2(true)
+		w.h2 = &http.Transport{
+			Protocols: protocols,
+			DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, network, w.addr)
+			},
+		}
+	}
+	body, app := io.Pipe()
+	ctx := httptrace.WithClientTrace(context.Background(), &httptrace.ClientTrace{
+		GotConn: func(info httptrace.GotConnInfo) { w.h2Reused = info.Reused },
+	})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodConnect, "http://"+net.JoinHostPort(host, port), body)
+	if id != "" {
+		req.Header.Set("Proxy-Authorization", strings.TrimPrefix(basic(id+":x"), "Proxy-Authorization: "))
+	}
+	resp, err := w.h2.RoundTrip(req) //nolint:bodyclose // the reply is the tunnel, closed with it
+	if err != nil {
+		return err
+	}
+	conn := &streamConn{reply: resp.Body, body: app}
+	w.tunnels = append(w.tunnels, conn)
+	if resp.StatusCode != http.StatusOK {
+		return failf("the proxy answered CONNECT with %d", resp.StatusCode)
+	}
+	w.secureTunnel(conn, host, port)
+	return nil
+}
+
+// secureTunnel sets up TLS inside an open tunnel, except on port 80, where
+// the app talks plain HTTP. A failed setup is what some scenarios check;
+// tunnelErr says why.
+func (w *world) secureTunnel(conn net.Conn, host, port string) {
 	if port == "80" {
 		w.tunnel = conn
-		return nil
+		return
 	}
 	client := tls.Client(conn, &tls.Config{RootCAs: w.tunnelRoots, ServerName: host, NextProtos: []string{"http/1.1"}, MinVersion: tls.VersionTLS12})
 	_ = client.SetDeadline(time.Now().Add(10 * time.Second))
@@ -425,9 +489,34 @@ func (w *world) openTunnel(host, port, id string) error {
 		w.tunnelCerts = append(w.tunnelCerts, state.PeerCertificates[0])
 		w.tunnel = client
 	}
-	// A failed setup is what some scenarios check; tunnelErr says why.
+}
+
+// streamConn is the app's end of a tunnel opened over HTTP/2.
+// A read deadline that passes ends the reply, as a stream has none.
+type streamConn struct {
+	reply io.ReadCloser
+	body  *io.PipeWriter
+	timer *time.Timer
+}
+
+func (c *streamConn) Read(p []byte) (int, error)  { return c.reply.Read(p) }
+func (c *streamConn) Write(p []byte) (int, error) { return c.body.Write(p) }
+func (c *streamConn) Close() error {
+	return errors.Join(c.body.Close(), c.reply.Close())
+}
+func (c *streamConn) LocalAddr() net.Addr           { return &net.TCPAddr{} }
+func (c *streamConn) RemoteAddr() net.Addr          { return &net.TCPAddr{} }
+func (c *streamConn) SetDeadline(t time.Time) error { return c.SetReadDeadline(t) }
+func (c *streamConn) SetReadDeadline(t time.Time) error {
+	if c.timer != nil {
+		c.timer.Stop()
+	}
+	if !t.IsZero() {
+		c.timer = time.AfterFunc(time.Until(t), func() { _ = c.reply.Close() })
+	}
 	return nil
 }
+func (c *streamConn) SetWriteDeadline(time.Time) error { return nil }
 
 // callInTunnel sends the world's usual call, with a JSON body, inside the
 // open tunnel.

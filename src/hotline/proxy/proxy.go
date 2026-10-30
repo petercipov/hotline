@@ -181,10 +181,13 @@ func Validate(configPath string, clock Clock) error {
 // Shutdown stops taking calls, lets calls in flight finish, then sends every
 // queued record, all within the time ctx allows.
 func (p *Proxy) Shutdown(ctx context.Context) error {
-	err := p.server.Shutdown(ctx)
+	// Both servers stop at once: a tunnel opened over HTTP/2 is a call on
+	// the proxy port that lasts until the tunnels' server closes the
+	// tunnel. Tunnels still being set up are cut short.
+	stopped := make(chan error, 1)
+	go func() { stopped <- p.server.Shutdown(ctx) }()
+	err := errors.Join(p.tunnelServer.Shutdown(ctx), <-stopped)
 	<-p.served
-	// Tunnels still being set up are cut short.
-	err = errors.Join(err, p.tunnelServer.Shutdown(ctx))
 	<-p.tunnelServed
 	finished := make(chan struct{})
 	go func() {

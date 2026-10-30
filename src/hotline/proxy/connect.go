@@ -51,20 +51,9 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request, start time.Tim
 		return
 	}
 	t.host = strings.ToLower(t.host)
-	conn, buffered, err := http.NewResponseController(w).Hijack()
-	if err != nil {
-		// A CONNECT over HTTP/2 would carry the tunnel as one stream,
-		// which is not offered yet.
-		refuse(w, http.StatusNotImplemented)
-		h.refused(r, start, "connect", t.id, &url.URL{Host: t.host}, http.StatusNotImplemented)
-		return
-	}
+	conn, done := open(w, r)
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
-	_, _ = io.WriteString(conn, "HTTP/1.1 200 Connection established\r\n\r\n")
-	// Bytes the HTTP server read ahead come first; the rest comes
-	// straight from the connection.
-	early, _ := buffered.Peek(buffered.Reader.Buffered())
-	reader := bufio.NewReader(io.MultiReader(bytes.NewReader(early), conn))
+	reader := bufio.NewReader(conn)
 	inner := &bufferedConn{Conn: conn, r: reader}
 	// The app's first byte tells TLS, which starts with a handshake
 	// record, from plain HTTP. An app that leaves, or the proxy stopping,
@@ -80,11 +69,68 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request, start time.Tim
 		if err != nil {
 			h.tunnelFailed(r, start, t, a, err)
 			_ = conn.Close()
-			return
 		}
 	}
-	_ = conn.SetDeadline(time.Time{})
-	h.tunnels.hand(a)
+	if err == nil {
+		_ = conn.SetDeadline(time.Time{})
+		h.tunnels.hand(a)
+	}
+	<-done
+}
+
+// open answers 200 to a CONNECT and gives the tunnel as a connection.
+// Over HTTP/1.1 the tunnel is the app's connection, taken over from the
+// HTTP server, and done is already closed. Over HTTP/2, which cannot give
+// up a connection that other calls share, the tunnel is the CONNECT's own
+// stream, and done closes once the stream has ended.
+func open(w http.ResponseWriter, r *http.Request) (net.Conn, <-chan struct{}) {
+	conn, buffered, err := http.NewResponseController(w).Hijack()
+	if err != nil {
+		return stream(w, r)
+	}
+	_, _ = io.WriteString(conn, "HTTP/1.1 200 Connection established\r\n\r\n")
+	// Bytes the HTTP server read ahead come first; the rest comes
+	// straight from the connection.
+	early, _ := buffered.Peek(buffered.Reader.Buffered())
+	done := make(chan struct{})
+	close(done)
+	return &bufferedConn{Conn: conn, r: io.MultiReader(bytes.NewReader(early), conn)}, done
+}
+
+// stream carries a tunnel in a CONNECT's HTTP/2 stream: the app's bytes
+// come in the request body and the proxy's go out in the reply. The tunnel
+// is one end of a pipe; the bytes are copied between its other end and the
+// stream. The stream ends once the tunnel is closed, or the app ends its
+// side, which closes the tunnel.
+func stream(w http.ResponseWriter, r *http.Request) (net.Conn, <-chan struct{}) {
+	w.WriteHeader(http.StatusOK)
+	rc := http.NewResponseController(w)
+	_ = rc.Flush()
+	tunnel, end := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(end, r.Body)
+		_ = end.Close()
+	}()
+	go func() {
+		defer close(done)
+		_, _ = io.Copy(flushWriter{w: w, rc: rc}, end)
+	}()
+	return tunnel, done
+}
+
+// flushWriter sends each write to the app at once.
+type flushWriter struct {
+	w  io.Writer
+	rc *http.ResponseController
+}
+
+func (f flushWriter) Write(p []byte) (int, error) {
+	n, err := f.w.Write(p)
+	if err == nil {
+		err = f.rc.Flush()
+	}
+	return n, err
 }
 
 // tunnelFailed records a tunnel in which TLS failed to set up, with what
@@ -134,7 +180,7 @@ func (t *tunnel) find(r *http.Request, a *appConn) (*url.URL, int) {
 // connection before the rest.
 type bufferedConn struct {
 	net.Conn
-	r *bufio.Reader
+	r io.Reader
 }
 
 func (c *bufferedConn) Read(p []byte) (int, error) { return c.r.Read(p) }
