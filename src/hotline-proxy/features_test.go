@@ -65,6 +65,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	guardSteps(sc, w)
 	hostHeaderSteps(sc, w)
 	connectSteps(sc, w)
+	overlaySteps(sc, w)
 }
 
 var errCheck = errors.New("check failed")
