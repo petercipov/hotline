@@ -135,41 +135,12 @@ func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 		sqs = newFakeSQS(p.issuer.leaf("localhost", time.Now().Add(24*time.Hour), false))
 		return nil
 	})
-	sc.Step(`^the hotline-proxy program runs with integration invoices for SQS, with the invoices overlay$`, func() error {
-		if err := os.MkdirAll(filepath.Join(p.dir, "specs"), 0o750); err != nil {
+	sc.Step(`^the hotline-proxy program runs with the example's hotline-proxy.yaml$`, func() error {
+		config, err := exampleConfig(p.proxyAddr, p.receiver.endpoint)
+		if err != nil {
 			return err
 		}
-		for from, to := range map[string]string{
-			filepath.Join("..", "..", "specs", "aws", "sqs", "2012-11-05.openapi.yaml"): "aws-sqs.openapi.yaml",
-			filepath.Join("testdata", "aws", "invoices.overlay.yaml"):                   "invoices.overlay.yaml",
-		} {
-			data, err := os.ReadFile(from) //nolint:gosec // the test's own files
-			if err == nil {
-				err = p.writeFile(filepath.Join("specs", to), string(data))
-			}
-			if err != nil {
-				return err
-			}
-		}
-		// The fake SQS runs on this computer, an internal address.
-		p.writeConfig(fmt.Sprintf(`version: e2e-sqs
-listen:
-  proxy: %q
-  admin: "127.0.0.1:0"
-exporters:
-  - otlp:
-      endpoint: %s
-apis:
-  aws-sqs-invoices:
-    hosts: [localhost]
-    spec: ./specs/aws-sqs.openapi.yaml
-    overlays: [./specs/invoices.overlay.yaml]
-    vendorTimeout: 25s
-    allowInternalIPs: true
-integrations:
-  - id: invoices
-    apis: [aws-sqs-invoices]
-`, p.proxyAddr, p.receiver.endpoint))
+		p.writeConfig(config)
 		return p.launch()
 	})
 	example := func(args ...string) error {
@@ -300,4 +271,33 @@ func (p *program) records() ([]map[string]any, error) {
 		}
 	}
 	return out, nil
+}
+
+// exampleConfig is the example's own hotline-proxy.yaml with only the
+// addresses changed: the local ports, the fake SQS on localhost (an internal
+// address), and the spec and overlay read from where they are in the repo.
+func exampleConfig(proxyAddr, otlpEndpoint string) (string, error) {
+	dir, err := filepath.Abs(filepath.Join("..", "..", "examples", "aws-sqs-invoices", "hotline"))
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "hotline-proxy.yaml")) //nolint:gosec // the example's own file
+	if err != nil {
+		return "", err
+	}
+	config := string(data)
+	for _, change := range [][2]string{
+		{`":8080"`, fmt.Sprintf("%q", proxyAddr)},
+		{`":8081"`, `"127.0.0.1:0"`},
+		{"localhost:4317", otlpEndpoint},
+		{"[sqs.eu-west-1.amazonaws.com]", "[localhost]\n    allowInternalIPs: true"},
+		{"../../../specs/", filepath.Join(dir, "..", "..", "..", "specs") + "/"},
+		{"./invoices.overlay.yaml", filepath.Join(dir, "invoices.overlay.yaml")},
+	} {
+		if strings.Count(config, change[0]) != 1 {
+			return "", failf("the example config no longer has %s once", change[0])
+		}
+		config = strings.Replace(config, change[0], change[1], 1)
+	}
+	return config, nil
 }
