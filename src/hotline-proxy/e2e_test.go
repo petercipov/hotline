@@ -119,6 +119,8 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		return ctx, err
 	})
 
+	overlayCommandSteps(sc, p)
+
 	// Running the program.
 	sc.Step(`^hotline-proxy is run with "([^"]*)"$`, func(args string) error {
 		if err := p.startProcess(strings.Fields(args)...); err != nil {

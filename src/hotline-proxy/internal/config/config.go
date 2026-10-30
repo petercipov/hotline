@@ -18,6 +18,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"hotline-proxy/internal/overlay"
 	"hotline-proxy/internal/spec"
 )
 
@@ -111,8 +112,10 @@ type file struct {
 	// APIs are the vendor apis, each written once and named by the
 	// integrations that use it.
 	APIs map[string]struct {
-		Hosts    []string     `yaml:"hosts"`
-		Spec     string       `yaml:"spec"`
+		Hosts []string `yaml:"hosts"`
+		Spec  string   `yaml:"spec"`
+		// Overlays change the spec for this api only, in this order.
+		Overlays []string     `yaml:"overlays"`
 		Settings settingsFile `yaml:",inline"`
 	} `yaml:"apis"`
 	Exporters []struct {
@@ -240,6 +243,7 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 	l := loader{
 		dir:       filepath.Dir(path),
 		specs:     map[string]*spec.Spec{},
+		files:     map[string][]byte{},
 		lookupEnv: lookupEnv,
 	}
 	c := &Config{
@@ -277,7 +281,7 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		}
 		apis[name] = &API{
 			Settings: l.settings(label, a.Settings, Settings{TLSOrigination: true, VendorTimeout: time.Minute}),
-			Spec:     l.spec(label, a.Spec),
+			Spec:     l.spec(label, a.Spec, a.Overlays),
 		}
 		for _, host := range a.Hosts {
 			hosts[name] = append(hosts[name], strings.ToLower(host))
@@ -325,12 +329,17 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 	if len(l.problems) > 0 {
 		return nil, errors.Join(l.problems...)
 	}
+	c.Warnings = append(c.Warnings, l.warnings...)
 	return c, nil
 }
 
 type loader struct {
-	dir       string
+	dir string
+	// specs are the specs read so far, by their file and overlays, and
+	// files the spec files read so far, so each is read once.
 	specs     map[string]*spec.Spec
+	files     map[string][]byte
+	warnings  []string
 	lookupEnv func(string) (string, bool)
 	problems  []error
 }
@@ -532,23 +541,57 @@ func (l *loader) path(path string) string {
 	return path
 }
 
-func (l *loader) spec(label, path string) *spec.Spec {
+// spec reads the spec at path and applies the overlays to it. Apis with the
+// same spec and the same overlays in the same order share one copy.
+func (l *loader) spec(label, path string, overlays []string) *spec.Spec {
 	if path == "" {
 		return nil
 	}
 	path = l.path(path)
-	if s, read := l.specs[path]; read {
+	names := []string{path}
+	files := make([]overlay.File, 0, len(overlays))
+	for _, o := range overlays {
+		o = l.path(o)
+		names = append(names, o)
+		files = append(files, overlay.File{Name: o})
+	}
+	name := strings.Join(names, " with ")
+	if s, read := l.specs[name]; read {
 		return s
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // the config names its spec files
-	if err != nil {
-		l.problem("%s: spec %s cannot be read: %v", label, path, err)
-		return nil
+	data, read := l.files[path]
+	if !read {
+		var err error
+		data, err = os.ReadFile(path) //nolint:gosec // the config names its spec files
+		if err != nil {
+			l.problem("%s: spec %s cannot be read: %v", label, path, err)
+			return nil
+		}
+		l.files[path] = data
 	}
-	s, err := spec.Parse(path, data)
-	if err != nil {
-		l.problems = append(l.problems, err)
+	if len(files) > 0 {
+		for i := range files {
+			var err error
+			files[i].Data, err = os.ReadFile(files[i].Name) //nolint:gosec // the config names its overlay files
+			if err != nil {
+				l.problem("%s: overlay %s cannot be read: %v", label, files[i].Name, err)
+				return nil
+			}
+		}
+		merged, warnings, err := overlay.Apply(data, files)
+		if err != nil {
+			l.problem("%s: %v", label, err)
+			return nil
+		}
+		for _, w := range warnings {
+			l.warnings = append(l.warnings, label+": "+w)
+		}
+		data = merged
 	}
-	l.specs[path] = s
+	s, err := spec.Parse(name, data)
+	if err != nil {
+		l.problems = append(l.problems, fmt.Errorf("%s: %w", label, err))
+	}
+	l.specs[name] = s
 	return s
 }

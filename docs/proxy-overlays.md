@@ -1,6 +1,6 @@
 # Overlays on an api's spec: requirements draft
 
-*Agreed with Peter, 2026-10-30, not built yet. It comes before the SQS example ([proxy-sqs-example.md](proxy-sqs-example.md), pull request #33), which needs it. His answers are at the end.*
+*Agreed with Peter, 2026-10-30, and built. Scenarios: `src/hotline-proxy/features/overlays.feature` and `overlay-command.feature`. It comes before the SQS example ([proxy-sqs-example.md](proxy-sqs-example.md), pull request #33), which needs it. His answers are at the end.*
 
 ## Why
 
@@ -55,7 +55,7 @@ apis:
 10. **Records don't change.** `url.template`, the check results and their `place` all come from the merged spec. No new record field: the config's `version`, which every record carries as `hotline.config.version`, covers overlays too, so whoever changes an overlay file changes the config version.
 11. **Reload.** Overlays are config: whenever the config is read again (the reload slice, still to come), its overlay files are read again with it.
 
-## Making an overlay from two specs (proposed, 2026-10-30)
+## Making an overlay from two specs (Peter, 2026-10-30)
 
 Peter asked for a way to make an overlay from two specs. A new command of the program:
 
@@ -63,8 +63,8 @@ Peter asked for a way to make an overlay from two specs. A new command of the pr
 hotline-proxy overlay --from ./specs/aws-sqs.openapi.yaml --to ./specs/aws-sqs-invoices.openapi.yaml --title "Invoices queue" > ./specs/aws-sqs-invoices.overlay.yaml
 ```
 
-1. It writes an overlay (version 1.1) to standard output that turns the `--from` spec into the `--to` spec. `--title` goes into `info.title`, and `info.version` is `1`.
-2. The result is checked before it is written: applying it to `--from` must give `--to` exactly. If not, the command writes nothing and exits with 1.
+1. It writes an overlay (version 1.1) to standard output that turns the `--from` spec into the `--to` spec. `--title` goes into `info.title` (`Hotline overlay` when not given), and `info.version` is `1`.
+2. The result is checked before it is written: applying it to `--from` must give the same values as `--to` (the order of keys does not matter). If not, the command writes nothing and exits with 1. Two specs with the same values give no overlay, also exit 1.
 3. A file that can't be read or isn't YAML or JSON exits with 1 and a clear message, as `validate` does. A wrong command line exits with 2.
 4. The proxy itself is not involved: no config, no listening. It is a helper for whoever writes the overlays.
 
@@ -80,105 +80,9 @@ The other choices: `pb33f/libopenapi` (also supports 1.1, but brings its own YAM
 
 Section 2 (config file): the `apis` example gains `overlays`, and a new rule says what overlays are and requirements 2, 3, 6 and 7 in short. Proposed in a pull request to `hotline-strategic`.
 
-## Draft scenarios
+## Scenarios
 
-```gherkin
-Feature: Overlays on an api's spec
-
-  Scenario: An overlay changes what is checked
-    Given the api stripe with the spec stripe.openapi.yaml
-    And the overlay that makes the query value limit at most 10
-    When the app sends GET /v1/customers?limit=50
-    Then the request results are query limit maximum 10
-
-  Scenario: The plain spec is unchanged for another api
-    Given the apis invoices and refunds share one SQS spec, each with its own overlay
-    When the refunds integration sends a message to the invoices queue
-    Then the request results are body $.QueueUrl const
-    When the invoices integration sends a message to the invoices queue
-    Then the record has no request results
-
-  Scenario: Overlays are applied in the order listed
-    Given an api with two overlays that both set the maximum of limit, first to 10, then to 20
-    When the app sends GET /v1/customers?limit=15
-    Then the record has no request results
-
-  Scenario: An overlay can add a route
-    Given the overlay that adds the route GET /v1/balance
-    When the app sends GET /v1/balance
-    Then the record has url.template /v1/balance
-
-  Scenario: An overlay can mark a header to keep
-    Given the overlay that marks the reply header x-amzn-RequestId with x-hotline-redact false
-    When the vendor replies with x-amzn-RequestId abc
-    Then the record has the reply header x-amzn-RequestId abc
-
-  Scenario: An overlay can remove a route
-    Given the overlay that removes the route DELETE /v1/customers/{id}
-    When the app sends DELETE /v1/customers/cus_1
-    Then the record has no url.template
-
-  Scenario: An overlay can copy a schema
-    Given the overlay that copies the schema Customer onto the reply of GET /v1/me
-    When the vendor replies to GET /v1/me with a customer with no id
-    Then the response results are body $.id required
-
-  Scenario Outline: A broken overlay stops the proxy at start
-    Given the api stripe with the overlay <overlay>
-    When the proxy starts
-    Then it refuses the config with <problem>
-    And hotline-proxy validate lists the same problem
-
-    Examples:
-      | overlay                                   | problem                                                     |
-      | a file that is not there                  | overlay ./o.yaml cannot be read                             |
-      | a file that is not YAML                   | overlay ./o.yaml is not an overlay document                 |
-      | a file with no actions                    | overlay ./o.yaml is not an overlay document                 |
-      | a file with overlay 1.0.0                 | overlay ./o.yaml: version 1.0.0 is not supported            |
-      | a file with overlay 2.0.0                 | overlay ./o.yaml: version 2.0.0 is not supported            |
-      | a target that is not valid JSONPath       | action 1: target $.paths[ is not valid JSONPath             |
-      | a copy whose source matches nothing       | action 1: copy $.components.schemas.Nope matches nothing    |
-      | a list onto an object                     | action 1: update is a list but the target is an object      |
-      | a $ref to another file                    | the spec's own problem, with the api and overlay named      |
-      | an openapi version changed to 3.0.3       | the spec's own problem, with the api and overlay named      |
-
-  Scenario Outline: A target that matches nothing is a warning
-    Given the api stripe with an overlay whose action 2 is <action> on $.components.schemas.Nope
-    When the proxy starts
-    Then it runs, with one warning line naming the api, the overlay file and action 2
-    And hotline-proxy validate lists the same warning
-    And the other actions of the overlay are applied
-
-    Examples:
-      | action |
-      | update |
-      | remove |
-
-  Scenario: Tool-specific JSONPath is not used
-    Given an overlay whose target uses the in keyword
-    When the proxy starts
-    Then it refuses the config with a JSONPath problem
-
-  Scenario: An overlay made from two specs turns one into the other
-    Given the plain SQS spec and a copy with the invoices queue and message schema
-    When I run hotline-proxy overlay with --from the plain spec and --to the copy
-    Then it writes an overlay with overlay 1.1.0
-    And the proxy with that overlay checks calls exactly as with the copy
-
-  Scenario: The overlay command refuses a file that isn't a spec
-    When I run hotline-proxy overlay with --to a file that is not YAML
-    Then it exits with 1 and writes nothing to standard output
-
-  Scenario: extends is ignored
-    Given an overlay whose extends names another file
-    When the proxy starts
-    Then the overlay is applied to the api's own spec
-
-  Scenario: An integration cannot add overlays
-    Given the integration shop-a names { api: stripe, overlays: [./o.yaml] }
-    When the proxy starts
-    Then the config is loaded with the warning that only vendorTimeout can be changed per integration
-```
+The behaviour is written down and tested in `src/hotline-proxy/features/overlays.feature` (overlays in the config) and `src/hotline-proxy/features/overlay-command.feature` (the `overlay` command, and warnings in `validate`, run against the built program).
 
 ## Answers (Peter, 2026-10-30)
 

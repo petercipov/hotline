@@ -152,7 +152,7 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		_ = p.tunnelServer.Serve(h.tunnels)
 	}()
 	for _, w := range cfg.Warnings {
-		o.Logger.Warn("config setting ignored", "reason", w)
+		o.Logger.Warn("config warning", "reason", w)
 	}
 	o.Logger.Info("hotline proxy started", "address", listener.Addr().String(), "config_version", cfg.Version)
 	return p, nil
@@ -172,10 +172,13 @@ func newTransport(o Options, allowInternal bool) *http.Transport {
 
 // Validate checks a config and every spec and certificate it points to,
 // without starting anything. A config with problems is refused with all of
-// them listed.
-func Validate(configPath string, clock Clock, lookupEnv func(string) (string, bool)) error {
-	_, err := config.Load(configPath, clock.Now(), lookupEnv)
-	return err
+// them listed. A valid config may still come with warnings, as at start.
+func Validate(configPath string, clock Clock, lookupEnv func(string) (string, bool)) ([]string, error) {
+	cfg, err := config.Load(configPath, clock.Now(), lookupEnv)
+	if err != nil {
+		return nil, err
+	}
+	return cfg.Warnings, nil
 }
 
 // Shutdown stops taking calls, lets calls in flight finish, then sends every

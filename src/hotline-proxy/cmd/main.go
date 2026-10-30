@@ -21,6 +21,7 @@ import (
 	"time"
 
 	proxy "hotline-proxy"
+	"hotline-proxy/internal/overlay"
 )
 
 // Exit codes.
@@ -35,6 +36,7 @@ const usage = `usage: hotline-proxy <command> [flags]
 commands:
   run       start the proxy
   validate  check a config and the specs it points to, then exit
+  overlay   write an overlay that turns one spec into another
   version   print the version
 
 Run "hotline-proxy <command> --help" for the flags of a command.
@@ -62,6 +64,8 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 	case "version":
 		_, _ = fmt.Fprintln(stdout, "hotline-proxy", version())
 		return exitOK
+	case "overlay":
+		return makeOverlay(args[1:], stdout, stderr)
 	case "run", "validate":
 	default:
 		_, _ = fmt.Fprintf(stderr, "unknown command %q\n\n%s", command, usage)
@@ -99,9 +103,13 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 		return exitFail
 	}
 	if command == "validate" {
-		if err := proxy.Validate(*configPath, proxy.SystemClock{}, os.LookupEnv); err != nil {
+		warnings, err := proxy.Validate(*configPath, proxy.SystemClock{}, os.LookupEnv)
+		if err != nil {
 			logProblems(logger, "config refused", err)
 			return exitFail
+		}
+		for _, w := range warnings {
+			logger.Warn("config warning", "reason", w)
 		}
 		logger.Info("config is valid", "config", *configPath)
 		return exitOK
@@ -119,6 +127,49 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 		InstanceID:     instanceID(),
 		LookupEnv:      os.LookupEnv,
 	}, *shutdownTimeout, signals)
+}
+
+// makeOverlay writes to stdout an overlay that turns the --from spec into
+// the --to spec.
+func makeOverlay(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("hotline-proxy overlay", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	from := flags.String("from", "", "the spec as it is (required)")
+	to := flags.String("to", "", "the spec as it should be (required)")
+	title := flags.String("title", "Hotline overlay", "the overlay's title")
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return exitOK
+		}
+		return exitUsage
+	}
+	switch {
+	case flags.NArg() > 0:
+		_, _ = fmt.Fprintf(stderr, "unexpected argument %q\n", flags.Arg(0))
+		flags.Usage()
+		return exitUsage
+	case *from == "" || *to == "":
+		_, _ = fmt.Fprintln(stderr, "--from and --to are required")
+		flags.Usage()
+		return exitUsage
+	}
+	logger := slog.New(slog.NewJSONHandler(stderr, nil))
+	files := [2]overlay.File{{Name: *from}, {Name: *to}}
+	for i := range files {
+		var err error
+		files[i].Data, err = os.ReadFile(files[i].Name)
+		if err != nil {
+			logger.Error("overlay not made", "problem", fmt.Sprintf("%s cannot be read: %v", files[i].Name, err))
+			return exitFail
+		}
+	}
+	out, err := overlay.Make(*title, files[0], files[1])
+	if err != nil {
+		logger.Error("overlay not made", "problem", err.Error())
+		return exitFail
+	}
+	_, _ = stdout.Write(out)
+	return exitOK
 }
 
 // serve runs the proxy until the first signal, then stops it within the
