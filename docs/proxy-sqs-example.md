@@ -6,12 +6,12 @@
 
 1. A complete, working example: a Go app that sends to AWS SQS through Hotline, with end-to-end tests.
 2. A complete OpenAPI spec for SQS, so every SQS call the app makes is checked, not only `SendMessage`.
-3. A check of the message itself. One integration sends a JSON message: a job that points to a folder of today's parquet files in S3 (Amazon's file storage). A worker reads the job, adds up the day's data, and writes the result (the "projection", a smaller summary table) back to S3 as parquet.
+3. A check of the message itself. One integration sends a JSON message: a job asking for the invoice PDF of one order (Peter, 2026-10-30, in place of the first idea of a parquet aggregation job in S3).
 
-## The use case, as I understand it
+## The use case
 
-- **The producer** (the app that starts the job) sends one message per day and dataset: "aggregate the folder `s3://shop-data/sales/date=2026-10-30/` and write the result to `s3://shop-data/sales-daily/date=2026-10-30/`".
-- **The worker** (the app that does the job) receives the message, reads every parquet file in the input folder, adds the rows up per day (the exact sums are Peter's to name), writes the projection to the output folder, and deletes the message from the queue so it is not handled twice.
+- **The shop** (the app that asks for the invoice) sends one message per paid order: "make the invoice for order `A-1001`, in English".
+- **The worker** (the app that does the job) receives the message, looks up the order, writes a one-page invoice PDF, and deletes the message from the queue so it is not handled twice.
 - **Hotline** sits between both apps and SQS. It records every call and checks it against the spec, including the job message inside it. It never blocks a call: a broken message still reaches SQS, and the check result shows up in the record.
 
 ## The job message (version 1)
@@ -22,11 +22,10 @@ A first proposal. Field names are open for Peter to change.
 {
   "schemaVersion": 1,
   "jobId": "5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10",
-  "date": "2026-10-30",
-  "input": "s3://shop-data/sales/date=2026-10-30/",
-  "output": "s3://shop-data/sales-daily/date=2026-10-30/",
-  "format": "parquet",
-  "requestedAt": "2026-10-30T23:05:00Z"
+  "orderId": "A-1001",
+  "language": "en",
+  "requestedAt": "2026-10-30T19:30:00Z",
+  "sendTo": "customer@example.com"
 }
 ```
 
@@ -34,20 +33,19 @@ A first proposal. Field names are open for Peter to change.
 |---|---|---|---|
 | `schemaVersion` | yes | whole number, exactly `1` | Lets the message change later without breaking old workers. |
 | `jobId` | yes | `uuid` | The worker uses it to notice a job it already did (SQS may deliver a message twice). |
-| `date` | yes | `date` (`2026-10-30`) | The day being added up. |
-| `input` | yes | text starting `s3://`, a bucket name, then a folder ending in `/` | The folder of parquet files to read. |
-| `output` | yes | same rule as `input` | Where the projection is written. |
-| `format` | no | `parquet` only, for now | Leaves room for other formats later. |
-| `requestedAt` | no | `date-time` | When the producer asked; helps when looking into a late job. |
+| `orderId` | yes | text like `A-1001`: a capital letter, a dash, digits | The order to make the invoice for. |
+| `language` | yes | one of `en`, `de`, `sk`, `cs` | The invoice's language. |
+| `requestedAt` | yes | `date-time` | When the shop asked; helps when looking into a late invoice. |
+| `sendTo` | no | `email` | Where to mail the PDF, if anywhere. Mailing it is not part of this step. |
 
-Any other field is reported (`additionalProperties: false`), so a typo like `inptu` is caught.
+Any other field is reported (`additionalProperties: false`), so a typo like `ordrId` is caught.
 
 ## How the message sits in the SQS spec
 
 An SQS `SendMessage` body is JSON, but the message itself is a **string** inside it, in the field `MessageBody`:
 
 ```json
-{"QueueUrl": "https://sqs.eu-west-1.amazonaws.com/123456789012/file-jobs",
+{"QueueUrl": "https://sqs.eu-west-1.amazonaws.com/123456789012/invoices",
  "MessageBody": "{\"schemaVersion\":1,\"jobId\":\"5f0c…\", …}"}
 ```
 
@@ -58,14 +56,14 @@ MessageBody:
   type: string
   contentMediaType: application/json
   contentSchema:
-    $ref: '#/components/schemas/FileJob'
+    $ref: '#/components/schemas/InvoiceJob'
 ```
 
 Requirements:
 
 1. **Strings holding JSON are checked** when the spec says `contentMediaType: application/json` with a `contentSchema`. The JSON Schema library the proxy already uses supports this; it only needs turning on. Without these words, a string stays a plain string, as today.
-2. **Places carry on into the inner message.** A missing `date` inside the message is reported as `body $.MessageBody.date required`. A message that is not valid JSON is `body $.MessageBody json`. As always, results never hold a value from the call.
-3. **The same in replies.** The worker's `ReceiveMessage` reply holds the messages in `Messages[].Body`; our spec marks those the same way, so a bad message is also reported when the worker receives it (`response body $.Messages[0].Body.date required`).
+2. **Places carry on into the inner message.** A missing `orderId` inside the message is reported as `body $.MessageBody.orderId required`. A message that is not valid JSON is `body $.MessageBody json`. As always, results never hold a value from the call.
+3. **The same in replies.** The worker's `ReceiveMessage` reply holds the messages in `Messages[].Body`; our spec marks those the same way, so a bad message is also reported when the worker receives it (`response body $.Messages[0].Body.orderId required`).
 4. **SQS's content type counts as JSON.** SQS sends `Content-Type: application/x-amz-json-1.0`. Today the proxy only reads `application/json` and `…+json`, so it would skip SQS bodies as `unsupported_content_type`. A spec that lists `application/x-amz-json-1.0` gets it read as JSON. (Only this exact AWS name, plus `1.1`, which other AWS services use.)
 
 ### Which integration gets the job schema
@@ -78,19 +76,19 @@ apis:
     hosts: [sqs.eu-west-1.amazonaws.com]
     spec: ./specs/aws-sqs.openapi.yaml
     vendorTimeout: 25s             # above SQS's 20 second long polling
-  aws-sqs-file-jobs:               # SQS carrying the file jobs
+  aws-sqs-invoices:                # SQS carrying the invoice jobs
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ./specs/aws-sqs-file-jobs.openapi.yaml
+    spec: ./specs/aws-sqs-invoices.openapi.yaml
     vendorTimeout: 25s
 
 integrations:
-  - id: file-jobs-producer
-    apis: [aws-sqs-file-jobs]
-  - id: file-jobs-worker
-    apis: [aws-sqs-file-jobs]
+  - id: invoice-shop
+    apis: [aws-sqs-invoices]
+  - id: invoice-worker
+    apis: [aws-sqs-invoices]
 ```
 
-`aws-sqs-file-jobs.openapi.yaml` is the full SQS spec with the job schema added to `MessageBody` (in `SendMessage`, `SendMessageBatch` and the `ReceiveMessage` reply). See question 2 for how the two files stay in step.
+`aws-sqs-invoices.openapi.yaml` is the full SQS spec with the job schema added to `MessageBody` (in `SendMessage`, `SendMessageBatch` and the `ReceiveMessage` reply). See question 2 for how the two files stay in step.
 
 ## The complete SQS spec
 
@@ -104,10 +102,10 @@ This also builds what [proxy-aws.md](proxy-aws.md) agreed but did not build yet:
 
 ## The example app
 
-One Go program in its own folder and Go module, `examples/aws-sqs-file-jobs/`, so the proxy's module never depends on the AWS SDK (agreed 2026-10-29). Two commands:
+One Go program in its own folder and Go module, `examples/aws-sqs-invoices/`, so the proxy's module never depends on the AWS SDK (agreed 2026-10-29). Two commands:
 
-- `produce`: sends today's job message to the queue.
-- `work`: receives messages, checks each one itself, does the job, and deletes the message.
+- `request --order A-1001 --language en`: sends the invoice job to the queue.
+- `work --out ./invoices`: receives jobs, checks each one itself, writes `A-1001.pdf` to the folder, and deletes the message.
 
 It sets up the SQS client exactly as the AWS setup guide says: the forward proxy set only on the SQS client, the HTTP client turning `https` into `http` after the SDK has signed, and the integration ID added by Go's proxy support. A `README.md` beside it shows how to run it against real AWS by hand.
 
@@ -118,16 +116,18 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
 ```gherkin
 # checks.feature: a string that holds JSON
   Scenario Outline: The job message inside an SQS call is checked
-    Given the SQS spec with the file job schema
+    Given the SQS spec with the invoice job schema
     When the app sends SendMessage with the message <message>
     Then the request results are <results>
 
     Examples:
       | message                                     | results                                                  |
       | a valid job                                 | none                                                     |
-      | a job with no date                          | body $.MessageBody.date required                         |
-      | a job whose input is https://… not s3://…   | body $.MessageBody.input pattern                         |
-      | a job whose schemaVersion is "1", a string  | body $.MessageBody.schemaVersion type integer            |
+      | a job with no orderId                       | body $.MessageBody.orderId required                      |
+      | a job whose orderId is 1001, a number       | body $.MessageBody.orderId type string                   |
+      | a job whose orderId is a-1001               | body $.MessageBody.orderId pattern                       |
+      | a job whose jobId is not a uuid             | body $.MessageBody.jobId format uuid                     |
+      | a job in the language fr                    | body $.MessageBody.language enum en, de, sk, cs          |
       | a job with an extra field priority          | body $.MessageBody.priority additionalProperties         |
       | text that is not JSON                       | body $.MessageBody json                                  |
 
@@ -137,42 +137,43 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
     Then the record has no request results
 
   Scenario: A bad message is also reported when the worker receives it
-    Given the SQS spec with the file job schema
-    And SQS answers ReceiveMessage with one job that has no date
+    Given the SQS spec with the invoice job schema
+    And SQS answers ReceiveMessage with one job that has no orderId
     When the worker sends ReceiveMessage
-    Then the response results are body $.Messages[0].Body.date required
+    Then the response results are body $.Messages[0].Body.orderId required
 
   Scenario: Results never hold values from the message
-    When the app sends SendMessage with a job whose input is s3://secret-bucket/x/
-    Then no result holds secret-bucket
+    When the app sends SendMessage with a job whose sendTo is secret@example.com
+    Then no result holds secret@example.com
 
 # end-to-end.feature
-  Scenario: A job goes through Hotline to SQS and back
+  Scenario: An invoice job goes through Hotline to SQS and back
     Given the fake SQS
-    And the hotline-proxy program runs with the integrations file-jobs-producer and file-jobs-worker
-    When the example app produces today's job
+    And the hotline-proxy program runs with the integrations invoice-shop and invoice-worker
+    When the example app requests the invoice for order A-1001
     And the example app works through the queue
     Then the fake SQS got the job unchanged and its signature parts intact
-    And the worker deleted the message
+    And the worker wrote A-1001.pdf and deleted the message
     And the receiver got records for SendMessage, ReceiveMessage and DeleteMessage, each with its own url.template and no results
 
   Scenario: A broken job is still delivered, and reported
-    When the example app produces a job with no date
+    When the example app sends a job with no orderId
     Then the fake SQS got the job
-    And the receiver got a SendMessage record with the result body $.MessageBody.date required
+    And the receiver got a SendMessage record with the result body $.MessageBody.orderId required
 ```
 
 ## Open questions, each with my recommendation
 
 1. **A fake SQS or real AWS for the tests?** I recommend a small fake SQS inside the end-to-end tests: it answers `SendMessage`, `ReceiveMessage` and `DeleteMessage` like SQS (including the MD5 hash of the message, which the SDK checks). Tests then run anywhere, offline, with no AWS account or cost. Running against real AWS stays a manual step in the example's README. (LocalStack, a local copy of AWS run in Docker, is the other choice, but it adds Docker to the tests.)
-2. **How does the job's spec stay in step with the plain SQS spec?** I recommend generating both: one small generator turns the Smithy model into `aws-sqs.openapi.yaml`, and, given the job schema file, also writes `aws-sqs-file-jobs.openapi.yaml`. A test fails when the committed files differ from what the generator makes. The other choice is letting the config add a schema to one field of a shared spec, which is a new config feature.
+2. **How does the job's spec stay in step with the plain SQS spec?** I recommend generating both: one small generator turns the Smithy model into `aws-sqs.openapi.yaml`, and, given the job schema file, also writes `aws-sqs-invoices.openapi.yaml`. A test fails when the committed files differ from what the generator makes. The other choice is letting the config add a schema to one field of a shared spec, which is a new config feature.
 3. **One job schema per integration, or per queue?** I recommend per integration for now (the setup above). If one integration sends different messages to different queues, the spec can choose the schema by `QueueUrl` later, using JSON Schema's `if`/`then`.
-4. **`s3://` folder or a ready-made download link?** I recommend `s3://` folders: a parquet folder holds many files, and a pre-signed download link (a link with a time-limited signature in it) works for one file only. The worker reads the files with its own AWS credentials.
-5. **How real is the worker?** I recommend that in this step the worker really receives, checks and deletes messages through Hotline, but the parquet reading, adding up and writing to S3 stays behind a small interface with an in-memory version for the tests. The real parquet and S3 part comes next, once you name the sums the projection needs. Its S3 calls would go through Hotline too, with an S3 spec, as a later step.
+4. **Where does the worker find the order?** I recommend a small built-in list of made-up orders in the example, so it needs no database or shop. The order's lines stay out of the message, which keeps the message small and the order data in one place.
+5. **Where does the PDF go?** I recommend a local folder in this step. Storing it in S3 (and its calls going through Hotline with an S3 spec) is a later step. The PDF is a plain one-page file written with a small PDF library in the example's own module.
 6. **Should the worker also refuse bad messages itself?** I recommend yes: Hotline only reports, it never blocks, so the worker checks the message against the same schema and moves a bad one aside (to a "dead letter" queue, the usual SQS place for messages that cannot be handled) instead of retrying it forever.
 
 ## Not in this step
 
 - SQS's older query protocol (form bodies with `Action=SendMessage`).
 - Other AWS services, including S3 through Hotline.
+- Mailing the invoice to `sendTo`.
 - Blocking calls whose message fails the check.
