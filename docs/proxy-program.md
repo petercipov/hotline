@@ -1,6 +1,6 @@
 # The hotline-proxy program
 
-The proxy from slice 1 runs as one program, `hotline-proxy`, in `src/hotline/cmd/hotline-proxy/`. It stays thin: it reads its command line, connects the real network, clock and log to the `proxy` package, starts the proxy and stops it. All decisions below are Peter's, 2026-10-28. The behaviour is written down in `src/hotline/proxy/features/program.feature`.
+The proxy from slice 1 runs as one program, `hotline-proxy`, in `src/hotline-proxy/cmd/`. It stays thin: it reads its command line, connects the real network, clock and log to the `proxy` package, starts the proxy and stops it. All decisions below are Peter's, 2026-10-28. The behaviour is written down in `src/hotline-proxy/features/program.feature`.
 
 ## What it does
 
@@ -17,7 +17,7 @@ The proxy from slice 1 runs as one program, `hotline-proxy`, in `src/hotline/cmd
 ## End-to-end tests
 
 - `make e2e` builds the program, runs the scenarios tagged `@e2e` against it as a separate process, and writes the program's coverage to `e2e-cover.out`. `make test` runs them too and adds that coverage to the total.
-- Without make: `go test -tags e2e -run TestEndToEnd ./proxy/` from `src/hotline`. It builds the program itself. The normal `go test ./...` skips them.
+- Without make: `go test -tags e2e -run TestEndToEnd .` from `src/hotline-proxy`. It builds the program itself. The normal `go test ./...` skips them.
 - The tests reach the program only through its command line, output, exit code and the network: a local TLS test vendor at `localhost` and a fake OTLP receiver.
 - Only the Go client cases from `research/matrix-clients/go` are in for now (cases 1 and 2). The Node, Java and Rust clients and the TLS cases (4 and 5) are tagged `@later`.
 - The "host that does not exist" case looks up `nothing.invalid` through the real DNS resolver. `.invalid` is a name kept by RFC 6761 that never exists.

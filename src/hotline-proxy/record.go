@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 
-	"hotline/proxy/internal/spec"
+	"hotline-proxy/internal/spec"
 )
 
 // finish builds the call's record once the reply has gone back to the app,

@@ -33,7 +33,7 @@ The ingress finds two things, the integration and the vendor's real address. Aft
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/url-in-path.feature`, and "Refused calls are still recorded" in `ingress.feature`.
+- Feature scenarios: `src/hotline-proxy/features/url-in-path.feature`, and "Refused calls are still recorded" in `ingress.feature`.
 - End to end: the Go client calls with a base address in the path, with an `https` and an `http` vendor address (`end-to-end.feature`), and over TLS to the proxy (`end-to-end-tls.feature`).
 
 ## How it is built

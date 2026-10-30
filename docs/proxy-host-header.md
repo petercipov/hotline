@@ -31,7 +31,7 @@ The app's own address for the proxy (`http://localhost:8080`) only says how the 
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/host-header.feature`. They replace the `501` rows for Host header calls in `ingress.feature` and `url-in-path.feature`, and the "HTTP/2 gets HTTP/1.1" scenario in `tls-from-apps.feature`.
+- Feature scenarios: `src/hotline-proxy/features/host-header.feature`. They replace the `501` rows for Host header calls in `ingress.feature` and `url-in-path.feature`, and the "HTTP/2 gets HTTP/1.1" scenario in `tls-from-apps.feature`.
 - End to end: the Go client calls with `Host` set, over plain HTTP/1.1 and plain HTTP/2 (`end-to-end.feature`), and over HTTP/2 with TLS (`end-to-end-tls.feature`).
 
 ## How it is built

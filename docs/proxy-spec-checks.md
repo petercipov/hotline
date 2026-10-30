@@ -1,6 +1,6 @@
 # Checking calls against the vendor's OpenAPI spec: requirements
 
-*Agreed with Peter, 2026-10-29. Built in two steps: the shared apis in the config (decisions 10 and 11), then the checks. Scenarios: `src/hotline/proxy/features/checks.feature`.*
+*Agreed with Peter, 2026-10-29. Built in two steps: the shared apis in the config (decisions 10 and 11), then the checks. Scenarios: `src/hotline-proxy/features/checks.feature`.*
 
 ## What the feature is
 
@@ -45,7 +45,7 @@ None. All nine were answered; see the decisions below.
 8. **Spec features in the first version** (Peter, 2026-10-29). Only OpenAPI 3.1; a 3.0 spec is refused when loaded. Shared parts (`$ref`) only within the same file. Lists and objects in query values in the usual OpenAPI ways (`?tag=a&tag=b`, `?filter[status]=open`). Stripe's form bodies (`metadata[order]=…`, `items[0][price]=…`) turned into a JSON-like shape for the schema. Callbacks, webhooks and XML come later.
 9. **A broken spec is a config problem** (Peter, 2026-10-29). A schema the proxy can't use (a wrong type name, a `$ref` that points nowhere, a link to another file, an OpenAPI version other than 3.1) stops the proxy at start, is listed by `hotline-proxy validate`, and on a later reload keeps the old config.
 10. **One spec, shared by all integrations** (Peter, 2026-10-29). Many integrations can use the same vendor spec, for example hundreds of integrations all calling Talon.One. A spec file is read, checked and turned into ready-to-use schemas once, and every integration that names it uses that one copy. Memory and start time grow with the number of different spec files, not with the number of integrations. The loader already reads each spec file once by its path; the schemas built for checks follow the same rule.
-11. **Each vendor api is named once in the config** (Peter, 2026-10-29). The full example is `src/hotline/proxy/testdata/proxy-example/hotline-proxy.yaml`, a copy of `proxy-example/hotline-proxy.yaml` in the `hotline-strategic` repo.
+11. **Each vendor api is named once in the config** (Peter, 2026-10-29). The full example is `src/hotline-proxy/testdata/proxy-example/hotline-proxy.yaml`, a copy of `proxy-example/hotline-proxy.yaml` in the `hotline-strategic` repo.
     ```yaml
     apis:                              # each vendor api, once
       talon-one:

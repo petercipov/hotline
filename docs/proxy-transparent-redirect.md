@@ -62,7 +62,7 @@ A start-up container with network rights rewrites the pod's outgoing plain calls
 
 ## Tests
 
-- End to end: "The transparent redirect" in `src/hotline/proxy/features/end-to-end.feature`. The Go client calls the test vendor's own name over plain `http`, its name lookup leads to the proxy, and it sends `Proxy-Authorization` as a default header; over plain HTTP/1.1 and plain HTTP/2.
+- End to end: "The transparent redirect" in `src/hotline-proxy/features/end-to-end.feature`. The Go client calls the test vendor's own name over plain `http`, its name lookup leads to the proxy, and it sends `Proxy-Authorization` as a default header; over plain HTTP/1.1 and plain HTTP/2.
 - Port 80 is kept: a new row in "Choosing http or https to the vendor" in `host-header.feature`. The fake vendor's port 80 now answers both plain `http` and `https`.
 - A name that leads back to the proxy: already covered by "A call to the proxy itself is stopped by the guard" in `host-header.feature`.
 

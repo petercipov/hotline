@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"hotline/proxy/internal/spec"
+	"hotline-proxy/internal/spec"
 )
 
 func TestSpec(t *testing.T) {

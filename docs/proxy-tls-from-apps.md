@@ -43,7 +43,7 @@ This feature encrypts the first connection. The app opens a TLS connection (an e
 
 ## Tests
 
-- Feature scenarios: `src/hotline/proxy/features/tls-from-apps.feature`. A call over TLS gets through; the proxy shows its one certificate whatever name is asked for; a plain request on the TLS port gets `400`; an app that doesn't trust the proxy, or allows only TLS 1.1, fails the setup and the proxy logs it at debug level; TLS 1.2 and 1.3 both work; a bad certificate stops the start; renewing the files changes the certificate for new connections only; a broken renewal keeps the old one.
+- Feature scenarios: `src/hotline-proxy/features/tls-from-apps.feature`. A call over TLS gets through; the proxy shows its one certificate whatever name is asked for; a plain request on the TLS port gets `400`; an app that doesn't trust the proxy, or allows only TLS 1.1, fails the setup and the proxy logs it at debug level; TLS 1.2 and 1.3 both work; a bad certificate stops the start; renewing the files changes the certificate for new connections only; a broken renewal keeps the old one.
 - End to end: `end-to-end-tls.feature` runs the Go client's cases 4 and 5 against the built program. The Node rows wait, tagged `@later`, for the Node client. `program.feature` checks that `validate` refuses a missing key file.
 
 ## How it is built

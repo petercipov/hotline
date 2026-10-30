@@ -68,7 +68,7 @@ The exception is passing in what the proxy needs from the world anyway: the cloc
 
 ### Feature files
 
-Behaviour is written as Gherkin feature files (plain-language test cases in Given, When, Then form) in `src/hotline/proxy/features/`, one file per behaviour, e.g. `redaction.feature`. They are run by [godog](https://github.com/cucumber/godog), the official Cucumber tool for Go (MIT license), from `src/hotline/proxy/features_test.go` (Peter, 2026-10-28).
+Behaviour is written as Gherkin feature files (plain-language test cases in Given, When, Then form) in `src/hotline-proxy/features/`, one file per behaviour, e.g. `redaction.feature`. They are run by [godog](https://github.com/cucumber/godog), the official Cucumber tool for Go (MIT license), from `src/hotline-proxy/features_test.go` (Peter, 2026-10-28).
 
 - **Given** sets up the starting state (config, specs, fake vendors), **When** is what an app or vendor does, **Then** is what can be seen from outside. Use `And` to add more lines of the same kind.
 - Use `Scenario Outline` with an `Examples` table when the same behaviour has several inputs.
@@ -126,7 +126,7 @@ The proxy is a small core with the outside world kept behind interfaces (often c
 
 ## 4. Layout and packages
 
-- Code lives under `src/hotline/` in module `hotline`. The program entry point goes in `src/hotline/cmd/hotline-proxy/`; it only reads flags, wires parts together and starts. All logic lives in packages it imports.
+- Proxy code lives under `src/hotline-proxy/` in module `hotline-proxy`; the `proxy` package sits at the top of that folder, next to `cmd/`, `features/`, `internal/` and `testdata/`. The metrics code stays in `src/hotline/metrics/`, module `hotline`. The program entry point goes in `src/hotline-proxy/cmd/`; build it with `-o hotline-proxy` so the program isn't named `cmd`; it only reads flags, wires parts together and starts. All logic lives in packages it imports.
 - One package per idea, named after what it provides, short and lower case: e.g. `ingress`, `forward`, `tap`, `check`, `redact`, `fingerprint`, `record`, `export`, `config`, `admin`. Never `util`, `common` or `helpers`.
 - Packages depend in one direction: the forwarding path knows nothing about exporters; it hands a finished record to a small interface.
 - Keep interfaces small (one or two methods) and declare them where they are *used*, not where they are implemented. Return concrete types.

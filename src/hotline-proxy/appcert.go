@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"hotline/proxy/internal/config"
+	"hotline-proxy/internal/config"
 )
 
 // certFiles is a certificate and key the proxy reads from files: the

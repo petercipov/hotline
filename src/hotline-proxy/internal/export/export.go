@@ -21,7 +21,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 
-	"hotline/proxy/internal/config"
+	"hotline-proxy/internal/config"
 )
 
 // Timing says how often the proxy sends, and how long one send to a

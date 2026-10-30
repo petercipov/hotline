@@ -85,7 +85,7 @@ Give the apps the issuer certificate (`ca.crt`, never the key), for example with
 
 ## Tests
 
-- `src/hotline/proxy/features/connect.feature`: a call through a tunnel, a signed call, the certificate shown, reuse, every host, the ID from `CONNECT`, the wrong host (`421`), HTTP/1.1 and HTTP/2 inside, plain HTTP inside, the handshake timing, an app that doesn't trust the issuer, the internal address guard, `CONNECT` on a TLS port, refused `CONNECT`s, `CONNECT` over HTTP/2 (one tunnel, many tunnels on one connection, plain HTTP inside, refused), stopping with a tunnel open (over HTTP/1.1 and HTTP/2), renewing the issuer, a bad issuer, and the long-lived issuer warning.
+- `src/hotline-proxy/features/connect.feature`: a call through a tunnel, a signed call, the certificate shown, reuse, every host, the ID from `CONNECT`, the wrong host (`421`), HTTP/1.1 and HTTP/2 inside, plain HTTP inside, the handshake timing, an app that doesn't trust the issuer, the internal address guard, `CONNECT` on a TLS port, refused `CONNECT`s, `CONNECT` over HTTP/2 (one tunnel, many tunnels on one connection, plain HTTP inside, refused), stopping with a tunnel open (over HTTP/1.1 and HTTP/2), renewing the issuer, a bad issuer, and the long-lived issuer warning.
 - `tls-from-apps.feature`: the handshake timing on the first call of each connection.
 - `end-to-end-connect.feature`: the real program with Go's own client and the standard proxy setting, through a plain and an https proxy address.
 
