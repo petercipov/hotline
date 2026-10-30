@@ -54,8 +54,8 @@ type Options struct {
 	ConfigPath string
 	Resolver   Resolver
 	Dialer     Dialer
-	// RootCAs are the trusted certificate issuers for vendors; nil means
-	// the system trust store.
+	// RootCAs are the trusted certificate issuers, for vendors and for
+	// collectors over TLS: the system's own and any extra ones.
 	RootCAs *x509.CertPool
 	Clock   Clock
 	Logger  *slog.Logger
@@ -66,6 +66,9 @@ type Options struct {
 	ExportTimeout time.Duration
 	Version       string
 	InstanceID    string
+	// LookupEnv reads the environment, for secrets the config reads from
+	// it.
+	LookupEnv func(string) (string, bool)
 }
 
 // Proxy is a running proxy.
@@ -85,7 +88,7 @@ type Proxy struct {
 // With listen.tls set, the proxy port accepts only TLS. With listen.connect
 // set, CONNECT is an ingress.
 func Start(ctx context.Context, o Options) (*Proxy, error) {
-	cfg, err := config.Load(o.ConfigPath, o.Clock.Now())
+	cfg, err := config.Load(o.ConfigPath, o.Clock.Now(), o.LookupEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -93,11 +96,8 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	sink, err := export.New(ctx, cfg.Exporters, export.Service{Version: o.Version, InstanceID: o.InstanceID},
+	sink := export.New(cfg.Exporters, o.RootCAs, export.Service{Version: o.Version, InstanceID: o.InstanceID},
 		export.Timing{Interval: o.ExportInterval, Timeout: o.ExportTimeout}, o.Logger)
-	if err != nil {
-		return nil, errors.Join(err, listener.Close())
-	}
 	h := &handler{
 		cfg:    cfg,
 		clock:  o.Clock,
@@ -173,8 +173,8 @@ func newTransport(o Options, allowInternal bool) *http.Transport {
 // Validate checks a config and every spec and certificate it points to,
 // without starting anything. A config with problems is refused with all of
 // them listed.
-func Validate(configPath string, clock Clock) error {
-	_, err := config.Load(configPath, clock.Now())
+func Validate(configPath string, clock Clock, lookupEnv func(string) (string, bool)) error {
+	_, err := config.Load(configPath, clock.Now(), lookupEnv)
 	return err
 }
 

@@ -113,6 +113,20 @@ Feature: Loading the config file
       | an exporter's temporality is neither cumulative nor delta |
       | an exporter's endpoint is not a valid address        |
       | an exporter's queueSize is zero                      |
+      | an exporter's protocol is http/json                  |
+      | an HTTP exporter's endpoint has no http:// or https:// |
+      | an exporter's endpoint has a query                   |
+      | an exporter's endpoint has a user name in it         |
+      | a gRPC exporter's endpoint has a path                |
+      | an exporter sets tls on a plain http:// endpoint     |
+      | an exporter sets tls.cert without tls.key            |
+      | an exporter's tls.ca file does not exist             |
+      | an exporter's tls.ca file holds no certificate       |
+      | an exporter's tls.cert file does not exist           |
+      | an exporter's header is neither a value, a file nor an env |
+      | an exporter's header secret file does not exist      |
+      | an exporter's header environment variable is not set |
+      | an exporter's compression is neither gzip nor none   |
       | two integrations have the same ID                    |
       | one integration names two apis with the same host    |
       | an integration names an api that is not in apis      |

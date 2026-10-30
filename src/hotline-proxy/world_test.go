@@ -46,7 +46,13 @@ type world struct {
 	telemetry *receiver
 	// downEndpoints are exporter endpoints where nothing listens.
 	downEndpoints []string
+	// exporterExtra are more lines for the exporter of each receiver.
 	exporterExtra []string
+	// env is the proxy's environment.
+	env map[string]string
+	// processEnv are variables set in the test process itself, unset with
+	// the world.
+	processEnv []string
 
 	// apis are the vendor apis of the config's apis section.
 	apis []namedAPI
@@ -188,6 +194,9 @@ func (w *world) close() {
 	}
 	if w.openConn != nil {
 		_ = w.openConn.Close()
+	}
+	for _, name := range w.processEnv {
+		_ = os.Unsetenv(name)
 	}
 	_ = os.RemoveAll(w.dir)
 }
@@ -338,7 +347,11 @@ func (w *world) config() string {
 	b.WriteString(w.listenConnect)
 	b.WriteString("exporters:\n")
 	for i, r := range w.receivers {
-		fmt.Fprintf(&b, "  - otlp:\n      endpoint: %s\n", r.endpoint)
+		b.WriteString("  - otlp:\n")
+		if r.http {
+			b.WriteString("      protocol: http/protobuf\n")
+		}
+		fmt.Fprintf(&b, "      endpoint: %s\n", r.endpoint)
 		if i < len(w.exporterExtra) {
 			b.WriteString(w.exporterExtra[i])
 		}
@@ -398,6 +411,10 @@ func (w *world) start() error {
 		ExportTimeout:  w.exportTimeout,
 		Version:        "1.0.0-test",
 		InstanceID:     "proxy-test-1",
+		LookupEnv: func(name string) (string, bool) {
+			v, ok := w.env[name]
+			return v, ok
+		},
 	})
 	return w.startErr
 }
