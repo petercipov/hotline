@@ -131,7 +131,10 @@ func (w *Worker) handle(ctx context.Context, m types.Message) error {
 		w.Log.Warn("message refused", "messageId", aws.ToString(m.MessageId), "eventId", job.EventID, "reason", err.Error())
 		return nil
 	}
-	file := filepath.Join(w.OutDir, job.OrderID+".pdf")
+	file := filepath.Join(w.OutDir, "invoice-"+job.OrderID+".pdf")
+	if err := os.MkdirAll(w.OutDir, 0o750); err != nil {
+		return fmt.Errorf("write %s: %w", file, err)
+	}
 	if err := os.WriteFile(file, pdf, 0o600); err != nil {
 		return err
 	}

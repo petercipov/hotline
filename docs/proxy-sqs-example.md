@@ -141,7 +141,7 @@ This also builds what [proxy-aws.md](proxy-aws.md) agreed but did not build yet:
 
 - `request --order A-1001 --template invoice-standard-v2 --language en`: sends the invoice job to the queue.
 - `send --body TEXT`: sends any text unchanged, to try Hotline's checks with a broken message.
-- `work --out ./invoices [--once]`: receives jobs, checks each one itself, writes `A-1001.pdf` to the folder, and deletes the message. A message it can't use stays on the queue, for the queue's dead letter queue.
+- `work --out ./invoices [--once]`: receives jobs, checks each one itself, writes `invoice-A-1001.pdf` to the folder (creating it if needed), and deletes the message. A message it can't use stays on the queue, for the queue's dead letter queue.
 
 It sets up the SQS client exactly as the AWS setup guide says. Its own tests use a fake SQS that also plays the forward proxy, so they check what the app sends to Hotline. The end-to-end tests below, through the real proxy, come with the proxy changes.
 

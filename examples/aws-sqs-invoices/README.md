@@ -34,7 +34,7 @@ Every command takes `--queue` (or `INVOICES_QUEUE_URL`), `--proxy` (or `HOTLINE_
 
 The worker:
 
-- writes `<orderId>.pdf` to the `--out` folder and deletes the message;
+- writes `invoice-<orderId>.pdf` to the `--out` folder, creating the folder if needed, and deletes the message;
 - deletes a message whose `eventId` it already handled, without writing again, since SQS may deliver a message twice;
 - leaves a message it can't use on the queue (broken JSON, a schema mistake, an unknown order or template). Give the queue a dead letter queue (a second queue where SQS moves messages that keep failing) with a `maxReceiveCount`, so such messages move aside instead of coming back forever.
 - uses long polling (SQS holds each receive call up to 20 seconds), so Hotline's `vendorTimeout` for SQS must be above 20 seconds. With `--once` it stops as soon as the queue is empty.
