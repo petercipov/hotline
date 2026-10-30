@@ -178,7 +178,8 @@ func (c *converter) operation(id string) map[string]any {
 }
 
 func (c *converter) content(schema any) map[string]any {
-	return map[string]any{c.mediaType: map[string]any{"schema": schema}}
+	// The proxy reads AWS's own name for JSON as JSON only when marked.
+	return map[string]any{c.mediaType: map[string]any{"schema": schema, "x-hotline-body": "json"}}
 }
 
 // body is the schema of an action's input or output. An action without

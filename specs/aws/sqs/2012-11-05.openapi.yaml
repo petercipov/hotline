@@ -21,6 +21,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/AddPermissionRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -28,6 +29,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -43,6 +45,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -58,6 +61,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -73,6 +77,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/CancelMessageMoveTaskRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -80,6 +85,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -95,6 +101,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -110,6 +117,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/CancelMessageMoveTaskResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -125,6 +133,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/ChangeMessageVisibilityRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -132,6 +141,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -147,6 +157,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -162,6 +173,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -177,6 +189,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/ChangeMessageVisibilityBatchRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -184,6 +197,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -199,6 +213,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -214,6 +229,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/ChangeMessageVisibilityBatchResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -229,6 +245,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/CreateQueueRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -236,6 +253,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -251,6 +269,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -266,6 +285,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/CreateQueueResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -281,6 +301,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/DeleteMessageRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -288,6 +309,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -303,6 +325,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -318,6 +341,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -333,6 +357,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/DeleteMessageBatchRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -340,6 +365,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -355,6 +381,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -370,6 +397,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/DeleteMessageBatchResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -385,6 +413,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/DeleteQueueRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -392,6 +421,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -407,6 +437,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -422,6 +453,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -437,6 +469,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/GetQueueAttributesRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -444,6 +477,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -459,6 +493,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -474,6 +509,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/GetQueueAttributesResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -489,6 +525,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/GetQueueUrlRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -496,6 +533,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -511,6 +549,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -526,6 +565,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/GetQueueUrlResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -541,6 +581,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/ListDeadLetterSourceQueuesRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -548,6 +589,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -563,6 +605,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -578,6 +621,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/ListDeadLetterSourceQueuesResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -593,6 +637,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/ListMessageMoveTasksRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -600,6 +645,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -615,6 +661,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -630,6 +677,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/ListMessageMoveTasksResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -645,6 +693,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/ListQueueTagsRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -652,6 +701,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -667,6 +717,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -682,6 +733,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/ListQueueTagsResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -697,6 +749,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/ListQueuesRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -704,6 +757,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -719,6 +773,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -734,6 +789,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/ListQueuesResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -749,6 +805,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/PurgeQueueRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -756,6 +813,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -771,6 +829,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -786,6 +845,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -801,6 +861,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/ReceiveMessageRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -808,6 +869,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -823,6 +885,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -838,6 +901,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/ReceiveMessageResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -853,6 +917,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/RemovePermissionRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -860,6 +925,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -875,6 +941,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -890,6 +957,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -905,6 +973,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/SendMessageRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -912,6 +981,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -927,6 +997,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -942,6 +1013,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/SendMessageResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -957,6 +1029,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/SendMessageBatchRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -964,6 +1037,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -979,6 +1053,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -994,6 +1069,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/SendMessageBatchResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -1009,6 +1085,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/SetQueueAttributesRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -1016,6 +1093,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1031,6 +1109,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1046,6 +1125,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -1061,6 +1141,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/StartMessageMoveTaskRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -1068,6 +1149,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1083,6 +1165,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1098,6 +1181,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/StartMessageMoveTaskResult'
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -1113,6 +1197,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/TagQueueRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -1120,6 +1205,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1135,6 +1221,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1150,6 +1237,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:
@@ -1165,6 +1253,7 @@ paths:
                     application/x-amz-json-1.0:
                         schema:
                             $ref: '#/components/schemas/UntagQueueRequest'
+                        x-hotline-body: json
                 required: true
             responses:
                 4XX:
@@ -1172,6 +1261,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1187,6 +1277,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 $ref: '#/components/schemas/AwsJsonError'
+                            x-hotline-body: json
                     description: An AWS error.
                     headers:
                         x-amzn-RequestId:
@@ -1202,6 +1293,7 @@ paths:
                         application/x-amz-json-1.0:
                             schema:
                                 type: object
+                            x-hotline-body: json
                     description: Done.
                     headers:
                         x-amzn-RequestId:

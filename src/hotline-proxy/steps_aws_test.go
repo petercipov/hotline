@@ -45,6 +45,18 @@ func awsSteps(sc *godog.ScenarioContext, w *world) {
 		w.addIntegration(integration("talon-shop-a", w.specAPI(sqsHost, spec, "")))
 		return nil
 	})
+	sc.Step(`^the SQS api with a spec whose SendMessage body is (\S+) with (no x-hotline-body|x-hotline-body: \S+)$`, func(mediaType, mark string) error {
+		if mark == "no x-hotline-body" {
+			mark = ""
+		}
+		spec := "openapi: 3.1.0\ninfo: { title: SQS, version: '1' }\nx-hotline-action-header: X-Amz-Target\n" +
+			"paths:\n  /#X-Amz-Target=AmazonSQS.SendMessage:\n    post:\n" +
+			"      requestBody:\n        content:\n          " + mediaType + ":\n            " + mark + "\n" +
+			"            schema: { type: object, properties: { DelaySeconds: { type: integer } } }\n" +
+			"      responses:\n        '200': { description: done }\n"
+		w.addIntegration(integration("talon-shop-a", w.specAPI(sqsHost, spec, "")))
+		return nil
+	})
 	sc.Step(`^SQS answers (\d+)(?: with "([^"]*)")? and the json body (.*)$`, func(status int, headers, body string) error {
 		w.sqsAnswers(status, headers, body)
 		return nil

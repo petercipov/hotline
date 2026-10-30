@@ -129,6 +129,14 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		Expect(at(send, "responses", "200", "content", "application/x-amz-json-1.0", "schema", "$ref")).To(Equal("#/components/schemas/SendResult"))
 	})
 
+	It("marks AWS's content type to be read as JSON, in requests, replies and errors", func() {
+		send := at(doc, "paths", "/#X-Amz-Target=Queues.Send", "post")
+		Expect(at(send, "requestBody", "content", "application/x-amz-json-1.0", "x-hotline-body")).To(Equal("json"))
+		for _, status := range []string{"200", "4XX", "5XX"} {
+			Expect(at(send, "responses", status, "content", "application/x-amz-json-1.0", "x-hotline-body")).To(Equal("json"))
+		}
+	})
+
 	It("gives an action with no output an empty object", func() {
 		Expect(at(doc, "paths", "/#X-Amz-Target=Queues.Purge", "post", "responses", "200", "content", "application/x-amz-json-1.0", "schema", "type")).To(Equal("object"))
 	})

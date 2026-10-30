@@ -351,8 +351,13 @@ func (b *builder) bodySpec(m map[string]any, pointer, where, what string) *bodyS
 	body := &bodySpec{}
 	for _, mediaType := range slices.Sorted(maps.Keys(listed)) {
 		media, _ := listed[mediaType].(map[string]any)
+		mark, marked := media["x-hotline-body"]
+		if marked && mark != "json" {
+			b.problem("%s: x-hotline-body of %s %s must be json", where, what, mediaType)
+		}
 		body.content = append(body.content, content{
 			mediaType: mediaType,
+			json:      mark == "json",
 			schema:    b.schema(media, pointer+"/content"+token(mediaType), where, what+" "+mediaType),
 		})
 	}

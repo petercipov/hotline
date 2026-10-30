@@ -91,6 +91,9 @@ type bodySpec struct {
 
 type content struct {
 	mediaType string
+	// json is set when the spec marks the type x-hotline-body: json, for a
+	// vendor's own name for JSON.
+	json bool
 	// schema is nil when the spec gives the type but no schema.
 	schema *jsonschema.Schema
 }
@@ -329,7 +332,7 @@ func (b *bodySpec) check(contentType string, body Body) ([]Result, string) {
 	}
 	var instance any
 	switch {
-	case isJSON(mediaType):
+	case c.json || isJSON(mediaType):
 		if body.TooLarge {
 			return nil, "body_too_large"
 		}
@@ -370,9 +373,7 @@ func (b *bodySpec) find(mediaType string) *content {
 }
 
 func isJSON(mediaType string) bool {
-	// AWS's JSON protocol names its own versions of JSON.
-	return mediaType == "application/json" || strings.HasSuffix(mediaType, "+json") ||
-		mediaType == "application/x-amz-json-1.0" || mediaType == "application/x-amz-json-1.1"
+	return mediaType == "application/json" || strings.HasSuffix(mediaType, "+json")
 }
 
 // nest reads bracketed names, as Stripe writes them, into objects and

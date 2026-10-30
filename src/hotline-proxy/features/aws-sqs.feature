@@ -37,7 +37,7 @@ Feature: AWS SQS through the proxy
         | with "X-Amz-Target: AmazonSQS.Teleport" |
         | with "X-Amz-Target: amazonsqs.sendmessage" |
 
-    Scenario: AWS's JSON content type is read as JSON
+    Scenario: AWS's JSON content type is read as JSON, as the spec marks it
       When the app sends SendMessage with the json body {"MessageBody":"hello","DelaySeconds":"soon"}
       Then the request results are body $.DelaySeconds type integer; body $.QueueUrl required
 
@@ -80,6 +80,33 @@ Feature: AWS SQS through the proxy
         | mark                                  |
         | no x-hotline-action-header            |
         | x-hotline-action-header: X-Amz-Action |
+
+  Rule: A body type is read as JSON where the spec marks it
+
+    The proxy itself reads only application/json, types ending in +json and
+    form bodies. AWS names its own type, application/x-amz-json-1.0, so the
+    spec marks it with x-hotline-body: json, next to its schema. The proxy
+    has nothing about AWS in it (Peter, 2026-10-30).
+
+    Scenario Outline: The mark decides whether AWS's content type is read
+      Given the SQS api with a spec whose SendMessage body is application/x-amz-json-1.0 with <mark>
+      When the app sends SendMessage with the json body {"DelaySeconds":"soon"}
+      Then <outcome>
+
+      Examples:
+        | mark                 | outcome                                                         |
+        | x-hotline-body: json | the request results are body $.DelaySeconds type integer        |
+        | no x-hotline-body    | the record says hotline.schema.skipped=unsupported_content_type |
+
+    Scenario Outline: A mark the proxy doesn't know is refused
+      Given the SQS api with a spec whose SendMessage body is application/x-amz-json-1.0 with <mark>
+      When the proxy loads the config
+      Then the config is refused with a message naming "x-hotline-body" and "application/x-amz-json-1.0"
+
+      Examples:
+        | mark                 |
+        | x-hotline-body: xml  |
+        | x-hotline-body: true |
 
   Rule: The invoice job inside each message is checked
 
