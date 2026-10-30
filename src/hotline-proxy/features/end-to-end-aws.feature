@@ -4,14 +4,13 @@ Feature: AWS SQS through the proxy, end to end
   send invoice jobs to SQS and to receive them, through the real
   hotline-proxy program. The proxy reaches a fake SQS on this computer over
   TLS; the app points the SDK at it, as with a local SQS. The proxy runs
-  with the example's own config, examples/aws-sqs-invoices/hotline/hotline-proxy.yaml,
-  with only its addresses changed: the stable SQS spec with the invoices
+  with testdata/aws/hotline-proxy.yaml, changing only its addresses: the stable SQS spec with the invoices
   overlay (Peter, 2026-10-30).
 
   Background:
     Given a fake OTLP receiver
     And a fake SQS
-    And the hotline-proxy program runs with the example's hotline-proxy.yaml
+    And the hotline-proxy program runs with the invoices hotline-proxy.yaml
 
   Scenario: An invoice job goes through Hotline to SQS and back
     When the example app requests the invoice for order A-1001

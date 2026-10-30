@@ -1,4 +1,4 @@
-# Hotline proxy config for the invoices example (see ../README.md).
+# Hotline proxy config for the invoices example app (examples/aws-sqs-invoices).
 # The end-to-end test runs the proxy with this file, changing only the
 # addresses, so what you read here is what the test checks.
 
@@ -14,7 +14,7 @@ exporters:
 apis:
   aws-sqs-invoices:                # the invoices queue
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ../../../specs/aws/sqs/2012-11-05.openapi.yaml   # the stable shared SQS spec
+    spec: ../../../../specs/aws/sqs/2012-11-05.openapi.yaml   # the stable shared SQS spec
     overlays: [./invoices.overlay.yaml]                     # this queue's URL and job message
     vendorTimeout: 25s             # above SQS's 20 second long polling
 

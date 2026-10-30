@@ -135,7 +135,7 @@ func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 		sqs = newFakeSQS(p.issuer.leaf("localhost", time.Now().Add(24*time.Hour), false))
 		return nil
 	})
-	sc.Step(`^the hotline-proxy program runs with the example's hotline-proxy.yaml$`, func() error {
+	sc.Step(`^the hotline-proxy program runs with the invoices hotline-proxy.yaml$`, func() error {
 		config, err := exampleConfig(p.proxyAddr, p.receiver.endpoint)
 		if err != nil {
 			return err
@@ -273,15 +273,15 @@ func (p *program) records() ([]map[string]any, error) {
 	return out, nil
 }
 
-// exampleConfig is the example's own hotline-proxy.yaml with only the
+// exampleConfig is testdata/aws/hotline-proxy.yaml with only the
 // addresses changed: the local ports, the fake SQS on localhost (an internal
 // address), and the spec and overlay read from where they are in the repo.
 func exampleConfig(proxyAddr, otlpEndpoint string) (string, error) {
-	dir, err := filepath.Abs(filepath.Join("..", "..", "examples", "aws-sqs-invoices", "hotline"))
+	dir, err := filepath.Abs(filepath.Join("testdata", "aws"))
 	if err != nil {
 		return "", err
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "hotline-proxy.yaml")) //nolint:gosec // the example's own file
+	data, err := os.ReadFile(filepath.Join(dir, "hotline-proxy.yaml")) //nolint:gosec // the test's own file
 	if err != nil {
 		return "", err
 	}
@@ -291,7 +291,7 @@ func exampleConfig(proxyAddr, otlpEndpoint string) (string, error) {
 		{`":8081"`, `"127.0.0.1:0"`},
 		{"localhost:4317", otlpEndpoint},
 		{"[sqs.eu-west-1.amazonaws.com]", "[localhost]\n    allowInternalIPs: true"},
-		{"../../../specs/", filepath.Join(dir, "..", "..", "..", "specs") + "/"},
+		{"../../../../specs/", filepath.Join(dir, "..", "..", "..", "..", "specs") + "/"},
 		{"./invoices.overlay.yaml", filepath.Join(dir, "invoices.overlay.yaml")},
 	} {
 		if strings.Count(config, change[0]) != 1 {

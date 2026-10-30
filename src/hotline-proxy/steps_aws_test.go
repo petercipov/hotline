@@ -25,7 +25,7 @@ func awsSteps(sc *godog.ScenarioContext, w *world) {
 		return w.sqsAPI("talon-shop-a", "aws-sqs", "")
 	})
 	sc.Step(`^the SQS spec with the invoices overlay$`, func() error {
-		overlay, err := os.ReadFile(filepath.Join("..", "..", "examples", "aws-sqs-invoices", "hotline", "invoices.overlay.yaml"))
+		overlay, err := os.ReadFile(filepath.Join("testdata", "aws", "invoices.overlay.yaml"))
 		w.writeFile("specs/invoices.overlay.yaml", string(overlay))
 		if err != nil {
 			return err

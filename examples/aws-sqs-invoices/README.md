@@ -51,15 +51,15 @@ The code is in [invoice/queue.go](invoice/queue.go). It follows the AWS setup gu
 
 ## Running it against real AWS
 
-You need an AWS account, a queue, and Hotline running with an integration `invoices` whose api lists `sqs.<region>.amazonaws.com`. The Hotline config for that is in [hotline/](hotline/):
+You need an AWS account, a queue, and Hotline running with an integration `invoices` whose api lists `sqs.<region>.amazonaws.com`. The end-to-end test's Hotline config does this, and is a good start:
 
-- [hotline/hotline-proxy.yaml](hotline/hotline-proxy.yaml): the proxy config, with the api `aws-sqs-invoices` and the integration `invoices`;
-- [hotline/invoices.overlay.yaml](hotline/invoices.overlay.yaml): the overlay that adds this queue's URL and the job schema to the stable SQS spec in [specs/aws/sqs](../../specs/aws/sqs/).
+- [hotline-proxy.yaml](../../src/hotline-proxy/testdata/aws/hotline-proxy.yaml): the proxy config, with the api `aws-sqs-invoices` and the integration `invoices`;
+- [invoices.overlay.yaml](../../src/hotline-proxy/testdata/aws/invoices.overlay.yaml): the overlay that adds this queue's URL and the job schema to the stable SQS spec in [specs/aws/sqs](../../specs/aws/sqs/).
 
-The overlay names the queue `https://sqs.eu-west-1.amazonaws.com/123456789012/invoices`, so change the account number and region there (and the host in the config) to yours. The end-to-end test runs the proxy with this same config, changing only its addresses.
+The overlay names the queue `https://sqs.eu-west-1.amazonaws.com/123456789012/invoices`, so change the account number and region there (and the host in the config) to yours.
 
 ```
-go run ../../src/hotline-proxy/cmd run --config hotline/hotline-proxy.yaml   # Hotline, in its own terminal
+go run ../../src/hotline-proxy/cmd run --config ../../src/hotline-proxy/testdata/aws/hotline-proxy.yaml   # Hotline, in its own terminal
 aws sqs create-queue --queue-name invoices
 export AWS_REGION=eu-west-1
 export INVOICES_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/<account>/invoices
