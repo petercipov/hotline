@@ -76,7 +76,7 @@ One thing to know: with SQS's JSON protocol, every call goes to the path `/`. Th
 
 Requirements:
 
-1. **One spec per integration.** Each is the full SQS spec with two things added: its own message schema on `MessageBody`, and its own queue URL on `QueueUrl` (an exact value, `const`). A message sent to the wrong queue is then reported as `body $.QueueUrl const`.
+1. **One shared SQS spec, plus a small overlay per integration** (Peter, 2026-10-30). An overlay is a small file in the official OpenAPI Overlay 1.0 format that says "in this spec, at this spot, add or change this". Overlays are worked out in their own step, before this one. Each integration's overlay adds two things: its own message schema on `MessageBody`, and its own queue URL on `QueueUrl` (an exact value, `const`). A message sent to the wrong queue is then reported as `body $.QueueUrl const`.
 2. **No config change.** The config already allows several apis on the same host, when different integrations use them (`config.feature`, "The same host in two apis of different integrations").
 
 ```yaml
@@ -189,7 +189,7 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
 ## Open questions, each with my recommendation
 
 1. **A fake SQS or real AWS for the tests?** I recommend a small fake SQS inside the end-to-end tests: it answers `SendMessage`, `ReceiveMessage` and `DeleteMessage` like SQS (including the MD5 hash of the message, which the SDK checks). Tests then run anywhere, offline, with no AWS account or cost. Running against real AWS stays a manual step in the example's README. (LocalStack, a local copy of AWS run in Docker, is the other choice, but it adds Docker to the tests.)
-2. **How do the three specs stay in step with the plain SQS spec?** I recommend generating them: one small generator turns the Smithy model into `aws-sqs.openapi.yaml`, and, for each integration, takes a small file with its queue URL and message schema and writes that integration's spec. A test fails when the committed files differ from what the generator makes. The other choice is letting the config add a schema to fields of a shared spec, which is a new config feature.
+2. **How do the three integrations stay in step with the SQS spec?** Settled: one SQS spec generated from the Smithy model, and a small overlay per integration, applied by the proxy when it loads (its own step).
 3. **What are the other two messages, and should the example show all three?** I recommend the example app and its end-to-end tests cover the invoice integration fully, and `checks.feature` uses a second integration on the same host to prove each one gets only its own schema and queue. The other two message schemas can be added once you name them.
 4. **Where does the worker find the order and the template?** I recommend a small built-in list of made-up orders and two built-in templates in the example, so it needs no database or shop. The order's lines stay out of the message, which keeps the message small and the order data in one place.
 5. **Where does the PDF go?** I recommend a local folder in this step. Storing it in S3 (and its calls going through Hotline with an S3 spec) is a later step. The PDF is a plain one-page file written with a small PDF library in the example's own module.
