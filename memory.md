@@ -37,7 +37,8 @@ The proxy is built in small slices, tests first.
    - each vendor api named once in the config, shared by integrations: built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md), decisions 10 and 11;
    - checks of every part of a call against the spec (path, query, headers, cookies, body; and the reply's status, headers and body). Built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md);
    - the transparent redirect ingress: built, as a Host header call with no proxy code change. Detail: [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redirect.md);
-   - AWS, starting with SQS: signed calls stay valid, actions as routes named by a header. Agreed, not built. Detail: [docs/proxy-aws.md](docs/proxy-aws.md);
+   - AWS, starting with SQS: signed calls stay valid, actions as routes named by a header. Built 2026-10-30. Detail: [docs/proxy-aws.md](docs/proxy-aws.md);
+   - the SQS invoice example: a string holding JSON (`contentMediaType` with `contentSchema`) is checked, AWS's JSON content types read as JSON, the stable SQS spec made from AWS's Smithy model by `tools/aws-openapi`, one overlay per queue, and end-to-end tests with the example app. Built. Detail: [docs/proxy-sqs-example.md](docs/proxy-sqs-example.md);
    - the CONNECT ingress, with interception: the proxy poses as the vendor inside the tunnel with certificates signed by the customer's issuer. Built. Detail: [docs/proxy-connect.md](docs/proxy-connect.md);
    - OTLP over HTTP, and TLS, login headers and gzip for both gRPC and HTTP: built. Detail: [docs/proxy-otlp-protocols.md](docs/proxy-otlp-protocols.md);
    - overlays on an api's spec: OpenAPI Overlay 1.1 only, on the api only, applied at load in order, a target matching nothing is a warning, library `speakeasy-api/openapi/overlay`, plus the `hotline-proxy overlay` command that makes one from two specs (Peter, 2026-10-30). Built; needed by the SQS example. Detail: [docs/proxy-overlays.md](docs/proxy-overlays.md);
@@ -179,3 +180,13 @@ Full wording in [docs/proxy-aws.md](docs/proxy-aws.md).
 5. The test uses a signed request fixture made once; Hotline never depends on the AWS SDK.
 6. AWS headers to record are marked in our SQS spec; the default header list is unchanged. No patterns in `hosts`.
 7. The setup guide recommends the forward proxy for AWS, with the app's HTTP client turning `https` into `http` after signing, says vendor URL in path can't work for signed hosts, and warns about `NO_PROXY` and VPC endpoints.
+
+## SQS example decisions (Peter, 2026-10-30)
+
+Full wording in [docs/proxy-sqs-example.md](docs/proxy-sqs-example.md).
+
+1. The example: a shop asks for an invoice PDF by putting a job on SQS; a worker renders it. Job fields: `schemaVersion`, `eventId` (not job ID), `orderId`, `templateId`, `language`, `requestedAt`, optional `sendTo`.
+2. Three integrations will each have their own queue and message schema on one shared SQS spec, through one overlay per queue that pins `QueueUrl` and adds the message schema. Overlays live with tests and examples, never in `specs/`.
+3. Stable vendor specs live in `specs/<vendor>/<api>/<version>.openapi.yaml`; the SQS one is generated from AWS's Smithy model, and a test keeps it in step.
+4. Tests use a fake SQS, never real AWS; running against AWS is a manual step in the example's README.
+5. Other AWS services (S3, DynamoDB) come later.

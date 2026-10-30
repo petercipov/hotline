@@ -1,6 +1,6 @@
 # AWS through the proxy, starting with SQS: requirements
 
-*Agreed with Peter, 2026-10-29. Not built yet. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo. The worked example, a Go app using the AWS SDK for Go v2 to send to SQS, is in the project files (`aws-sqs/`), with the throwaway check that ran it.*
+*Agreed with Peter, 2026-10-29; built 2026-10-30. Scenarios: `src/hotline-proxy/features/aws-sqs.feature` and `end-to-end-aws.feature`. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo. The worked example is [examples/aws-sqs-invoices](../examples/aws-sqs-invoices/README.md); the message check it uses is in [proxy-sqs-example.md](proxy-sqs-example.md).*
 
 ## What the feature is
 
@@ -52,7 +52,7 @@ What we checked with the real SDK (`service/sqs` v1.52.7):
 
 ## Tests
 
-### Signed calls stay valid (`forward.feature`)
+### Signed calls stay valid (`aws-sqs.feature`)
 
 The test uses a fixed, recorded request, signed once outside the repo with the SDK's signer, a made-up key and a fixed time: `testdata/aws/sqs-sendmessage-signed.http`. Hotline never imports the AWS SDK (Peter, 2026-10-29). The fake vendor needs no signing code: a signature stays valid exactly when every signed part arrives unchanged, so it checks the method, path, `Host`, body, and each header named in the fixture's `SignedHeaders`, read from its own `Authorization` line.
 
@@ -75,7 +75,7 @@ The test uses a fixed, recorded request, signed once outside the repo with the S
       | the Host header   | plain HTTP/2 |
 ```
 
-### Routes named by a header (`checks.feature` and `record.feature`)
+### Routes named by a header (`aws-sqs.feature`)
 
 - A call to `/` with `X-Amz-Target: AmazonSQS.SendMessage` matches `/#X-Amz-Target=AmazonSQS.SendMessage`, is checked against that route's body schema, and its record has that `url.template`.
 - The same call with `X-Amz-Target: AmazonSQS.ReceiveMessage` matches the receive route instead.
@@ -85,6 +85,5 @@ The test uses a fixed, recorded request, signed once outside the repo with the S
 ## Not in this step
 
 - SQS's older query protocol (a form body with `Action=SendMessage`), sent by SDKs from before late 2023.
-- Generating the SQS spec from the Smithy model; the tests use a small hand-written spec with two routes.
 - Other AWS services.
 - `CONNECT` with interception, the only way an unchanged SDK with its `https` address would work.

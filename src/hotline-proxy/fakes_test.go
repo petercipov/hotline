@@ -79,6 +79,8 @@ type vendorCall struct {
 	host   string
 	header http.Header
 	body   []byte
+	// contentLength is -1 when the body came in chunks of unknown size.
+	contentLength int64
 }
 
 // vendor is a fake vendor: one host that answers on https ports 443, 8443
@@ -97,7 +99,7 @@ func (v *vendor) record(scheme, port string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c := vendorCall{
 			scheme: scheme, port: port, proto: r.Proto, method: r.Method,
-			uri: r.RequestURI, host: r.Host, header: r.Header.Clone(),
+			uri: r.RequestURI, host: r.Host, header: r.Header.Clone(), contentLength: r.ContentLength,
 		}
 		v.mu.Lock()
 		answer := v.answer

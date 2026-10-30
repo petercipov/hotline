@@ -1,6 +1,6 @@
-# A Go app sending to AWS SQS through Hotline, with a checked message: requirements draft
+# A Go app sending to AWS SQS through Hotline, with a checked message
 
-*Draft for Peter, 2026-10-30. The example app is built; the proxy side is not agreed or built yet. It builds on [proxy-aws.md](proxy-aws.md) (agreed 2026-10-29, not built) and on the spec checks in [proxy-spec-checks.md](proxy-spec-checks.md) (built). Open questions are at the end, each with a recommendation.*
+*Agreed with Peter and built, 2026-10-30. Scenarios: `src/hotline-proxy/features/aws-sqs.feature` (fast, with a fake SQS) and `end-to-end-aws.feature` (the example app and the real program). It builds on [proxy-aws.md](proxy-aws.md), [proxy-spec-checks.md](proxy-spec-checks.md) and [proxy-overlays.md](proxy-overlays.md). Peter's answers are at the end.*
 
 ## What Peter asked for
 
@@ -145,69 +145,19 @@ This also builds what [proxy-aws.md](proxy-aws.md) agreed but did not build yet:
 
 It sets up the SQS client exactly as the AWS setup guide says. Its own tests use a fake SQS that also plays the forward proxy, so they check what the app sends to Hotline. The end-to-end tests below, through the real proxy, come with the proxy changes.
 
-## End-to-end tests
+## Tests
 
-The detailed rules are tested fast, with the proxy and a fake vendor, in `checks.feature`. The end-to-end tests then prove the whole path once with the real SDK and the real program. Draft scenarios:
+- `aws-sqs.feature` drives the proxy with a fake SQS: each action is its own route; a call with no or an unknown `X-Amz-Target` has no route; SQS's content type is read as JSON; AWS's error reply is checked and its headers kept; a spec whose routes name a header it doesn't declare is refused; the recorded signed call reaches the vendor with every signed part unchanged, over the forward proxy and the Host header ingress, on HTTP/1.1 and plain HTTP/2; and, with the invoices overlay ([testdata/aws/invoices.overlay.yaml](../src/hotline-proxy/testdata/aws/invoices.overlay.yaml)), each mistake in the job is reported at its place inside `MessageBody`, in the `ReceiveMessage` reply too, a message to another queue is reported, results never hold a value, and the plain spec doesn't check the message.
+- `end-to-end-aws.feature` builds the example app and runs it against the real `hotline-proxy` program and a fake SQS over TLS: a job goes there and back with records for `SendMessage`, `ReceiveMessage` and `DeleteMessage` and no results; a broken job is still delivered, and reported.
 
-```gherkin
-# checks.feature: a string that holds JSON
-  Scenario Outline: The job message inside an SQS call is checked
-    Given the SQS spec with the invoice job schema
-    When the app sends SendMessage with the message <message>
-    Then the request results are <results>
+## Found while building
 
-    Examples:
-      | message                                     | results                                                  |
-      | a valid job                                 | none                                                     |
-      | a job with no orderId                       | body $.MessageBody.orderId required                      |
-      | a job whose orderId is 1001, a number       | body $.MessageBody.orderId type string                   |
-      | a job whose orderId is a-1001               | body $.MessageBody.orderId pattern                       |
-      | a job with no templateId                    | body $.MessageBody.templateId required                   |
-      | a job whose templateId is Invoice Standard  | body $.MessageBody.templateId pattern                    |
-      | a job whose eventId is not a uuid           | body $.MessageBody.eventId format uuid                   |
-      | a job in the language fr                    | body $.MessageBody.language enum en, de, sk, cs          |
-      | a job with an extra field priority          | body $.MessageBody.priority additionalProperties         |
-      | text that is not JSON                       | body $.MessageBody json                                  |
+- The JSON Schema library can check a string that holds JSON itself, but it reports the wrong place for that string (it points at whichever field was checked last). The proxy does this check itself instead, with the library's support for added keywords, so places are right.
+- SQS leaves `Messages` out of an empty `ReceiveMessage` reply. A fake SQS that sent `"Messages": null` was caught by the reply check, as a real vendor's mistake would be.
 
-  Scenario: Each integration is checked against its own message and queue
-    Given the invoices integration and a second integration, each with its own SQS spec
-    When the second integration sends an invoice job to its own queue
-    Then the request results report the message against the second integration's schema
-    When the invoices integration sends an invoice job to the second integration's queue
-    Then the request results are body $.QueueUrl const
+## Open questions and answers
 
-  Scenario: The plain SQS spec does not check the message
-    Given the plain SQS spec
-    When the app sends SendMessage with the message text that is not JSON
-    Then the record has no request results
-
-  Scenario: A bad message is also reported when the worker receives it
-    Given the SQS spec with the invoice job schema
-    And SQS answers ReceiveMessage with one job that has no orderId
-    When the worker sends ReceiveMessage
-    Then the response results are body $.Messages[0].Body.orderId required
-
-  Scenario: Results never hold values from the message
-    When the app sends SendMessage with a job whose sendTo is secret@example.com
-    Then no result holds secret@example.com
-
-# end-to-end.feature
-  Scenario: An invoice job goes through Hotline to SQS and back
-    Given the fake SQS
-    And the hotline-proxy program runs with the integration invoices, used by both the shop and the worker
-    When the example app requests the invoice for order A-1001
-    And the example app works through the queue
-    Then the fake SQS got the job unchanged and its signature parts intact
-    And the worker wrote A-1001.pdf and deleted the message
-    And the receiver got records for SendMessage, ReceiveMessage and DeleteMessage, each with its own url.template and no results
-
-  Scenario: A broken job is still delivered, and reported
-    When the example app sends a job with no orderId
-    Then the fake SQS got the job
-    And the receiver got a SendMessage record with the result body $.MessageBody.orderId required
-```
-
-## Open questions, each with my recommendation
+Peter said to go ahead with the proxy side (2026-10-30), taking the recommendations below, except where noted.
 
 1. **A fake SQS or real AWS for the tests?** I recommend a small fake SQS inside the end-to-end tests: it answers `SendMessage`, `ReceiveMessage` and `DeleteMessage` like SQS (including the MD5 hash of the message, which the SDK checks). Tests then run anywhere, offline, with no AWS account or cost. Running against real AWS stays a manual step in the example's README. (LocalStack, a local copy of AWS run in Docker, is the other choice, but it adds Docker to the tests.)
 2. **How do the three integrations stay in step with the SQS spec?** Settled: one SQS spec generated from the Smithy model, and one overlay per queue, applied by the proxy when it loads (built in pull request #35).

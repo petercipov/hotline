@@ -47,6 +47,28 @@ Feature: AWS SQS through the proxy
       Then the record has no reply results
       And the record keeps the reply headers x-amzn-requestid and x-amzn-query-error
 
+  Rule: Signed calls stay valid
+
+    AWS signs the method, the path, Host, a hash of the body and the headers
+    named in SignedHeaders. The proxy holds no AWS keys and cannot sign
+    again, so every signed part must reach AWS unchanged (Peter,
+    2026-10-29). The fixture was signed once by the AWS SDK; Hotline never
+    imports the SDK.
+
+    Scenario Outline: A signed call reaches the vendor with every signed part unchanged
+      Given the SQS spec
+      And the recorded signed SQS call from the fixture, with Proxy-Authorization added after signing
+      When the app sends it to the proxy over <ingress> with <protocol>
+      Then every signed part reaches the vendor exactly as in the fixture
+      And SQS never sees Proxy-Authorization
+      And the vendor receives Content-Length with the body's length, not a body in chunks
+
+      Examples:
+        | ingress           | protocol     |
+        | the forward proxy | HTTP/1.1     |
+        | the Host header   | HTTP/1.1     |
+        | the Host header   | plain HTTP/2 |
+
   Rule: A spec with header routes must name the header
 
     Scenario Outline: A spec that doesn't name the routes' header is refused

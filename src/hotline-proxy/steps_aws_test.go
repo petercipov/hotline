@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 )
@@ -18,6 +20,7 @@ const (
 )
 
 func awsSteps(sc *godog.ScenarioContext, w *world) {
+	signedSteps(sc, w)
 	sc.Step(`^the SQS spec$`, func() error {
 		return w.sqsAPI("talon-shop-a", "aws-sqs", "")
 	})
@@ -142,4 +145,145 @@ func (w *world) sqsCall(id string, headers []string, body string) error {
 		body:    strings.NewReader(body),
 		length:  len(body),
 	})
+}
+
+// signedCall is the fixture: one SendMessage call the AWS SDK signed.
+type signedCall struct {
+	host   string
+	header http.Header
+	body   string
+}
+
+func readSignedCall() (signedCall, error) {
+	data, err := os.ReadFile(filepath.Join("testdata", "aws", "sqs-sendmessage-signed.http"))
+	if err != nil {
+		return signedCall{}, err
+	}
+	// The file is written as on the wire: lines end in CRLF.
+	head, body, _ := strings.Cut(string(data), "\r\n\r\n")
+	c := signedCall{header: http.Header{}, body: body}
+	for _, line := range strings.Split(head, "\r\n")[1:] {
+		name, value, _ := strings.Cut(line, ": ")
+		c.header.Add(name, value)
+	}
+	c.host = c.header.Get("Host")
+	return c, nil
+}
+
+// signedHeaders are the header names in the fixture's own Authorization
+// line, never typed into the test.
+func (c signedCall) signedHeaders() []string {
+	auth := c.header.Get("Authorization")
+	_, after, _ := strings.Cut(auth, "SignedHeaders=")
+	list, _, _ := strings.Cut(after, ",")
+	return strings.Split(list, ";")
+}
+
+func signedSteps(sc *godog.ScenarioContext, w *world) {
+	var call signedCall
+	sc.Step(`^the recorded signed SQS call from the fixture, with Proxy-Authorization added after signing$`, func() error {
+		var err error
+		call, err = readSignedCall()
+		call.header.Set("Proxy-Authorization", strings.TrimPrefix(basic(w.appID+":x"), "Proxy-Authorization: "))
+		return err
+	})
+	sc.Step(`^the app sends it to the proxy over (the forward proxy|the Host header) with (HTTP/1.1|plain HTTP/2)$`, func(ingress, protocol string) error {
+		target := "/"
+		if ingress == "the forward proxy" {
+			target = "http://" + call.host + "/"
+		}
+		if protocol == "plain HTTP/2" {
+			return w.sendHTTP2Body(call)
+		}
+		var lines []string
+		for name, values := range call.header {
+			if name != "Content-Length" {
+				for _, v := range values {
+					lines = append(lines, name+": "+v)
+				}
+			}
+		}
+		return w.send(request{method: http.MethodPost, target: target, headers: lines, body: strings.NewReader(call.body), length: len(call.body)})
+	})
+	sc.Step(`^every signed part reaches the vendor exactly as in the fixture$`, func() error {
+		got, err := w.lastVendorCall(sqsHost)
+		if err != nil {
+			return err
+		}
+		if got.method != http.MethodPost || got.uri != "/" || got.host != call.host || string(got.body) != call.body {
+			return failf("the vendor got %s %s, Host %s and the body %q", got.method, got.uri, got.host, got.body)
+		}
+		for _, name := range call.signedHeaders() {
+			switch name {
+			case "host", "content-length":
+				continue // checked above and below
+			}
+			if want, have := call.header.Values(name), got.header.Values(name); strings.Join(want, ",") != strings.Join(have, ",") {
+				return failf("the signed header %s reached the vendor as %q, want %q", name, have, want)
+			}
+		}
+		return nil
+	})
+	sc.Step(`^SQS never sees Proxy-Authorization$`, func() error {
+		got, err := w.lastVendorCall(sqsHost)
+		if err != nil {
+			return err
+		}
+		if got.header.Get("Proxy-Authorization") != "" {
+			return failf("SQS got Proxy-Authorization")
+		}
+		return nil
+	})
+	sc.Step(`^the vendor receives Content-Length with the body's length, not a body in chunks$`, func() error {
+		got, err := w.lastVendorCall(sqsHost)
+		if err != nil {
+			return err
+		}
+		if got.contentLength != int64(len(call.body)) {
+			return failf("the vendor got a Content-Length of %d, want %d", got.contentLength, len(call.body))
+		}
+		return nil
+	})
+}
+
+func (w *world) lastVendorCall(host string) (vendorCall, error) {
+	calls := w.vendor(host).received()
+	if len(calls) == 0 {
+		return vendorCall{}, failf("the vendor %s got no call; the app got %v %v %s", host, w.resp, w.respErr, w.respBody)
+	}
+	return calls[len(calls)-1], nil
+}
+
+// sendHTTP2Body sends the signed call over plain HTTP/2 from the first
+// byte, as a Host header call.
+func (w *world) sendHTTP2Body(c signedCall) error {
+	if err := w.start(); err != nil {
+		return err
+	}
+	w.vendor(c.host)
+	protocols := new(http.Protocols)
+	protocols.SetUnencryptedHTTP2(true)
+	transport := &http.Transport{Protocols: protocols}
+	defer transport.CloseIdleConnections()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+w.addr+"/", strings.NewReader(c.body))
+	if err != nil {
+		return err
+	}
+	req.Host = c.host
+	for name, values := range c.header {
+		switch name {
+		case "Host", "Content-Length":
+		default:
+			req.Header[name] = values
+		}
+	}
+	resp, err := (&http.Client{Transport: transport}).Do(req)
+	w.resp, w.respErr = resp, err
+	if err != nil {
+		return nil
+	}
+	w.respBody, w.respErr = io.ReadAll(resp.Body)
+	return resp.Body.Close()
 }
