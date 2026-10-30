@@ -17,6 +17,15 @@ Feature: TLS from apps to the proxy
     And the app gets the vendor's status, headers and body unchanged
     And the record says hotline.ingress forward_proxy and ID talon-shop-a
 
+  Scenario: The handshake with the app is timed on the first call of each connection
+    The proxy's own cost includes setting up TLS with the app (Peter,
+    2026-10-29). Later calls on the same connection skip it, like any phase
+    that did not happen.
+    Given an app that trusts the test issuer
+    When the app sends two calls on one TLS connection
+    Then the first record has hotline.timing.app_tls
+    And the second record has no hotline.timing.app_tls
+
   Scenario: The proxy shows its one certificate whatever name the app asks for
     When an app opens TLS to the proxy asking for the name api.talon.one
     Then the proxy shows its own certificate

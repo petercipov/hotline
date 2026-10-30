@@ -5,6 +5,7 @@ package config
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"maps"
@@ -27,7 +28,10 @@ type Config struct {
 	ProxyAddr string
 	// TLS, when set, makes the proxy port accept only TLS, with this
 	// certificate.
-	TLS       *TLS
+	TLS *TLS
+	// Connect, when set, makes CONNECT an ingress: this issuer signs the
+	// certificate the proxy shows for each vendor host inside a tunnel.
+	Connect   *TLS
 	Exporters []Exporter
 	// NotPassed applies to calls without a known integration ID, and to
 	// calls to a host outside the integration's apis.
@@ -40,8 +44,9 @@ type Config struct {
 	integrations map[string]map[string]*API
 }
 
-// TLS is the proxy's own certificate for apps: the files it comes from,
-// and the pair they held when the config was loaded.
+// TLS is a certificate the proxy shows apps, or the issuer it signs them
+// with: the files it comes from, and the pair they held when the config
+// was loaded.
 type TLS struct {
 	CertFile    string
 	KeyFile     string
@@ -82,12 +87,10 @@ func (c *Config) API(integrationID, host string) *API {
 type file struct {
 	Version string `yaml:"version"`
 	Listen  struct {
-		Proxy string `yaml:"proxy"`
-		Admin any    `yaml:"admin"`
-		TLS   *struct {
-			Cert string `yaml:"cert"`
-			Key  string `yaml:"key"`
-		} `yaml:"tls"`
+		Proxy   string    `yaml:"proxy"`
+		Admin   any       `yaml:"admin"`
+		TLS     *pairFile `yaml:"tls"`
+		Connect *pairFile `yaml:"connect"`
 	} `yaml:"listen"`
 	Telemetry any `yaml:"telemetry"`
 	// APIs are the vendor apis, each written once and named by the
@@ -110,6 +113,12 @@ type file struct {
 		Settings       settingsFile `yaml:",inline"`
 		APIs           []apiRef     `yaml:"apis"`
 	} `yaml:"integrations"`
+}
+
+// pairFile names a certificate file and its key file.
+type pairFile struct {
+	Cert string `yaml:"cert"`
+	Key  string `yaml:"key"`
 }
 
 // apiRef is an api an integration names: just its name, or
@@ -192,7 +201,10 @@ func Load(path string, now time.Time) (*Config, error) {
 		l.problem("there is no listen.proxy address")
 	}
 	if t := f.Listen.TLS; t != nil {
-		c.TLS = l.tls(t.Cert, t.Key, now)
+		c.TLS = l.pair("listen.tls", t, LoadCertificate, now)
+	}
+	if t := f.Listen.Connect; t != nil {
+		c.Connect = l.pair("listen.connect", t, LoadIssuer, now)
 	}
 	if len(f.Exporters) == 0 {
 		l.problem("there are no exporters")
@@ -301,13 +313,13 @@ func (l *loader) settings(label string, f settingsFile, s Settings) Settings {
 	return s
 }
 
-func (l *loader) tls(certFile, keyFile string, now time.Time) *TLS {
-	if certFile == "" || keyFile == "" {
-		l.problem("listen.tls needs both cert and key")
+func (l *loader) pair(label string, f *pairFile, load func(certFile, keyFile string, now time.Time) (*tls.Certificate, error), now time.Time) *TLS {
+	if f.Cert == "" || f.Key == "" {
+		l.problem("%s needs both cert and key", label)
 		return nil
 	}
-	t := &TLS{CertFile: l.path(certFile), KeyFile: l.path(keyFile)}
-	cert, err := LoadCertificate(t.CertFile, t.KeyFile, now)
+	t := &TLS{CertFile: l.path(f.Cert), KeyFile: l.path(f.Key)}
+	cert, err := load(t.CertFile, t.KeyFile, now)
 	if err != nil {
 		l.problems = append(l.problems, err)
 	}
@@ -319,17 +331,35 @@ func (l *loader) tls(certFile, keyFile string, now time.Time) *TLS {
 // its key, and checks that they match and that the certificate has not
 // expired by now.
 func LoadCertificate(certFile, keyFile string, now time.Time) (*tls.Certificate, error) {
+	return loadPair("listen.tls", certFile, keyFile, now)
+}
+
+// LoadIssuer reads the issuer the proxy signs its certificates for vendor
+// hosts with, as LoadCertificate does, and checks that it is an issuer:
+// a certificate authority allowed to sign certificates.
+func LoadIssuer(certFile, keyFile string, now time.Time) (*tls.Certificate, error) {
+	cert, err := loadPair("listen.connect", certFile, keyFile, now)
+	if err != nil {
+		return nil, err
+	}
+	if leaf := cert.Leaf; !leaf.IsCA || leaf.KeyUsage != 0 && leaf.KeyUsage&x509.KeyUsageCertSign == 0 {
+		return nil, fmt.Errorf("%w: listen.connect: the certificate in %s is not an issuer: it may not sign certificates", ErrInvalid, certFile)
+	}
+	return cert, nil
+}
+
+func loadPair(label, certFile, keyFile string, now time.Time) (*tls.Certificate, error) {
 	certPEM, certErr := os.ReadFile(certFile) //nolint:gosec // the config names its certificate files
 	keyPEM, keyErr := os.ReadFile(keyFile)    //nolint:gosec // the config names its certificate files
 	if err := errors.Join(certErr, keyErr); err != nil {
-		return nil, fmt.Errorf("%w: listen.tls: the cert or key file cannot be read: %w", ErrInvalid, err)
+		return nil, fmt.Errorf("%w: %s: the cert or key file cannot be read: %w", ErrInvalid, label, err)
 	}
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
-		return nil, fmt.Errorf("%w: listen.tls: %s and %s are not a matching certificate and key: %w", ErrInvalid, certFile, keyFile, err)
+		return nil, fmt.Errorf("%w: %s: %s and %s are not a matching certificate and key: %w", ErrInvalid, label, certFile, keyFile, err)
 	}
 	if notAfter := cert.Leaf.NotAfter; now.After(notAfter) {
-		return nil, fmt.Errorf("%w: listen.tls: the certificate in %s expired on %s", ErrInvalid, certFile, notAfter.UTC().Format(time.RFC3339))
+		return nil, fmt.Errorf("%w: %s: the certificate in %s expired on %s", ErrInvalid, label, certFile, notAfter.UTC().Format(time.RFC3339))
 	}
 	return &cert, nil
 }

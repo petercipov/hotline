@@ -31,6 +31,7 @@ The proxy is built in small slices, tests first.
    - checks of every part of a call against the spec (path, query, headers, cookies, body; and the reply's status, headers and body). Built. Detail: [docs/proxy-spec-checks.md](docs/proxy-spec-checks.md);
    - the transparent redirect ingress: built, as a Host header call with no proxy code change. Detail: [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redirect.md);
    - AWS, starting with SQS: signed calls stay valid, actions as routes named by a header. Agreed, not built. Detail: [docs/proxy-aws.md](docs/proxy-aws.md);
+   - the CONNECT ingress, with interception: the proxy poses as the vendor inside the tunnel with certificates signed by the customer's issuer. Built. Detail: [docs/proxy-connect.md](docs/proxy-connect.md);
    - config reload without a restart;
    - the load test, with k6.
 
@@ -38,7 +39,7 @@ The proxy is built in small slices, tests first.
 
 Full wording is at the end of [docs/proxy-slice-1.md](docs/proxy-slice-1.md).
 
-1. Other requests on the proxy port (a plain path, a Host header request, `CONNECT`) get `501`. A full address the proxy can't use gets `400`.
+1. Other requests on the proxy port (a plain path, a Host header request, `CONNECT`) get `501`. `CONNECT` is an ingress since 2026-10-29, when `listen.connect` is set. A full address the proxy can't use gets `400`.
 2. A broken `Proxy-Authorization` header counts as no integration ID: `not-passed`.
 3. A path with no route in the spec: `url.full` and `url.template` are left out.
 4. Turning `http` into `https` keeps the app's port.
@@ -77,7 +78,7 @@ Full wording in [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
 5. Client certificates (mutual TLS) come later, with caller authentication.
 6. TLS 1.2 and 1.3 only, Go's default ciphers, nothing to configure.
 7. Only HTTP/1.1 over TLS for now; HTTP/2 comes with the Host header ingress.
-8. No record field for it; the proxy's own health data says it once.
+8. No record field for it; the proxy's own health data says it once. Changed 2026-10-29: the TLS setup time is recorded as `hotline.timing.app_tls`.
 9. A missing, broken, mismatched or expired certificate stops the proxy at start. A failed app TLS setup is a debug log line and, later, a count in health data.
 10. The warning before the proxy's own certificate expires comes with the health data.
 
@@ -139,6 +140,24 @@ Full wording in [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redi
 2. The app adds `Proxy-Authorization` itself as a default header; no new way to pass the integration ID.
 3. No separate port or record value: a redirected call is a Host header call, `hotline.ingress=host_header`.
 4. The port is always kept, port 80 too (`Host: api.x.com:80` goes to `https` on port 80); no port means 443.
+
+## CONNECT ingress decisions (Peter, 2026-10-29)
+
+Full wording in [docs/proxy-connect.md](docs/proxy-connect.md). Why: a proxy deployed apart from the apps needs the hop to it encrypted, with no change in the app.
+
+1. The issuer comes from the customer: `listen.connect: { cert, key }`, re-read on change. Without it, `CONNECT` gets `501`.
+2. Hotline builds nothing for apps to trust the issuer; the setup guide shows how per language.
+3. Every host is intercepted; pinned hosts go in `NO_PROXY`. No blind tunnel.
+4. The integration ID comes from `Proxy-Authorization` on the `CONNECT`, for the whole tunnel; one inside is ignored. `CONNECT` works on plain and TLS ports.
+5. Host certificates: made on first use, memory only, 24 hours.
+6. HTTP/2 and HTTP/1.1 inside the tunnel. `CONNECT` over HTTP/2 gets `501` for now.
+7. Calls go to the `CONNECT` host and port; another host gets `421`.
+8. One record per call, `hotline.ingress=connect`; `hotline.timing.app_tls` on the first call of each connection; an app that doesn't trust the issuer gets a minimal record with `tls_untrusted_by_app`.
+9. `hotline.timing.app_tls` also on TLS from apps (changes TLS from apps decision 8).
+10. The issuer is made only for Hotline; files that are not an issuer stop the start; over a year gets a warning.
+11. Plain HTTP inside a tunnel is allowed, handled like a forward proxy `http` call.
+
+Found while building: Go's client offers HTTP/2 to an `https` proxy address and then speaks HTTP/1.1, so the proxy sets up TLS with apps itself and picks the HTTP version from the app's first bytes.
 
 ## AWS and SQS decisions (Peter, 2026-10-29)
 

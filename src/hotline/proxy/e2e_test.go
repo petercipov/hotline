@@ -80,6 +80,8 @@ type program struct {
 	// tls makes the program's proxy port accept only TLS, with a
 	// certificate for hotline-proxy from the test issuer.
 	tls bool
+	// interception, when set, is the issuer in the listen.connect files.
+	interception *issuer
 
 	process  *exec.Cmd
 	stdout   syncBuffer
@@ -130,6 +132,15 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 	sc.Step(`^the hotline-proxy program runs with TLS on its proxy port and integration test-shop for the test vendor$`, func() error {
 		p.tls = true
 		return p.run()
+	})
+	sc.Step(`^the hotline-proxy program runs with listen.connect( and TLS on its port)? and integration test-shop for the test vendor$`, func(withTLS string) error {
+		p.interception = newIssuer()
+		p.tls = withTLS != ""
+		return p.run()
+	})
+	sc.Step(`^the Go client sends POST to the test vendor's https address through the proxy at an (http|https) one$`, func(scheme string) error {
+		p.respond(p.goConnect(scheme, p.vendorURL+paymentPath, "test-shop"))
+		return p.respErr
 	})
 	sc.Step(`^the hotline-proxy program runs with "([^"]*)" and integration test-shop for the test vendor$`, func(flags string) error {
 		return p.run(strings.Fields(flags)...)
@@ -352,7 +363,7 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		}
 		return nil
 	})
-	sc.Step(`^the receiver got one hotline.request record with hotline.ingress (forward_proxy|url_in_path|host_header) and ID test-shop$`, func(ingress string) error {
+	sc.Step(`^the receiver got one hotline.request record with hotline.ingress (forward_proxy|url_in_path|host_header|connect) and ID test-shop$`, func(ingress string) error {
 		record, err := p.record()
 		if err != nil {
 			return err
@@ -495,6 +506,12 @@ func (p *program) config(validateOnly bool) string {
 		_ = os.WriteFile(filepath.Join(p.dir, "tls", "cert.pem"), []byte(certPEM(cert)), 0o600)
 		_ = os.WriteFile(filepath.Join(p.dir, "tls", "key.pem"), []byte(keyPEM(cert)), 0o600)
 		listenTLS = "  tls: { cert: ./tls/cert.pem, key: ./tls/key.pem }\n"
+	}
+	if p.interception != nil {
+		_ = os.MkdirAll(filepath.Join(p.dir, "ca"), 0o750)
+		_ = os.WriteFile(filepath.Join(p.dir, "ca", "cert.pem"), []byte(issuerCertPEM(p.interception)), 0o600)
+		_ = os.WriteFile(filepath.Join(p.dir, "ca", "key.pem"), []byte(issuerKeyPEM(p.interception)), 0o600)
+		listenTLS += "  connect: { cert: ./ca/cert.pem, key: ./ca/key.pem }\n"
 	}
 	// The test vendor runs on this computer, an internal address, so the
 	// config allows internal IPs.
@@ -710,6 +727,27 @@ func goCase4(proxyAddr, target, id string, appTLS *tls.Config) (*http.Response, 
 	req.URL = &url.URL{Scheme: "https", Host: proxyAddr, Opaque: strings.TrimPrefix(target, "https:")}
 	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":x")))
 	return t.RoundTrip(req)
+}
+
+// goConnect calls the vendor's own https address through the standard
+// proxy setting, as HTTPS_PROXY does: Go sends CONNECT with the ID from the
+// proxy address, then sets up TLS with the "vendor" inside the tunnel. The
+// app trusts the interception issuer, and the test issuer for the proxy's
+// own name. Like Go's default client, it offers HTTP/2 everywhere.
+func (p *program) goConnect(proxyScheme, target, id string) (*http.Response, error) {
+	_, proxyPort, _ := net.SplitHostPort(p.proxyAddr)
+	roots := p.interception.pool.Clone()
+	roots.AddCert(p.issuer.cert)
+	t := &http.Transport{
+		Proxy: http.ProxyURL(&url.URL{Scheme: proxyScheme, Host: "hotline-proxy:" + proxyPort, User: url.UserPassword(id, "x")}),
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, p.proxyAddr)
+		},
+		TLSClientConfig:   &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12},
+		ForceAttemptHTTP2: true,
+	}
+	defer t.CloseIdleConnections()
+	return t.RoundTrip(paymentRequest(target))
 }
 
 // goCase5 sends "POST http://… HTTP/1.1" through the standard proxy setting

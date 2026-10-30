@@ -88,16 +88,6 @@ func tlsSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^the record says hotline.ingress forward_proxy and ID talon-shop-a$`, func() error {
-		record, err := w.record()
-		if err != nil {
-			return err
-		}
-		if err := has(record, "hotline.ingress", "forward_proxy"); err != nil {
-			return err
-		}
-		return has(record, "hotline.integration.id", "talon-shop-a")
-	})
 	sc.Step(`^no record is sent$`, func() error {
 		if records := w.records(); len(records) != 0 {
 			return failf("the receiver got %d records", len(records))

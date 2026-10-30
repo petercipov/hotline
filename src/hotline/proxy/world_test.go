@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -116,6 +117,26 @@ type world struct {
 	openConn net.Conn
 	// renewed is the certificate that replaced proxyCert in its files.
 	renewed *tls.Certificate
+
+	// listenConnect, when set, is the listen.connect line of the config.
+	listenConnect string
+	// interception is the issuer in the listen.connect files, and second
+	// the one that replaced it.
+	interception *issuer
+	second       *issuer
+	// tunnelRoots are the issuers an app trusts inside a tunnel, and
+	// tunnelProtos the HTTP versions it offers there; none means both.
+	tunnelRoots  *x509.CertPool
+	tunnelProtos []string
+	// tunnel is the last tunnel opened, and tunnels all of them, closed
+	// with the world. tunnelErr says why TLS inside the last one failed.
+	tunnel    net.Conn
+	tunnels   []net.Conn
+	tunnelErr error
+	// tunnelCerts are the certificates the proxy showed in each tunnel.
+	tunnelCerts []*x509.Certificate
+	// sentRecords are the records that arrived while the proxy runs.
+	sentRecords []receivedRecord
 }
 
 func newWorld() (*world, error) {
@@ -139,6 +160,9 @@ func newWorld() (*world, error) {
 }
 
 func (w *world) close() {
+	for _, c := range w.tunnels {
+		_ = c.Close()
+	}
 	if w.proxy != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		_ = w.proxy.Shutdown(ctx)
@@ -304,6 +328,7 @@ func (w *world) config() string {
 	b.WriteString("version: 2026-10-28.1\n")
 	fmt.Fprintf(&b, "listen:\n  proxy: %q\n  admin: \"127.0.0.1:0\"\n", w.addr)
 	b.WriteString(w.listenTLS)
+	b.WriteString(w.listenConnect)
 	b.WriteString("exporters:\n")
 	for i, r := range w.receivers {
 		fmt.Fprintf(&b, "  - otlp:\n      endpoint: %s\n", r.endpoint)
