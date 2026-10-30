@@ -1,0 +1,23 @@
+# Hotline proxy config for the invoices example app (examples/aws-sqs-invoices).
+# The end-to-end test runs the proxy with this file, changing only the
+# addresses, so what you read here is what the test checks.
+
+version: aws-sqs-invoices-1        # carried by every record
+listen:
+  proxy: ":8080"                   # the app sets HOTLINE_PROXY=http://invoices:x@localhost:8080
+  admin: ":8081"
+
+exporters:
+  - otlp:
+      endpoint: localhost:4317     # an OpenTelemetry collector
+
+apis:
+  aws-sqs-invoices:                # the invoices queue
+    hosts: [sqs.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/sqs/2012-11-05.openapi.yaml   # the stable shared SQS spec
+    overlays: [./invoices.overlay.yaml]                     # this queue's URL and job message
+    vendorTimeout: 25s             # above SQS's 20 second long polling
+
+integrations:
+  - id: invoices                   # the user name in HOTLINE_PROXY
+    apis: [aws-sqs-invoices]

@@ -43,10 +43,12 @@ func TestEndToEnd(t *testing.T) {
 			t.Fatalf("building hotline-proxy failed: %v\n%s", err, out)
 		}
 	}
+	app := &exampleApp{dir: t.TempDir()}
 	suite := godog.TestSuite{
 		Name: "hotline-proxy-e2e",
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			programScenario(sc, binary)
+			p := programScenario(sc, binary)
+			sqsScenario(sc, p, app)
 		},
 		Options: &godog.Options{
 			Format:   "progress",
@@ -104,7 +106,7 @@ type program struct {
 	answered chan struct{}
 }
 
-func programScenario(sc *godog.ScenarioContext, binary string) {
+func programScenario(sc *godog.ScenarioContext, binary string) *program {
 	p := &program{}
 	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
 		dir, err := os.MkdirTemp("", "hotline-proxy-e2e-")
@@ -426,6 +428,7 @@ func programScenario(sc *godog.ScenarioContext, binary string) {
 		}
 		return hasNo(record, "url.full", "url.template")
 	})
+	return p
 }
 
 // paymentPath is the call the research clients make, with a customer ID
@@ -451,6 +454,12 @@ paths:
 func (p *program) run(flags ...string) error {
 	p.startVendors()
 	p.writeConfig(p.config(false))
+	return p.launch(flags...)
+}
+
+// launch starts the program with the config already written, trusting the
+// test issuer, and waits until its proxy port listens.
+func (p *program) launch(flags ...string) error {
 	block := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: p.issuer.cert.Raw})
 	if err := os.WriteFile(filepath.Join(p.dir, "issuer.pem"), block, 0o600); err != nil {
 		return err

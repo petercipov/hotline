@@ -1,6 +1,6 @@
 # AWS through the proxy, starting with SQS: requirements
 
-*Agreed with Peter, 2026-10-29. Not built yet. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo. The worked example, a Go app using the AWS SDK for Go v2 to send to SQS, is in the project files (`aws-sqs/`), with the throwaway check that ran it.*
+*Agreed with Peter, 2026-10-29; built 2026-10-30. Scenarios: `src/hotline-proxy/features/aws-sqs.feature` and `end-to-end-aws.feature`. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo. The worked example is [examples/aws-sqs-invoices](../examples/aws-sqs-invoices/README.md); the message check it uses is in [proxy-sqs-example.md](proxy-sqs-example.md).*
 
 ## What the feature is
 
@@ -20,7 +20,7 @@ What we checked with the real SDK (`service/sqs` v1.52.7):
 1. **Signed calls stay valid** (Peter, 2026-10-29). The proxy forwards the method, the path and query as sent, `Host`, the body byte for byte, `Content-Length`, and every end-to-end header with its exact value. It only removes `Proxy-Authorization` and the headers for one hop (such as `Connection`), and may switch `http` to `https`, since the scheme is never signed. A body with a known length is never sent to the vendor in chunks of unknown size, also over HTTP/2. The proxy already behaves this way; this makes it a rule with a test.
 2. **The integration ID stays in `Proxy-Authorization`** (Peter, 2026-10-29). The proxy never reads `Authorization`, for security reasons. A port per integration is ruled out, since integrations are unlimited.
 3. **Each action is its own route in the spec** (Peter, 2026-10-29). AWS publishes no OpenAPI for SQS, only a Smithy model (AWS's own API description language), and Smithy's OpenAPI converter does not handle SQS's protocol. So we generate our own OpenAPI 3.1 spec from the Smithy model. OpenAPI allows one operation per path and method, so each action's route names the header value after `#`, the form the `aws2openapi` converter uses: `/#X-Amz-Target=AmazonSQS.SendMessage`.
-4. **The action header is named in the spec** (Peter, 2026-10-29). A mark at the top of our spec, `x-hotline-action-header: X-Amz-Target`, says which header names the action. It belongs to the api, never to an integration, is never hard-coded in the proxy, and the config does not change. Like `x-hotline-redact`, it lives only in our copy of the spec.
+4. **The action header is named in the spec** (Peter, 2026-10-29). A mark at the top of our spec, `x-hotline-action-header: X-Amz-Target`, says which header names the action. It belongs to the api, never to an integration, is never hard-coded in the proxy, and the config does not change. Like `x-hotline-redact`, it lives only in our copy of the spec. In the same way, each body's media type is marked `x-hotline-body: json`, so the proxy reads `application/x-amz-json-1.0` as JSON without knowing anything about AWS (Peter, 2026-10-30).
 5. **Matching a route with `#`.** A route `/#X-Amz-Target=AmazonSQS.SendMessage` matches a call to `/` whose `X-Amz-Target` header is exactly `AmazonSQS.SendMessage`. With the header missing or unknown, the call has no route (`no_spec_route`). The record's `url.template` is the route as written, so each action gets its own line.
 6. **AWS headers in the record come from our spec** (Peter, 2026-10-29). Our SQS spec marks `x-amzn-RequestId` (AWS's request ID) and `x-amzn-query-error` (the error name) with `x-hotline-redact: false`. The default header list for all vendors does not change. `X-Amz-Target` need not be recorded, since the action is in the route.
 7. **No patterns in `hosts`** (Peter, 2026-10-29). Each region's name is listed (`sqs.eu-west-1.amazonaws.com`, `sqs.eu-central-1.amazonaws.com`, …), as for any vendor.
@@ -52,7 +52,7 @@ What we checked with the real SDK (`service/sqs` v1.52.7):
 
 ## Tests
 
-### Signed calls stay valid (`forward.feature`)
+### Signed calls stay valid (`aws-sqs.feature`)
 
 The test uses a fixed, recorded request, signed once outside the repo with the SDK's signer, a made-up key and a fixed time: `testdata/aws/sqs-sendmessage-signed.http`. Hotline never imports the AWS SDK (Peter, 2026-10-29). The fake vendor needs no signing code: a signature stays valid exactly when every signed part arrives unchanged, so it checks the method, path, `Host`, body, and each header named in the fixture's `SignedHeaders`, read from its own `Authorization` line.
 
@@ -75,7 +75,7 @@ The test uses a fixed, recorded request, signed once outside the repo with the S
       | the Host header   | plain HTTP/2 |
 ```
 
-### Routes named by a header (`checks.feature` and `record.feature`)
+### Routes named by a header (`aws-sqs.feature`)
 
 - A call to `/` with `X-Amz-Target: AmazonSQS.SendMessage` matches `/#X-Amz-Target=AmazonSQS.SendMessage`, is checked against that route's body schema, and its record has that `url.template`.
 - The same call with `X-Amz-Target: AmazonSQS.ReceiveMessage` matches the receive route instead.
@@ -85,6 +85,5 @@ The test uses a fixed, recorded request, signed once outside the repo with the S
 ## Not in this step
 
 - SQS's older query protocol (a form body with `Action=SendMessage`), sent by SDKs from before late 2023.
-- Generating the SQS spec from the Smithy model; the tests use a small hand-written spec with two routes.
 - Other AWS services.
 - `CONNECT` with interception, the only way an unchanged SDK with its `https` address would work.

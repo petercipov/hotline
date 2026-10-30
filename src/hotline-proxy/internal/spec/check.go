@@ -91,6 +91,9 @@ type bodySpec struct {
 
 type content struct {
 	mediaType string
+	// json is set when the spec marks the type x-hotline-body: json, for a
+	// vendor's own name for JSON.
+	json bool
 	// schema is nil when the spec gives the type but no schema.
 	schema *jsonschema.Schema
 }
@@ -110,7 +113,7 @@ const (
 // Check checks a finished call against the spec. A call with no route is
 // not checked.
 func (s *Spec) Check(e Exchange) Checked {
-	r := s.match(e.Method, e.EscapedPath)
+	r := s.match(e.Method, e.EscapedPath, e.Header)
 	if r.segments == nil {
 		return Checked{Skipped: "no_spec_route"}
 	}
@@ -329,7 +332,7 @@ func (b *bodySpec) check(contentType string, body Body) ([]Result, string) {
 	}
 	var instance any
 	switch {
-	case isJSON(mediaType):
+	case c.json || isJSON(mediaType):
 		if body.TooLarge {
 			return nil, "body_too_large"
 		}
@@ -535,6 +538,9 @@ func validate(s *jsonschema.Schema, instance any, part, base string) []Result {
 			for _, name := range k.Missing {
 				results = append(results, Result{Part: part, Place: place + "." + name, Rule: "dependentRequired"})
 			}
+		case *kind.ContentMediaType:
+			// A string that should hold JSON doesn't.
+			results = append(results, Result{Part: part, Place: place, Rule: "json"})
 		default:
 			results = append(results, Result{Part: part, Place: place, Rule: rule(e.ErrorKind), Expected: expected(e.ErrorKind)})
 		}
@@ -579,6 +585,13 @@ func placeOf(base string, instance any, location []string) string {
 	var b strings.Builder
 	b.WriteString(base)
 	for _, token := range location {
+		if token == insideJSON {
+			// The value is JSON text; the place carries on inside it.
+			if text, ok := instance.(string); ok {
+				instance, _ = jsonschema.UnmarshalJSON(strings.NewReader(text))
+			}
+			continue
+		}
 		if list, ok := instance.([]any); ok {
 			i, _ := strconv.Atoi(token)
 			b.WriteString("[" + token + "]")

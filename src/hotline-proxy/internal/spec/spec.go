@@ -19,7 +19,11 @@ var ErrInvalid = errors.New("spec: invalid")
 
 // Spec is a read, checked vendor spec. It never changes after Parse.
 type Spec struct {
-	routes        []route
+	routes []route
+	// actionHeader names the header that picks a route written as
+	// /path#Header=value, such as X-Amz-Target. Empty when the spec has
+	// no such routes.
+	actionHeader  string
 	secretHeaders map[string]bool
 	secretQuery   map[string]bool
 }
@@ -37,6 +41,9 @@ type route struct {
 	method   string
 	template string
 	segments []string
+	// action is the value the action header must have, for a route
+	// written as /path#Header=value. Empty for an ordinary route.
+	action string
 	// marks hold the parameter marks by where the parameter lives
 	// ("path", "query", "header" and "reply") and then by name. Header
 	// names are lower case.
@@ -46,8 +53,9 @@ type route struct {
 }
 
 type document struct {
-	OpenAPI string `yaml:"openapi"`
-	Servers []struct {
+	OpenAPI      string `yaml:"openapi"`
+	ActionHeader string `yaml:"x-hotline-action-header"` //nolint:tagliatelle // the name of our OpenAPI extension
+	Servers      []struct {
 		URL string `yaml:"url"`
 	} `yaml:"servers"`
 	Paths      map[string]pathItem `yaml:"paths"`
@@ -100,7 +108,7 @@ func Parse(name string, data []byte) (*Spec, error) {
 		return nil, fmt.Errorf("%w: %s is not an OpenAPI 3.1 document", ErrInvalid, name)
 	}
 	b := newBuilder(name, data)
-	s := &Spec{secretHeaders: map[string]bool{}, secretQuery: map[string]bool{}}
+	s := &Spec{actionHeader: doc.ActionHeader, secretHeaders: map[string]bool{}, secretQuery: map[string]bool{}}
 	var problems []error
 	// A base path in the first servers address, such as /v1 in
 	// https://api.x.com/v1, goes in front of every route.
@@ -112,11 +120,16 @@ func Parse(name string, data []byte) (*Spec, error) {
 	}
 	for key, item := range doc.Paths {
 		template := base + key
+		path, action, err := s.splitAction(name, template)
+		if err != nil {
+			problems = append(problems, err)
+		}
 		for method, op := range item.operations() {
 			r := route{
 				method:   method,
 				template: template,
-				segments: strings.Split(strings.TrimSuffix(template, "/"), "/"),
+				action:   action,
+				segments: strings.Split(strings.TrimSuffix(path, "/"), "/"),
 				marks:    map[string]map[string]mark{"path": {}, "query": {}, "header": {}, "reply": {}},
 			}
 			where := fmt.Sprintf("%s %s %s", name, method, template)
@@ -146,6 +159,23 @@ func Parse(name string, data []byte) (*Spec, error) {
 		return nil, errors.Join(problems...)
 	}
 	return s, nil
+}
+
+// splitAction reads a route written as /path#Header=value, the way a
+// vendor that names each action in a header is written (Peter,
+// 2026-10-29). The header must be the one the spec names in
+// x-hotline-action-header.
+func (s *Spec) splitAction(name, template string) (path, action string, err error) {
+	path, after, found := strings.Cut(template, "#")
+	if !found {
+		return template, "", nil
+	}
+	header, action, _ := strings.Cut(after, "=")
+	if s.actionHeader == "" || !strings.EqualFold(header, s.actionHeader) || action == "" {
+		return path, action, fmt.Errorf("%w: %s: the route %s names the header %s, but the spec's x-hotline-action-header is %q",
+			ErrInvalid, name, template, header, s.actionHeader)
+	}
+	return path, action, nil
 }
 
 func (p pathItem) operations() map[string]*operation {
