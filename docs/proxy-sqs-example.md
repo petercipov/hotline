@@ -10,8 +10,8 @@
 
 ## The use case
 
-- **The shop** (the app that asks for the invoice) sends one message per paid order: "make the invoice for order `A-1001`, in English".
-- **The worker** (the app that does the job) receives the message, looks up the order, writes a one-page invoice PDF, and deletes the message from the queue so it is not handled twice.
+- **The shop** (the app that asks for the invoice) sends one message per paid order: "make the invoice for order `A-1001` with the template `invoice-standard-v2`, in English".
+- **The worker** (the app that does the job) receives the message, looks up the order, renders the PDF with the template the message names, and deletes the message from the queue so it is not handled twice.
 - **Hotline** sits between both apps and SQS. It records every call and checks it against the spec, including the job message inside it. It never blocks a call: a broken message still reaches SQS, and the check result shows up in the record.
 
 ## The job message (version 1)
@@ -23,6 +23,7 @@ A first proposal. Field names are open for Peter to change.
   "schemaVersion": 1,
   "jobId": "5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10",
   "orderId": "A-1001",
+  "templateId": "invoice-standard-v2",
   "language": "en",
   "requestedAt": "2026-10-30T19:30:00Z",
   "sendTo": "customer@example.com"
@@ -34,6 +35,7 @@ A first proposal. Field names are open for Peter to change.
 | `schemaVersion` | yes | whole number, exactly `1` | Lets the message change later without breaking old workers. |
 | `jobId` | yes | `uuid` | The worker uses it to notice a job it already did (SQS may deliver a message twice). |
 | `orderId` | yes | text like `A-1001`: a capital letter, a dash, digits | The order to make the invoice for. |
+| `templateId` | yes | text of lower-case letters, digits and dashes, such as `invoice-standard-v2` | Which template renders the PDF (Peter, 2026-10-30). The worker refuses a template it doesn't know; the schema only checks the shape. |
 | `language` | yes | one of `en`, `de`, `sk`, `cs` | The invoice's language. |
 | `requestedAt` | yes | `date-time` | When the shop asked; helps when looking into a late invoice. |
 | `sendTo` | no | `email` | Where to mail the PDF, if anywhere. Mailing it is not part of this step. |
@@ -104,7 +106,7 @@ This also builds what [proxy-aws.md](proxy-aws.md) agreed but did not build yet:
 
 One Go program in its own folder and Go module, `examples/aws-sqs-invoices/`, so the proxy's module never depends on the AWS SDK (agreed 2026-10-29). Two commands:
 
-- `request --order A-1001 --language en`: sends the invoice job to the queue.
+- `request --order A-1001 --template invoice-standard-v2 --language en`: sends the invoice job to the queue.
 - `work --out ./invoices`: receives jobs, checks each one itself, writes `A-1001.pdf` to the folder, and deletes the message.
 
 It sets up the SQS client exactly as the AWS setup guide says: the forward proxy set only on the SQS client, the HTTP client turning `https` into `http` after the SDK has signed, and the integration ID added by Go's proxy support. A `README.md` beside it shows how to run it against real AWS by hand.
@@ -126,6 +128,8 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
       | a job with no orderId                       | body $.MessageBody.orderId required                      |
       | a job whose orderId is 1001, a number       | body $.MessageBody.orderId type string                   |
       | a job whose orderId is a-1001               | body $.MessageBody.orderId pattern                       |
+      | a job with no templateId                    | body $.MessageBody.templateId required                   |
+      | a job whose templateId is Invoice Standard  | body $.MessageBody.templateId pattern                    |
       | a job whose jobId is not a uuid             | body $.MessageBody.jobId format uuid                     |
       | a job in the language fr                    | body $.MessageBody.language enum en, de, sk, cs          |
       | a job with an extra field priority          | body $.MessageBody.priority additionalProperties         |
@@ -167,7 +171,7 @@ The detailed rules are tested fast, with the proxy and a fake vendor, in `checks
 1. **A fake SQS or real AWS for the tests?** I recommend a small fake SQS inside the end-to-end tests: it answers `SendMessage`, `ReceiveMessage` and `DeleteMessage` like SQS (including the MD5 hash of the message, which the SDK checks). Tests then run anywhere, offline, with no AWS account or cost. Running against real AWS stays a manual step in the example's README. (LocalStack, a local copy of AWS run in Docker, is the other choice, but it adds Docker to the tests.)
 2. **How does the job's spec stay in step with the plain SQS spec?** I recommend generating both: one small generator turns the Smithy model into `aws-sqs.openapi.yaml`, and, given the job schema file, also writes `aws-sqs-invoices.openapi.yaml`. A test fails when the committed files differ from what the generator makes. The other choice is letting the config add a schema to one field of a shared spec, which is a new config feature.
 3. **One job schema per integration, or per queue?** I recommend per integration for now (the setup above). If one integration sends different messages to different queues, the spec can choose the schema by `QueueUrl` later, using JSON Schema's `if`/`then`.
-4. **Where does the worker find the order?** I recommend a small built-in list of made-up orders in the example, so it needs no database or shop. The order's lines stay out of the message, which keeps the message small and the order data in one place.
+4. **Where does the worker find the order and the template?** I recommend a small built-in list of made-up orders and two built-in templates in the example, so it needs no database or shop. The order's lines stay out of the message, which keeps the message small and the order data in one place.
 5. **Where does the PDF go?** I recommend a local folder in this step. Storing it in S3 (and its calls going through Hotline with an S3 spec) is a later step. The PDF is a plain one-page file written with a small PDF library in the example's own module.
 6. **Should the worker also refuse bad messages itself?** I recommend yes: Hotline only reports, it never blocks, so the worker checks the message against the same schema and moves a bad one aside (to a "dead letter" queue, the usual SQS place for messages that cannot be handled) instead of retrying it forever.
 
