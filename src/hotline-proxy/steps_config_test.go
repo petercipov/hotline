@@ -401,6 +401,15 @@ func (w *world) brokenConfig(problem string) error {
 	case "an exporter's compression is neither gzip nor none":
 		w.rawConfig = start + exporters + "      compression: zstd\n"
 		w.problem = "compression must be gzip or none"
+	case "an exporter's resource sets service.version":
+		w.rawConfig = start + exporters + "      resource:\n        service.version: \"9\"\n"
+		w.problem = "resource: service.version is the proxy's own and cannot be set"
+	case `an exporter's resource has the name "my label"`:
+		w.rawConfig = start + exporters + "      resource:\n        my label: x\n"
+		w.problem = `resource: the name "my label" may only hold letters, digits, dots and underscores`
+	case "an exporter's resource environment variable is not set":
+		w.rawConfig = start + exporters + "      resource:\n        deployment.environment.name: { env: HOTLINE_ENV }\n"
+		w.problem = "resource deployment.environment.name: the environment variable HOTLINE_ENV is not set"
 	case "an exporter's queueSize is zero":
 		w.rawConfig = start + exporters + "      queueSize: 0\n"
 		w.problem = "queueSize must be at least 1"

@@ -18,7 +18,7 @@ It sends no traces and none of its own health data yet.
 | Protocol | OTLP over gRPC (the default) or over HTTP as protobuf (`protocol: http/protobuf`), to `/v1/logs` and `/v1/metrics`. Detail: [proxy-otlp-protocols.md](proxy-otlp-protocols.md). |
 | Connection to the collector | Plain, or TLS with an `https://` endpoint, with `tls.ca` and a client certificate if needed. Login headers from `headers`. |
 | Compression | gzip, unless `compression: none`. |
-| Destinations | Every entry under `exporters` gets the same data. Each has its own queue, so one that is down never holds up the others or the calls. |
+| Destinations | Every entry under `exporters` gets the same records and counts, each with its own resource labels. Each has its own queue, so one that is down never holds up the others or the calls. |
 | How often | Every second, or sooner once 512 records are waiting. Fixed in the program, not in the config. |
 | Time limit per send | 10 seconds, retries included. Fixed in the program. A busy collector is tried again after about a second at first, then at most every 5 seconds. A send the collector refuses loses its records, counted in a warning line like a full queue. |
 | Records per send | At most 512. |
@@ -42,17 +42,30 @@ exporters:
       endpoint: https://otel.example.com:4318
       headers:
         Authorization: { file: /etc/hotline/otlp/token }
+      resource:                                   # labels for this destination only
+        service.name: invoices-proxy
+        service.instance.id: { env: POD_NAME }
+        deployment.environment.name: { env: HOTLINE_ENV }
 ```
 
 ## Resource
 
-A resource is the set of labels that describe the sender. Both signals carry the same one.
+A resource is the set of labels that describe the sender. Both signals carry the same one. By default it is:
 
 | Attribute | Value |
 |---|---|
 | `service.name` | `hotline-proxy` |
 | `service.version` | the program's version |
 | `service.instance.id` | a random ID (a version 4 UUID) made at each start |
+
+Each exporter may add labels, or change these, with its own `resource` section, to say where the proxy runs (Peter, 2026-10-30):
+
+- A value is written out, or read from `{ env: NAME }` or `{ file: path }`, like a login header. A variable that is not set, or a file that cannot be read, refuses the config.
+- `service.name` and `service.instance.id` may be changed, for example to the pod's name. `service.version` is always the proxy's own; setting it refuses the config.
+- A name may hold only letters, digits, dots and underscores. The OpenTelemetry standard names are best, such as `deployment.environment.name`, `service.namespace` or `cloud.region`.
+- The labels go only to that exporter. One without a `resource` section gets the defaults above.
+
+Grafana Cloud turns the dots into underscores, so `deployment.environment.name` shows as `deployment_environment_name`.
 
 The instrumentation scope (the name of the code that made the data) is `hotline-proxy` for both signals.
 
@@ -62,7 +75,8 @@ One OpenTelemetry log record per call, sent once the reply has gone back to the 
 
 - Event name: `hotline.request`.
 - Timestamp: when the call reached the proxy.
-- No body text and no severity: everything is in the attributes.
+- A level (the OpenTelemetry severity, its text and number): `INFO` (9) for a normal call; `WARN` (13) when the call or the reply broke the spec (`hotline.schema.request.errors` or `hotline.schema.response.errors`), or the vendor answered with a 4xx; `ERROR` (17) when the vendor answered with a 5xx or the call failed in the proxy (`error.type`). ERROR wins over WARN. Log tools such as Grafana show it as the record's level (Peter, 2026-10-30).
+- No body text: everything else is in the attributes. A log tool can build a line from them, for example Grafana's `| line_format "{{.http_request_method}} {{.url_template}} {{.http_response_status_code}}"`.
 - Standard names come from the OpenTelemetry semantic conventions (the official list of field names), Go package `semconv` v1.43.0. Hotline-only fields start with `hotline.`.
 
 There are two sizes of record:

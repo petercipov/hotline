@@ -29,6 +29,68 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return has(res, "service.instance.id", "proxy-test-1")
 	})
+	sc.Step(`^an exporter with the resource service.name invoices-proxy, service.instance.id from the env POD_NAME and deployment.environment.name from the file env-name$`, func() error {
+		w.env = map[string]string{"POD_NAME": "invoices-proxy-7d9f"}
+		file := w.writeFile("env-name", "production\n")
+		w.exporterExtra = []string{"      resource:\n" +
+			"        service.name: invoices-proxy\n" +
+			"        service.instance.id: { env: POD_NAME }\n" +
+			"        deployment.environment.name: { file: " + file + " }\n"}
+		return nil
+	})
+	sc.Step(`^its resource has service.name invoices-proxy, service.instance.id from POD_NAME and deployment.environment.name from the file$`, func() error {
+		records := w.records()
+		if len(records) == 0 {
+			return failf("no record arrived")
+		}
+		res := records[0].resource
+		if err := has(res, "service.name", "invoices-proxy"); err != nil {
+			return err
+		}
+		if err := has(res, "service.instance.id", "invoices-proxy-7d9f"); err != nil {
+			return err
+		}
+		return has(res, "deployment.environment.name", "production")
+	})
+	sc.Step(`^service.version is still the proxy's own$`, func() error {
+		return has(w.records()[0].resource, "service.version", "1.0.0-test")
+	})
+	sc.Step(`^the hotline.requests counter carries the same resource$`, func() error {
+		counts := w.counts()
+		if len(counts) == 0 {
+			return failf("no count arrived")
+		}
+		if fmt.Sprint(counts[0].resource) != fmt.Sprint(w.records()[0].resource) {
+			return failf("the counter's resource is %v, the record's %v", counts[0].resource, w.records()[0].resource)
+		}
+		return nil
+	})
+	sc.Step(`^two exporters, the second with the resource deployment.environment.name staging$`, func() error {
+		w.receivers = append(w.receivers, newReceiver())
+		w.exporterExtra = []string{"", "      resource:\n        deployment.environment.name: staging\n"}
+		return nil
+	})
+	sc.Step(`^the first gets the proxy's own resource, with no deployment.environment.name$`, func() error {
+		w.settle()
+		records, _ := w.receivers[0].got()
+		if len(records) != 1 {
+			return failf("the first exporter got %d records", len(records))
+		}
+		if _, set := records[0].resource["deployment.environment.name"]; set {
+			return failf("the first exporter's resource is %v", records[0].resource)
+		}
+		return has(records[0].resource, "service.name", "hotline-proxy")
+	})
+	sc.Step(`^the second gets deployment.environment.name staging$`, func() error {
+		records, _ := w.receivers[1].got()
+		if len(records) != 1 {
+			return failf("the second exporter got %d records", len(records))
+		}
+		if err := has(records[0].resource, "deployment.environment.name", "staging"); err != nil {
+			return err
+		}
+		return has(records[0].resource, "service.name", "hotline-proxy")
+	})
 	sc.Step(`^the record's level is (INFO|WARN|ERROR)$`, func(level string) error {
 		records := w.records()
 		if len(records) == 0 {

@@ -42,6 +42,7 @@ type receivedCount struct {
 	unit        string
 	monotonic   bool
 	temporality metrics.AggregationTemporality
+	resource    map[string]any
 	attrs       map[string]any
 	value       int64
 }
@@ -310,6 +311,7 @@ func (r *receiver) exportMetrics(ctx context.Context, req *colmetrics.ExportMetr
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, rm := range req.GetResourceMetrics() {
+		res := values(rm.GetResource().GetAttributes())
 		for _, sm := range rm.GetScopeMetrics() {
 			for _, m := range sm.GetMetrics() {
 				if m.GetHistogram() != nil || m.GetExponentialHistogram() != nil {
@@ -325,6 +327,7 @@ func (r *receiver) exportMetrics(ctx context.Context, req *colmetrics.ExportMetr
 						unit:        m.GetUnit(),
 						monotonic:   sum.GetIsMonotonic(),
 						temporality: sum.GetAggregationTemporality(),
+						resource:    res,
 						attrs:       values(dp.GetAttributes()),
 						value:       dp.GetAsInt(),
 					})
