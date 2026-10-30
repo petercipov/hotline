@@ -20,7 +20,7 @@ import (
 	"hotline-example/aws-sqs-invoices/invoice"
 )
 
-const queueURL = "https://sqs.eu-west-1.amazonaws.com/123456789012/invoices"
+const queueURL = "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"
 
 func testAWS() []func(*config.LoadOptions) error {
 	return []func(*config.LoadOptions) error{

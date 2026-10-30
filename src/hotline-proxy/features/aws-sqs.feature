@@ -23,8 +23,8 @@ Feature: AWS SQS through the proxy
 
       Examples:
         | action         | body                                                                                         |
-        | SendMessage    | {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/123456789012/orders","MessageBody":"hello"} |
-        | ReceiveMessage | {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/123456789012/orders","WaitTimeSeconds":20}  |
+        | SendMessage    | {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/192325781350/orders","MessageBody":"hello"} |
+        | ReceiveMessage | {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/192325781350/orders","WaitTimeSeconds":20}  |
 
     Scenario Outline: A call without a known action has no route
       When the app sends POST / <header> with the json body {}
@@ -43,7 +43,7 @@ Feature: AWS SQS through the proxy
 
     Scenario: AWS's error reply is checked, and its headers are recorded
       Given SQS answers 400 with "x-amzn-RequestId: req-1; x-amzn-query-error: AWS.SimpleQueueService.NonExistentQueue;Sender" and the json body {"__type":"com.amazonaws.sqs#QueueDoesNotExist","message":"no queue"}
-      When the app sends SendMessage with the json body {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/123456789012/orders","MessageBody":"hello"}
+      When the app sends SendMessage with the json body {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/192325781350/orders","MessageBody":"hello"}
       Then the record has no reply results
       And the record keeps the reply headers x-amzn-requestid and x-amzn-query-error
 
@@ -137,12 +137,12 @@ Feature: AWS SQS through the proxy
         | order 42 paid | body $.MessageBody json |
 
     Scenario: A message sent to another queue is reported
-      When the app sends SendMessage to https://sqs.eu-west-1.amazonaws.com/123456789012/refunds with the message {"schemaVersion":1,"eventId":"5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10","orderId":"A-1001","templateId":"invoice-standard-v2","language":"en","requestedAt":"2026-10-30T19:30:00Z"}
-      Then the request results are body $.QueueUrl const https://sqs.eu-west-1.amazonaws.com/123456789012/invoices
+      When the app sends SendMessage to https://sqs.eu-west-1.amazonaws.com/192325781350/refunds with the message {"schemaVersion":1,"eventId":"5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10","orderId":"A-1001","templateId":"invoice-standard-v2","language":"en","requestedAt":"2026-10-30T19:30:00Z"}
+      Then the request results are body $.QueueUrl const https://sqs.eu-west-1.amazonaws.com/192325781350/invoices
 
     Scenario: A bad message is also reported when the worker receives it
       Given SQS answers 200 with one received message {"schemaVersion":1,"orderId":"A-1001"}
-      When the app sends ReceiveMessage with the json body {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/123456789012/invoices"}
+      When the app sends ReceiveMessage with the json body {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"}
       Then the reply results are body $.Messages[0].Body.eventId required; body $.Messages[0].Body.language required; body $.Messages[0].Body.requestedAt required; body $.Messages[0].Body.templateId required
 
     Scenario: Results never hold values from the message

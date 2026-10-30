@@ -15,7 +15,7 @@ overlay: 1.1.0
 info: { title: Invoices queue, version: "1" }
 actions:
   - target: $.components.schemas.SendMessageRequest.properties.QueueUrl
-    update: { const: https://sqs.eu-west-1.amazonaws.com/123456789012/invoices }
+    update: { const: https://sqs.eu-west-1.amazonaws.com/192325781350/invoices }
   - target: $.components.schemas.SendMessageRequest.properties.MessageBody
     update:
       contentMediaType: application/json

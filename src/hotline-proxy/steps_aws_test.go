@@ -16,7 +16,7 @@ import (
 
 const (
 	sqsHost       = "sqs.eu-west-1.amazonaws.com"
-	invoicesQueue = "https://sqs.eu-west-1.amazonaws.com/123456789012/invoices"
+	invoicesQueue = "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"
 )
 
 func awsSteps(sc *godog.ScenarioContext, w *world) {

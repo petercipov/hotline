@@ -22,7 +22,7 @@ import (
 	"github.com/cucumber/godog"
 )
 
-const invoicesQueueURL = "https://sqs.eu-west-1.amazonaws.com/123456789012/invoices"
+const invoicesQueueURL = "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"
 
 // fakeSQS answers SendMessage, ReceiveMessage and DeleteMessage the way SQS
 // does over its JSON protocol, over TLS as localhost.

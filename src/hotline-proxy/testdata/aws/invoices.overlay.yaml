@@ -24,7 +24,7 @@ actions:
   # Every action that names a queue names this one.
   - target: $.components.schemas.*.properties.QueueUrl
     update:
-      const: https://sqs.eu-west-1.amazonaws.com/123456789012/invoices
+      const: https://sqs.eu-west-1.amazonaws.com/192325781350/invoices
   # The message is an invoice job, written as JSON text: when sent, alone or
   # in a batch, and when received.
   - target: $.components.schemas['SendMessageRequest','SendMessageBatchRequestEntry'].properties.MessageBody

@@ -56,7 +56,7 @@ You need an AWS account, a queue, and Hotline running with an integration `invoi
 - [hotline-proxy.yaml](../../src/hotline-proxy/testdata/aws/hotline-proxy.yaml): the proxy config, with the api `aws-sqs-invoices` and the integration `invoices`;
 - [invoices.overlay.yaml](../../src/hotline-proxy/testdata/aws/invoices.overlay.yaml): the overlay that adds this queue's URL and the job schema to the stable SQS spec in [specs/aws/sqs](../../specs/aws/sqs/).
 
-The overlay names the queue `https://sqs.eu-west-1.amazonaws.com/123456789012/invoices`, so change the account number and region there (and the host in the config) to yours.
+The overlay names the queue `https://sqs.eu-west-1.amazonaws.com/192325781350/invoices`, so change the account number and region there (and the host in the config) to yours.
 
 ```
 go run ../../src/hotline-proxy/cmd run --config ../../src/hotline-proxy/testdata/aws/hotline-proxy.yaml   # Hotline, in its own terminal

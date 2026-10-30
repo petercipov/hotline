@@ -47,7 +47,7 @@ Any other field is reported (`additionalProperties: false`), so a typo like `ord
 An SQS `SendMessage` body is JSON, but the message itself is a **string** inside it, in the field `MessageBody`:
 
 ```json
-{"QueueUrl": "https://sqs.eu-west-1.amazonaws.com/123456789012/invoices",
+{"QueueUrl": "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices",
  "MessageBody": "{\"schemaVersion\":1,\"eventId\":\"5f0c…\", …}"}
 ```
 
@@ -70,7 +70,7 @@ Requirements:
 
 ### Three integrations, three message schemas
 
-There will be three integrations, each with its own queue and its own message schema, all starting from the same SQS spec (Peter, 2026-10-30). The queues differ in the path of their queue URL: `https://sqs.eu-west-1.amazonaws.com/123456789012/invoices`, `…/123456789012/<second queue>`, and so on.
+There will be three integrations, each with its own queue and its own message schema, all starting from the same SQS spec (Peter, 2026-10-30). The queues differ in the path of their queue URL: `https://sqs.eu-west-1.amazonaws.com/192325781350/invoices`, `…/192325781350/<second queue>`, and so on.
 
 One thing to know: with SQS's JSON protocol, every call goes to the path `/`. The queue URL is not in the call's path; it travels in the body, in the field `QueueUrl`. So the proxy cannot pick a route by queue, but the spec can check the field.
 
@@ -117,7 +117,7 @@ actions:
     update:
       InvoiceJob: { type: object, additionalProperties: false, required: [schemaVersion, eventId, orderId, templateId, language, requestedAt], properties: { … } }
   - target: $.components.schemas.SendMessageRequest.properties.QueueUrl
-    update: { const: https://sqs.eu-west-1.amazonaws.com/123456789012/invoices }
+    update: { const: https://sqs.eu-west-1.amazonaws.com/192325781350/invoices }
   - target: $.components.schemas.SendMessageRequest.properties.MessageBody
     update: { contentMediaType: application/json, contentSchema: { $ref: '#/components/schemas/InvoiceJob' } }
   # … the same for SendMessageBatch entries, the ReceiveMessage reply and QueueUrl elsewhere
