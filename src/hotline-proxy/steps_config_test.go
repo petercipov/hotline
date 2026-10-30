@@ -358,6 +358,49 @@ func (w *world) brokenConfig(problem string) error {
 	case "an exporter's endpoint is not a valid address":
 		w.rawConfig = start + exporters + "  - otlp:\n      endpoint: \"col%zz:4317\"\n"
 		w.problem = "endpoint col%zz:4317"
+	case "an exporter's protocol is http/json":
+		w.rawConfig = start + exporters + "      protocol: http/json\n"
+		w.problem = "protocol must be grpc or http/protobuf"
+	case "an HTTP exporter's endpoint has no http:// or https://":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      protocol: http/protobuf\n      endpoint: collector:4318\n"
+		w.problem = "exporter collector:4318: an HTTP endpoint must start with http:// or https://"
+	case "an exporter's endpoint has a query":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      protocol: http/protobuf\n      endpoint: https://collector:4318/?tenant=a\n"
+		w.problem = "endpoint may not have a query"
+	case "an exporter's endpoint has a user name in it":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      protocol: http/protobuf\n      endpoint: https://shop:s3cr3t@collector:4318\n"
+		w.problem = "endpoint may not hold a user name or password; use headers"
+	case "a gRPC exporter's endpoint has a path":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      endpoint: https://collector:4317/otlp\n"
+		w.problem = "exporter https://collector:4317/otlp: a gRPC endpoint may not have a path"
+	case "an exporter sets tls on a plain http:// endpoint":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      protocol: http/protobuf\n      endpoint: http://collector:4318\n      tls:\n        ca: ca.crt\n"
+		w.problem = "exporter http://collector:4318: tls needs an https:// endpoint"
+	case "an exporter sets tls.cert without tls.key":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      endpoint: https://collector:4317\n      tls:\n        cert: client.crt\n"
+		w.problem = "exporter https://collector:4317: tls needs both cert and key, or neither"
+	case "an exporter's tls.ca file does not exist":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      endpoint: https://collector:4317\n      tls:\n        ca: missing-ca.crt\n"
+		w.problem = "missing-ca.crt"
+	case "an exporter's tls.ca file holds no certificate":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      endpoint: https://collector:4317\n      tls:\n        ca: " +
+			w.writeFile("otlp/empty-ca.crt", "not a certificate\n") + "\n"
+		w.problem = "empty-ca.crt holds no PEM certificate"
+	case "an exporter's tls.cert file does not exist":
+		w.rawConfig = start + "exporters:\n  - otlp:\n      endpoint: https://collector:4317\n      tls:\n        cert: missing.crt\n        key: missing.key\n"
+		w.problem = "exporter https://collector:4317: tls: the cert or key file cannot be read"
+	case "an exporter's header is neither a value, a file nor an env":
+		w.rawConfig = start + exporters + "      headers:\n        Authorization: [a, b]\n"
+		w.problem = "a value is written out, or read from { file: path } or { env: NAME }"
+	case "an exporter's header secret file does not exist":
+		w.rawConfig = start + exporters + "      headers:\n        Authorization: { file: missing-token }\n"
+		w.problem = "header Authorization: the file"
+	case "an exporter's header environment variable is not set":
+		w.rawConfig = start + exporters + "      headers:\n        Authorization: { env: OTLP_TOKEN }\n"
+		w.problem = "header Authorization: the environment variable OTLP_TOKEN is not set"
+	case "an exporter's compression is neither gzip nor none":
+		w.rawConfig = start + exporters + "      compression: zstd\n"
+		w.problem = "compression must be gzip or none"
 	case "an exporter's queueSize is zero":
 		w.rawConfig = start + exporters + "      queueSize: 0\n"
 		w.problem = "queueSize must be at least 1"

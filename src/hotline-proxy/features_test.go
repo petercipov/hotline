@@ -60,10 +60,12 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	headerSteps(sc, w)
 	recordSteps(sc, w)
 	exportSteps(sc, w)
+	protocolSteps(sc, w)
 	tlsSteps(sc, w)
 	guardSteps(sc, w)
 	hostHeaderSteps(sc, w)
 	connectSteps(sc, w)
+	overlaySteps(sc, w)
 }
 
 var errCheck = errors.New("check failed")

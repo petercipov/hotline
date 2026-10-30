@@ -37,6 +37,8 @@ The proxy is built in small slices, tests first.
    - the transparent redirect ingress: built, as a Host header call with no proxy code change. Detail: [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redirect.md);
    - AWS, starting with SQS: signed calls stay valid, actions as routes named by a header. Agreed, not built. Detail: [docs/proxy-aws.md](docs/proxy-aws.md);
    - the CONNECT ingress, with interception: the proxy poses as the vendor inside the tunnel with certificates signed by the customer's issuer. Built. Detail: [docs/proxy-connect.md](docs/proxy-connect.md);
+   - OTLP over HTTP, and TLS, login headers and gzip for both gRPC and HTTP: built. Detail: [docs/proxy-otlp-protocols.md](docs/proxy-otlp-protocols.md);
+   - overlays on an api's spec: OpenAPI Overlay 1.1 only, on the api only, applied at load in order, a target matching nothing is a warning, library `speakeasy-api/openapi/overlay`, plus the `hotline-proxy overlay` command that makes one from two specs (Peter, 2026-10-30). Built; needed by the SQS example. Detail: [docs/proxy-overlays.md](docs/proxy-overlays.md);
    - config reload without a restart;
    - the load test, with k6.
 

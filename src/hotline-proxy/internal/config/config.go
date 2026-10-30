@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,6 +18,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"hotline-proxy/internal/overlay"
 	"hotline-proxy/internal/spec"
 )
 
@@ -55,8 +57,22 @@ type TLS struct {
 
 // Exporter is one OTLP destination.
 type Exporter struct {
+	// Endpoint is the destination as the config names it.
 	Endpoint string
-	Delta    bool
+	// HTTP sends OTLP over HTTP as protobuf; otherwise it goes over gRPC.
+	HTTP bool
+	// URL is where to send. Its scheme is https for TLS, else http. Over
+	// HTTP its path goes in front of /v1/logs and /v1/metrics.
+	URL *url.URL
+	// CAs are PEM certificates of issuers to trust on top of the proxy's
+	// own, for TLS.
+	CAs []byte
+	// Certificate, when set, is shown to the destination in mutual TLS.
+	Certificate *tls.Certificate
+	// Headers go with every request, login headers among them.
+	Headers map[string]string
+	Gzip    bool
+	Delta   bool
 	// QueueSize is how many records wait for the destination at most.
 	QueueSize int
 }
@@ -96,16 +112,14 @@ type file struct {
 	// APIs are the vendor apis, each written once and named by the
 	// integrations that use it.
 	APIs map[string]struct {
-		Hosts    []string     `yaml:"hosts"`
-		Spec     string       `yaml:"spec"`
+		Hosts []string `yaml:"hosts"`
+		Spec  string   `yaml:"spec"`
+		// Overlays change the spec for this api only, in this order.
+		Overlays []string     `yaml:"overlays"`
 		Settings settingsFile `yaml:",inline"`
 	} `yaml:"apis"`
 	Exporters []struct {
-		OTLP struct {
-			Endpoint    string `yaml:"endpoint"`
-			Temporality string `yaml:"temporality"`
-			QueueSize   *int   `yaml:"queueSize"`
-		} `yaml:"otlp"`
+		OTLP exporterFile `yaml:"otlp"`
 	} `yaml:"exporters"`
 	Integrations []struct {
 		ID             string       `yaml:"id"`
@@ -113,6 +127,49 @@ type file struct {
 		Settings       settingsFile `yaml:",inline"`
 		APIs           []apiRef     `yaml:"apis"`
 	} `yaml:"integrations"`
+}
+
+// exporterFile is one OTLP destination as the config writes it.
+type exporterFile struct {
+	Protocol    string            `yaml:"protocol"`
+	Endpoint    string            `yaml:"endpoint"`
+	Headers     map[string]secret `yaml:"headers"`
+	TLS         *exporterTLSFile  `yaml:"tls"`
+	Compression string            `yaml:"compression"`
+	Temporality string            `yaml:"temporality"`
+	QueueSize   *int              `yaml:"queueSize"`
+}
+
+type exporterTLSFile struct {
+	CA   string `yaml:"ca"`
+	Cert string `yaml:"cert"`
+	Key  string `yaml:"key"`
+}
+
+// secret is a value written out, or read from { file: path } or
+// { env: NAME }.
+type secret struct {
+	value string
+	file  string
+	env   string
+	// written says the value is written out in the config.
+	written bool
+}
+
+func (s *secret) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		s.value, s.written = node.Value, true
+		return nil
+	}
+	var from struct {
+		File string `yaml:"file"`
+		Env  string `yaml:"env"`
+	}
+	if err := node.Decode(&from); err != nil || (from.File == "") == (from.Env == "") {
+		return fmt.Errorf("%w: line %d: a value is written out, or read from { file: path } or { env: NAME }", ErrInvalid, node.Line)
+	}
+	s.file, s.env = from.File, from.Env
+	return nil
 }
 
 // pairFile names a certificate file and its key file.
@@ -164,7 +221,7 @@ const notPassed = "not-passed"
 // Load reads the config file and every spec and certificate it points to.
 // Their paths are relative to the folder of the config file. A certificate
 // that has expired by now is refused.
-func Load(path string, now time.Time) (*Config, error) {
+func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*Config, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // the operator chooses the config file
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
@@ -184,8 +241,10 @@ func Load(path string, now time.Time) (*Config, error) {
 		}
 	}
 	l := loader{
-		dir:   filepath.Dir(path),
-		specs: map[string]*spec.Spec{},
+		dir:       filepath.Dir(path),
+		specs:     map[string]*spec.Spec{},
+		files:     map[string][]byte{},
+		lookupEnv: lookupEnv,
 	}
 	c := &Config{
 		Version:      f.Version,
@@ -210,20 +269,7 @@ func Load(path string, now time.Time) (*Config, error) {
 		l.problem("there are no exporters")
 	}
 	for _, e := range f.Exporters {
-		switch e.OTLP.Temporality {
-		case "", "cumulative":
-		case "delta":
-		default:
-			l.problem("exporter %s: temporality must be cumulative or delta", e.OTLP.Endpoint)
-		}
-		exporter := Exporter{Endpoint: e.OTLP.Endpoint, Delta: e.OTLP.Temporality == "delta", QueueSize: 10_000}
-		if e.OTLP.QueueSize != nil {
-			exporter.QueueSize = *e.OTLP.QueueSize
-		}
-		if exporter.QueueSize < 1 {
-			l.problem("exporter %s: queueSize must be at least 1", e.OTLP.Endpoint)
-		}
-		c.Exporters = append(c.Exporters, exporter)
+		c.Exporters = append(c.Exporters, l.exporter(e.OTLP, now))
 	}
 	apis := map[string]*API{}
 	hosts := map[string][]string{}
@@ -235,7 +281,7 @@ func Load(path string, now time.Time) (*Config, error) {
 		}
 		apis[name] = &API{
 			Settings: l.settings(label, a.Settings, Settings{TLSOrigination: true, VendorTimeout: time.Minute}),
-			Spec:     l.spec(label, a.Spec),
+			Spec:     l.spec(label, a.Spec, a.Overlays),
 		}
 		for _, host := range a.Hosts {
 			hosts[name] = append(hosts[name], strings.ToLower(host))
@@ -283,13 +329,137 @@ func Load(path string, now time.Time) (*Config, error) {
 	if len(l.problems) > 0 {
 		return nil, errors.Join(l.problems...)
 	}
+	c.Warnings = append(c.Warnings, l.warnings...)
 	return c, nil
 }
 
 type loader struct {
-	dir      string
-	specs    map[string]*spec.Spec
-	problems []error
+	dir string
+	// specs are the specs read so far, by their file and overlays, and
+	// files the spec files read so far, so each is read once.
+	specs     map[string]*spec.Spec
+	files     map[string][]byte
+	warnings  []string
+	lookupEnv func(string) (string, bool)
+	problems  []error
+}
+
+func (l *loader) exporter(f exporterFile, now time.Time) Exporter {
+	label := "exporter " + f.Endpoint
+	e := Exporter{
+		Endpoint:  f.Endpoint,
+		HTTP:      f.Protocol == "http/protobuf",
+		Gzip:      true,
+		Delta:     f.Temporality == "delta",
+		QueueSize: 10_000,
+		Headers:   map[string]string{},
+	}
+	switch f.Protocol {
+	case "", "grpc", "http/protobuf":
+	default:
+		l.problem("%s: protocol must be grpc or http/protobuf", label)
+	}
+	e.URL = l.endpoint(label, f.Endpoint, e.HTTP)
+	switch f.Compression {
+	case "", "gzip":
+	case "none":
+		e.Gzip = false
+	default:
+		l.problem("%s: compression must be gzip or none", label)
+	}
+	switch f.Temporality {
+	case "", "cumulative", "delta":
+	default:
+		l.problem("%s: temporality must be cumulative or delta", label)
+	}
+	if f.QueueSize != nil {
+		e.QueueSize = *f.QueueSize
+	}
+	if e.QueueSize < 1 {
+		l.problem("%s: queueSize must be at least 1", label)
+	}
+	for _, name := range slices.Sorted(maps.Keys(f.Headers)) {
+		e.Headers[name] = l.secret(label+": header "+name, f.Headers[name])
+	}
+	if t := f.TLS; t != nil {
+		if e.URL != nil && e.URL.Scheme != "https" {
+			l.problem("%s: tls needs an https:// endpoint", label)
+		}
+		if t.CA != "" {
+			e.CAs = l.issuers(label+": tls.ca", t.CA)
+		}
+		if (t.Cert == "") != (t.Key == "") {
+			l.problem("%s: tls needs both cert and key, or neither", label)
+		} else if t.Cert != "" {
+			cert, err := loadPair(label+": tls", l.path(t.Cert), l.path(t.Key), now)
+			if err != nil {
+				l.problems = append(l.problems, err)
+			}
+			e.Certificate = cert
+		}
+	}
+	return e
+}
+
+// endpoint reads where an exporter sends. Over HTTP it is a URL; over gRPC
+// a host:port, or a URL with no path, whose https:// turns TLS on.
+func (l *loader) endpoint(label, endpoint string, http bool) *url.URL {
+	raw := endpoint
+	if !strings.Contains(endpoint, "://") {
+		if http {
+			l.problem("%s: an HTTP endpoint must start with http:// or https://", label)
+			return nil
+		}
+		raw = "http://" + endpoint
+	}
+	u, err := url.Parse(raw)
+	switch {
+	case err != nil || u.Host == "" || u.Scheme != "http" && u.Scheme != "https":
+		l.problem("%s: endpoint %s is not a valid address", label, endpoint)
+	case u.User != nil:
+		l.problem("%s: the endpoint may not hold a user name or password; use headers", label)
+	case u.RawQuery != "" || u.Fragment != "":
+		l.problem("%s: the endpoint may not have a query", label)
+	case !http && strings.Trim(u.Path, "/") != "":
+		l.problem("%s: a gRPC endpoint may not have a path", label)
+	default:
+		return u
+	}
+	return nil
+}
+
+// secret reads a value without ever putting it into a message.
+func (l *loader) secret(label string, s secret) string {
+	switch {
+	case s.written:
+		return s.value
+	case s.file != "":
+		data, err := os.ReadFile(l.path(s.file)) //nolint:gosec // the config names its secret files
+		if err != nil {
+			l.problem("%s: the file %s cannot be read", label, s.file)
+		}
+		// Secret files often end in a line break, which is not part of
+		// the value.
+		return strings.TrimRight(string(data), "\r\n")
+	}
+	value, set := l.lookupEnv(s.env)
+	if !set {
+		l.problem("%s: the environment variable %s is not set", label, s.env)
+	}
+	return value
+}
+
+// issuers reads a PEM file of certificates.
+func (l *loader) issuers(label, path string) []byte {
+	data, err := os.ReadFile(l.path(path)) //nolint:gosec // the config names its certificate files
+	if err != nil {
+		l.problem("%s: %s cannot be read: %v", label, path, err)
+		return nil
+	}
+	if !x509.NewCertPool().AppendCertsFromPEM(data) {
+		l.problem("%s: %s holds no PEM certificate", label, path)
+	}
+	return data
 }
 
 func (l *loader) problem(format string, args ...any) {
@@ -371,23 +541,57 @@ func (l *loader) path(path string) string {
 	return path
 }
 
-func (l *loader) spec(label, path string) *spec.Spec {
+// spec reads the spec at path and applies the overlays to it. Apis with the
+// same spec and the same overlays in the same order share one copy.
+func (l *loader) spec(label, path string, overlays []string) *spec.Spec {
 	if path == "" {
 		return nil
 	}
 	path = l.path(path)
-	if s, read := l.specs[path]; read {
+	names := []string{path}
+	files := make([]overlay.File, 0, len(overlays))
+	for _, o := range overlays {
+		o = l.path(o)
+		names = append(names, o)
+		files = append(files, overlay.File{Name: o})
+	}
+	name := strings.Join(names, " with ")
+	if s, read := l.specs[name]; read {
 		return s
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // the config names its spec files
-	if err != nil {
-		l.problem("%s: spec %s cannot be read: %v", label, path, err)
-		return nil
+	data, read := l.files[path]
+	if !read {
+		var err error
+		data, err = os.ReadFile(path) //nolint:gosec // the config names its spec files
+		if err != nil {
+			l.problem("%s: spec %s cannot be read: %v", label, path, err)
+			return nil
+		}
+		l.files[path] = data
 	}
-	s, err := spec.Parse(path, data)
-	if err != nil {
-		l.problems = append(l.problems, err)
+	if len(files) > 0 {
+		for i := range files {
+			var err error
+			files[i].Data, err = os.ReadFile(files[i].Name) //nolint:gosec // the config names its overlay files
+			if err != nil {
+				l.problem("%s: overlay %s cannot be read: %v", label, files[i].Name, err)
+				return nil
+			}
+		}
+		merged, warnings, err := overlay.Apply(data, files)
+		if err != nil {
+			l.problem("%s: %v", label, err)
+			return nil
+		}
+		for _, w := range warnings {
+			l.warnings = append(l.warnings, label+": "+w)
+		}
+		data = merged
 	}
-	l.specs[path] = s
+	s, err := spec.Parse(name, data)
+	if err != nil {
+		l.problems = append(l.problems, fmt.Errorf("%s: %w", label, err))
+	}
+	l.specs[name] = s
 	return s
 }

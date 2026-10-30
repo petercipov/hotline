@@ -28,8 +28,11 @@ type queue struct {
 
 	mu      sync.Mutex
 	records []sdklog.Record
-	dropped int
-	warned  time.Time
+	// crowded counts records dropped from a full queue, failed those lost
+	// in a send the destination refused.
+	crowded drops
+	failed  drops
+	lastErr error
 	sendMu  sync.Mutex
 	full    chan struct{}
 	stop    chan struct{}
@@ -58,7 +61,7 @@ func (q *queue) OnEmit(_ context.Context, r *sdklog.Record) error {
 	defer q.mu.Unlock()
 	if len(q.records) == q.size {
 		q.records = q.records[1:]
-		q.dropped++
+		q.crowded.count++
 	}
 	q.records = append(q.records, r.Clone())
 	if len(q.records) >= batchSize {
@@ -86,8 +89,8 @@ func (q *queue) run() {
 }
 
 // send sends what is queued, in batches; all of it when flushing, else one
-// batch. A batch the destination refuses is lost: the destination has had
-// its retries.
+// batch. A batch the destination refuses is lost and counted: the
+// destination has had its retries.
 func (q *queue) send(ctx context.Context, all bool) error {
 	q.sendMu.Lock()
 	defer q.sendMu.Unlock()
@@ -100,23 +103,48 @@ func (q *queue) send(ctx context.Context, all bool) error {
 		if len(batch) == 0 {
 			return nil
 		}
-		if err := q.exporter.Export(ctx, batch); err != nil || !all {
+		err := q.exporter.Export(ctx, batch)
+		if err != nil {
+			q.mu.Lock()
+			q.failed.count += len(batch)
+			q.lastErr = err
+			q.mu.Unlock()
+		}
+		if err != nil || !all {
 			return err
 		}
 	}
 }
 
-// warnDropped writes how many records were dropped, at most once a minute,
-// and always on the last send.
+// drops counts lost records until the next warning about them.
+type drops struct {
+	count  int
+	warned time.Time
+}
+
+// due says a warning about the drops is due: at most once a minute, and
+// always on the last send.
+func (d *drops) due(last bool) bool {
+	if d.count == 0 || !last && time.Since(d.warned) < time.Minute {
+		return false
+	}
+	d.warned = time.Now()
+	return true
+}
+
+// warnDropped writes how many records were lost, for each of the two
+// reasons.
 func (q *queue) warnDropped(last bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.dropped == 0 || !last && time.Since(q.warned) < time.Minute {
-		return
+	if q.crowded.due(last) {
+		q.logger.Warn("export queue full, dropped the oldest records", "endpoint", q.endpoint, "dropped", q.crowded.count)
+		q.crowded.count = 0
 	}
-	q.logger.Warn("export queue full, dropped the oldest records", "endpoint", q.endpoint, "dropped", q.dropped)
-	q.dropped = 0
-	q.warned = time.Now()
+	if q.failed.due(last) {
+		q.logger.Warn("export failed, dropped the records it held", "endpoint", q.endpoint, "dropped", q.failed.count, "error", q.lastErr.Error())
+		q.failed.count = 0
+	}
 }
 
 // ForceFlush sends everything queued.

@@ -5,14 +5,18 @@ package export
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
-	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
@@ -20,6 +24,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
+	"google.golang.org/grpc/credentials"
 
 	"hotline-proxy/internal/config"
 )
@@ -57,53 +62,41 @@ func counted(kv attribute.KeyValue) bool {
 
 // New starts one queue and sender per destination. Nothing is sent to a
 // destination before the first record, so a destination that is down does
-// not stop the proxy from starting.
-func New(ctx context.Context, exporters []config.Exporter, service Service, timing Timing, logger *slog.Logger) (*Sink, error) {
+// not stop the proxy from starting. TLS to a destination trusts roots and
+// the destination's own CAs.
+//
+// Only the config says how to send: every option is set here, so the
+// library never falls back to the OTEL_EXPORTER_OTLP_* environment
+// variables.
+func New(exporters []config.Exporter, roots *x509.CertPool, service Service, timing Timing, logger *slog.Logger) *Sink {
 	res := resource.NewSchemaless(
 		semconv.ServiceName("hotline-proxy"),
 		semconv.ServiceVersion(service.Version),
 		semconv.ServiceInstanceID(service.InstanceID),
 	)
-	type sender struct {
-		config.Exporter
-		logs    *otlploggrpc.Exporter
-		metrics *otlpmetricgrpc.Exporter
-	}
-	var senders []sender
-	var problems []error
+	logOptions := []sdklog.LoggerProviderOption{sdklog.WithResource(res)}
+	metricOptions := []sdkmetric.Option{sdkmetric.WithResource(res)}
 	for _, e := range exporters {
-		logs, err := otlploggrpc.New(ctx,
-			otlploggrpc.WithEndpoint(e.Endpoint),
-			otlploggrpc.WithInsecure(),
-			otlploggrpc.WithTimeout(timing.Timeout))
-		if err != nil {
-			problems = append(problems, wrap(e, err))
-			continue
+		var tlsConfig *tls.Config
+		if e.URL.Scheme == "https" {
+			pool := roots.Clone()
+			pool.AppendCertsFromPEM(e.CAs)
+			tlsConfig = &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}
+			if e.Certificate != nil {
+				tlsConfig.Certificates = []tls.Certificate{*e.Certificate}
+			}
 		}
 		temporality := sdkmetric.DefaultTemporalitySelector
 		if e.Delta {
 			temporality = delta
 		}
-		// The same endpoint was just accepted for logs, so metrics accept it
-		// too.
-		metrics, _ := otlpmetricgrpc.New(ctx,
-			otlpmetricgrpc.WithEndpoint(e.Endpoint),
-			otlpmetricgrpc.WithInsecure(),
-			otlpmetricgrpc.WithTimeout(timing.Timeout),
-			otlpmetricgrpc.WithTemporalitySelector(temporality))
-		senders = append(senders, sender{Exporter: e, logs: logs, metrics: metrics})
-	}
-	if len(problems) > 0 {
-		for _, s := range senders {
-			problems = append(problems, s.logs.Shutdown(ctx), s.metrics.Shutdown(ctx))
+		senders := grpcSenders
+		if e.HTTP {
+			senders = httpSenders
 		}
-		return nil, errors.Join(problems...)
-	}
-	logOptions := []sdklog.LoggerProviderOption{sdklog.WithResource(res)}
-	metricOptions := []sdkmetric.Option{sdkmetric.WithResource(res)}
-	for _, s := range senders {
-		logOptions = append(logOptions, sdklog.WithProcessor(newQueue(s.logs, s.Endpoint, s.QueueSize, timing.Interval, logger)))
-		metricOptions = append(metricOptions, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(s.metrics,
+		logs, metrics := senders(e, tlsConfig, timing, temporality)
+		logOptions = append(logOptions, sdklog.WithProcessor(newQueue(logs, e.Endpoint, e.QueueSize, timing.Interval, logger)))
+		metricOptions = append(metricOptions, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metrics,
 			sdkmetric.WithInterval(timing.Interval),
 			sdkmetric.WithTimeout(timing.Timeout))))
 	}
@@ -114,14 +107,87 @@ func New(ctx context.Context, exporters []config.Exporter, service Service, timi
 	s.logger = s.logs.Logger("hotline-proxy")
 	// The name and unit are fixed and valid, so there is no error to handle.
 	s.requests, _ = s.metrics.Meter("hotline-proxy").Int64Counter("hotline.requests", metric.WithUnit("{request}"))
-	return s, nil
+	return s
 }
 
-// ErrExporter marks a destination the proxy cannot send to.
-var ErrExporter = errors.New("export: unusable exporter")
+// A busy destination is tried again, first after about a second, then at
+// most every few seconds, until the send's time is up.
+const (
+	retryFirst = time.Second
+	retryMost  = 5 * time.Second
+)
 
-func wrap(e config.Exporter, err error) error {
-	return fmt.Errorf("%w: endpoint %s: %w", ErrExporter, e.Endpoint, err)
+// grpcSenders send OTLP over gRPC. The config has checked the endpoint,
+// the only thing New could refuse, so there is no error to handle.
+func grpcSenders(e config.Exporter, tlsConfig *tls.Config, timing Timing, temporality sdkmetric.TemporalitySelector) (sdklog.Exporter, sdkmetric.Exporter) {
+	compressor := "none"
+	if e.Gzip {
+		compressor = "gzip"
+	}
+	logOptions := []otlploggrpc.Option{
+		otlploggrpc.WithEndpoint(e.URL.Host),
+		otlploggrpc.WithHeaders(e.Headers),
+		otlploggrpc.WithCompressor(compressor),
+		otlploggrpc.WithTimeout(timing.Timeout),
+		otlploggrpc.WithRetry(otlploggrpc.RetryConfig{Enabled: true, InitialInterval: retryFirst, MaxInterval: retryMost, MaxElapsedTime: timing.Timeout}),
+		otlploggrpc.WithInsecure(),
+	}
+	metricOptions := []otlpmetricgrpc.Option{
+		otlpmetricgrpc.WithEndpoint(e.URL.Host),
+		otlpmetricgrpc.WithHeaders(e.Headers),
+		otlpmetricgrpc.WithCompressor(compressor),
+		otlpmetricgrpc.WithTimeout(timing.Timeout),
+		otlpmetricgrpc.WithRetry(otlpmetricgrpc.RetryConfig{Enabled: true, InitialInterval: retryFirst, MaxInterval: retryMost, MaxElapsedTime: timing.Timeout}),
+		otlpmetricgrpc.WithTemporalitySelector(temporality),
+		otlpmetricgrpc.WithInsecure(),
+	}
+	if tlsConfig != nil {
+		creds := credentials.NewTLS(tlsConfig)
+		logOptions[len(logOptions)-1] = otlploggrpc.WithTLSCredentials(creds)
+		metricOptions[len(metricOptions)-1] = otlpmetricgrpc.WithTLSCredentials(creds)
+	}
+	logs, _ := otlploggrpc.New(context.Background(), logOptions...)
+	metrics, _ := otlpmetricgrpc.New(context.Background(), metricOptions...)
+	return logs, metrics
+}
+
+// httpSenders send OTLP over HTTP as protobuf, to /v1/logs and /v1/metrics
+// after the endpoint's own path. The config has checked the endpoint, so
+// there is no error to handle.
+func httpSenders(e config.Exporter, tlsConfig *tls.Config, timing Timing, temporality sdkmetric.TemporalitySelector) (sdklog.Exporter, sdkmetric.Exporter) {
+	base := strings.TrimSuffix(e.URL.Path, "/")
+	logCompression, metricCompression := otlploghttp.NoCompression, otlpmetrichttp.NoCompression
+	if e.Gzip {
+		logCompression, metricCompression = otlploghttp.GzipCompression, otlpmetrichttp.GzipCompression
+	}
+	// A plain endpoint still sets a TLS config, nil, so none is read from
+	// the environment.
+	logOptions := []otlploghttp.Option{
+		otlploghttp.WithEndpoint(e.URL.Host),
+		otlploghttp.WithURLPath(base + "/v1/logs"),
+		otlploghttp.WithHeaders(e.Headers),
+		otlploghttp.WithCompression(logCompression),
+		otlploghttp.WithTimeout(timing.Timeout),
+		otlploghttp.WithRetry(otlploghttp.RetryConfig{Enabled: true, InitialInterval: retryFirst, MaxInterval: retryMost, MaxElapsedTime: timing.Timeout}),
+		otlploghttp.WithTLSClientConfig(tlsConfig),
+	}
+	metricOptions := []otlpmetrichttp.Option{
+		otlpmetrichttp.WithEndpoint(e.URL.Host),
+		otlpmetrichttp.WithURLPath(base + "/v1/metrics"),
+		otlpmetrichttp.WithHeaders(e.Headers),
+		otlpmetrichttp.WithCompression(metricCompression),
+		otlpmetrichttp.WithTimeout(timing.Timeout),
+		otlpmetrichttp.WithRetry(otlpmetrichttp.RetryConfig{Enabled: true, InitialInterval: retryFirst, MaxInterval: retryMost, MaxElapsedTime: timing.Timeout}),
+		otlpmetrichttp.WithTemporalitySelector(temporality),
+		otlpmetrichttp.WithTLSClientConfig(tlsConfig),
+	}
+	if tlsConfig == nil {
+		logOptions = append(logOptions, otlploghttp.WithInsecure())
+		metricOptions = append(metricOptions, otlpmetrichttp.WithInsecure())
+	}
+	logs, _ := otlploghttp.New(context.Background(), logOptions...)
+	metrics, _ := otlpmetrichttp.New(context.Background(), metricOptions...)
+	return logs, metrics
 }
 
 func delta(sdkmetric.InstrumentKind) metricdata.Temporality {
