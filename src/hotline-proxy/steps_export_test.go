@@ -29,6 +29,18 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return has(res, "service.instance.id", "proxy-test-1")
 	})
+	sc.Step(`^the record's level is (INFO|WARN|ERROR)$`, func(level string) error {
+		records := w.records()
+		if len(records) == 0 {
+			return failf("no record arrived; the app got %v %q", w.resp, w.respBody)
+		}
+		last := records[len(records)-1]
+		numbers := map[string]int32{"INFO": 9, "WARN": 13, "ERROR": 17}
+		if last.severityText != level || last.severityNumber != numbers[level] {
+			return failf("the level is %q (%d), want %s (%d)", last.severityText, last.severityNumber, level, numbers[level])
+		}
+		return nil
+	})
 	sc.Step(`^the receiver gets one OTLP log record with all of the record's attributes$`, func() error {
 		record, err := w.record()
 		if err != nil {

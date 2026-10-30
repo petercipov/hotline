@@ -200,6 +200,9 @@ func (s *Sink) Record(ctx context.Context, at time.Time, attrs []attribute.KeyVa
 	var r log.Record
 	r.SetEventName("hotline.request")
 	r.SetTimestamp(at)
+	severity := level(attrs)
+	r.SetSeverity(severity)
+	r.SetSeverityText(severity.String())
 	var counter []attribute.KeyValue
 	for _, kv := range attrs {
 		r.AddAttributes(kv)
@@ -209,6 +212,29 @@ func (s *Sink) Record(ctx context.Context, at time.Time, attrs []attribute.KeyVa
 	}
 	s.logger.Emit(ctx, r)
 	s.requests.Add(ctx, 1, metric.WithAttributes(counter...))
+}
+
+// level is INFO unless something went wrong: WARN when the call or the reply
+// broke the spec or the vendor refused the call (a 4xx), ERROR when the
+// vendor failed (a 5xx) or the call failed in the proxy.
+func level(attrs []attribute.KeyValue) log.Severity {
+	severity := log.SeverityInfo
+	for _, kv := range attrs {
+		switch kv.Key {
+		case semconv.ErrorTypeKey:
+			return log.SeverityError
+		case semconv.HTTPResponseStatusCodeKey:
+			switch status := kv.Value.AsInt64(); {
+			case status >= 500:
+				return log.SeverityError
+			case status >= 400:
+				severity = log.SeverityWarn
+			}
+		case "hotline.schema.request.errors", "hotline.schema.response.errors":
+			severity = log.SeverityWarn
+		}
+	}
+	return severity
 }
 
 // Shutdown sends what is still queued, within the time ctx allows.

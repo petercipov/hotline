@@ -30,8 +30,11 @@ import (
 // receivedRecord is one log record the fake OTLP receiver got.
 type receivedRecord struct {
 	eventName string
-	resource  map[string]any
-	attrs     map[string]any
+	// severityText and severityNumber are the record's level.
+	severityText   string
+	severityNumber int32
+	resource       map[string]any
+	attrs          map[string]any
 }
 
 // receivedCount is one data point of the hotline.requests counter.
@@ -280,9 +283,11 @@ func (r *receiver) Export(ctx context.Context, req *collogs.ExportLogsServiceReq
 		for _, sl := range rl.GetScopeLogs() {
 			for _, lr := range sl.GetLogRecords() {
 				r.records = append(r.records, receivedRecord{
-					eventName: lr.GetEventName(),
-					resource:  res,
-					attrs:     values(lr.GetAttributes()),
+					eventName:      lr.GetEventName(),
+					severityText:   lr.GetSeverityText(),
+					severityNumber: int32(lr.GetSeverityNumber()),
+					resource:       res,
+					attrs:          values(lr.GetAttributes()),
 				})
 			}
 		}
