@@ -15,9 +15,10 @@ import (
 // End-to-end scenarios run on their own, and scenarios tagged @later wait
 // for a later slice.
 func TestFeatures(t *testing.T) {
+	app := &exampleApp{dir: t.TempDir()}
 	suite := godog.TestSuite{
 		Name:                "hotline-proxy",
-		ScenarioInitializer: initializeScenario,
+		ScenarioInitializer: func(sc *godog.ScenarioContext) { initializeScenario(sc, app) },
 		Options: &godog.Options{
 			Format:   "progress",
 			Paths:    []string{"features"},
@@ -31,7 +32,7 @@ func TestFeatures(t *testing.T) {
 	}
 }
 
-func initializeScenario(sc *godog.ScenarioContext) {
+func initializeScenario(sc *godog.ScenarioContext, app *exampleApp) {
 	w := &world{}
 	var before goleak.Option
 	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
@@ -69,6 +70,9 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	connectSteps(sc, w)
 	overlaySteps(sc, w)
 	awsSteps(sc, w)
+	xmlSteps(sc, w)
+	routeSteps(sc, w)
+	s3Steps(sc, w, app)
 	traceSteps(sc, w)
 	reloadSteps(sc, w)
 	telemetrySteps(sc, w)

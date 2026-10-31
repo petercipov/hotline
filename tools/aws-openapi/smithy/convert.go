@@ -1,7 +1,9 @@
 // Package smithy turns an AWS service's Smithy model (AWS's own api
 // description language, in its JSON form) into an OpenAPI 3.1 spec Hotline
-// can read. Only services on AWS's JSON protocol are handled: every call is
-// POST /, and the action is named in the X-Amz-Target header.
+// can read. Two of AWS's protocols are handled: its JSON one, where every
+// call is POST / and the action is named in the X-Amz-Target header, and
+// its REST and XML one, used by S3, where actions are told apart by path
+// and query words, and bodies are XML.
 package smithy
 
 import (
@@ -87,8 +89,10 @@ func Convert(data []byte, options Options) ([]byte, error) {
 		mediaType = "application/x-amz-json-1.0"
 	case has(service.Traits, "aws.protocols#awsJson1_1"):
 		mediaType = "application/x-amz-json-1.1"
+	case has(service.Traits, "aws.protocols#restXml"):
+		return convertRestXML(m, serviceID, service, options)
 	default:
-		return nil, fmt.Errorf("%w: %s is not on AWS's JSON protocol", ErrUnsupported, serviceID)
+		return nil, fmt.Errorf("%w: %s is on neither AWS's JSON protocol nor its REST and XML one", ErrUnsupported, serviceID)
 	}
 	c := converter{model: m, mediaType: mediaType, schemas: map[string]any{}, options: options}
 	prefix := name(serviceID)
@@ -162,6 +166,9 @@ type converter struct {
 	mediaType string
 	schemas   map[string]any
 	options   Options
+	// xml says bodies are XML: AWS's XML names, attributes and lists are
+	// written as OpenAPI xml notes, and times as text.
+	xml bool
 }
 
 func (c *converter) operation(id, action string) map[string]any {
@@ -233,7 +240,7 @@ func (c *converter) body(r *ref) any {
 // first time. Smithy's own simple shapes are written in place.
 func (c *converter) schemaRef(target string) map[string]any {
 	if strings.HasPrefix(target, "smithy.api#") {
-		return prelude(target)
+		return c.prelude(target)
 	}
 	n := name(target)
 	if _, done := c.schemas[n]; !done {
@@ -247,29 +254,26 @@ func (c *converter) shapeSchema(s shape) map[string]any {
 	var out map[string]any
 	switch s.Type {
 	case "structure":
-		props := map[string]any{}
-		var required []string
-		for _, n := range sortedKeys(s.Members) {
-			mb := s.Members[n]
-			props[jsonName(n, mb)] = c.memberSchema(mb)
-			if has(mb.Traits, "smithy.api#required") {
-				required = append(required, jsonName(n, mb))
-			}
-		}
-		out = map[string]any{"type": "object", "properties": props}
-		if len(required) > 0 {
-			out["required"] = required
-		}
+		out = c.object(s.Members, func(member) bool { return true })
 	case "union":
 		props := map[string]any{}
 		for _, n := range sortedKeys(s.Members) {
-			props[jsonName(n, s.Members[n])] = c.memberSchema(s.Members[n])
+			props[c.propName(n, s.Members[n])] = c.memberSchema(n, s.Members[n])
 		}
 		out = map[string]any{"type": "object", "properties": props, "minProperties": 1, "maxProperties": 1}
 	case "list", "set":
-		out = map[string]any{"type": "array", "items": c.memberSchema(*s.Member)}
+		items := c.memberSchema("", *s.Member)
+		if c.xml {
+			// Each item's element is named member, unless AWS names it.
+			itemName := "member"
+			if xn, ok := s.Member.Traits["smithy.api#xmlName"].(string); ok {
+				itemName = xn
+			}
+			items["xml"] = map[string]any{"name": itemName}
+		}
+		out = map[string]any{"type": "array", "items": items}
 	case "map":
-		out = map[string]any{"type": "object", "additionalProperties": c.memberSchema(*s.Value)}
+		out = map[string]any{"type": "object", "additionalProperties": c.memberSchema("", *s.Value)}
 	case "enum":
 		var values []string
 		for _, n := range sortedKeys(s.Members) {
@@ -287,32 +291,114 @@ func (c *converter) shapeSchema(s shape) map[string]any {
 		}
 		out = map[string]any{"type": "integer", "enum": values}
 	default:
-		out = simple(s.Type)
+		out = c.simple(s.Type)
 	}
 	constrain(out, s.Traits, s.Type)
 	if doc := text(s.Traits); doc != "" && s.Type == "structure" {
 		out["description"] = doc
 	}
+	if xn, ok := s.Traits["smithy.api#xmlName"].(string); ok && c.xml && s.Type == "structure" {
+		out["xml"] = map[string]any{"name": xn}
+	}
 	return out
 }
 
-func (c *converter) memberSchema(mb member) map[string]any {
-	base := c.schemaRef(mb.Target)
-	out := map[string]any{}
-	for k, v := range base {
-		out[k] = v
+// object is the schema of a structure's members that keep says belong in
+// its body.
+func (c *converter) object(members map[string]member, keep func(member) bool) map[string]any {
+	props := map[string]any{}
+	var required []string
+	for _, n := range sortedKeys(members) {
+		mb := members[n]
+		if !keep(mb) {
+			continue
+		}
+		props[c.propName(n, mb)] = c.memberSchema(n, mb)
+		if has(mb.Traits, "smithy.api#required") {
+			required = append(required, c.propName(n, mb))
+		}
 	}
+	out := map[string]any{"type": "object", "properties": props}
+	if len(required) > 0 {
+		out["required"] = required
+	}
+	return out
+}
+
+// propName is a member's name in the body: AWS's JSON name for JSON, the
+// member's own name for XML, whose element name goes in the xml notes.
+func (c *converter) propName(n string, mb member) string {
+	if c.xml {
+		return n
+	}
+	return jsonName(n, mb)
+}
+
+// memberSchema is the schema of a structure's member n, or of a list's
+// items when n is empty.
+func (c *converter) memberSchema(n string, mb member) map[string]any {
 	kind := ""
 	if strings.HasPrefix(mb.Target, "smithy.api#") {
 		kind = strings.ToLower(strings.TrimPrefix(mb.Target, "smithy.api#"))
 	} else {
 		kind = c.model.Shapes[mb.Target].Type
 	}
+	var out map[string]any
+	if c.xml && n != "" && (kind == "list" || kind == "set") && has(mb.Traits, "smithy.api#xmlFlattened") {
+		// A flattened list has no outer element: each item is an element
+		// named like the member, so its items are written here.
+		list := c.model.Shapes[mb.Target]
+		items := c.memberSchema("", *list.Member)
+		items["xml"] = map[string]any{"name": c.elementName(n, mb)}
+		out = map[string]any{"type": "array", "items": items}
+		constrain(out, list.Traits, kind)
+	} else {
+		out = map[string]any{}
+		for k, v := range c.schemaRef(mb.Target) {
+			out[k] = v
+		}
+		if c.xml && n != "" {
+			c.xmlNotes(out, n, mb, kind)
+		}
+	}
 	constrain(out, mb.Traits, kind)
 	if doc := text(mb.Traits); doc != "" {
 		out["description"] = doc
 	}
 	return out
+}
+
+// xmlNotes write how a member is written in XML: its element name, when
+// it differs from the member's name or the shape it points to has its
+// own; as an attribute; and a list's outer element.
+func (c *converter) xmlNotes(out map[string]any, n string, mb member, kind string) {
+	notes := map[string]any{}
+	xn, named := mb.Traits["smithy.api#xmlName"].(string)
+	if _, ownName := c.model.Shapes[mb.Target].Traits["smithy.api#xmlName"]; named || ownName {
+		notes["name"] = c.elementName(n, mb)
+	}
+	if has(mb.Traits, "smithy.api#xmlAttribute") {
+		notes["attribute"] = true
+		// The proxy matches an attribute by its name without a prefix.
+		_, local, found := strings.Cut(xn, ":")
+		if found {
+			notes["name"] = local
+		}
+	}
+	if kind == "list" || kind == "set" {
+		notes["wrapped"] = true
+	}
+	if len(notes) > 0 {
+		out["xml"] = notes
+	}
+}
+
+// elementName is a member's element name in XML.
+func (c *converter) elementName(n string, mb member) string {
+	if xn, ok := mb.Traits["smithy.api#xmlName"].(string); ok {
+		return xn
+	}
+	return n
 }
 
 // constrain adds Smithy's length, range and pattern rules.
@@ -345,10 +431,19 @@ func constrain(out map[string]any, traits map[string]any, kind string) {
 	}
 }
 
-func prelude(target string) map[string]any {
+func (c *converter) prelude(target string) map[string]any {
 	t := strings.ToLower(strings.TrimPrefix(target, "smithy.api#"))
 	t = strings.TrimPrefix(t, "primitive")
-	return simple(t)
+	return c.simple(t)
+}
+
+// simple is the JSON Schema for one of Smithy's simple shape types. AWS's
+// XML writes times as date-time text.
+func (c *converter) simple(kind string) map[string]any {
+	if kind == "timestamp" && c.xml {
+		return map[string]any{"type": "string", "format": "date-time"}
+	}
+	return simple(kind)
 }
 
 // simple is the JSON Schema for one of Smithy's simple shape types, as AWS's

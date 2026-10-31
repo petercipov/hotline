@@ -1,4 +1,5 @@
-# Hotline proxy config for the invoices example app (examples/aws-sqs-invoices).
+# Hotline proxy config for the invoices example app (examples/aws-sqs-invoices):
+# its SQS queue and its S3 bucket.
 # The end-to-end test runs the proxy with this file, changing only the
 # addresses, so what you read here is what the test checks.
 
@@ -18,6 +19,11 @@ apis:
     overlays: [./invoices.overlay.yaml]                     # this queue's URL and job message
     vendorTimeout: 25s             # above SQS's 20 second long polling
 
+  aws-s3-invoices:                 # the invoices bucket
+    hosts: [shop-invoices.s3.eu-west-1.amazonaws.com]   # the bucket is in the host name
+    spec: ../../../../specs/aws/s3/2006-03-01.openapi.yaml    # the stable shared S3 spec
+    overlays: [./invoices-bucket.overlay.yaml]              # this bucket's name and file names
+
 integrations:
   - id: invoices                   # the user name in HOTLINE_PROXY
-    apis: [aws-sqs-invoices]
+    apis: [aws-sqs-invoices, aws-s3-invoices]

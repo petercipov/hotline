@@ -1,0 +1,17 @@
+# The invoices bucket on the shared S3 spec (specs/aws/s3/2006-03-01.openapi.yaml):
+# the bucket's own name in its lists, and invoice PDFs named like A-1001.pdf. The
+# bucket itself is in the host name, which the proxy config names. The proxy
+# config that uses it is hotline-proxy.yaml here.
+overlay: 1.1.0
+info:
+  title: Invoices bucket
+  version: "1"
+actions:
+  # A list of the bucket names this bucket.
+  - target: $.components.schemas['ListObjectsV2Output','ListObjectsOutput'].properties.Name
+    update:
+      const: shop-invoices
+  # Every file listed, fetched or deleted is an invoice PDF.
+  - target: $.components.schemas['Object','ObjectIdentifier'].properties.Key
+    update:
+      pattern: '^[A-Z]-[0-9]+\.pdf$'

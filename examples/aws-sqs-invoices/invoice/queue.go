@@ -45,23 +45,34 @@ func NewClient(ctx context.Context, s Settings, opts ...func(*config.LoadOptions
 	if err != nil {
 		return nil, err
 	}
+	client, err := s.httpClient()
+	if err != nil {
+		return nil, err
+	}
 	return sqs.NewFromConfig(cfg, func(o *sqs.Options) {
 		if s.Endpoint != "" {
 			o.BaseEndpoint = aws.String(s.Endpoint)
 		}
-		if s.ProxyURL != "" {
-			proxy, perr := url.Parse(s.ProxyURL)
-			if perr != nil {
-				err = fmt.Errorf("the proxy address can't be read: %w", perr)
-				return
-			}
-			transport := http.DefaultTransport.(*http.Transport).Clone()
-			// Go adds Proxy-Authorization from the user name here, after
-			// signing, so the signature stays valid when Hotline removes it.
-			transport.Proxy = http.ProxyURL(proxy)
-			o.HTTPClient = &http.Client{Transport: toHTTP{transport}}
+		if client != nil {
+			o.HTTPClient = client
 		}
-	}), err
+	}), nil
+}
+
+// httpClient is the HTTP client that reaches Hotline, nil without a proxy.
+func (s Settings) httpClient() (*http.Client, error) {
+	if s.ProxyURL == "" {
+		return nil, nil //nolint:nilnil // no proxy: the SDK's own client
+	}
+	proxy, err := url.Parse(s.ProxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("the proxy address can't be read: %w", err)
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// Go adds Proxy-Authorization from the user name here, after signing,
+	// so the signature stays valid when Hotline removes it.
+	transport.Proxy = http.ProxyURL(proxy)
+	return &http.Client{Transport: toHTTP{transport}}, nil
 }
 
 // Send puts one message on the queue and returns its SQS message ID.
@@ -73,11 +84,13 @@ func Send(ctx context.Context, c *sqs.Client, queueURL, body string) (string, er
 	return aws.ToString(out.MessageId), nil
 }
 
-// Worker receives invoice jobs and writes each invoice to OutDir.
+// Worker receives invoice jobs and writes each invoice to OutDir, or
+// stores it in Files when set.
 type Worker struct {
 	Client   *sqs.Client
 	QueueURL string
 	OutDir   string
+	Files    *Files
 	Log      *slog.Logger
 
 	seen map[string]bool
@@ -131,11 +144,8 @@ func (w *Worker) handle(ctx context.Context, m types.Message) error {
 		w.Log.Warn("message refused", "messageId", aws.ToString(m.MessageId), "eventId", job.EventID, "reason", err.Error())
 		return nil
 	}
-	file := filepath.Join(w.OutDir, "invoice-"+job.OrderID+".pdf")
-	if err := os.MkdirAll(w.OutDir, 0o750); err != nil {
-		return fmt.Errorf("write %s: %w", file, err)
-	}
-	if err := os.WriteFile(file, pdf, 0o600); err != nil {
+	file, err := w.keep(ctx, job.OrderID, pdf)
+	if err != nil {
 		return err
 	}
 	w.Log.Info("invoice written", "eventId", job.EventID, "file", file)
@@ -144,6 +154,19 @@ func (w *Worker) handle(ctx context.Context, m types.Message) error {
 	}
 	w.seen[job.EventID] = true
 	return w.delete(ctx, m)
+}
+
+// keep stores the PDF in the bucket, or writes it to the folder, and says
+// where it went.
+func (w *Worker) keep(ctx context.Context, orderID string, pdf []byte) (string, error) {
+	if w.Files != nil {
+		return w.Files.Bucket + "/" + Key(orderID), w.Files.Store(ctx, orderID, pdf)
+	}
+	file := filepath.Join(w.OutDir, "invoice-"+orderID+".pdf")
+	if err := os.MkdirAll(w.OutDir, 0o750); err != nil {
+		return "", fmt.Errorf("write %s: %w", file, err)
+	}
+	return file, os.WriteFile(file, pdf, 0o600)
 }
 
 func (w *Worker) delete(ctx context.Context, m types.Message) error {

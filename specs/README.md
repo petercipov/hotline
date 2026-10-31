@@ -12,6 +12,9 @@ specs/
     sqs/
       2012-11-05.openapi.yaml   # SQS, JSON protocol; 2012-11-05 is AWS's version name for the SQS api
       README.md                 # where it came from and how it was made
+    s3/
+      2006-03-01.openapi.yaml   # S3, REST and XML protocol; the bucket is in the host name
+      README.md
 ```
 
 ## Rules

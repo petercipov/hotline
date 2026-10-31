@@ -86,7 +86,7 @@ paths:
         - { name: name, in: path, required: true, schema: { type: string } }
       requestBody:
         content:
-          application/xml: {}
+          application/pdf: {}
       responses:
         "200":
           description: Stored

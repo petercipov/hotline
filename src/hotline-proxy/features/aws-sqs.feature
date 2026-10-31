@@ -83,10 +83,11 @@ Feature: AWS SQS through the proxy
 
   Rule: A body type is read as JSON where the spec marks it
 
-    The proxy itself reads only application/json, types ending in +json and
-    form bodies. AWS names its own type, application/x-amz-json-1.0, so the
-    spec marks it with x-hotline-body: json, next to its schema. The proxy
-    has nothing about AWS in it (Peter, 2026-10-30).
+    The proxy itself reads application/json and types ending in +json as
+    JSON, besides form and XML bodies. AWS names its own type,
+    application/x-amz-json-1.0, so the spec marks it with x-hotline-body:
+    json, next to its schema. The proxy has nothing about AWS in it (Peter,
+    2026-10-30). The mark takes xml too, as xml-bodies.feature shows.
 
     Scenario Outline: The mark decides whether AWS's content type is read
       Given the SQS api with a spec whose SendMessage body is application/x-amz-json-1.0 with <mark>
@@ -105,7 +106,7 @@ Feature: AWS SQS through the proxy
 
       Examples:
         | mark                 |
-        | x-hotline-body: xml  |
+        | x-hotline-body: yaml |
         | x-hotline-body: true |
 
   Rule: The invoice job inside each message is checked

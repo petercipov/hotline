@@ -85,5 +85,5 @@ The test uses a fixed, recorded request, signed once outside the repo with the S
 ## Not in this step
 
 - SQS's older query protocol (a form body with `Action=SendMessage`), sent by SDKs from before late 2023.
-- Other AWS services.
+- Other AWS services. S3 came next, on AWS's REST and XML protocol: see [proxy-xml-bodies.md](proxy-xml-bodies.md).
 - `CONNECT` with interception, the only way an unchanged SDK with its `https` address would work.

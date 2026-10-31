@@ -44,6 +44,12 @@ type route struct {
 	// action is the value the action header must have, for a route
 	// written as /path#Header=value. Empty for an ordinary route.
 	action string
+	// words are the query words a call must have, for a route written as
+	// /path#?word or /path#?word=value&other.
+	words []queryWord
+	// rest says the last segment, written {name+}, takes the rest of the
+	// path.
+	rest bool
 	// marks hold the parameter marks by where the parameter lives
 	// ("path", "query", "header" and "reply") and then by name. Header
 	// names are lower case.
@@ -120,16 +126,25 @@ func Parse(name string, data []byte) (*Spec, error) {
 	}
 	for key, item := range doc.Paths {
 		template := base + key
-		path, action, err := s.splitAction(name, template)
+		path, action, words, err := s.splitAction(name, template)
 		if err != nil {
 			problems = append(problems, err)
+		}
+		segments := strings.Split(strings.TrimSuffix(path, "/"), "/")
+		for i, segment := range segments {
+			if strings.HasSuffix(segment, "+}") && i != len(segments)-1 {
+				problems = append(problems, fmt.Errorf("%w: %s: the route %s has %s before its end, but only the last part of a path may take the rest of it",
+					ErrInvalid, name, template, segment))
+			}
 		}
 		for method, op := range item.operations() {
 			r := route{
 				method:   method,
 				template: template,
 				action:   action,
-				segments: strings.Split(strings.TrimSuffix(path, "/"), "/"),
+				words:    words,
+				rest:     strings.HasSuffix(segments[len(segments)-1], "+}"),
+				segments: segments,
 				marks:    map[string]map[string]mark{"path": {}, "query": {}, "header": {}, "reply": {}},
 			}
 			where := fmt.Sprintf("%s %s %s", name, method, template)
@@ -161,21 +176,40 @@ func Parse(name string, data []byte) (*Spec, error) {
 	return s, nil
 }
 
+// queryWord is a word a call's query must hold to take a route: only
+// present, or with exactly the value given.
+type queryWord struct {
+	name     string
+	value    string
+	hasValue bool
+}
+
 // splitAction reads a route written as /path#Header=value, the way a
 // vendor that names each action in a header is written (Peter,
-// 2026-10-29). The header must be the one the spec names in
-// x-hotline-action-header.
-func (s *Spec) splitAction(name, template string) (path, action string, err error) {
+// 2026-10-29), or as /path#?word&other=value, for a vendor that names it
+// with words in the query (Peter, 2026-10-31). The header must be the one
+// the spec names in x-hotline-action-header.
+func (s *Spec) splitAction(name, template string) (path, action string, words []queryWord, err error) {
 	path, after, found := strings.Cut(template, "#")
 	if !found {
-		return template, "", nil
+		return template, "", nil, nil
+	}
+	if query, isWords := strings.CutPrefix(after, "?"); isWords {
+		for _, pair := range strings.Split(query, "&") {
+			word, value, hasValue := strings.Cut(pair, "=")
+			if word == "" {
+				return path, "", nil, fmt.Errorf("%w: %s: the route %s names an empty query word", ErrInvalid, name, template)
+			}
+			words = append(words, queryWord{name: word, value: value, hasValue: hasValue})
+		}
+		return path, "", words, nil
 	}
 	header, action, _ := strings.Cut(after, "=")
 	if s.actionHeader == "" || !strings.EqualFold(header, s.actionHeader) || action == "" {
-		return path, action, fmt.Errorf("%w: %s: the route %s names the header %s, but the spec's x-hotline-action-header is %q",
+		return path, action, nil, fmt.Errorf("%w: %s: the route %s names the header %s, but the spec's x-hotline-action-header is %q",
 			ErrInvalid, name, template, header, s.actionHeader)
 	}
-	return path, action, nil
+	return path, action, nil, nil
 }
 
 func (p pathItem) operations() map[string]*operation {

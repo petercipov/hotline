@@ -358,17 +358,27 @@ func (b *builder) bodySpec(m map[string]any, pointer, where, what string) *bodyS
 	for _, mediaType := range slices.Sorted(maps.Keys(listed)) {
 		media, _ := listed[mediaType].(map[string]any)
 		mark, marked := media["x-hotline-body"]
-		if marked && mark != "json" {
-			b.problem("%s: x-hotline-body of %s %s must be json", where, what, mediaType)
+		if marked && mark != "json" && mark != "xml" {
+			b.problem("%s: x-hotline-body of %s %s must be json or xml", where, what, mediaType)
 		}
 		at := pointer + "/content" + token(mediaType)
 		ct := content{
 			mediaType: mediaType,
 			json:      mark == "json",
+			xmlMark:   mark == "xml",
 			schema:    b.schema(media, at, where, what+" "+mediaType),
 		}
-		if schema, ok := media["schema"]; ok {
+		schema, hasSchema := media["schema"]
+		if hasSchema {
 			ct.fields = b.fields(schema, at+"/schema")
+		}
+		// XML is read by the schema's shape, built only where a body can
+		// be XML: by the mark, by its type, or by a wildcard type.
+		if ct.xmlMark || isXML(strings.ToLower(mediaType)) || strings.Contains(mediaType, "*") {
+			ct.xml = &xmlBody{}
+			if hasSchema {
+				ct.xml = b.xmlBody(schema, at+"/schema")
+			}
 		}
 		body.content = append(body.content, ct)
 	}

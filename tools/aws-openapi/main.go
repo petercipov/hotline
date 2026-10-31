@@ -1,7 +1,9 @@
-// Command aws-openapi writes the OpenAPI spec of an AWS JSON service from
-// its Smithy model, for the specs folder:
+// Command aws-openapi writes the OpenAPI spec of an AWS service from its
+// Smithy model, for the specs folder. It knows AWS's JSON protocol (SQS)
+// and its REST and XML one (S3):
 //
 //	go run . -record QueueUrl=messaging.destination.name -record-action messaging.operation.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml
+//	go run . models/s3-2006-03-01.json > ../../specs/aws/s3/2006-03-01.openapi.yaml
 //
 // Each -record FIELD=NAME marks that field of every action's input, so the
 // proxy copies it into records as NAME. -record-action NAME lists the
