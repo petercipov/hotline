@@ -4,12 +4,12 @@ This page lists every piece of data the Hotline proxy sends out over OTLP, as th
 
 The rules come from the spec, `proxy-spec.md` section 4 in the `hotline-strategic` repo. The code lives in `src/hotline-proxy/record.go`, `connect.go` and `internal/export/`. Where the two differ, the last section says so.
 
-In short, the proxy sends two things:
+In short, the proxy sends two things to every destination under `exporters`:
 
 1. **One log record per call**, named `hotline.request`. It holds everything known about the call.
 2. **One counter**, `hotline.requests`, that goes up by one per call.
 
-It sends no traces. Numbers about the proxy itself go only to the `telemetry` destination: [proxy-telemetry.md](proxy-telemetry.md). Each record carries the app's trace id, or a new one, in its own trace fields: [proxy-trace-context.md](proxy-trace-context.md).
+A third kind, numbers about the proxy itself, goes only to the `telemetry` destination (last signal below). It sends no traces.
 
 ## How it is sent
 
@@ -75,6 +75,7 @@ One OpenTelemetry log record per call, sent once the reply has gone back to the 
 
 - Event name: `hotline.request`.
 - Timestamp: when the call reached the proxy.
+- Trace id, span id and flags, in the log record's own OpenTelemetry fields, not in attributes. The trace id and flags are the app's, read from its call in the integration's `traceFormat` (`w3c` by default, or `b3`, `xray`, `jaeger`); when the app sent none, the proxy makes a new trace id. The span id is always a new one for the proxy's step. Detail: [proxy-trace-context.md](proxy-trace-context.md).
 - A level (the OpenTelemetry severity, its text and number): `INFO` (9) for a normal call; `WARN` (13) when the call or the reply broke the spec (`hotline.schema.request.errors` or `hotline.schema.response.errors`), or the vendor answered with a 4xx; `ERROR` (17) when the vendor answered with a 5xx or the call failed in the proxy (`error.type`). ERROR wins over WARN. Log tools such as Grafana show it as the record's level (Peter, 2026-10-30).
 - No body text: everything else is in the attributes. A log tool can build a line from them, for example Grafana's `| line_format "{{.http_request_method}} {{.url_template}} {{.http_response_status_code}}"`.
 - Standard names come from the OpenTelemetry semantic conventions (the official list of field names), Go package `semconv` v1.43.0. Hotline-only fields start with `hotline.`.
@@ -130,7 +131,7 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 | `http.response.header.<name>` | list of text | Allowed reply headers, name in lower case. |
 | `hotline.client.cancelled` | true or false | The app gave up before the vendor answered. |
 | `hotline.connection.reused` | true or false | The call used a connection that was already open. |
-| `hotline.config.version` | text | The `version` field of the config. |
+| `hotline.config.version` | text | The config's `version`, a `+`, and the first 12 hex characters of a SHA-256 over the config, its specs and overlays, such as `2026-10-31.2+a3f9c21e07b4`. |
 | `hotline.schema.*` | see below | What the check against the spec found. |
 | any name the spec gives | text, number, or true or false | A body field or call header the spec marks `x-hotline-record`, such as `messaging.destination.name` for SQS's `QueueUrl` and `messaging.operation.name` for its `X-Amz-Target`. Detail: [proxy-body-fields.md](proxy-body-fields.md). |
 
@@ -195,6 +196,17 @@ Every record above also counts once here, refused calls and failed tunnels inclu
 
 There is no latency histogram and no pass or fail count: the control plane builds those from the records.
 
+## Signal 3: the proxy's own numbers
+
+Metrics about the proxy itself, sent only to the `telemetry` destination and never mixed with the records and counts above. Without a `telemetry` section, nothing of this is measured or sent. No number is split by integration, vendor, host or route, so their count stays small however many integrations there are.
+
+- Calls: `http.server.active_requests`, `http.server.request.duration` and `hotline.proxy.overhead`.
+- Sending to each destination: `otel.sdk.processor.log.queue.size`, `otel.sdk.processor.log.queue.capacity`, `otel.sdk.processor.log.processed` (with `error.type=queue_full` for dropped records), `otel.sdk.exporter.log.exported`, `otel.sdk.exporter.metric_data_point.exported` and `hotline.destination.state`.
+- Config and certificates: `hotline.config.info`, `hotline.config.reloads`, `hotline.config.reload.last_success`, `hotline.config.restart_needed`, `hotline.certificate.not_after` and `hotline.app_tls.failures`.
+- The Go runtime's standard set, such as `go.memory.used` and `go.goroutine.count`.
+
+Any of them can be turned off with `telemetry.disable`. Units, labels and details: [proxy-telemetry.md](proxy-telemetry.md).
+
 ## What is not sent
 
 - **Traces.** No spans at all. The spec plans an optional span per call, off by default.
@@ -203,8 +215,4 @@ There is no latency histogram and no pass or fail count: the control plane build
 
 ## Where the spec and the code differ
 
-1. **Error type examples.** The spec's table gives `timeout` and `dns` as examples; the real values are longer, such as `dns_timeout` (table above).
-2. **Minimal record and status code.** The spec says every minimal record has `http.response.status_code`. A failed tunnel's record has none.
-3. **`hotline.schema.skipped=overloaded`.** In the spec's list, never set by the code.
-4. **Send timing.** One second and ten seconds are fixed in the program; the spec does not mention them and they are not in the config.
-5. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces. The body fingerprints are replaced by the record's signature (Peter, 2026-10-30).
+They match since 2026-10-31. Two things in the spec are not built yet: traces (an optional span per call), and `hotline.schema.skipped=overloaded`, which comes with the load test.
