@@ -86,7 +86,9 @@ const model = `{
 }`
 
 // sqsRecord is what the committed SQS spec copies into records.
-var sqsRecord = map[string]string{"QueueUrl": "messaging.destination.name"}
+func sqsRecord() map[string]string {
+	return map[string]string{"QueueUrl": "messaging.destination.name"}
+}
 
 func convert(m string) map[string]any {
 	return convertRecording(m, nil)
@@ -224,13 +226,13 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		Expect(err).NotTo(HaveOccurred())
 		want, err := os.ReadFile("../../../specs/aws/sqs/2012-11-05.openapi.yaml")
 		Expect(err).NotTo(HaveOccurred())
-		got, err := smithy.Convert(m, sqsRecord)
+		got, err := smithy.Convert(m, sqsRecord())
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(got)).To(Equal(string(want)), "run: cd tools/aws-openapi && go run . -record QueueUrl=messaging.destination.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml")
 	})
 
 	It("marks the named fields of every action's input to be copied into records", func() {
-		doc := convertRecording(model, sqsRecord)
+		doc := convertRecording(model, sqsRecord())
 		for _, input := range []string{"SendRequest", "PurgeRequest"} {
 			Expect(at(doc, "components", "schemas", input, "properties", "QueueUrl", "x-hotline-record")).To(Equal("messaging.destination.name"))
 		}
