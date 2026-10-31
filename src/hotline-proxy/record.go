@@ -12,11 +12,12 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"hotline-proxy/internal/export"
 	"hotline-proxy/internal/spec"
 )
 
-// finish builds the call's record once the reply has gone back to the app,
-// and hands it to the exporters without waiting for them.
+// finish builds the call's record and trace once the reply has gone back to
+// the app, and hands them to the exporters without waiting for them.
 func (c *call) finish() {
 	end := c.h.clock.Now()
 	c.mu.Lock()
@@ -30,7 +31,7 @@ func (c *call) finish() {
 	}
 	if c.respBody != nil {
 		if _, err := c.respBody.counts(); err != nil {
-			c.errorType = "http_response_incomplete"
+			c.errorType, c.failedStep = "http_response_incomplete", "receive reply"
 		}
 	}
 	if c.errorType != "" {
@@ -41,16 +42,23 @@ func (c *call) finish() {
 		// second address. Every record has it, minimal ones too.
 		attrs = append(attrs, semconv.NetworkPeerAddress(c.peer))
 	}
-	attrs = append(attrs, c.timings(end)...)
+	opened := c.opened()
+	attrs = append(attrs, attribute.Int64("hotline.timing.total_us", end.Sub(opened).Microseconds()))
+	spans := c.spans(opened, end)
 	if c.api != nil {
 		attrs = append(attrs, c.full()...)
+		attrs = append(attrs, traceSignature(c.trace, spans, c.api.SigningKey))
 		attrs = append(attrs, signature(attrs, c.start, c.trace, c.api.SigningKey)...)
 	}
-	c.h.record(c.in, c.trace, c.start, attrs)
+	c.h.record(c.in, finished{
+		sc: c.trace, at: c.start, attrs: attrs, spans: spans,
+		overhead: c.vendorIn.Sub(c.start) + end.Sub(orTime(c.vendorOut, end)), reached: true,
+	})
 }
 
 // refused records a request the proxy read but did not forward, with a
-// minimal record. The vendor host is in it only when the request named one.
+// minimal record and a trace of the call span alone. The vendor host is in
+// it only when the request named one.
 func (h *handler) refused(r *http.Request, start time.Time, ingress, id string, target *url.URL, status int) {
 	attrs := []attribute.KeyValue{attribute.String("hotline.integration.id", orNotPassed(id))}
 	if ingress != "" {
@@ -59,21 +67,35 @@ func (h *handler) refused(r *http.Request, start time.Time, ingress, id string, 
 	if target != nil && target.Hostname() != "" {
 		attrs = append(attrs, semconv.ServerAddress(strings.ToLower(target.Hostname())))
 	}
+	end := h.clock.Now()
 	attrs = append(attrs,
 		semconv.HTTPRequestMethodKey.String(r.Method),
 		semconv.HTTPResponseStatusCode(status),
 		semconv.ErrorTypeKey.String("http_request_error"),
-		attribute.Int64("hotline.timing.total_us", h.clock.Now().Sub(start).Microseconds()),
+		attribute.Int64("hotline.timing.total_us", end.Sub(start).Microseconds()),
 	)
-	traced, _ := h.traced(id, r.Header, start)
-	h.record(r, traced, start, attrs)
+	traced, parent, _ := h.traced(id, r.Header, start)
+	spans := []export.Span{callSpan(traced, parent, start, end, true)}
+	h.record(r, finished{sc: traced, at: start, attrs: attrs, spans: spans})
 }
 
-// record hands a record to the exporters, and measures the call for the
-// proxy's own numbers.
-func (h *handler) record(r *http.Request, sc trace.SpanContext, start time.Time, attrs []attribute.KeyValue) {
-	h.sink.Record(recordContext(sc), start, attrs)
-	h.own.ended(r, attrs)
+// finished is what a call leaves: its record, its trace and, once it got as
+// far as the vendor, the proxy's own time on it.
+type finished struct {
+	sc       trace.SpanContext
+	at       time.Time
+	attrs    []attribute.KeyValue
+	spans    []export.Span
+	overhead time.Duration
+	reached  bool
+}
+
+// record hands a record and its trace to the exporters, and measures the
+// call for the proxy's own numbers.
+func (h *handler) record(r *http.Request, f finished) {
+	h.sink.Record(recordContext(f.sc), f.at, f.attrs)
+	h.sink.Trace(f.sc, f.spans)
+	h.own.ended(r, f.attrs, f.overhead, f.reached)
 }
 
 func orNotPassed(id string) string {
@@ -81,30 +103,6 @@ func orNotPassed(id string) string {
 		return "not-passed"
 	}
 	return id
-}
-
-// timings are the phase lengths in whole microseconds, each name ending in
-// _us (Peter, 2026-10-31). A phase that did not happen, such as DNS for a
-// reused connection, has no timing.
-func (c *call) timings(end time.Time) []attribute.KeyValue {
-	micros := func(from, to time.Time) int64 { return to.Sub(from).Microseconds() }
-	var attrs []attribute.KeyValue
-	for _, p := range []phase{phaseDNS, phaseConnect, phaseTLS} {
-		if t := c.times[p]; !t[1].IsZero() {
-			attrs = append(attrs, attribute.Int64("hotline.timing."+string(p)+"_us", micros(t[0], t[1])))
-		}
-	}
-	if c.appTimed {
-		attrs = append(attrs, attribute.Int64("hotline.timing.app_tls_us", c.appTLS.Microseconds()))
-	}
-	if !c.firstByte.IsZero() {
-		attrs = append(attrs, attribute.Int64("hotline.timing.first_byte_us", micros(c.start, c.firstByte)))
-	}
-	return append(attrs,
-		attribute.Int64("hotline.timing.total_us", micros(c.start, end)),
-		attribute.Int64("hotline.timing.proxy_request_us", micros(c.start, c.vendorIn)),
-		attribute.Int64("hotline.timing.proxy_response_us", micros(c.vendorOut, end)),
-	)
 }
 
 // full is the rest of the record, for calls with a known integration and api.
@@ -132,14 +130,10 @@ func (c *call) full() []attribute.KeyValue {
 		semconv.ServerPort(port),
 		semconv.HTTPRequestBodySize(int(sent)),
 		attribute.Bool("hotline.client.cancelled", c.app.gone),
-		attribute.Bool("hotline.connection.reused", c.reused),
 		attribute.String("hotline.config.version", c.cfg.Label()),
 	}
 	if redacted.Template != "" {
 		attrs = append(attrs, semconv.URLFull(redacted.URLFull), semconv.URLTemplate(redacted.Template))
-	}
-	if c.looked != "" {
-		attrs = append(attrs, semconv.DNSQuestionName(c.looked))
 	}
 	if body := c.reqBody.signed(); body != "" {
 		attrs = append(attrs, attribute.String("hotline.request.body.signature", body))

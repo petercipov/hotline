@@ -11,10 +11,10 @@ The ids go in the log record's own OpenTelemetry fields, not in attributes, so n
 | Field | Holds |
 |---|---|
 | `TraceId` | The app's trace id, or a new one when the app sent none the proxy can read. |
-| `SpanId` | A new span id for the proxy's own step, one per call. |
+| `SpanId` | A new span id for the proxy's own step, one per call: the id of the call's `hotline call` span. |
 | `TraceFlags` | The app's flags. The flags say whether the trace is sampled, that is kept by whoever records traces. A new trace id is sampled. |
 
-The app's own span id is not recorded: there is no standard name for it on a log record (Peter, 2026-10-31). The proxy sends no traces, so in Grafana the span id does not open a trace view.
+The app's own span id is not on the record: there is no standard name for it on a log record (Peter, 2026-10-31). It is the parent of the call's trace instead, so the proxy's steps show inside the app's own trace ([proxy-traces.md](proxy-traces.md)). In Grafana the record's span id opens that trace.
 
 Every record has the three fields: full records, refused calls and failed tunnels alike. They are signed with the rest of the record; see [proxy-signatures.md](proxy-signatures.md).
 
@@ -33,7 +33,7 @@ A header that is missing, sent twice or broken in any way counts as no trace con
 
 ## Passing it on
 
-By default the proxy only reads the trace headers and the vendor gets the call unchanged. With `traceForward: true` on an integration, the vendor gets the proxy's trace id and new span id, in the same format, in place of the app's:
+By default the proxy only reads the trace headers and the vendor gets the call unchanged. With `traceForward: true` on an integration, the vendor gets the proxy's trace id and the id of the call's `vendor call` span, in the same format, in place of the app's, so the vendor's own spans sit under that step:
 
 ```yaml
 integrations:

@@ -1,4 +1,5 @@
-// Package export sends records and the hotline.requests counter over OTLP.
+// Package export sends records, their traces and the hotline.requests
+// counter over OTLP.
 // Every destination gets its own queue, so one that is down never holds up
 // the others or the calls.
 package export
@@ -27,6 +28,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"google.golang.org/grpc/credentials"
 
@@ -57,7 +59,10 @@ type destination struct {
 	metrics  *sdkmetric.MeterProvider
 	logger   log.Logger
 	requests metric.Int64Counter
-	queue    *queue
+	queue    logQueue
+	// spans is the queue of spans, and res the resource they carry.
+	spans *queue[sdktrace.ReadOnlySpan]
+	res   *resource.Resource
 	// up is 1 while sends work, 0 from a failed send until one works, and
 	// place names the destination in the proxy's own numbers.
 	up    *atomic.Int64
@@ -86,18 +91,22 @@ func New(exporters []config.Exporter, roots *x509.CertPool, service Service, tim
 	s := &Sink{}
 	stats := newSendStats(meter)
 	for i, e := range exporters {
-		logs := grpcLogs
+		logs, traces := grpcLogs, grpcTraces
 		if e.HTTP {
-			logs = httpLogs
+			logs, traces = httpLogs, httpTraces
 		}
 		metrics := metricSender(e, roots, timing)
-		logKind, metricKind := kinds(e)
+		logKind, metricKind, spanKind := kinds(e)
 		up := &atomic.Int64{}
 		up.Store(1)
-		q := newQueue(logs(e, tlsFor(e, roots), timing), e.Endpoint, e.QueueSize, timing.Interval, logger)
-		q.stats, q.up = stats, up
-		q.processor = component("batching_log_processor", i, e)
-		q.sender = component(logKind, i, e)
+		setup := queueSetup{endpoint: e.Endpoint, size: e.QueueSize, interval: timing.Interval, logger: logger, up: up}
+		logSetup := setup
+		logSetup.processed, logSetup.exported = stats.processed, stats.logs
+		logSetup.processor, logSetup.sender = component("batching_log_processor", i, e), component(logKind, i, e)
+		q := newLogQueue(logs(e, tlsFor(e, roots), timing), logSetup)
+		spanSetup := setup
+		spanSetup.processed, spanSetup.exported = stats.spansProcessed, stats.spans
+		spanSetup.processor, spanSetup.sender = component("batching_span_processor", i, e), component(spanKind, i, e)
 		counted := countedMetrics{Exporter: metrics, points: stats.points, set: component(metricKind, i, e), up: up}
 		res := describe(service, e.Resource)
 		d := destination{
@@ -107,6 +116,8 @@ func New(exporters []config.Exporter, roots *x509.CertPool, service Service, tim
 					sdkmetric.WithInterval(timing.Interval),
 					sdkmetric.WithTimeout(timing.Timeout)))),
 			queue: q,
+			spans: newSpanQueue(traces(e, tlsFor(e, roots), timing), spanSetup),
+			res:   res,
 			up:    up,
 			place: attribute.NewSet(append(address(e),
 				attribute.String("otel.component.name", logKind+"/"+strconv.Itoa(i)))...),
@@ -312,7 +323,7 @@ func level(attrs []attribute.KeyValue) log.Severity {
 func (s *Sink) Shutdown(ctx context.Context) error {
 	var errs []error
 	for _, d := range s.destinations {
-		errs = append(errs, d.logs.Shutdown(ctx), d.metrics.Shutdown(ctx))
+		errs = append(errs, d.logs.Shutdown(ctx), d.spans.Shutdown(ctx), d.metrics.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }
