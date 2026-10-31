@@ -34,6 +34,7 @@ func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 		return nil
 	})
 	sc.Step(`^the hotline-proxy program runs with the invoices hotline-proxy.yaml$`, func() error {
+		p.pickPorts()
 		config, err := exampleConfig(p.proxyAddr, p.receiver.endpoint)
 		if err != nil {
 			return err

@@ -285,7 +285,7 @@ func unchunk(data []byte) ([]byte, map[string]string) {
 
 // invoicesConfig is testdata/aws/hotline-proxy.yaml with the given
 // changes, each to text the file holds once, its admin port free, and its
-// specs and overlays read from where they are in the repo.
+// specs, overlays and key read from where they are in the repo.
 func invoicesConfig(changes ...[2]string) (string, error) {
 	dir, err := filepath.Abs(filepath.Join("testdata", "aws"))
 	if err != nil {
@@ -300,6 +300,7 @@ func invoicesConfig(changes ...[2]string) (string, error) {
 		[2]string{`":8081"`, `"127.0.0.1:0"`},
 		[2]string{"./invoices.overlay.yaml", filepath.Join(dir, "invoices.overlay.yaml")},
 		[2]string{"./invoices-bucket.overlay.yaml", filepath.Join(dir, "invoices-bucket.overlay.yaml")},
+		[2]string{"./invoices.key", filepath.Join(dir, "invoices.key")},
 	)
 	for _, change := range changes {
 		if strings.Count(config, change[0]) != 1 {

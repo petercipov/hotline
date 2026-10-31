@@ -62,7 +62,8 @@ The code is in [invoice/queue.go](invoice/queue.go) and [invoice/files.go](invoi
 
 You need an AWS account, a queue, a bucket, and Hotline running with an integration `invoices` whose apis list `sqs.<region>.amazonaws.com` and `<bucket>.s3.<region>.amazonaws.com` (S3 puts the bucket in the host name). The end-to-end test's Hotline config does this, and is a good start:
 
-- [hotline-proxy.yaml](../../src/hotline-proxy/testdata/aws/hotline-proxy.yaml): the proxy config, with the api `aws-sqs-invoices` and the integration `invoices`;
+- [hotline-proxy.yaml](../../src/hotline-proxy/testdata/aws/hotline-proxy.yaml): the proxy config, with the api `aws-sqs-invoices` and the integration `invoices`. It sends records and the proxy's own numbers to an OpenTelemetry collector on `localhost:4317`;
+- [invoices.key](../../src/hotline-proxy/testdata/aws/invoices.key): the key that signs the integration's records. It is an example and not secret: put your own secret in it, or read it from the environment with `fingerprintKey: { env: NAME }`;
 - [invoices.overlay.yaml](../../src/hotline-proxy/testdata/aws/invoices.overlay.yaml): the overlay that adds this queue's URL and the job schema to the stable SQS spec in [specs/aws/sqs](../../specs/aws/sqs/);
 - [invoices-bucket.overlay.yaml](../../src/hotline-proxy/testdata/aws/invoices-bucket.overlay.yaml): the overlay that adds the bucket's name and the PDF name rule to the stable S3 spec in [specs/aws/s3](../../specs/aws/s3/).
 
