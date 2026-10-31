@@ -4,8 +4,11 @@ package config
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -42,8 +45,16 @@ type Config struct {
 	// NotPassed applies to calls without a known integration ID, and to
 	// calls to a host outside the integration's apis.
 	NotPassed Settings
-	// Version is the config's own version field, carried by every record.
+	// Version is the config's own version field.
 	Version string
+	// Fingerprint is the first 12 hex characters of a SHA-256 of the
+	// config, specs and overlays, so configs differ even when someone
+	// forgot to change Version. Key and certificate files are left out: a
+	// renewal is not a new config, and secrets stay out of it.
+	Fingerprint string
+	// Files are every file the load read or tried to read, so the proxy
+	// can tell when one changes. A refused config still lists them.
+	Files []string
 	// Warnings name settings the proxy does not use, such as a misspelt
 	// field. They do not stop the proxy.
 	Warnings     []string
@@ -51,6 +62,12 @@ type Config struct {
 	// traces are each integration's trace settings, the not-passed entry's
 	// among them.
 	traces map[string]Trace
+}
+
+// Label is what every record carries as hotline.config.version: the
+// version, a +, and the fingerprint.
+func (c *Config) Label() string {
+	return c.Version + "+" + c.Fingerprint
 }
 
 // Trace says how an integration's app sends its trace context, and whether
@@ -259,14 +276,17 @@ const notPassed = "not-passed"
 // Load reads the config file and every spec and certificate it points to.
 // Their paths are relative to the folder of the config file. A certificate
 // that has expired by now is refused.
+//
+// A refused config comes back with only Files set, next to the problems.
 func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*Config, error) {
+	tried := &Config{Files: []string{path}}
 	data, err := os.ReadFile(path) //nolint:gosec // the operator chooses the config file
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
+		return tried, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	var f file
 	if err := yaml.Unmarshal(data, &f); err != nil {
-		return nil, fmt.Errorf("%w: %s is not valid YAML: %w", ErrInvalid, path, err)
+		return tried, fmt.Errorf("%w: %s is not valid YAML: %w", ErrInvalid, path, err)
 	}
 	var warnings []string
 	strict := yaml.NewDecoder(bytes.NewReader(data))
@@ -283,6 +303,8 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		specs:     map[string]*spec.Spec{},
 		files:     map[string][]byte{},
 		lookupEnv: lookupEnv,
+		read:      map[string]bool{path: true},
+		hashed:    map[string][]byte{path: data},
 	}
 	c := &Config{
 		Version:      f.Version,
@@ -389,11 +411,29 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		}
 		c.integrations[in.ID] = byHost
 	}
+	c.Files = slices.Sorted(maps.Keys(l.read))
 	if len(l.problems) > 0 {
-		return nil, errors.Join(l.problems...)
+		return &Config{Files: c.Files}, errors.Join(l.problems...)
 	}
 	c.Warnings = append(c.Warnings, l.warnings...)
+	c.Fingerprint = l.fingerprint()
 	return c, nil
+}
+
+// fingerprint hashes the config, specs and overlays in the order of their
+// paths, each path relative to the config's folder, so the same files give
+// the same fingerprint wherever the folder is.
+func (l *loader) fingerprint() string {
+	h := sha256.New()
+	for _, path := range slices.Sorted(maps.Keys(l.hashed)) {
+		name, _ := filepath.Rel(l.dir, path) // both are under the same root
+		data := l.hashed[path]
+		h.Write([]byte(name))
+		h.Write([]byte{0})
+		_ = binary.Write(h, binary.BigEndian, uint64(len(data)))
+		h.Write(data)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:12]
 }
 
 type loader struct {
@@ -405,6 +445,10 @@ type loader struct {
 	warnings  []string
 	lookupEnv func(string) (string, bool)
 	problems  []error
+	// read are the files the load read or tried to read, and hashed those
+	// the fingerprint covers, with what they held.
+	read   map[string]bool
+	hashed map[string][]byte
 }
 
 func (l *loader) exporter(f exporterFile, now time.Time) Exporter {
@@ -513,6 +557,7 @@ func (l *loader) secret(label string, s secret) string {
 	case s.written:
 		return s.value
 	case s.file != "":
+		l.read[l.path(s.file)] = true
 		data, err := os.ReadFile(l.path(s.file)) //nolint:gosec // the config names its secret files
 		if err != nil {
 			l.problem("%s: the file %s cannot be read", label, s.file)
@@ -530,6 +575,7 @@ func (l *loader) secret(label string, s secret) string {
 
 // issuers reads a PEM file of certificates.
 func (l *loader) issuers(label, path string) []byte {
+	l.read[l.path(path)] = true
 	data, err := os.ReadFile(l.path(path)) //nolint:gosec // the config names its certificate files
 	if err != nil {
 		l.problem("%s: %s cannot be read: %v", label, path, err)
@@ -568,6 +614,7 @@ func (l *loader) pair(label string, f *pairFile, load func(certFile, keyFile str
 		return nil
 	}
 	t := &TLS{CertFile: l.path(f.Cert), KeyFile: l.path(f.Key)}
+	l.read[t.CertFile], l.read[t.KeyFile] = true, true
 	cert, err := load(t.CertFile, t.KeyFile, now)
 	if err != nil {
 		l.problems = append(l.problems, err)
@@ -627,10 +674,12 @@ func (l *loader) spec(label, path string, overlays []string) *spec.Spec {
 		return nil
 	}
 	path = l.path(path)
+	l.read[path] = true
 	names := []string{path}
 	files := make([]overlay.File, 0, len(overlays))
 	for _, o := range overlays {
 		o = l.path(o)
+		l.read[o] = true
 		names = append(names, o)
 		files = append(files, overlay.File{Name: o})
 	}
@@ -647,6 +696,7 @@ func (l *loader) spec(label, path string, overlays []string) *spec.Spec {
 			return nil
 		}
 		l.files[path] = data
+		l.hashed[path] = data
 	}
 	if len(files) > 0 {
 		for i := range files {
@@ -656,6 +706,7 @@ func (l *loader) spec(label, path string, overlays []string) *spec.Spec {
 				l.problem("%s: overlay %s cannot be read: %v", label, files[i].Name, err)
 				return nil
 			}
+			l.hashed[files[i].Name] = files[i].Data
 		}
 		merged, warnings, err := overlay.Apply(data, files)
 		if err != nil {

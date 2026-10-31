@@ -12,7 +12,7 @@ Gains: no change in the app's code, the hop to the proxy is encrypted, and signe
 
 ## Decisions (Peter, 2026-10-29)
 
-1. **The issuer comes from the customer**: two PEM files in `listen.connect: { cert, key }`, on Kubernetes a mounted Secret, which cert-manager can make and renew. The proxy re-reads them when they change. It never invents its own issuer. Without `listen.connect`, `CONNECT` keeps getting `501`.
+1. **The issuer comes from the customer**: two PEM files in `listen.connect: { cert, key }`, on Kubernetes a mounted Secret, which cert-manager can make and renew. The proxy picks up renewed files through the config reload (see [proxy-config-reload.md](proxy-config-reload.md)). It never invents its own issuer. Without `listen.connect`, `CONNECT` keeps getting `501`.
 2. **Hotline builds nothing for apps to trust the issuer.** The setup guide below shows how per language.
 3. **Every host is intercepted**, as on the other ingresses. An app that pins a vendor's certificate leaves that host out with `NO_PROXY`. No blind tunnel.
 4. **The integration ID comes from the `CONNECT` request**, in `Proxy-Authorization`, and covers every call in the tunnel. A `Proxy-Authorization` inside the tunnel is removed and ignored. `CONNECT` works on a plain port and on a TLS port (`listen.tls`), where the ID travels encrypted too.

@@ -1,7 +1,7 @@
 # Answers to the open questions are in docs/proxy-slice-1.md.
 Feature: Loading the config file
-  The proxy reads one YAML file, hotline-proxy.yaml, once at start.
-  Reloading without a restart comes in a later slice.
+  The proxy reads one YAML file, hotline-proxy.yaml, at start and again on
+  every reload (see reload.feature).
 
   Scenario: A valid config is read in full
     Given a valid config file
@@ -12,12 +12,14 @@ Feature: Loading the config file
     And every integration is read with the apis it names
     And spec files are found relative to the folder of the config file
 
-  Scenario: The config's version goes into every record
+  Scenario: The config's version and fingerprint go into every record
     The version is a field in the config file, written by whoever changes
-    it (Peter, 2026-10-28).
+    it (Peter, 2026-10-28). After it comes a + and a fingerprint: the first
+    12 hex characters of a SHA-256 of the config, specs and overlays, so a
+    forgotten version change still tells configs apart (Peter, 2026-10-31).
     Given a valid config file with version 2026-10-28.1
     When the proxy loads it
-    Then every record carries hotline.config.version 2026-10-28.1
+    Then every record carries hotline.config.version 2026-10-28.1 and a fingerprint
 
   Scenario: The full example loads
     Given the full example config from proxy-example

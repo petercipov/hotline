@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -151,7 +152,7 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 	sc.Step(`^the hotline-proxy program runs with "([^"]*)" and integration test-shop for the test vendor$`, func(flags string) error {
 		return p.run(strings.Fields(flags)...)
 	})
-	sc.Step(`^the program gets (SIGTERM|SIGINT)$`, p.signal)
+	sc.Step(`^the program gets (SIGTERM|SIGINT|SIGHUP)$`, p.signal)
 	sc.Step(`^the program gets (SIGTERM|SIGINT) again$`, p.signalAgain)
 	sc.Step(`^it exits with code (\d+)$`, func(code int) error {
 		return p.exitsWith(code, 30*time.Second)
@@ -257,11 +258,8 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 		return nil
 	})
 	sc.Step(`^an app's call is in progress and the program gets (SIGTERM|SIGINT)$`, func(name string) error {
-		p.callInBackground()
-		select {
-		case <-p.arrived:
-		case <-time.After(5 * time.Second):
-			return failf("the call did not reach the test vendor")
+		if err := p.callInProgress(); err != nil {
+			return err
 		}
 		return p.signal(name)
 	})
@@ -285,6 +283,41 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 			return failf("the receiver got %d records, want 1", len(records))
 		}
 		return has(records[0].attrs, "hotline.integration.id", "test-shop")
+	})
+
+	// Reloading.
+	sc.Step(`^an app's call is in progress$`, p.callInProgress)
+	sc.Step(`^the config's version changes to (\S+)$`, func(version string) error {
+		p.writeConfig(strings.Replace(p.config(false), "version: e2e-1\n", "version: "+version+"\n", 1))
+		return nil
+	})
+	sc.Step(`^within (\d+) seconds standard error says "(.*)"$`, func(seconds int, text string) error {
+		for deadline := time.Now().Add(time.Duration(seconds) * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+			if strings.Contains(p.stderr.String(), text) {
+				return nil
+			}
+		}
+		return failf("standard error does not say %q:\n%s", text, p.stderr.String())
+	})
+	// A call's record is made just after its answer is sent, so the
+	// records of two calls in a row can reach the receiver in either order.
+	sc.Step(`^the records carry the config versions (.+)$`, func(list string) error {
+		records, _ := p.receiver.got()
+		want := strings.Split(strings.ReplaceAll(list, " and ", ", "), ", ")
+		var got []string
+		for _, r := range records {
+			version, _ := r.attrs["hotline.config.version"].(string)
+			if !regexp.MustCompile(`^\S+\+[0-9a-f]{12}$`).MatchString(version) {
+				return failf("a record carries hotline.config.version %q, want a version and a fingerprint", version)
+			}
+			got = append(got, strings.Split(version, "+")[0])
+		}
+		slices.Sort(got)
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			return failf("the records carry the config versions %v, want %v", got, want)
+		}
+		return nil
 	})
 
 	// The health checks.
@@ -672,10 +705,7 @@ func (p *program) exitsWith(code int, limit time.Duration) error {
 }
 
 func (p *program) signal(name string) error {
-	sig := syscall.SIGTERM
-	if name == "SIGINT" {
-		sig = syscall.SIGINT
-	}
+	sig := map[string]syscall.Signal{"SIGTERM": syscall.SIGTERM, "SIGINT": syscall.SIGINT, "SIGHUP": syscall.SIGHUP}[name]
 	p.signalled = time.Now()
 	return p.process.Process.Signal(sig)
 }
@@ -735,6 +765,20 @@ func (p *program) callInBackground() {
 		defer close(p.answered)
 		p.respond(goCase2(p.proxyAddr, target, "test-shop"))
 	}()
+}
+
+// callInProgress makes a case 2 call and waits until it reaches the
+// holding test vendor.
+func (p *program) callInProgress() error {
+	p.callInBackground()
+	select {
+	case <-p.arrived:
+		return nil
+	case <-p.answered:
+		return failf("the call ended before it reached the test vendor: %v\n%s", p.respErr, p.stderr.String())
+	case <-time.After(5 * time.Second):
+		return failf("the call did not reach the test vendor:\n%s", p.stderr.String())
+	}
 }
 
 func (p *program) releaseVendor() {

@@ -201,7 +201,7 @@ const (
 // one per vendor host, signed by the interception issuer, kept in memory
 // only and reused until shortly before it ends or the issuer changes.
 type interceptor struct {
-	issuer *certFiles
+	issuer *certHolder
 	clock  Clock
 	logger *slog.Logger
 	seed   maphash.Seed
@@ -220,8 +220,7 @@ type leafSlot struct {
 
 func newInterceptor(t *config.TLS, clock Clock, logger *slog.Logger) *interceptor {
 	i := &interceptor{
-		issuer: newCertFiles(t, config.LoadIssuer, clock, logger,
-			"kept the interception issuer, the new files are not usable", "new interception issuer in use"),
+		issuer: newCertHolder(t, logger, "new interception issuer in use"),
 		clock:  clock,
 		logger: logger,
 		seed:   maphash.MakeSeed(),

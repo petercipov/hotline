@@ -192,14 +192,6 @@ func tlsSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the open connection still takes calls$`, func() error {
 		return w.callOn(w.openConn)
 	})
-	sc.Step(`^the proxy logs a warning that it kept the certificate$`, func() error {
-		for _, line := range strings.Split(w.logs.String(), "\n") {
-			if strings.Contains(line, "level=WARN") && strings.Contains(line, "kept the TLS certificate") {
-				return nil
-			}
-		}
-		return failf("no warning about the kept certificate; the log is %s", w.logs.String())
-	})
 }
 
 // appTLSConfig is how an app that trusts the test issuer opens TLS to the

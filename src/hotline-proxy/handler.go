@@ -37,7 +37,9 @@ import (
 // and CONNECT, where the app opens a tunnel to the vendor's host and the
 // proxy poses as the vendor inside it.
 type handler struct {
-	cfg       *config.Config
+	// cfg is the config in use. Each call takes it once as it starts, so
+	// a reload never changes a call in progress.
+	cfg       atomic.Pointer[config.Config]
 	clock     Clock
 	logger    *slog.Logger
 	sink      *export.Sink
@@ -80,8 +82,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	host := strings.ToLower(target.Hostname())
-	api := h.cfg.API(id, host)
-	settings := h.cfg.NotPassed
+	cfg := h.cfg.Load()
+	api := cfg.API(id, host)
+	settings := cfg.NotPassed
 	if api != nil {
 		settings = api.Settings
 	}
@@ -96,6 +99,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	c := &call{
 		h:         h,
+		cfg:       cfg,
 		start:     start,
 		ingress:   ingress,
 		target:    target,
@@ -251,7 +255,7 @@ func refuse(w http.ResponseWriter, status int) {
 // span id for the proxy's own step. It comes with the integration's trace
 // settings.
 func (h *handler) traced(id string, header http.Header, start time.Time) (trace.SpanContext, config.Trace) {
-	settings := h.cfg.Trace(id)
+	settings := h.cfg.Load().Trace(id)
 	traceID, flags, ok := settings.Format.Read(header)
 	if !ok {
 		traceID, flags = settings.Format.NewTraceID(start), trace.FlagsSampled
@@ -293,7 +297,9 @@ func integrationID(h http.Header) string {
 
 // call is one call through the proxy, from the app's request to the record.
 type call struct {
-	h       *handler
+	h *handler
+	// cfg is the config the call started with.
+	cfg     *config.Config
 	start   time.Time
 	ingress string
 	// trace is the call's trace context, which its record carries.
