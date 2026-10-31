@@ -35,7 +35,7 @@ apis:                             # each vendor api once; its spec is read once 
 
 integrations:
   - id: talon-shop-a              # shop A's use of Talon.One and Stripe
-    fingerprintKey: { file: /etc/hotline/keys/talon-shop-a }   # secret key for body fingerprints, from a mounted Kubernetes Secret
+    fingerprintKey: { file: /etc/hotline/keys/talon-shop-a }   # secret key that signs the records, from a mounted Kubernetes Secret
     apis: [talon-one, stripe]     # names from the apis section
 
   - id: talon-shop-b              # same Talon.One API, different shop

@@ -44,6 +44,7 @@ func (c *call) finish() {
 	attrs = append(attrs, c.timings(end)...)
 	if c.api != nil {
 		attrs = append(attrs, c.full()...)
+		attrs = append(attrs, signature(attrs, c.start, end, c.api.SigningKey)...)
 	}
 	c.h.sink.Record(context.Background(), c.start, attrs)
 }

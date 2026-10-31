@@ -135,6 +135,10 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 
 **Headers.** Kept by default: `content-type`, `content-length`, `date`, `retry-after`, `request-id`, `x-request-id` and any `ratelimit-*`. A header marked `x-hotline-redact: false` in the spec is kept; one marked `true` shows as `REDACTED`. Never recorded: `authorization`, `proxy-authorization`, `cookie`, `set-cookie` and the login headers named in the spec. Every other header is left out, name and all.
 
+### The signature
+
+Every full record has `hotline.signature` and `hotline.signature_input`: an RFC 9421 signature, with HMAC-SHA256 and the integration's `fingerprintKey`, of everything else the record holds. Minimal records have none. Detail: [proxy-signatures.md](proxy-signatures.md).
+
 ### Check results
 
 The proxy checks each full-record call against the vendor's spec, after the reply has gone back to the app.
@@ -194,7 +198,6 @@ There is no latency histogram and no pass or fail count: the control plane build
 
 - **Traces.** No spans at all. The spec plans an optional span per call, off by default.
 - **The proxy's own health data.** The `telemetry` section of the config is accepted but nothing is sent there. Dropped records show only in the warning log line.
-- **Body fingerprints**, `hotline.body.request.hmac_sha256` and `hotline.body.response.hmac_sha256`. Not built yet.
 - **Bodies, cookies, `Authorization` and `Proxy-Authorization`.** Never sent, by design.
 - **The proxy's own log lines.** They go to standard error as JSON, not over OTLP.
 
@@ -204,4 +207,4 @@ There is no latency histogram and no pass or fail count: the control plane build
 2. **Minimal record and status code.** The spec says every minimal record has `http.response.status_code`. A failed tunnel's record has none.
 3. **`hotline.schema.skipped=overloaded`.** In the spec's list, never set by the code.
 4. **Send timing.** One second and ten seconds are fixed in the program; the spec does not mention them and they are not in the config.
-5. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces, health data to `telemetry`, and body fingerprints.
+5. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces and health data to `telemetry`. The body fingerprints are replaced by the record's signature (Peter, 2026-10-30).

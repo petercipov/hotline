@@ -30,6 +30,8 @@ import (
 // receivedRecord is one log record the fake OTLP receiver got.
 type receivedRecord struct {
 	eventName string
+	// timestamp is the record's time, in nanoseconds since 1970.
+	timestamp uint64
 	// severityText and severityNumber are the record's level.
 	severityText   string
 	severityNumber int32
@@ -285,6 +287,7 @@ func (r *receiver) Export(ctx context.Context, req *collogs.ExportLogsServiceReq
 			for _, lr := range sl.GetLogRecords() {
 				r.records = append(r.records, receivedRecord{
 					eventName:      lr.GetEventName(),
+					timestamp:      lr.GetTimeUnixNano(),
 					severityText:   lr.GetSeverityText(),
 					severityNumber: int32(lr.GetSeverityNumber()),
 					resource:       res,
