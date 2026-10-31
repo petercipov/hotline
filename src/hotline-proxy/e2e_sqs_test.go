@@ -4,120 +4,18 @@ package proxy_test
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec // SQS's own message checksum
-	"crypto/tls"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cucumber/godog"
 )
 
 const invoicesQueueURL = "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"
-
-// fakeSQS answers SendMessage, ReceiveMessage and DeleteMessage the way SQS
-// does over its JSON protocol, over TLS as localhost.
-type fakeSQS struct {
-	server   *httptest.Server
-	mu       sync.Mutex
-	calls    []*http.Request
-	messages []sqsMessage
-	next     int
-}
-
-type sqsMessage struct {
-	id, body, receipt string
-	inFlight          bool
-}
-
-func newFakeSQS(cert tls.Certificate) *fakeSQS {
-	f := &fakeSQS{}
-	f.server = httptest.NewUnstartedServer(f)
-	f.server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
-	f.server.StartTLS()
-	return f
-}
-
-func (f *fakeSQS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var in map[string]any
-	_ = json.NewDecoder(r.Body).Decode(&in)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls = append(f.calls, r.Clone(context.Background()))
-	var out any
-	switch r.Header.Get("X-Amz-Target") {
-	case "AmazonSQS.SendMessage":
-		f.next++
-		body, _ := in["MessageBody"].(string)
-		m := sqsMessage{id: fmt.Sprintf("m-%d", f.next), body: body, receipt: fmt.Sprintf("r-%d", f.next)}
-		f.messages = append(f.messages, m)
-		out = map[string]any{"MessageId": m.id, "MD5OfMessageBody": md5Hex(m.body)}
-	case "AmazonSQS.ReceiveMessage":
-		var got []map[string]any
-		for i := range f.messages {
-			m := &f.messages[i]
-			if !m.inFlight {
-				m.inFlight = true
-				got = append(got, map[string]any{"MessageId": m.id, "ReceiptHandle": m.receipt, "MD5OfBody": md5Hex(m.body), "Body": m.body})
-			}
-		}
-		// Like SQS, an empty receive has no Messages at all.
-		reply := map[string]any{}
-		if len(got) > 0 {
-			reply["Messages"] = got
-		}
-		out = reply
-	case "AmazonSQS.DeleteMessage":
-		f.messages = slices.DeleteFunc(f.messages, func(m sqsMessage) bool { return m.receipt == in["ReceiptHandle"] })
-		out = map[string]any{}
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-		out = map[string]any{"__type": "com.amazonaws.sqs#InvalidAction", "message": "unknown action"}
-	}
-	w.Header().Set("Content-Type", "application/x-amz-json-1.0")
-	if err := json.NewEncoder(w).Encode(out); err != nil {
-		panic(err)
-	}
-}
-
-func (f *fakeSQS) waiting() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return len(f.messages)
-}
-
-func md5Hex(s string) string {
-	sum := md5.Sum([]byte(s)) //nolint:gosec // SQS's own message checksum
-	return hex.EncodeToString(sum[:])
-}
-
-// exampleApp builds the example program once per run.
-type exampleApp struct {
-	dir    string
-	once   sync.Once
-	binary string
-	err    error
-}
-
-func (e *exampleApp) build() (string, error) {
-	e.once.Do(func() {
-		e.binary = filepath.Join(e.dir, "aws-sqs-invoices")
-		build := exec.CommandContext(context.Background(), "go", "build", "-o", e.binary, "hotline-example/aws-sqs-invoices") //nolint:gosec // builds the example app
-		if out, err := build.CombinedOutput(); err != nil {
-			e.err = fmt.Errorf("%w: building the example app: %s", err, out)
-		}
-	})
-	return e.binary, e.err
-}
 
 func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 	var (
@@ -275,29 +173,11 @@ func (p *program) records() ([]map[string]any, error) {
 
 // exampleConfig is testdata/aws/hotline-proxy.yaml with only the
 // addresses changed: the local ports, the fake SQS on localhost (an internal
-// address), and the spec and overlay read from where they are in the repo.
+// address), and the spec and overlays read from where they are in the repo.
 func exampleConfig(proxyAddr, otlpEndpoint string) (string, error) {
-	dir, err := filepath.Abs(filepath.Join("testdata", "aws"))
-	if err != nil {
-		return "", err
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "hotline-proxy.yaml")) //nolint:gosec // the test's own file
-	if err != nil {
-		return "", err
-	}
-	config := string(data)
-	for _, change := range [][2]string{
-		{`":8080"`, fmt.Sprintf("%q", proxyAddr)},
-		{`":8081"`, `"127.0.0.1:0"`},
-		{"localhost:4317", otlpEndpoint},
-		{"[sqs.eu-west-1.amazonaws.com]", "[localhost]\n    allowInternalIPs: true"},
-		{"../../../../specs/", filepath.Join(dir, "..", "..", "..", "..", "specs") + "/"},
-		{"./invoices.overlay.yaml", filepath.Join(dir, "invoices.overlay.yaml")},
-	} {
-		if strings.Count(config, change[0]) != 1 {
-			return "", failf("the example config no longer has %s once", change[0])
-		}
-		config = strings.Replace(config, change[0], change[1], 1)
-	}
-	return config, nil
+	return invoicesConfig(
+		[2]string{`":8080"`, fmt.Sprintf("%q", proxyAddr)},
+		[2]string{"localhost:4317", otlpEndpoint},
+		[2]string{"[sqs.eu-west-1.amazonaws.com]", "[localhost]\n    allowInternalIPs: true"},
+	)
 }

@@ -157,6 +157,12 @@ func (w *world) results(side string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return resultsOf(record, side)
+}
+
+// resultsOf are a record's results on one side, each written as
+// "part place rule expected".
+func resultsOf(record map[string]any, side string) ([]string, error) {
 	list, ok := record[resultsKey(side)].([]any)
 	if !ok {
 		return nil, failf("the record has no list of %s results; it has %v", side, record)
