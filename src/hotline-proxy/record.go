@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	"crypto/tls"
 	"net/http"
 	"net/url"
@@ -44,9 +43,9 @@ func (c *call) finish() {
 	attrs = append(attrs, c.timings(end)...)
 	if c.api != nil {
 		attrs = append(attrs, c.full()...)
-		attrs = append(attrs, signature(attrs, c.start, c.api.SigningKey)...)
+		attrs = append(attrs, signature(attrs, c.start, c.trace, c.api.SigningKey)...)
 	}
-	c.h.sink.Record(context.Background(), c.start, attrs)
+	c.h.sink.Record(recordContext(c.trace), c.start, attrs)
 }
 
 // refused records a request the proxy read but did not forward, with a
@@ -65,7 +64,8 @@ func (h *handler) refused(r *http.Request, start time.Time, ingress, id string, 
 		semconv.ErrorTypeKey.String("http_request_error"),
 		attribute.Int64("hotline.timing.total_us", h.clock.Now().Sub(start).Microseconds()),
 	)
-	h.sink.Record(context.Background(), start, attrs)
+	traced, _ := h.traced(id, r.Header, start)
+	h.sink.Record(recordContext(traced), start, attrs)
 }
 
 func orNotPassed(id string) string {

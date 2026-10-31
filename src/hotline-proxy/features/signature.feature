@@ -5,9 +5,10 @@ Feature: Each record is signed
   record and the key can check that nobody changed it. The call itself is
   not changed.
 
-  The signed text is one line per attribute, sorted by name, then a line
-  for the record's timestamp: the name and the value, both as JSON. No list
-  of names is needed, since the whole record is signed (Peter, 2026-10-31).
+  The signed text is one line per attribute, sorted by name, then lines
+  for the record's timestamp, trace id, span id and flags: the name and the
+  value, both as JSON. No list of names is needed, since the whole record
+  is signed (Peter, 2026-10-31).
 
   Each body is signed too, on its own, as it passes: the call's body in
   hotline.request.body.signature and the reply's in
@@ -38,6 +39,9 @@ Feature: Each record is signed
         | http.request.method is changed             |
         | url.full is changed                        |
         | a kept header's value is changed           |
+        | the trace_id is changed                    |
+        | the span_id is changed                     |
+        | the flags are changed                      |
         | http.response.status_code is changed       |
         | hotline.timing.total_us is changed            |
         | hotline.integration.id is changed          |

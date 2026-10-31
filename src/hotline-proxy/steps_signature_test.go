@@ -86,7 +86,8 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 			return failf("no record arrived")
 		}
 		last := records[len(records)-1]
-		changed = receivedRecord{timestamp: last.timestamp, attrs: map[string]any{}}
+		changed = last
+		changed.attrs = map[string]any{}
 		for k, v := range last.attrs {
 			changed.attrs[k] = v
 		}
@@ -97,6 +98,12 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 			changed.attrs["url.full"] = "https://api.shop.test/orders?x=1"
 		case "a kept header's value is changed":
 			changed.attrs["http.request.header.content-type"] = []any{"text/plain"}
+		case "the trace_id is changed":
+			changed.traceID = strings.Repeat("ab", 16)
+		case "the span_id is changed":
+			changed.spanID = strings.Repeat("cd", 8)
+		case "the flags are changed":
+			changed.flags ^= 1
 		case "http.response.status_code is changed":
 			changed.attrs["http.response.status_code"] = int64(200)
 		case "hotline.timing.total_us is changed":
@@ -181,7 +188,11 @@ func checkSignature(r receivedRecord, key string) error {
 		lines = append(lines, strconv.Quote(name)+": "+string(value))
 	}
 	sort.Strings(lines)
-	lines = append(lines, `"log.record.timestamp": `+strconv.FormatUint(r.timestamp, 10))
+	lines = append(lines,
+		`"log.record.timestamp": `+strconv.FormatUint(r.timestamp, 10),
+		`"log.record.trace_id": "`+r.traceID+`"`,
+		`"log.record.span_id": "`+r.spanID+`"`,
+		`"log.record.trace_flags": "`+fmt.Sprintf("%02x", r.flags)+`"`)
 	mac := hmac.New(sha256.New, []byte(key))
 	mac.Write([]byte(strings.Join(lines, "\n")))
 	if want := base64.StdEncoding.EncodeToString(mac.Sum(nil)); signature != want {

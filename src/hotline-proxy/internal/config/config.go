@@ -21,6 +21,7 @@ import (
 
 	"hotline-proxy/internal/overlay"
 	"hotline-proxy/internal/spec"
+	"hotline-proxy/internal/tracectx"
 )
 
 // ErrInvalid marks a config the proxy refuses.
@@ -45,6 +46,16 @@ type Config struct {
 	// field. They do not stop the proxy.
 	Warnings     []string
 	integrations map[string]map[string]*API
+	// traces are each integration's trace settings, the not-passed entry's
+	// among them.
+	traces map[string]Trace
+}
+
+// Trace says how an integration's app sends its trace context, and whether
+// the proxy passes its own on to the vendor.
+type Trace struct {
+	Format  tracectx.Format
+	Forward bool
 }
 
 // TLS is a certificate the proxy shows apps, or the issuer it signs them
@@ -100,6 +111,18 @@ type API struct {
 	SigningKey []byte
 }
 
+// Trace is the trace settings of an integration. An unknown ID gets the
+// not-passed entry's, and those are w3c, not forwarded, unless it sets them.
+func (c *Config) Trace(integrationID string) Trace {
+	if t, ok := c.traces[integrationID]; ok {
+		return t
+	}
+	if t, ok := c.traces[notPassed]; ok {
+		return t
+	}
+	return Trace{Format: tracectx.W3C}
+}
+
 // API finds the api an integration uses for a host, or nil when the ID is
 // unknown or the host is outside the integration's apis.
 func (c *Config) API(integrationID, host string) *API {
@@ -134,6 +157,10 @@ type file struct {
 		FingerprintKey *secret      `yaml:"fingerprintKey"`
 		Settings       settingsFile `yaml:",inline"`
 		APIs           []apiRef     `yaml:"apis"`
+		// TraceFormat is how the app sends its trace context; w3c when not
+		// set. TraceForward passes the proxy's own on to the vendor.
+		TraceFormat  *string `yaml:"traceFormat"`
+		TraceForward bool    `yaml:"traceForward"`
 	} `yaml:"integrations"`
 }
 
@@ -261,6 +288,7 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		ProxyAddr:    f.Listen.Proxy,
 		NotPassed:    Settings{VendorTimeout: time.Minute},
 		integrations: map[string]map[string]*API{},
+		traces:       map[string]Trace{},
 	}
 	if f.Version == "" {
 		l.problem("there is no version")
@@ -304,6 +332,15 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 			l.problem("an integration has no id")
 			continue
 		}
+		t := Trace{Format: tracectx.W3C, Forward: in.TraceForward}
+		if in.TraceFormat != nil {
+			format, known := tracectx.Parse(*in.TraceFormat)
+			if !known {
+				l.problem("integration %s: traceFormat %s must be w3c, b3, xray or jaeger", in.ID, *in.TraceFormat)
+			}
+			t.Format = format
+		}
+		c.traces[in.ID] = t
 		if in.ID == notPassed {
 			c.NotPassed = l.settings("integration "+in.ID, in.Settings, c.NotPassed)
 			continue

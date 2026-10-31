@@ -147,6 +147,7 @@ Feature: Loading the config file
       | a vendorTimeout is negative                          |
       | a vendorTimeout is not a duration                    |
       | an x-hotline-redact mark is not true or false        |
+      | an integration's traceFormat is zipkin               |
 
   Scenario Outline: Settings the proxy does not use start with a warning
     The proxy starts anyway, so a typo never stops traffic, but each one is

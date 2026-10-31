@@ -35,10 +35,12 @@ var (
 // world is one scenario's system under test: the proxy, and the fakes at
 // its edges (vendors, network, OTLP receivers). Every scenario starts clean.
 type world struct {
-	dir     string
-	issuer  *issuer
-	network *network
-	vendors map[string]*vendor
+	// lastSent are the headers of the app's last call.
+	lastSent []string
+	dir      string
+	issuer   *issuer
+	network  *network
+	vendors  map[string]*vendor
 	// receivers are the OTLP destinations, in the order of the config.
 	receivers []*receiver
 	// telemetry, when set, is the destination for the proxy's own health
@@ -485,6 +487,7 @@ func hostOf(target string) string {
 }
 
 func (w *world) send(r request) error {
+	w.lastSent = r.headers
 	if err := w.start(); err != nil {
 		return err
 	}

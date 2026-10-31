@@ -153,7 +153,8 @@ func (h *handler) tunnelFailed(r *http.Request, start time.Time, t *tunnel, a *a
 	if took, timed := a.handshakeTime(); timed {
 		attrs = append(attrs, attribute.Int64("hotline.timing.app_tls_us", took.Microseconds()))
 	}
-	h.sink.Record(context.Background(), start, attrs)
+	traced, _ := h.traced(t.id, r.Header, start)
+	h.sink.Record(recordContext(traced), start, attrs)
 }
 
 // find works out the vendor address of a call inside the tunnel. The call
