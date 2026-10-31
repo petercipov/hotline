@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"sync/atomic"
 	"time"
 
 	"hotline-proxy/internal/config"
@@ -81,6 +82,12 @@ type Proxy struct {
 	sink         *export.Sink
 	served       chan struct{}
 	tunnelServed chan struct{}
+	// admin serves the health checks, when the config names an admin
+	// address.
+	admin       *http.Server
+	adminServed chan struct{}
+	// stopping is set from the first stop signal on, so /readyz says no.
+	stopping atomic.Bool
 }
 
 // Start loads the config, listens on its proxy address and serves calls
@@ -95,6 +102,16 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.ProxyAddr)
 	if err != nil {
 		return nil, err
+	}
+	// The admin port listens only once the config is loaded and the proxy
+	// port listens, so until then Kubernetes finds the proxy not ready.
+	var adminListener net.Listener
+	if cfg.AdminAddr != "" {
+		adminListener, err = (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.AdminAddr)
+		if err != nil {
+			_ = listener.Close()
+			return nil, err
+		}
 	}
 	sink := export.New(cfg.Exporters, o.RootCAs, export.Service{Version: o.Version, InstanceID: o.InstanceID},
 		export.Timing{Interval: o.ExportInterval, Timeout: o.ExportTimeout}, o.Logger)
@@ -151,6 +168,9 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		defer close(p.tunnelServed)
 		_ = p.tunnelServer.Serve(h.tunnels)
 	}()
+	if adminListener != nil {
+		p.serveAdmin(adminListener, o.Logger)
+	}
 	for _, w := range cfg.Warnings {
 		o.Logger.Warn("config warning", "reason", w)
 	}
@@ -181,9 +201,44 @@ func Validate(configPath string, clock Clock, lookupEnv func(string) (string, bo
 	return cfg.Warnings, nil
 }
 
+// serveAdmin answers the health checks: /livez says the proxy is alive
+// while it answers at all, /readyz says it takes calls until it starts to
+// stop. Nothing else is served there, and nothing there is recorded.
+func (p *Proxy) serveAdmin(l net.Listener, logger *slog.Logger) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /livez", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok\n"))
+	})
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
+		if p.stopping.Load() {
+			http.Error(w, "not ready: stopping", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte("ok\n"))
+	})
+	p.admin = &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ErrorLog:          log.New(serverLog{logger: logger}, "", 0),
+	}
+	p.adminServed = make(chan struct{})
+	go func() {
+		defer close(p.adminServed)
+		_ = p.admin.Serve(l)
+	}()
+}
+
+// Drain makes /readyz say no, so Kubernetes stops sending new calls, while
+// the proxy still takes the calls that come.
+func (p *Proxy) Drain() {
+	p.stopping.Store(true)
+}
+
 // Shutdown stops taking calls, lets calls in flight finish, then sends every
-// queued record, all within the time ctx allows.
+// queued record, all within the time ctx allows. The health checks answer
+// until the end, /readyz with no.
 func (p *Proxy) Shutdown(ctx context.Context) error {
+	p.Drain()
 	// Both servers stop at once: a tunnel opened over HTTP/2 is a call on
 	// the proxy port that lasts until the tunnels' server closes the
 	// tunnel. Tunnels still being set up are cut short.
@@ -204,5 +259,10 @@ func (p *Proxy) Shutdown(ctx context.Context) error {
 	for _, t := range p.transports {
 		t.CloseIdleConnections()
 	}
-	return errors.Join(err, p.sink.Shutdown(ctx))
+	err = errors.Join(err, p.sink.Shutdown(ctx))
+	if p.admin != nil {
+		_ = p.admin.Close()
+		<-p.adminServed
+	}
+	return err
 }

@@ -64,7 +64,11 @@ type world struct {
 	// a config with none gets talon-shop-a for Talon.One and Stripe.
 	noIntegrations bool
 	// rawConfig, when set, replaces the generated config file.
-	rawConfig  string
+	rawConfig string
+	// adminAddr is the admin listen address; any free port when empty.
+	adminAddr string
+	// busy is the address another program already listens on.
+	busy       string
 	configPath string
 
 	proxy    *proxy.Proxy
@@ -344,7 +348,11 @@ func freePort() string {
 func (w *world) config() string {
 	var b strings.Builder
 	b.WriteString("version: 2026-10-28.1\n")
-	fmt.Fprintf(&b, "listen:\n  proxy: %q\n  admin: \"127.0.0.1:0\"\n", w.addr)
+	admin := w.adminAddr
+	if admin == "" {
+		admin = "127.0.0.1:0"
+	}
+	fmt.Fprintf(&b, "listen:\n  proxy: %q\n  admin: %q\n", w.addr, admin)
 	b.WriteString(w.listenTLS)
 	b.WriteString(w.listenConnect)
 	b.WriteString("exporters:\n")

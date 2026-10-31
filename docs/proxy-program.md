@@ -7,7 +7,7 @@ The proxy from slice 1 runs as one program, `hotline-proxy`, in `src/hotline-pro
 1. **Commands.** `hotline-proxy run --config hotline-proxy.yaml` starts the proxy. `hotline-proxy validate --config hotline-proxy.yaml` only checks the config and the specs it points to, then exits. `hotline-proxy version` prints the version that Go recorded when it built the program.
 2. **Config path.** Given only with `--config`. No default path and no environment variables. Without it the program stops with exit code 2 and says why.
 3. **Listen address.** Comes only from `listen.proxy` in the config.
-4. **Health checks.** `/livez` and `/readyz` on `listen.admin` come in their own later step.
+4. **Health checks.** `/livez` and `/readyz` on `listen.admin`, and the `--drain-delay` flag: built later, see [proxy-health-checks.md](proxy-health-checks.md).
 5. **Logs.** The proxy's own log lines go to standard error (the program's error output), one JSON object per line. `--log-level` (debug, info, warn, error) sets the lowest level logged; the default is info. Help and usage text is plain text.
 6. **Stopping.** On SIGTERM (what Kubernetes sends to stop a program) or SIGINT (Ctrl+C), the proxy stops taking new calls, lets calls in progress finish, and sends every queued record. It takes at most 25 seconds, set with `--shutdown-timeout`, so it ends before Kubernetes' usual 30 second limit. A second signal cuts the stop short.
 7. **Exit codes.** 0 after a clean stop. 1 when it cannot start (config refused, trust file refused, port taken), or when a stop ran out of time or was cut short. 2 for a wrong command line.

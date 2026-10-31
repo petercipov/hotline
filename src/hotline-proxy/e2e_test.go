@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -78,6 +79,7 @@ type program struct {
 	vendorURL string
 	untrusted string
 	proxyAddr string
+	adminAddr string
 	taken     net.Listener
 	// tls makes the program's proxy port accept only TLS, with a
 	// certificate for hotline-proxy from the test issuer.
@@ -111,7 +113,7 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
 		dir, err := os.MkdirTemp("", "hotline-proxy-e2e-")
 		*p = program{
-			binary: binary, dir: dir, issuer: newIssuer(), proxyAddr: freePort(),
+			binary: binary, dir: dir, issuer: newIssuer(), proxyAddr: freePort(), adminAddr: freePort(),
 			release: make(chan struct{}), arrived: make(chan struct{}, 8),
 		}
 		return ctx, err
@@ -239,6 +241,11 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 		p.receiver = newReceiver()
 		return nil
 	})
+	sc.Step(`^a fake OTLP receiver that refuses connections$`, func() error {
+		p.receiver = newReceiver()
+		p.receiver.stop()
+		return nil
+	})
 	sc.Step(`^the test vendor holds its answer$`, func() error {
 		p.vendor.setAnswer(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.Copy(io.Discard, r.Body)
@@ -278,6 +285,63 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 			return failf("the receiver got %d records, want 1", len(records))
 		}
 		return has(records[0].attrs, "hotline.integration.id", "test-shop")
+	})
+
+	// The health checks.
+	sc.Step(`^(GET|HEAD|POST) (\S+) on the admin port answers (\d+)$`, func(method, path string, status int) error {
+		// A signal reaches the program a moment after it is sent, so the
+		// answer may take that moment to change.
+		var got int
+		for deadline := time.Now().Add(time.Second); ; time.Sleep(20 * time.Millisecond) {
+			var err error
+			if got, err = p.askAdmin(method, path); err != nil {
+				return err
+			}
+			if got == status || time.Now().After(deadline) {
+				break
+			}
+		}
+		if got != status {
+			return failf("%s %s answered %d, want %d", method, path, got, status)
+		}
+		return nil
+	})
+	sc.Step(`^GET (\S+) on the admin port is asked (\d+) times$`, func(path string, times int) error {
+		for range times {
+			if _, err := p.askAdmin(http.MethodGet, path); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	sc.Step(`^a new call through the proxy reaches the test vendor$`, func() error {
+		p.respond(goCase2(p.proxyAddr, strings.Replace(p.vendorURL, "https:", "http:", 1)+paymentPath, "test-shop"))
+		if p.respErr != nil {
+			return p.respErr
+		}
+		if p.resp.StatusCode != http.StatusOK {
+			return failf("the call got %d %s", p.resp.StatusCode, p.respBody)
+		}
+		return nil
+	})
+	sc.Step(`^the proxy port stops taking calls between (\d+) and (\d+) seconds after the signal$`, func(from, to int) error {
+		for deadline := p.signalled.Add(time.Duration(to) * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+			conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", p.proxyAddr)
+			if err != nil {
+				if took := time.Since(p.signalled); took < time.Duration(from)*time.Second {
+					return failf("the proxy port stopped taking calls after %s", took)
+				}
+				return nil
+			}
+			_ = conn.Close()
+		}
+		return failf("the proxy port still takes calls %d seconds after the signal", to)
+	})
+	sc.Step(`^the receiver got no records$`, func() error {
+		if records, _ := p.receiver.got(); len(records) != 0 {
+			return failf("the receiver got %d records", len(records))
+		}
+		return nil
 	})
 
 	// The client matrix.
@@ -465,6 +529,11 @@ func (p *program) launch(flags ...string) error {
 		return err
 	}
 	args := append([]string{"run", "--config", "hotline-proxy.yaml", "--trust-file", "issuer.pem"}, flags...)
+	if !slices.Contains(flags, "--drain-delay") {
+		// Scenarios about other things stop at once, not after the
+		// usual wait for Kubernetes.
+		args = append(args, "--drain-delay", "0s")
+	}
 	if err := p.startProcess(args...); err != nil {
 		return err
 	}
@@ -480,6 +549,21 @@ func (p *program) launch(flags ...string) error {
 		}
 	}
 	return failf("the program did not listen on %s:\n%s", p.proxyAddr, p.stderr.String())
+}
+
+// askAdmin sends one request to the admin port and gives its status.
+func (p *program) askAdmin(method, path string) (int, error) {
+	req, err := http.NewRequestWithContext(context.Background(), method, "http://"+p.adminAddr+path, nil)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	if err != nil {
+		return 0, err
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
 }
 
 func (p *program) startVendors() {
@@ -529,7 +613,7 @@ func (p *program) config(validateOnly bool) string {
 	return fmt.Sprintf(`version: e2e-1
 listen:
   proxy: %q
-  admin: "127.0.0.1:0"
+  admin: %q
 %sexporters:
   - otlp:
       endpoint: %s
@@ -543,7 +627,7 @@ integrations:
     apis: [test-vendor]
   - id: not-passed
     allowInternalIPs: true
-`, p.proxyAddr, listenTLS, endpoint)
+`, p.proxyAddr, p.adminAddr, listenTLS, endpoint)
 }
 
 func (p *program) writeConfig(content string) {

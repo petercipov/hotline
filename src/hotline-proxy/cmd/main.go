@@ -79,6 +79,7 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 	level := slog.LevelInfo
 	flags.TextVar(&level, "log-level", slog.LevelInfo, "the lowest level logged: debug, info, warn or error")
 	shutdownTimeout := flags.Duration("shutdown-timeout", 25*time.Second, "how long a stop may take (run only)")
+	drainDelay := flags.Duration("drain-delay", 5*time.Second, "how long new calls are still taken after the stop signal, while Kubernetes stops sending them; part of the shutdown timeout (run only)")
 	if err := flags.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
@@ -126,7 +127,7 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 		Version:        version(),
 		InstanceID:     instanceID(),
 		LookupEnv:      os.LookupEnv,
-	}, *shutdownTimeout, signals)
+	}, stopping{timeout: *shutdownTimeout, drainDelay: *drainDelay}, signals)
 }
 
 // makeOverlay writes to stdout an overlay that turns the --from spec into
@@ -172,17 +173,27 @@ func makeOverlay(args []string, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
+// stopping is how the program stops: within timeout, still taking new
+// calls for drainDelay first.
+type stopping struct {
+	timeout    time.Duration
+	drainDelay time.Duration
+}
+
 // serve runs the proxy until the first signal, then stops it within the
-// timeout. A second signal cuts the stop short.
-func serve(logger *slog.Logger, o proxy.Options, timeout time.Duration, signals <-chan os.Signal) int {
+// timeout. For the drain delay it still takes new calls while /readyz says
+// no, so Kubernetes has time to stop sending them. A second signal cuts the
+// stop short.
+func serve(logger *slog.Logger, o proxy.Options, stop stopping, signals <-chan os.Signal) int {
 	p, err := proxy.Start(context.Background(), o)
 	if err != nil {
 		logProblems(logger, "hotline proxy did not start", err)
 		return exitFail
 	}
 	sig := <-signals
-	logger.Info("hotline proxy stopping", "signal", sig.String(), "timeout", timeout.String())
-	ctx, cancel := context.WithTimeoutCause(context.Background(), timeout, errOutOfTime)
+	p.Drain()
+	logger.Info("hotline proxy stopping", "signal", sig.String(), "timeout", stop.timeout.String(), "drain_delay", stop.drainDelay.String())
+	ctx, cancel := context.WithTimeoutCause(context.Background(), stop.timeout, errOutOfTime)
 	defer cancel()
 	ctx, cutShort := context.WithCancelCause(ctx)
 	defer cutShort(nil)
@@ -193,6 +204,12 @@ func serve(logger *slog.Logger, o proxy.Options, timeout time.Duration, signals 
 		case <-ctx.Done():
 		}
 	}()
+	drained := time.NewTimer(stop.drainDelay)
+	defer drained.Stop()
+	select {
+	case <-drained.C:
+	case <-ctx.Done():
+	}
 	if err := p.Shutdown(ctx); err != nil {
 		logger.Error("hotline proxy stopped with calls or records left", "reason", fmt.Sprint(context.Cause(ctx)), "error", err.Error())
 		return exitFail

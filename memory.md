@@ -30,7 +30,7 @@ The proxy is built in small slices, tests first.
 2. **The `hotline-proxy` program: built** (commands, flags, stopping, exit codes, `@e2e` tests). Detail: [docs/proxy-program.md](docs/proxy-program.md).
 3. **TLS from apps to the proxy: built** (`listen.tls`, renewal without a restart, Go cases 4 and 5 end to end). Detail: [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
 4. Still to come, roughly in this order:
-   - the health checks `/livez` and `/readyz` on the admin port;
+   - the health checks `/livez` and `/readyz` on the admin port, with a short wait (`--drain-delay`, 5 seconds) before the proxy port closes on stop: built. Detail: [docs/proxy-health-checks.md](docs/proxy-health-checks.md);
    - the Node, Java and Rust clients in the end-to-end tests;
    - the vendor URL in path ingress: built, with refused calls recorded on every ingress. Detail: [docs/proxy-url-in-path.md](docs/proxy-url-in-path.md);
    - the guard against calls to internal addresses: built. Detail: [docs/proxy-internal-guard.md](docs/proxy-internal-guard.md);
@@ -195,6 +195,17 @@ Full wording in [docs/proxy-sqs-example.md](docs/proxy-sqs-example.md).
 3. Stable vendor specs live in `specs/<vendor>/<api>/<version>.openapi.yaml`; the SQS one is generated from AWS's Smithy model, and a test keeps it in step.
 4. Tests use a fake SQS, never real AWS; running against AWS is a manual step in the example's README.
 5. Other AWS services (S3, DynamoDB) come later.
+
+## Health check decisions (Peter, 2026-10-31)
+
+Full wording in [docs/proxy-health-checks.md](docs/proxy-health-checks.md).
+
+1. `/readyz` says no (503) only before the first config has loaded, while the proxy port is not listening, and from the first stop signal on. Never because a reload failed or a destination is down: one bad shared config edit would otherwise take every copy out of service.
+2. `/livez` says no only when the proxy is stuck.
+3. After the stop signal the proxy still takes new calls for `--drain-delay` (5 seconds, inside the 25 second stop limit), since Kubernetes needs a moment to stop sending calls and our image has no shell for `sleep`. A second signal skips it.
+4. No `listen.admin` means no health checks and one warning; the proxy still runs.
+5. Plain HTTP, only `/livez` and `/readyz`, no records. No detail page: the state of each part comes with the proxy's own telemetry, a chapter of its own.
+6. The end-to-end tests pass `--drain-delay 0s` unless a scenario sets it, so they stop at once.
 
 ## Trace context decisions (Peter, 2026-10-31)
 

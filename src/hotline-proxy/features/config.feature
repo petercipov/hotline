@@ -161,9 +161,15 @@ Feature: Loading the config file
       | the not-passed entry has an apis list                 | apis          |
       | a field name has a typo, such as tlsOrigintion        | tlsOrigintion |
       | an integration changes tlsOrigination of an api it names | tlsOrigination |
+      | there is no admin listen address                      | listen.admin  |
 
   Scenario: A busy listen address
     Given another program listens on the proxy address
+    When the proxy loads the config
+    Then the proxy does not start, and says the address is in use
+
+  Scenario: A busy admin address
+    Given another program listens on the admin address
     When the proxy loads the config
     Then the proxy does not start, and says the address is in use
 
