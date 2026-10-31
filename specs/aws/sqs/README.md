@@ -6,10 +6,10 @@
 - **Made by:** [tools/aws-openapi](../../../tools/aws-openapi), never by hand. A test fails when this file differs from what the tool makes from the copy of the model.
   ```
   cd tools/aws-openapi
-  go run . -record QueueUrl=messaging.destination.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml
+  go run . -record QueueUrl=messaging.destination.name -record-action messaging.operation.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml
   ```
 - **Replies:** `200` with each action's body, and `4XX` and `5XX` with AWS's JSON error body (`__type`, `message`).
-- **Recorded body field:** `QueueUrl` in every action's input is marked `x-hotline-record: messaging.destination.name`, so records name the queue. Detail: [docs/proxy-body-fields.md](../../../docs/proxy-body-fields.md).
+- **Recorded body field:** `QueueUrl` in every action's input is marked `x-hotline-record: messaging.destination.name`, so records name the queue. Every action also lists its `X-Amz-Target` header, with its own value, marked `x-hotline-record: messaging.operation.name`. Detail: [docs/proxy-body-fields.md](../../../docs/proxy-body-fields.md).
 - **Recorded headers:** `x-amzn-RequestId` and `x-amzn-query-error` are marked `x-hotline-redact: false`.
 - **Login:** the signed `Authorization` header, named in the security section; the proxy never reads it.
 - **Not here:** queue URLs and message schemas. Those go in an overlay per queue, next to the test or example that uses it.

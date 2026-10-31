@@ -132,7 +132,7 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 | `hotline.connection.reused` | true or false | The call used a connection that was already open. |
 | `hotline.config.version` | text | The `version` field of the config. |
 | `hotline.schema.*` | see below | What the check against the spec found. |
-| any name the spec gives | text, number, or true or false | A body field the spec marks `x-hotline-record`, such as `messaging.destination.name` for SQS's `QueueUrl`. Detail: [proxy-body-fields.md](proxy-body-fields.md). |
+| any name the spec gives | text, number, or true or false | A body field or call header the spec marks `x-hotline-record`, such as `messaging.destination.name` for SQS's `QueueUrl` and `messaging.operation.name` for its `X-Amz-Target`. Detail: [proxy-body-fields.md](proxy-body-fields.md). |
 
 **Headers.** Kept by default: `content-type`, `content-length`, `date`, `retry-after`, `request-id`, `x-request-id` and any `ratelimit-*`. A header marked `x-hotline-redact: false` in the spec is kept; one marked `true` shows as `REDACTED`. Never recorded: `authorization`, `proxy-authorization`, `cookie`, `set-cookie` and the login headers named in the spec. Every other header is left out, name and all.
 

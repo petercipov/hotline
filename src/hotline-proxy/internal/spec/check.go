@@ -79,6 +79,9 @@ type param struct {
 	deepObject bool
 	explode    bool
 	schema     *jsonschema.Schema
+	// record names the record attribute a header is copied to, when the
+	// spec marks it x-hotline-record.
+	record string
 }
 
 type credential struct {
@@ -133,11 +136,12 @@ func (s *Spec) Check(e Exchange) Checked {
 		c.Request = append(c.Request, p.check(values)...)
 	}
 	c.Request = append(c.Request, s.unknownQuery(r.checks.params, query)...)
+	c.Copied = r.checks.copiedHeaders(e.Header)
 	c.Request = append(c.Request, r.checks.loggedIn(e.Header, query, cookies)...)
 	results, skipped, copied := r.checks.body.check(e.Header.Get("Content-Type"), e.Body)
 	c.Request = append(c.Request, results...)
 	c.Skipped = skipped
-	c.Copied = copied
+	c.Copied = append(c.Copied, copied...)
 	if e.Status == 0 || r.checks.replies == nil {
 		return c
 	}

@@ -1,11 +1,13 @@
 # Agreed with Peter, 2026-10-31. Detail: docs/proxy-body-fields.md.
-Feature: Marked body fields are copied into the record
+Feature: Marked body fields and headers are copied into the record
   Bodies are never recorded. But a spec can mark a field of a call's or a
   reply's body with x-hotline-record, giving the name of a record
   attribute, and the proxy then copies that one field's value into the
   record. For example, SQS's QueueUrl is recorded as
   messaging.destination.name, OpenTelemetry's name for a queue, so a log
-  tool shows which queue a call went to.
+  tool shows which queue a call went to. The same mark on a header
+  parameter of the call copies that header: SQS's X-Amz-Target is recorded
+  as messaging.operation.name, such as AmazonSQS.SendMessage.
 
   A mark is the spec author's promise that the field holds no secret and
   no personal data. Only plain values are copied: text, numbers, and true
@@ -99,6 +101,39 @@ Feature: Marked body fields are copied into the record
       When the app sends POST /orders with "Idempotency-Key: k1" and the json body {"item":"A1","quantity":2}
       Then hotline.requests carries no shop.order.item
 
+  Rule: Marked headers of the call are copied
+
+    Background:
+      Given the overlay key.overlay.yaml:
+        """
+        overlay: 1.1.0
+        info: { title: Key, version: "1" }
+        actions:
+          - target: $.paths['/orders'].post.parameters[?@.name == 'Idempotency-Key']
+            update: { x-hotline-record: shop.idempotency_key }
+        """
+      And the shop spec with the overlay key.overlay.yaml
+      And the integration's fingerprintKey is read from a file
+      And the vendor answers 201
+
+    Scenario: A header is copied, and signed
+      When the app sends POST /orders with "Idempotency-Key: k1" and the json body {"item":"A1","quantity":2}
+      Then the record holds shop.idempotency_key = k1
+      And the signature input names shop.idempotency_key
+      And the signature checks out when rebuilt from the record alone, with the key
+
+    Scenario: A header sent twice is joined
+      When the app sends POST /orders with "Idempotency-Key: k1; Idempotency-Key: k2" and the json body {"item":"A1","quantity":2}
+      Then the record holds shop.idempotency_key = "k1, k2"
+
+    Scenario: A missing header is not copied
+      When the app sends POST /orders and the json body {"item":"A1","quantity":2}
+      Then the record has no attribute shop.idempotency_key
+
+    Scenario: A long header is cut at 256 characters
+      When the app sends POST /orders with an Idempotency-Key 300 characters long
+      Then the record holds shop.idempotency_key with its first 256 characters
+
   Rule: The copied fields are signed
 
     Background:
@@ -132,6 +167,55 @@ Feature: Marked body fields are copied into the record
         | A name with a space          | "shop item"         | $.components.schemas.Order.properties.item                                                                           | Order/properties/item     | letters, digits          |
         | A name the proxy uses itself | http.request.method | $.components.schemas.Order.properties.item                                                                           | Order/properties/item     | the proxy's own          |
         | A hotline name               | hotline.item        | $.components.schemas.Order.properties.item                                                                           | Order/properties/item     | the proxy's own          |
+        | A mark on a query parameter  | shop.limit          | $.paths['/orders'].get.parameters[?@.name == 'limit']                                                                | limit                     | only on a header of the call |
+        | A mark on a reply header     | shop.request_id     | $.paths['/orders/{orderId}'].get.responses['200'].headers['X-Request-Id']                                            | X-Request-Id              | only on a header of the call |
+        | A bad name on a header       | "shop key"          | $.paths['/orders'].post.parameters[?@.name == 'Idempotency-Key']                                                     | Idempotency-Key           | letters, digits          |
+
+    Scenario: A login header can't be copied
+      Given the overlay login.overlay.yaml:
+        """
+        overlay: 1.1.0
+        info: { title: Login, version: "1" }
+        actions:
+          - target: $.paths['/orders'].get.parameters
+            update:
+              - { name: Authorization, in: header, x-hotline-record: shop.login }
+        """
+      And the shop spec with the overlay login.overlay.yaml
+      When the proxy loads the config
+      Then the config is refused with a message naming "x-hotline-record", "Authorization" and "login"
+
+    Scenario: A login header the spec names can't be copied either
+      Given the overlay key-login.overlay.yaml:
+        """
+        overlay: 1.1.0
+        info: { title: Key login, version: "1" }
+        actions:
+          - target: $.components.securitySchemes
+            update:
+              apiKey: { type: apiKey, in: header, name: X-Api-Key }
+          - target: $.paths['/orders'].get.parameters
+            update:
+              - { name: X-Api-Key, in: header, x-hotline-record: shop.api_key }
+        """
+      And the shop spec with the overlay key-login.overlay.yaml
+      When the proxy loads the config
+      Then the config is refused with a message naming "x-hotline-record", "X-Api-Key" and "login"
+
+    Scenario: The same name on a header and in the body of one call
+      Given the overlay twice.overlay.yaml:
+        """
+        overlay: 1.1.0
+        info: { title: Twice, version: "1" }
+        actions:
+          - target: $.paths['/orders'].post.parameters[?@.name == 'Idempotency-Key']
+            update: { x-hotline-record: shop.order.item }
+          - target: $.components.schemas.Order.properties.item
+            update: { x-hotline-record: shop.order.item }
+        """
+      And the shop spec with the overlay twice.overlay.yaml
+      When the proxy loads the config
+      Then the config is refused with a message naming "x-hotline-record", "shop.order.item" and "both a header and the body"
 
     Scenario: The same name in the call and the reply of one route
       Given the overlay clash.overlay.yaml:
@@ -151,7 +235,7 @@ Feature: Marked body fields are copied into the record
       When the proxy loads the config
       Then the config is refused with a message naming "x-hotline-record", "shop.order.item" and "both the call and the reply"
 
-  Rule: SQS calls name their queue
+  Rule: SQS calls name their queue and their action
 
     Scenario Outline: <action> names the queue
       Given the SQS spec with the invoices overlay
@@ -164,3 +248,16 @@ Feature: Marked body fields are copied into the record
         | SendMessage    | ,"MessageBody":"{\"schemaVersion\":1,\"eventId\":\"6f1c2b9e-1d3a-4c5b-8e7f-9a0b1c2d3e4f\",\"orderId\":\"A-1001\",\"templateId\":\"invoice-standard-v2\",\"language\":\"en\",\"requestedAt\":\"2026-10-30T10:00:00Z\"}" |
         | ReceiveMessage | ,"WaitTimeSeconds":1                                                                                                                                                                         |
         | DeleteMessage  | ,"ReceiptHandle":"r-1"                                                                                                                                                                       |
+
+    Scenario Outline: <action> names its action
+      Given the SQS spec
+      And SQS answers 200 with the json body {}
+      When the app sends <action> with the json body {"QueueUrl":"https://sqs.eu-west-1.amazonaws.com/192325781350/orders"<more>}
+      Then the record holds messaging.operation.name = AmazonSQS.<action>
+      And the record has no request results
+
+      Examples:
+        | action         | more                   |
+        | SendMessage    | ,"MessageBody":"hello" |
+        | ReceiveMessage |                        |
+        | DeleteMessage  | ,"ReceiptHandle":"r-1" |

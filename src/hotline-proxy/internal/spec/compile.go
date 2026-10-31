@@ -304,6 +304,9 @@ func (b *builder) param(m map[string]any, pointer, where string) *param {
 	if p.name == "" || p.in == "" {
 		return nil
 	}
+	if mark, marked := m["x-hotline-record"]; marked {
+		p.record = b.headerMark(mark, p.in, p.name, where)
+	}
 	// OpenAPI says these headers are described elsewhere, so a header
 	// parameter with their name is ignored.
 	if p.in == partHeader && slices.Contains([]string{"accept", "content-type", "authorization"}, strings.ToLower(p.name)) {
@@ -380,6 +383,9 @@ func (b *builder) reply(m map[string]any, pointer, where, code string) *reply {
 			continue
 		}
 		h, hp := b.object(headers[name], pointer+"/headers"+token(name), where)
+		if _, marked := h["x-hotline-record"]; marked {
+			b.problem("%s: x-hotline-record on the %s reply header %s: a mark goes only on a header of the call", where, code, name)
+		}
 		required, _ := h["required"].(bool)
 		r.headers = append(r.headers, param{
 			name: name, in: partHeader, required: required,

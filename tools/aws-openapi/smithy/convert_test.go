@@ -86,16 +86,19 @@ const model = `{
 }`
 
 // sqsRecord is what the committed SQS spec copies into records.
-func sqsRecord() map[string]string {
-	return map[string]string{"QueueUrl": "messaging.destination.name"}
+func sqsRecord() smithy.Options {
+	return smithy.Options{
+		Record: map[string]string{"QueueUrl": "messaging.destination.name"},
+		Action: "messaging.operation.name",
+	}
 }
 
 func convert(m string) map[string]any {
-	return convertRecording(m, nil)
+	return convertRecording(m, smithy.Options{})
 }
 
-func convertRecording(m string, record map[string]string) map[string]any {
-	out, err := smithy.Convert([]byte(m), record)
+func convertRecording(m string, options smithy.Options) map[string]any {
+	out, err := smithy.Convert([]byte(m), options)
 	Expect(err).NotTo(HaveOccurred())
 	var doc map[string]any
 	Expect(yaml.Unmarshal(out, &doc)).To(Succeed())
@@ -212,12 +215,12 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 	})
 
 	It("refuses a model that is not an AWS JSON service", func() {
-		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#restXml")), nil)
+		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#restXml")), smithy.Options{})
 		Expect(err).To(MatchError(smithy.ErrUnsupported))
 	})
 
 	It("refuses text that is not a Smithy model", func() {
-		_, err := smithy.Convert([]byte("nope"), nil)
+		_, err := smithy.Convert([]byte("nope"), smithy.Options{})
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -228,7 +231,7 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		Expect(err).NotTo(HaveOccurred())
 		got, err := smithy.Convert(m, sqsRecord())
 		Expect(err).NotTo(HaveOccurred())
-		Expect(string(got)).To(Equal(string(want)), "run: cd tools/aws-openapi && go run . -record QueueUrl=messaging.destination.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml")
+		Expect(string(got)).To(Equal(string(want)), "run: cd tools/aws-openapi && go run . -record QueueUrl=messaging.destination.name -record-action messaging.operation.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml")
 	})
 
 	It("marks the named fields of every action's input to be copied into records", func() {
@@ -240,11 +243,25 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 	})
 
 	It("marks nothing in an action's output", func() {
-		doc := convertRecording(model, map[string]string{"MessageId": "example.message.id"})
+		doc := convertRecording(model, smithy.Options{Record: map[string]string{"MessageId": "example.message.id"}})
 		Expect(at(doc, "components", "schemas", "SendResult", "properties", "MessageId")).NotTo(HaveKey("x-hotline-record"))
 	})
 
 	It("marks nothing unless asked", func() {
 		Expect(at(doc, "components", "schemas", "SendRequest", "properties", "QueueUrl")).NotTo(HaveKey("x-hotline-record"))
+		Expect(at(doc, "paths", "/#X-Amz-Target=Queues.Send", "post")).NotTo(HaveKey("parameters"))
+	})
+
+	It("lists the action header on every action, with its own value, to be copied into records", func() {
+		doc := convertRecording(model, sqsRecord())
+		for _, action := range []string{"Send", "Purge"} {
+			params, ok := at(doc, "paths", "/#X-Amz-Target=Queues."+action, "post", "parameters").([]any)
+			Expect(ok).To(BeTrue())
+			Expect(params).To(ConsistOf(map[string]any{
+				"name": "X-Amz-Target", "in": "header", "required": true,
+				"schema":           map[string]any{"type": "string", "const": "Queues." + action},
+				"x-hotline-record": "messaging.operation.name",
+			}))
+		}
 	})
 })

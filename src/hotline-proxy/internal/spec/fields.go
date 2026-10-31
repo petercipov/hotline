@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"net/http"
 	"regexp"
 	"slices"
 	"strconv"
@@ -74,19 +75,13 @@ func (b *builder) walk(v any, pointer string, path []string, inList bool, seen m
 	}
 }
 
-// mark reads one x-hotline-record mark. A problem with it is reported once,
-// however many bodies share the schema.
+// mark reads one x-hotline-record mark on a body field. A problem with it
+// is reported once, however many bodies share the schema.
 func (b *builder) mark(mark any, types []string, pointer string) (field, bool) {
-	name, isText := mark.(string)
-	var problem string
-	switch {
-	case !isText:
-		problem = "must be a name, such as messaging.destination.name"
-	case !recordName.MatchString(name):
-		problem = fmt.Sprintf("names %q, but a name may only hold letters, digits, dots and underscores", name)
-	case slices.ContainsFunc(ownNames(), func(own string) bool { return strings.HasPrefix(name, own) }):
-		problem = fmt.Sprintf("names %s, which starts like the proxy's own names (%s)", name, strings.Join(ownNames(), " "))
-	case len(types) == 0 || slices.ContainsFunc(types, func(t string) bool { return !slices.Contains([]string{"string", "number", "integer", "boolean"}, t) }):
+	name, problem := recordedAs(mark)
+	if problem == "" && (len(types) == 0 || slices.ContainsFunc(types, func(t string) bool {
+		return !slices.Contains([]string{"string", "number", "integer", "boolean"}, t)
+	})) {
 		problem = "must be on a field of text, a number, or true or false, with its type given"
 	}
 	if problem == "" {
@@ -97,6 +92,53 @@ func (b *builder) mark(mark any, types []string, pointer string) (field, bool) {
 		b.problem("%s: x-hotline-record at %s %s", b.name, pointer, problem)
 	}
 	return field{}, false
+}
+
+// headerMark reads one x-hotline-record mark on a parameter: only a header
+// of the call, never a login header, can be copied. It returns the name
+// the header is copied to, empty when the mark can't be used.
+func (b *builder) headerMark(mark any, in, header, where string) string {
+	name, problem := recordedAs(mark)
+	switch {
+	case in != partHeader:
+		problem = "a mark goes only on a header of the call"
+	case problem == "" && b.login(header):
+		problem = "is on a login header, which is never recorded"
+	}
+	if problem != "" {
+		b.problem("%s: x-hotline-record on the %s parameter %s %s", where, in, header, problem)
+		return ""
+	}
+	return name
+}
+
+// login says whether a header carries a login: Authorization, the
+// proxy's own, a cookie, or one the spec names in its security section.
+func (b *builder) login(header string) bool {
+	switch strings.ToLower(header) {
+	case "authorization", "proxy-authorization", "cookie":
+		return true
+	}
+	for _, cred := range b.schemes {
+		if cred.in == partHeader && strings.EqualFold(cred.name, header) {
+			return true
+		}
+	}
+	return false
+}
+
+// recordedAs checks the name a mark gives, and says what is wrong with it.
+func recordedAs(mark any) (string, string) {
+	name, isText := mark.(string)
+	switch {
+	case !isText:
+		return "", "must be a name, such as messaging.destination.name"
+	case !recordName.MatchString(name):
+		return "", fmt.Sprintf("names %q, but a name may only hold letters, digits, dots and underscores", name)
+	case slices.ContainsFunc(ownNames(), func(own string) bool { return strings.HasPrefix(name, own) }):
+		return "", fmt.Sprintf("names %s, which starts like the proxy's own names (%s)", name, strings.Join(ownNames(), " "))
+	}
+	return name, ""
 }
 
 // kinds are the types a property allows, null left out: its own, or those
@@ -120,34 +162,60 @@ func kinds(raw, resolved map[string]any) []string {
 	return slices.DeleteFunc(list, func(s string) bool { return s == "null" })
 }
 
-// clashes reports names marked in both the call's body and a reply's on one
-// route, since a record holds each name once.
+// clashes reports a name marked twice on one route: on a header and in the
+// call's body, or in both the call and a reply, since a record holds each
+// name once.
 func (b *builder) clashes(c *checks, where string) {
-	if c.body == nil {
-		return
-	}
-	asked := map[string]bool{}
-	for _, ct := range c.body.content {
-		for _, f := range ct.fields {
-			asked[f.name] = true
+	headers := map[string]bool{}
+	for _, p := range c.params {
+		if p.record != "" {
+			headers[p.record] = true
 		}
+	}
+	asked := maps.Clone(headers)
+	for _, name := range c.body.names() {
+		if headers[name] {
+			b.problem("%s: x-hotline-record names %s in both a header and the body of the call", where, name)
+		}
+		asked[name] = true
 	}
 	clashing := map[string]bool{}
 	for _, rp := range c.replies {
-		if rp == nil || rp.body == nil {
-			continue
-		}
-		for _, ct := range rp.body.content {
-			for _, f := range ct.fields {
-				if asked[f.name] {
-					clashing[f.name] = true
-				}
+		for _, name := range rp.body.names() {
+			if asked[name] {
+				clashing[name] = true
 			}
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(clashing)) {
 		b.problem("%s: x-hotline-record names %s in both the call and the reply", where, name)
 	}
+}
+
+// names are the names a body's marked fields are copied to.
+func (b *bodySpec) names() []string {
+	if b == nil {
+		return nil
+	}
+	var names []string
+	for _, ct := range b.content {
+		for _, f := range ct.fields {
+			names = append(names, f.name)
+		}
+	}
+	return names
+}
+
+// copiedHeaders are the marked headers of the call, as text. A header sent
+// more than once is joined with ", ".
+func (c *checks) copiedHeaders(header http.Header) []Field {
+	var out []Field
+	for _, p := range c.params {
+		if values := header.Values(p.name); p.record != "" && len(values) > 0 {
+			out = append(out, Field{Name: p.record, Value: cut(strings.Join(values, ", "))})
+		}
+	}
+	return out
 }
 
 // copied are the marked fields found in a read body, each with the value
@@ -173,10 +241,7 @@ func plain(v any, types []string) (any, bool) {
 		if !slices.Contains(types, "string") {
 			return nil, false
 		}
-		if runes := []rune(x); len(runes) > longestText {
-			x = string(runes[:longestText])
-		}
-		return x, true
+		return cut(x), true
 	case bool:
 		return x, slices.Contains(types, "boolean")
 	case json.Number:
@@ -190,4 +255,12 @@ func plain(v any, types []string) (any, bool) {
 		return f, err == nil && !math.IsInf(f, 0)
 	}
 	return nil, false
+}
+
+// cut keeps the first longestText characters of a text.
+func cut(text string) string {
+	if runes := []rune(text); len(runes) > longestText {
+		return string(runes[:longestText])
+	}
+	return text
 }
