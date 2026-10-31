@@ -22,9 +22,12 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"hotline-proxy/internal/config"
 	"hotline-proxy/internal/export"
 	"hotline-proxy/internal/spec"
+	"hotline-proxy/internal/tracectx"
 )
 
 // handler serves the proxy port. It knows four ingresses: the forward
@@ -106,6 +109,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		transport: transport,
 		reqBody:   &tap{ReadCloser: r.Body, limit: keepFor(api), mac: macFor(api)},
 	}
+	traced, tracing := h.traced(id, r.Header, start)
+	c.trace = traced
 	c.appTLS, c.appTimed = a.handshakeTime()
 	r.Body = c.reqBody
 	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
@@ -125,6 +130,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				// proxy does not offer: the call stays HTTP/1.1.
 				pr.Out.Header.Del("Upgrade")
 				pr.Out.Header.Del("Connection")
+			}
+			if tracing.Forward {
+				tracing.Format.Write(pr.Out.Header, traced)
 			}
 		},
 		Transport:     c,
@@ -238,6 +246,29 @@ func refuse(w http.ResponseWriter, status int) {
 	w.WriteHeader(status)
 }
 
+// traced is a call's trace context: the app's trace id and flags, or a new
+// trace id, sampled, when the app sent none the proxy can read, and a new
+// span id for the proxy's own step. It comes with the integration's trace
+// settings.
+func (h *handler) traced(id string, header http.Header, start time.Time) (trace.SpanContext, config.Trace) {
+	settings := h.cfg.Trace(id)
+	traceID, flags, ok := settings.Format.Read(header)
+	if !ok {
+		traceID, flags = settings.Format.NewTraceID(start), trace.FlagsSampled
+	}
+	return trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     tracectx.NewSpanID(),
+		TraceFlags: flags,
+	}), settings
+}
+
+// recordContext carries a record's trace context to the exporters, which
+// put it in the record's trace_id, span_id and flags.
+func recordContext(sc trace.SpanContext) context.Context {
+	return trace.ContextWithSpanContext(context.Background(), sc)
+}
+
 // integrationID reads the user name from "Proxy-Authorization: Basic".
 // Anything else, including a broken or repeated header, counts as no ID.
 func integrationID(h http.Header) string {
@@ -265,6 +296,8 @@ type call struct {
 	h       *handler
 	start   time.Time
 	ingress string
+	// trace is the call's trace context, which its record carries.
+	trace trace.SpanContext
 	// target is the vendor address the app named.
 	target  *url.URL
 	id      string

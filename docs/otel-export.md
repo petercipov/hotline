@@ -9,7 +9,7 @@ In short, the proxy sends two things:
 1. **One log record per call**, named `hotline.request`. It holds everything known about the call.
 2. **One counter**, `hotline.requests`, that goes up by one per call.
 
-It sends no traces and none of its own health data yet.
+It sends no traces and none of its own health data yet. Each record carries the app's trace id, or a new one, in its own trace fields: [proxy-trace-context.md](proxy-trace-context.md).
 
 ## How it is sent
 

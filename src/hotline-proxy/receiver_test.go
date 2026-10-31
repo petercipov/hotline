@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"io"
 	"net"
 	"net/http"
@@ -37,6 +38,11 @@ type receivedRecord struct {
 	severityNumber int32
 	resource       map[string]any
 	attrs          map[string]any
+	// traceID, spanID and flags are the record's own trace fields, the ids
+	// in hex.
+	traceID string
+	spanID  string
+	flags   uint32
 }
 
 // receivedCount is one data point of the hotline.requests counter.
@@ -292,6 +298,9 @@ func (r *receiver) Export(ctx context.Context, req *collogs.ExportLogsServiceReq
 					severityNumber: int32(lr.GetSeverityNumber()),
 					resource:       res,
 					attrs:          values(lr.GetAttributes()),
+					traceID:        hex.EncodeToString(lr.GetTraceId()),
+					spanID:         hex.EncodeToString(lr.GetSpanId()),
+					flags:          lr.GetFlags(),
 				})
 			}
 		}

@@ -471,6 +471,9 @@ func (w *world) brokenConfig(problem string) error {
 		w.rawConfig, w.problem = one("    vendorTimeout: -5s\n"), `vendorTimeout "-5s"`
 	case "a vendorTimeout is not a duration":
 		w.rawConfig, w.problem = one("    vendorTimeout: soon\n"), `vendorTimeout "soon"`
+	case "an integration's traceFormat is zipkin":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", ""))+"    traceFormat: zipkin\n")
+		w.problem = "integration shop: traceFormat zipkin must be w3c, b3, xray or jaeger"
 	case "an x-hotline-redact mark is not true or false":
 		w.rawConfig = w.raw(start+exporters, integration("shop", w.specAPI("api.x.com",
 			"openapi: 3.1.0\npaths:\n  /a:\n    get:\n      parameters:\n        - { name: q, in: query, x-hotline-redact: maybe }\n", "")))

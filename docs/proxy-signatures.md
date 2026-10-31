@@ -19,7 +19,7 @@ Some terms, in plain words:
 
 ## The signed text
 
-One line per attribute, sorted by name, every attribute but `hotline.signature` itself, the key ID and the body signatures included. Then one last line for the record's timestamp, in nanoseconds since 1970:
+One line per attribute, sorted by name, every attribute but `hotline.signature` itself, the key ID and the body signatures included. Then a line for the record's timestamp, in nanoseconds since 1970, and lines for its trace id, span id and flags, in hex ([proxy-trace-context.md](proxy-trace-context.md)):
 
 ```
 "hotline.integration.id": "talon-shop-a"
@@ -28,6 +28,9 @@ One line per attribute, sorted by name, every attribute but `hotline.signature` 
 "http.response.status_code": 201
 …
 "log.record.timestamp": 1793404800000000000
+"log.record.trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+"log.record.span_id": "00f067aa0ba902b7"
+"log.record.trace_flags": "01"
 ```
 
 The name and the value are both JSON: text in quotes, numbers, `true` or `false`, lists, and maps with their keys sorted. Lines end with a line feed, and the last line has none. To check a record, build the same text from it and compare the HMAC with the key.
