@@ -2,9 +2,12 @@ package proxy
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
+	"hash"
 	"io"
 	"log"
 	"log/slog"
@@ -101,7 +104,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		in:        r,
 		timeout:   settings.VendorTimeout,
 		transport: transport,
-		reqBody:   &tap{ReadCloser: r.Body, limit: keepFor(api)},
+		reqBody:   &tap{ReadCloser: r.Body, limit: keepFor(api), mac: macFor(api)},
 	}
 	c.appTLS, c.appTimed = a.handshakeTime()
 	r.Body = c.reqBody
@@ -334,7 +337,7 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.respBody = &tap{ReadCloser: resp.Body, limit: keepFor(c.api), done: func() { c.mark(func() { c.vendorOut = c.h.clock.Now() }) }}
+	c.respBody = &tap{ReadCloser: resp.Body, limit: keepFor(c.api), mac: macFor(c.api), done: func() { c.mark(func() { c.vendorOut = c.h.clock.Now() }) }}
 	if both, ok := resp.Body.(io.Writer); ok && resp.StatusCode == http.StatusSwitchingProtocols {
 		// An upgraded connection, such as a WebSocket, carries data both
 		// ways, so the proxy must be able to write to it too. It may stay
@@ -467,8 +470,18 @@ func keepFor(api *config.API) int {
 	return keptBody
 }
 
+// macFor signs a body with the integration's key as it passes: none for a
+// call without a full record.
+func macFor(api *config.API) hash.Hash {
+	if api == nil {
+		return nil
+	}
+	return hmac.New(sha256.New, api.SigningKey)
+}
+
 // tap passes a body straight on and counts the bytes that passed. It keeps
-// a copy of up to limit bytes for the checks. done, if
+// a copy of up to limit bytes for the checks, and signs every byte with
+// mac, if set (Peter, 2026-10-31). done, if
 // set, runs once when the body ends: read to the end, broken off, or closed
 // early. The request body is read by the transport, which may still be
 // reading when the record is made, so the counts are behind a lock.
@@ -479,6 +492,7 @@ type tap struct {
 	wait func() func() bool
 
 	limit int
+	mac   hash.Hash
 
 	mu   sync.Mutex
 	size int64
@@ -494,6 +508,9 @@ func (t *tap) Read(p []byte) (int, error) {
 	n, err := t.ReadCloser.Read(p)
 	t.mu.Lock()
 	t.size += int64(n)
+	if t.mac != nil {
+		t.mac.Write(p[:n])
+	}
 	if t.limit > 0 {
 		room := min(n, t.limit-len(t.kept))
 		t.kept = append(t.kept, p[:room]...)
@@ -520,6 +537,17 @@ func (t *tap) counts() (int64, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.size, t.err
+}
+
+// signed is the signature of the bytes that passed so far, empty when none
+// did.
+func (t *tap) signed() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.size == 0 {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString(t.mac.Sum(nil))
 }
 
 // copied is the copy of the body kept so far.

@@ -1,7 +1,9 @@
 package proxy
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"slices"
@@ -10,56 +12,30 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
-
-	"hotline-proxy/internal/httpsig"
 )
 
 // signature signs everything a full record holds, so anyone with the record
-// and the key can check that nobody changed it. The RFC 9421 lines for the
-// call come first: the method, the address, the kept request headers, the
-// status and the kept reply headers, marked ;resp. Then one line for each
-// other attribute and for the record's timestamp, sorted by name, with its
-// value as JSON.
-func signature(attrs []attribute.KeyValue, at, now time.Time, key []byte) []attribute.KeyValue {
-	var method, target, status []httpsig.Component
-	var request, reply, rest []httpsig.Component
-	for _, kv := range attrs {
-		name := string(kv.Key)
-		switch {
-		case kv.Key == semconv.HTTPRequestMethodKey:
-			method = []httpsig.Component{{Name: "@method", Value: kv.Value.AsString()}}
-		case kv.Key == semconv.URLFullKey:
-			target = []httpsig.Component{{Name: "@target-uri", Value: kv.Value.AsString()}}
-		case kv.Key == semconv.HTTPResponseStatusCodeKey:
-			status = []httpsig.Component{{Name: "@status", Value: strconv.FormatInt(kv.Value.AsInt64(), 10)}}
-		case strings.HasPrefix(name, "http.request.header."):
-			request = append(request, httpsig.Component{
-				Name: strings.TrimPrefix(name, "http.request.header."), Value: strings.Join(kv.Value.AsStringSlice(), ", "),
-			})
-		case strings.HasPrefix(name, "http.response.header."):
-			reply = append(reply, httpsig.Component{
-				Name: strings.TrimPrefix(name, "http.response.header."), Param: "resp", Value: strings.Join(kv.Value.AsStringSlice(), ", "),
-			})
-		default:
-			// The values are plain types and finite numbers, so they always
-			// turn into JSON.
-			value, _ := json.Marshal(plain(kv.Value)) //nolint:errchkjson // see above
-			rest = append(rest, httpsig.Component{Name: name, Value: string(value)})
-		}
-	}
-	rest = append(rest, httpsig.Component{Name: "log.record.timestamp", Value: strconv.FormatInt(at.UnixNano(), 10)})
-	for _, part := range [][]httpsig.Component{request, reply, rest} {
-		slices.SortFunc(part, func(a, b httpsig.Component) int { return strings.Compare(a.Name, b.Name) })
-	}
-	components := slices.Concat(method, target, request, status, reply, rest)
+// and the key can check that nobody changed it. The signed text has one
+// line per attribute, sorted by name, then one for the record's timestamp:
+// the name and the value, both as JSON. The whole record is signed, so no
+// list of names is needed (Peter, 2026-10-31).
+func signature(attrs []attribute.KeyValue, at time.Time, key []byte) []attribute.KeyValue {
 	sum := sha256.Sum256(key)
-	value, input := httpsig.HMACSHA256(key, components, httpsig.Params{
-		Created: now.Unix(), KeyID: hex.EncodeToString(sum[:8]), Alg: "hmac-sha256",
-	})
+	attrs = append(slices.Clone(attrs), attribute.String("hotline.signature_key_id", hex.EncodeToString(sum[:8])))
+	slices.SortFunc(attrs, func(a, b attribute.KeyValue) int { return strings.Compare(string(a.Key), string(b.Key)) })
+	lines := make([]string, 0, len(attrs)+1)
+	for _, kv := range attrs {
+		// The values are plain types and finite numbers, so they always
+		// turn into JSON.
+		value, _ := json.Marshal(plain(kv.Value)) //nolint:errchkjson // see above
+		lines = append(lines, strconv.Quote(string(kv.Key))+": "+string(value))
+	}
+	lines = append(lines, `"log.record.timestamp": `+strconv.FormatInt(at.UnixNano(), 10))
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(strings.Join(lines, "\n")))
 	return []attribute.KeyValue{
-		attribute.String("hotline.signature", value),
-		attribute.String("hotline.signature_input", input),
+		attribute.String("hotline.signature_key_id", hex.EncodeToString(sum[:8])),
+		attribute.String("hotline.signature", base64.StdEncoding.EncodeToString(mac.Sum(nil))),
 	}
 }
 

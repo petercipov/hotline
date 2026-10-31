@@ -138,7 +138,7 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 
 ### The signature
 
-Every full record has `hotline.signature` and `hotline.signature_input`: an RFC 9421 signature, with HMAC-SHA256 and the integration's `fingerprintKey`, of everything else the record holds. Minimal records have none. Detail: [proxy-signatures.md](proxy-signatures.md).
+Every full record has `hotline.signature` and `hotline.signature_key_id`: an HMAC-SHA256 signature, with the integration's `fingerprintKey`, of everything else the record holds, sorted by name. Each body that passed is signed on its own, in `hotline.request.body.signature` and `hotline.response.body.signature`. Minimal records have none. Detail: [proxy-signatures.md](proxy-signatures.md).
 
 ### Check results
 
