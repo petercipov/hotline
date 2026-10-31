@@ -99,6 +99,10 @@ type content struct {
 	// json is set when the spec marks the type x-hotline-body: json, for a
 	// vendor's own name for JSON.
 	json bool
+	// xmlMark is set when the spec marks the type x-hotline-body: xml.
+	xmlMark bool
+	// xml is how the body is read as XML; nil when it can't be XML.
+	xml *xmlBody
 	// schema is nil when the spec gives the type but no schema.
 	schema *jsonschema.Schema
 	// fields are the body fields marked x-hotline-record.
@@ -343,6 +347,19 @@ func (b *bodySpec) check(contentType string, body Body) ([]Result, string, []Fie
 	}
 	var instance any
 	switch {
+	case c.xmlMark || !c.json && isXML(mediaType) && c.xml != nil:
+		if body.TooLarge {
+			return nil, "body_too_large", nil
+		}
+		var problem *Result
+		instance, problem = c.xml.read(body.Data)
+		if problem != nil {
+			return []Result{*problem}, "", nil
+		}
+		if c.xml.shape == nil {
+			return nil, "", nil
+		}
+		instance = coerce(instance, c.schema)
 	case c.json || isJSON(mediaType):
 		if body.TooLarge {
 			return nil, "body_too_large", nil

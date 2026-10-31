@@ -1,0 +1,141 @@
+# A vendor that speaks XML, shaped like S3: a list of files, deleting
+# several at once, and an error reply. Plus a shipment, to show the xml
+# notes S3 doesn't use: an attribute and a list with an outer element.
+openapi: 3.1.0
+info: { title: Files, version: "1" }
+paths:
+  /:
+    get:
+      parameters:
+        - { name: list-type, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: The files
+          content:
+            application/xml:
+              schema: { $ref: '#/components/schemas/ListBucketResult' }
+        4XX:
+          description: An error
+          content:
+            application/xml:
+              schema: { $ref: '#/components/schemas/Error' }
+  /delete:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema: { $ref: '#/components/schemas/Delete' }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/xml:
+              schema: { $ref: '#/components/schemas/DeleteResult' }
+  /shipments:
+    post:
+      requestBody:
+        content:
+          application/vnd.parcels.v1:
+            schema: { $ref: '#/components/schemas/Shipment' }
+            x-hotline-body: xml
+          text/xml:
+            schema: { $ref: '#/components/schemas/Shipment' }
+          application/shipment+xml:
+            schema: { $ref: '#/components/schemas/Shipment' }
+          application/vnd.parcels.v2:
+            schema: { $ref: '#/components/schemas/Shipment' }
+      responses:
+        "201":
+          description: Booked
+          content:
+            application/xml:
+              schema: { $ref: '#/components/schemas/Label' }
+  /notes:
+    put:
+      requestBody:
+        content:
+          application/xml: {}
+      responses:
+        "200": { description: Stored }
+components:
+  schemas:
+    ListBucketResult:
+      type: object
+      required: [Name, KeyCount]
+      properties:
+        Name: { type: string, const: shop-invoices }
+        KeyCount: { type: integer }
+        IsTruncated: { type: boolean }
+        Tags: { type: array }
+        Contents:
+          type: array
+          items: { $ref: '#/components/schemas/Object' }
+    Object:
+      type: object
+      xml: { name: Contents }
+      required: [Key, Size]
+      properties:
+        Key: { type: string, pattern: '^[A-Z]-[0-9]+\.pdf$' }
+        Size: { type: integer, minimum: 1 }
+        LastModified: { type: string, format: date-time }
+    Delete:
+      type: object
+      additionalProperties: false
+      required: [Object]
+      properties:
+        Quiet: { type: boolean }
+        Object:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            required: [Key]
+            properties:
+              Key: { type: string }
+    DeleteResult:
+      type: object
+      properties:
+        Deleted:
+          type: array
+          items:
+            type: object
+            properties:
+              Key: { type: string }
+    Error:
+      type: object
+      required: [Code]
+      properties:
+        Code: { type: string }
+        Message: { type: string }
+        Cause: { $ref: '#/components/schemas/Error' }
+    Shipment:
+      type: object
+      xml: { name: shipment }
+      required: [reference, parcels]
+      properties:
+        reference:
+          type: string
+          xml: { attribute: true }
+        express: { type: boolean }
+        parcels:
+          type: array
+          minItems: 1
+          xml: { wrapped: true }
+          items:
+            type: object
+            xml: { name: parcel }
+            required: [weightGrams]
+            properties:
+              weightGrams: { type: integer, minimum: 1 }
+    Label:
+      type: object
+      xml: { name: label }
+      required: [trackingId]
+      properties:
+        trackingId:
+          type: string
+          x-hotline-record: shipment.tracking_id
+        code:
+          type: string
+          xml: { name: barcode }

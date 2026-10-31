@@ -37,7 +37,7 @@ func checksSteps(sc *godog.ScenarioContext, w *world) {
 		})
 		return nil
 	})
-	sc.Step(`^the app sends (GET|POST|PUT) (\S+)( without the login key)?(?: with "([^"]*)")?(?: and the (json|form|xml) body (.*))?$`,
+	sc.Step(`^the app sends (GET|POST|PUT) (\S+)( without the login key)?(?: with "([^"]*)")?(?: and the (json|form|pdf) body (.*))?$`,
 		func(method, path, noKey, headers, kind, body string) error {
 			return w.shopCall(method, path, noKey == "", headers, kind, body)
 		})
@@ -128,7 +128,7 @@ func (w *world) shopCall(method, path string, withKey bool, headers, kind, body 
 		lines = append(lines, "Content-Type: "+map[string]string{
 			"json": "application/json",
 			"form": "application/x-www-form-urlencoded",
-			"xml":  "application/xml",
+			"pdf":  "application/pdf",
 		}[kind])
 		r.body, r.length = strings.NewReader(body), len(body)
 	}

@@ -75,7 +75,7 @@ Feature: Checking calls against the vendor's spec
       Then the request results are body $ json
 
     Scenario: A listed format the proxy can't read is skipped
-      When the app sends PUT /files/a.xml and the xml body <file/>
+      When the app sends PUT /files/a.pdf and the pdf body %PDF-1.7
       Then the record says hotline.schema.skipped=unsupported_content_type
       And the record has no request results
 
