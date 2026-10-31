@@ -54,6 +54,8 @@ type Checked struct {
 	Request []Result
 	Reply   []Result
 	Skipped string
+	// Copied are the marked fields of both bodies.
+	Copied []Field
 }
 
 // checks are what the spec says about one route: its parameters, who may
@@ -96,6 +98,8 @@ type content struct {
 	json bool
 	// schema is nil when the spec gives the type but no schema.
 	schema *jsonschema.Schema
+	// fields are the body fields marked x-hotline-record.
+	fields []field
 }
 
 type reply struct {
@@ -130,9 +134,10 @@ func (s *Spec) Check(e Exchange) Checked {
 	}
 	c.Request = append(c.Request, s.unknownQuery(r.checks.params, query)...)
 	c.Request = append(c.Request, r.checks.loggedIn(e.Header, query, cookies)...)
-	results, skipped := r.checks.body.check(e.Header.Get("Content-Type"), e.Body)
+	results, skipped, copied := r.checks.body.check(e.Header.Get("Content-Type"), e.Body)
 	c.Request = append(c.Request, results...)
 	c.Skipped = skipped
+	c.Copied = copied
 	if e.Status == 0 || r.checks.replies == nil {
 		return c
 	}
@@ -150,8 +155,9 @@ func (s *Spec) Check(e Exchange) Checked {
 		}
 		return c
 	}
-	results, skipped = rp.body.check(e.ReplyHeader.Get("Content-Type"), e.ReplyBody)
+	results, skipped, copied = rp.body.check(e.ReplyHeader.Get("Content-Type"), e.ReplyBody)
 	c.Reply = append(c.Reply, results...)
+	c.Copied = append(c.Copied, copied...)
 	if c.Skipped == "" {
 		c.Skipped = skipped
 	}
@@ -304,19 +310,20 @@ func (cred credential) present(header http.Header, query url.Values, cookies map
 	return header.Get(cred.name) != ""
 }
 
-// check checks a body against what the spec lists. A body that cannot be
-// read, or is too large to check, is skipped, and the reason returned.
-func (b *bodySpec) check(contentType string, body Body) ([]Result, string) {
+// check checks a body against what the spec lists, and copies its marked
+// fields. A body that cannot be read, or is too large to check, is skipped,
+// and the reason returned.
+func (b *bodySpec) check(contentType string, body Body) ([]Result, string, []Field) {
 	empty := len(body.Data) == 0 && !body.TooLarge
 	switch {
 	case b == nil && empty:
-		return nil, ""
+		return nil, "", nil
 	case b == nil:
-		return []Result{{Part: partBody, Place: whole, Rule: "not_in_spec"}}, ""
+		return []Result{{Part: partBody, Place: whole, Rule: "not_in_spec"}}, "", nil
 	case empty && b.required:
-		return []Result{{Part: partBody, Place: whole, Rule: "required"}}, ""
+		return []Result{{Part: partBody, Place: whole, Rule: "required"}}, "", nil
 	case empty:
-		return nil, ""
+		return nil, "", nil
 	}
 	mediaType, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -328,34 +335,35 @@ func (b *bodySpec) check(contentType string, body Body) ([]Result, string) {
 		for i, c := range b.content {
 			listed[i] = c.mediaType
 		}
-		return []Result{{Part: partBody, Place: whole, Rule: "content_type", Expected: strings.Join(listed, ", ")}}, ""
+		return []Result{{Part: partBody, Place: whole, Rule: "content_type", Expected: strings.Join(listed, ", ")}}, "", nil
 	}
 	var instance any
 	switch {
 	case c.json || isJSON(mediaType):
 		if body.TooLarge {
-			return nil, "body_too_large"
+			return nil, "body_too_large", nil
 		}
 		instance, err = jsonschema.UnmarshalJSON(bytes.NewReader(body.Data))
 		if err != nil {
-			return []Result{{Part: partBody, Place: whole, Rule: "json"}}, ""
+			return []Result{{Part: partBody, Place: whole, Rule: "json"}}, "", nil
 		}
 	case mediaType == "application/x-www-form-urlencoded":
 		if body.TooLarge {
-			return nil, "body_too_large"
+			return nil, "body_too_large", nil
 		}
 		values, err := url.ParseQuery(string(body.Data))
 		if err != nil {
-			return []Result{{Part: partBody, Place: whole, Rule: "form"}}, ""
+			return []Result{{Part: partBody, Place: whole, Rule: "form"}}, "", nil
 		}
 		instance = coerce(nest(values), c.schema)
 	default:
-		return nil, "unsupported_content_type"
+		return nil, "unsupported_content_type", nil
 	}
+	copied := c.copied(instance)
 	if c.schema == nil {
-		return nil, ""
+		return nil, "", copied
 	}
-	return validate(c.schema, instance, partBody, whole), ""
+	return validate(c.schema, instance, partBody, whole), "", copied
 }
 
 // find picks the content for a media type: the exact type first, then

@@ -169,6 +169,18 @@ func (c *call) checked() []attribute.KeyValue {
 	}
 	found := c.api.Spec.Check(e)
 	var attrs []attribute.KeyValue
+	for _, f := range found.Copied {
+		switch v := f.Value.(type) {
+		case string:
+			attrs = append(attrs, attribute.String(f.Name, v))
+		case bool:
+			attrs = append(attrs, attribute.Bool(f.Name, v))
+		case int64:
+			attrs = append(attrs, attribute.Int64(f.Name, v))
+		case float64:
+			attrs = append(attrs, attribute.Float64(f.Name, v))
+		}
+	}
 	if found.Skipped != "" {
 		attrs = append(attrs, attribute.String("hotline.schema.skipped", found.Skipped))
 	}

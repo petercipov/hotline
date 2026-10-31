@@ -66,7 +66,7 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^the signature input names (hotline\.\S+)$`, func(name string) error {
+	sc.Step(`^the signature input names ([a-z]+\.\S+)$`, func(name string) error {
 		covered, _, err := w.signatureInput()
 		if err != nil {
 			return err
@@ -143,6 +143,8 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 			changed.attrs["hotline.timing.total"] = changed.attrs["hotline.timing.total"].(float64) + 0.001
 		case "hotline.integration.id is changed":
 			changed.attrs["hotline.integration.id"] = "talon-shop-b"
+		case "shop.order.item is changed":
+			changed.attrs["shop.order.item"] = "A2"
 		case "the timestamp is changed":
 			changed.timestamp++
 		default:

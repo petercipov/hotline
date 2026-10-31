@@ -61,6 +61,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	recordSteps(sc, w)
 	exportSteps(sc, w)
 	signatureSteps(sc, w)
+	bodyFieldSteps(sc, w)
 	protocolSteps(sc, w)
 	tlsSteps(sc, w)
 	guardSteps(sc, w)

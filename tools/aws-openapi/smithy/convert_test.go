@@ -85,8 +85,15 @@ const model = `{
   }
 }`
 
+// sqsRecord is what the committed SQS spec copies into records.
+var sqsRecord = map[string]string{"QueueUrl": "messaging.destination.name"}
+
 func convert(m string) map[string]any {
-	out, err := smithy.Convert([]byte(m))
+	return convertRecording(m, nil)
+}
+
+func convertRecording(m string, record map[string]string) map[string]any {
+	out, err := smithy.Convert([]byte(m), record)
 	Expect(err).NotTo(HaveOccurred())
 	var doc map[string]any
 	Expect(yaml.Unmarshal(out, &doc)).To(Succeed())
@@ -203,12 +210,12 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 	})
 
 	It("refuses a model that is not an AWS JSON service", func() {
-		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#restXml")))
+		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#restXml")), nil)
 		Expect(err).To(MatchError(smithy.ErrUnsupported))
 	})
 
 	It("refuses text that is not a Smithy model", func() {
-		_, err := smithy.Convert([]byte("nope"))
+		_, err := smithy.Convert([]byte("nope"), nil)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -217,8 +224,25 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		Expect(err).NotTo(HaveOccurred())
 		want, err := os.ReadFile("../../../specs/aws/sqs/2012-11-05.openapi.yaml")
 		Expect(err).NotTo(HaveOccurred())
-		got, err := smithy.Convert(m)
+		got, err := smithy.Convert(m, sqsRecord)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(string(got)).To(Equal(string(want)), "run: cd tools/aws-openapi && go run . models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml")
+		Expect(string(got)).To(Equal(string(want)), "run: cd tools/aws-openapi && go run . -record QueueUrl=messaging.destination.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml")
+	})
+
+	It("marks the named fields of every action's input to be copied into records", func() {
+		doc := convertRecording(model, sqsRecord)
+		for _, input := range []string{"SendRequest", "PurgeRequest"} {
+			Expect(at(doc, "components", "schemas", input, "properties", "QueueUrl", "x-hotline-record")).To(Equal("messaging.destination.name"))
+		}
+		Expect(at(doc, "components", "schemas", "SendRequest", "properties", "Body")).NotTo(HaveKey("x-hotline-record"))
+	})
+
+	It("marks nothing in an action's output", func() {
+		doc := convertRecording(model, map[string]string{"MessageId": "example.message.id"})
+		Expect(at(doc, "components", "schemas", "SendResult", "properties", "MessageId")).NotTo(HaveKey("x-hotline-record"))
+	})
+
+	It("marks nothing unless asked", func() {
+		Expect(at(doc, "components", "schemas", "SendRequest", "properties", "QueueUrl")).NotTo(HaveKey("x-hotline-record"))
 	})
 })

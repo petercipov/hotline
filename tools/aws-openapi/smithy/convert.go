@@ -59,8 +59,10 @@ type document struct {
 }
 
 // Convert reads a Smithy model holding one AWS JSON service and writes its
-// OpenAPI spec as YAML.
-func Convert(data []byte) ([]byte, error) {
+// OpenAPI spec as YAML. record maps a field of an action's input, such as
+// QueueUrl, to the record attribute the proxy copies it to, such as
+// messaging.destination.name; the field is marked x-hotline-record.
+func Convert(data []byte, record map[string]string) ([]byte, error) {
 	var m model
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("%w: not a Smithy JSON model: %w", ErrUnsupported, err)
@@ -78,7 +80,7 @@ func Convert(data []byte) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("%w: %s is not on AWS's JSON protocol", ErrUnsupported, serviceID)
 	}
-	c := converter{model: m, mediaType: mediaType, schemas: map[string]any{}}
+	c := converter{model: m, mediaType: mediaType, schemas: map[string]any{}, record: record}
 	prefix := name(serviceID)
 
 	paths := map[string]any{}
@@ -148,6 +150,7 @@ type converter struct {
 	model     model
 	mediaType string
 	schemas   map[string]any
+	record    map[string]string
 }
 
 func (c *converter) operation(id string) map[string]any {
@@ -162,9 +165,11 @@ func (c *converter) operation(id string) map[string]any {
 		"headers":     errorHeaders,
 		"content":     c.content(map[string]any{"$ref": "#/components/schemas/AwsJsonError"}),
 	}
+	input := c.body(op.Input)
+	c.mark(op.Input)
 	out := map[string]any{
 		"operationId": name(id),
-		"requestBody": map[string]any{"required": true, "content": c.content(c.body(op.Input))},
+		"requestBody": map[string]any{"required": true, "content": c.content(input)},
 		"responses": map[string]any{
 			"200": map[string]any{"description": "Done.", "headers": requestID, "content": c.content(c.body(op.Output))},
 			"4XX": errorReply,
@@ -175,6 +180,21 @@ func (c *converter) operation(id string) map[string]any {
 		out["description"] = doc
 	}
 	return out
+}
+
+// mark marks the fields of an action's input that are copied into records.
+// Only inputs are marked, so an output that shares a field's name is not.
+func (c *converter) mark(r *ref) {
+	if r == nil || r.Target == "smithy.api#Unit" {
+		return
+	}
+	schema, _ := c.schemas[name(r.Target)].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	for field, attribute := range c.record {
+		if prop, ok := props[field].(map[string]any); ok {
+			prop["x-hotline-record"] = attribute
+		}
+	}
 }
 
 func (c *converter) content(schema any) map[string]any {
