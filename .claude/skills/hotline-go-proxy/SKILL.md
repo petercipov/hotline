@@ -180,6 +180,13 @@ These protect the customer's traffic. Breaking one is a bug even if tests pass.
 - Any new module is named and justified.
 - No secret or body value can reach a log, error or record.
 
+### When asking Peter a question
+
+While agreeing a chapter's requirements, ask one question at a time, and always bring its impact:
+- Give the real situations it plays out in, such as a bad config edit, a rollout, a sidecar or a vendor that is down, and what happens in each for the apps and their vendor calls.
+- Say what each choice costs and which one you recommend, and why.
+- Keep it simple, everyday language a non-expert can follow: short sentences, no arrow chains, and every piece of jargon explained in plain words.
+
 ### When the pull request is merged
 
 Mark the chapter as done everywhere it is tracked, in the same session:
