@@ -4,18 +4,19 @@ This page lists every piece of data the Hotline proxy sends out over OTLP, as th
 
 The rules come from the spec, `proxy-spec.md` section 4 in the `hotline-strategic` repo. The code lives in `src/hotline-proxy/record.go`, `connect.go` and `internal/export/`. Where the two differ, the last section says so.
 
-In short, the proxy sends two things to every destination under `exporters`:
+In short, the proxy sends three things to every destination under `exporters`:
 
 1. **One log record per call**, named `hotline.request`. It holds everything known about the call.
 2. **One counter**, `hotline.requests`, that goes up by one per call.
+3. **One trace per call**: the call's steps as spans, each with its start and end. That is where the timings are (Peter, 2026-10-31).
 
-A third kind, numbers about the proxy itself, goes only to the `telemetry` destination (last signal below). It sends no traces.
+A fourth kind, numbers about the proxy itself, goes only to the `telemetry` destination (last signal below).
 
 ## How it is sent
 
 | What | Today |
 |---|---|
-| Protocol | OTLP over gRPC (the default) or over HTTP as protobuf (`protocol: http/protobuf`), to `/v1/logs` and `/v1/metrics`. Detail: [proxy-otlp-protocols.md](proxy-otlp-protocols.md). |
+| Protocol | OTLP over gRPC (the default) or over HTTP as protobuf (`protocol: http/protobuf`), to `/v1/logs`, `/v1/metrics` and `/v1/traces`. Detail: [proxy-otlp-protocols.md](proxy-otlp-protocols.md). |
 | Connection to the collector | Plain, or TLS with an `https://` endpoint, with `tls.ca` and a client certificate if needed. Login headers from `headers`. |
 | Compression | gzip, unless `compression: none`. |
 | Destinations | Every entry under `exporters` gets the same records and counts, each with its own resource labels. Each has its own queue, so one that is down never holds up the others or the calls. |
@@ -24,7 +25,7 @@ A third kind, numbers about the proxy itself, goes only to the `telemetry` desti
 | Records per send | At most 512. |
 | Queue size | 10 000 records per destination, or `queueSize`. When full, the oldest record is dropped, and a warning log line gives the count, at most once a minute per destination and always once at shutdown. |
 | At shutdown | Whatever is queued is sent first, within the shutdown time limit. |
-| Sampling | None. Every call is recorded and counted. |
+| Sampling | None. Every call is recorded, counted and traced. |
 | Counter temporality | Cumulative by default (the running total since start); `temporality: delta` sends only the change since the last send. |
 
 Config example:
@@ -96,22 +97,7 @@ There are two sizes of record:
 | `http.response.status_code` | whole number | The status the app got, also when the proxy made it up (`502`, `504`, `403`). |
 | `error.type` | text | Only when the call failed. Values are listed below. |
 | `network.peer.address` | text | The vendor IP the proxy connected to, after DNS. Only when a connection was made. |
-| `hotline.timing.*_us` | whole number, microseconds | The timings below (Peter, 2026-10-31: whole microseconds, the unit in the name, since a log attribute has no unit field). |
-
-### Timings
-
-Measured with Go's `httptrace` hooks (hooks that fire as each step of a connection happens). Each one is the length of its own step, except `first_byte`. A step that did not happen has no field: no DNS for an IP address, no TLS for plain `http`, and none of the three on a reused connection.
-
-| Attribute | What it measures |
-|---|---|
-| `hotline.timing.dns_us` | Looking up the vendor's IP. |
-| `hotline.timing.connect_us` | Opening the connection to the vendor. |
-| `hotline.timing.tls_us` | Setting up TLS with the vendor. |
-| `hotline.timing.first_byte_us` | From the call reaching the proxy until the vendor's first reply byte. |
-| `hotline.timing.total_us` | From the call reaching the proxy until its last byte went back to the app. |
-| `hotline.timing.proxy_request_us` | The proxy's own time before calling the vendor. |
-| `hotline.timing.proxy_response_us` | The proxy's own time after the vendor's reply ended. |
-| `hotline.timing.app_tls_us` | Setting up TLS between the app and the proxy, on a TLS port or inside a `CONNECT` tunnel. Only on the first call of each connection. |
+| `hotline.timing.total_us` | whole number, microseconds | From the call reaching the proxy until its last byte went back to the app; on the first call of an app's TLS connection, from the start of the handshake. The same length as the trace's `hotline call` span. Every other timing is in the trace (Peter, 2026-10-31). |
 
 ### Fields only in a full record
 
@@ -121,7 +107,6 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 | `server.port` | whole number | The vendor port. |
 | `url.full` | text | The vendor address with values replaced by `REDACTED` unless the spec marks them as safe. Left out when the path has no route in the spec. |
 | `url.template` | text | The spec's route, such as `/v1/customer_sessions/{sessionId}`. Left out with `url.full`. |
-| `dns.question.name` | text | The name looked up, when a lookup happened. |
 | `network.protocol.version` | text | The HTTP version to the vendor: `1.1` or `2`. Only when the vendor replied. |
 | `http.request.body.size` | whole number | Bytes sent to the vendor. |
 | `http.response.body.size` | whole number | Bytes received from the vendor. Only when the vendor replied. |
@@ -130,7 +115,6 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 | `http.request.header.<name>` | list of text | Allowed request headers, name in lower case. |
 | `http.response.header.<name>` | list of text | Allowed reply headers, name in lower case. |
 | `hotline.client.cancelled` | true or false | The app gave up before the vendor answered. |
-| `hotline.connection.reused` | true or false | The call used a connection that was already open. |
 | `hotline.config.version` | text | The config's `version`, a `+`, and the first 12 hex characters of a SHA-256 over the config, its specs and overlays, such as `2026-10-31.2+a3f9c21e07b4`. |
 | `hotline.schema.*` | see below | What the check against the spec found. |
 | any name the spec gives | text, number, or true or false | A body field or call header the spec marks `x-hotline-record`, such as `messaging.destination.name` for SQS's `QueueUrl` and `messaging.operation.name` for its `X-Amz-Target`. Detail: [proxy-body-fields.md](proxy-body-fields.md). |
@@ -139,7 +123,7 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 
 ### The signature
 
-Every full record has `hotline.signature` and `hotline.signature_key_id`: an HMAC-SHA256 signature, with the integration's `fingerprintKey`, of everything else the record holds, sorted by name. Each body that passed is signed on its own, in `hotline.request.body.signature` and `hotline.response.body.signature`. Minimal records have none. Detail: [proxy-signatures.md](proxy-signatures.md).
+Every full record has `hotline.signature` and `hotline.signature_key_id`: an HMAC-SHA256 signature, with the integration's `fingerprintKey`, of everything else the record holds, sorted by name. Each body that passed is signed on its own, in `hotline.request.body.signature` and `hotline.response.body.signature`, and the call's trace in `hotline.trace.signature` ([proxy-traces.md](proxy-traces.md)). Minimal records have none. Detail: [proxy-signatures.md](proxy-signatures.md).
 
 ### Check results
 
@@ -182,7 +166,7 @@ Each problem is a map with these keys. It never holds a value from the call.
 
 A request the proxy reads and refuses still gets a minimal record, with `error.type=http_request_error`. `hotline.ingress` and `server.address` are there only when the proxy could work them out. The only timing is `hotline.timing.total_us`.
 
-A `CONNECT` tunnel whose TLS setup with the app fails gets a minimal record with the ID and host from the `CONNECT`, `http.request.method=CONNECT`, `hotline.ingress=connect`, `hotline.timing.total_us`, and `hotline.timing.app_tls_us` when it was measured. It has no status code, since no HTTP reply was sent.
+A `CONNECT` tunnel whose TLS setup with the app fails gets a minimal record with the ID and host from the `CONNECT`, `http.request.method=CONNECT`, `hotline.ingress=connect` and `hotline.timing.total_us`; its trace has the handshake when it was measured. It has no status code, since no HTTP reply was sent.
 
 Plain HTTP sent to a TLS port is a failed TLS setup, not a request, so it has no record.
 
@@ -196,12 +180,16 @@ Every record above also counts once here, refused calls and failed tunnels inclu
 
 There is no latency histogram and no pass or fail count: the control plane builds those from the records.
 
-## Signal 3: the proxy's own numbers
+## Signal 3: the trace of each call
+
+One trace per call, to every destination, with the same resource labels as the records: `hotline call` for the whole call, and under it a span for each step that happened, such as `prepare call`, `vendor call` with `dns lookup`, `tcp connect`, `vendor tls handshake`, `send call`, `wait for vendor` and `receive reply` under it, and `finish reply`. `hotline call` has the record's trace id and span id, and sits under the app's span when the app sent one. Spans hold nothing the record holds: only `hotline.connection.reused` on `vendor call` and `dns.question.name` on `dns lookup`. Detail: [proxy-traces.md](proxy-traces.md).
+
+## Signal 4: the proxy's own numbers
 
 Metrics about the proxy itself, sent only to the `telemetry` destination and never mixed with the records and counts above. Without a `telemetry` section, nothing of this is measured or sent. No number is split by integration, vendor, host or route, so their count stays small however many integrations there are.
 
 - Calls: `http.server.active_requests`, `http.server.request.duration` and `hotline.proxy.overhead`.
-- Sending to each destination: `otel.sdk.processor.log.queue.size`, `otel.sdk.processor.log.queue.capacity`, `otel.sdk.processor.log.processed` (with `error.type=queue_full` for dropped records), `otel.sdk.exporter.log.exported`, `otel.sdk.exporter.metric_data_point.exported` and `hotline.destination.state`.
+- Sending to each destination: `otel.sdk.processor.log.queue.size`, `otel.sdk.processor.log.queue.capacity`, `otel.sdk.processor.log.processed` (with `error.type=queue_full` for dropped records), `otel.sdk.exporter.log.exported`, `otel.sdk.exporter.metric_data_point.exported`, the same four for spans (`otel.sdk.processor.span.queue.size`, `otel.sdk.processor.span.queue.capacity`, `otel.sdk.processor.span.processed`, `otel.sdk.exporter.span.exported`) and `hotline.destination.state`.
 - Config and certificates: `hotline.config.info`, `hotline.config.reloads`, `hotline.config.reload.last_success`, `hotline.config.restart_needed`, `hotline.certificate.not_after` and `hotline.app_tls.failures`.
 - The Go runtime's standard set, such as `go.memory.used` and `go.goroutine.count`.
 
@@ -209,10 +197,9 @@ Any of them can be turned off with `telemetry.disable`. Units, labels and detail
 
 ## What is not sent
 
-- **Traces.** No spans at all. The spec plans an optional span per call, off by default.
 - **Bodies, cookies, `Authorization` and `Proxy-Authorization`.** Never sent, by design. Only the body fields a spec marks `x-hotline-record` are copied.
 - **The proxy's own log lines.** They go to standard error as JSON, not over OTLP.
 
 ## Where the spec and the code differ
 
-They match since 2026-10-31. Two things in the spec are not built yet: traces (an optional span per call), and `hotline.schema.skipped=overloaded`, which comes with the load test.
+They match since 2026-10-31. One thing in the spec is not built yet: `hotline.schema.skipped=overloaded`, which comes with the load test.

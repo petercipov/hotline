@@ -12,8 +12,8 @@ Feature: Building the request record
     And url.full holds the redacted address
     And url.template is /v2/customer_sessions/{customerSessionId}
     And server.address is api.talon.one and server.port is 443
-    And the allowed headers, phase timings, network and TLS fields are recorded
-    And hotline.client.cancelled, hotline.connection.reused and hotline.config.version are recorded
+    And the allowed headers, the total timing, network and TLS fields are recorded
+    And hotline.client.cancelled and hotline.config.version are recorded
     And there is no error.type
 
   Scenario: The sample call from proxy-example
@@ -48,7 +48,7 @@ Feature: Building the request record
   Scenario Outline: Minimal record
     Given <call>
     When the call ends
-    Then the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields
+    Then the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and hotline.timing.total_us
     And hotline.integration.id is <id>
 
     Examples:

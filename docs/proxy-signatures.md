@@ -44,7 +44,7 @@ The proxy signs each body as it passes, with no copy and no size limit, so a bod
 ## Decisions (Peter, 2026-10-30 and 2026-10-31)
 
 1. **Sign what the record holds, never the original call.** The record is all a checker has.
-2. **Every field is signed**, timings and check results included.
+2. **Every field is signed**, timings and check results included. Since 2026-10-31 the timings are a trace, signed on its own in `hotline.trace.signature`, which the record's signature covers ([proxy-traces.md](proxy-traces.md)).
 3. **Each body is signed on its own**, in the record, and those signatures are covered by the record's signature (2026-10-31). Login headers are never in the record.
 4. **No list of names** (2026-10-31): the attributes are sorted by name. This replaces the RFC 9421 form with `hotline.signature_input` of 2026-10-30.
 5. **The key** is the integration's `fingerprintKey`, read from `{ file: path }` or `{ env: NAME }`; a key written in the config is refused. An integration without a key is signed with its ID, which is not secret, and the proxy logs a warning at start.

@@ -118,9 +118,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		transport: transport,
 		reqBody:   &tap{ReadCloser: r.Body, limit: keepFor(api), mac: macFor(api)},
 	}
-	traced, tracing := h.traced(id, r.Header, start)
-	c.trace = traced
-	c.appTLS, c.appTimed = a.handshakeTime()
+	traced, parent, tracing := h.traced(id, r.Header, start)
+	c.trace, c.parent, c.vendorSpan = traced, parent, tracectx.NewSpanID()
+	c.appStart, c.appEnd, c.appTimed = a.handshakeTime()
 	r.Body = c.reqBody
 	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
 	defer cancel()
@@ -141,7 +141,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				pr.Out.Header.Del("Connection")
 			}
 			if tracing.Forward {
-				tracing.Format.Write(pr.Out.Header, traced)
+				// The vendor's own spans sit under the proxy's vendor call.
+				tracing.Format.Write(pr.Out.Header, traced.WithSpanID(c.vendorSpan))
 			}
 		},
 		Transport:     c,
@@ -257,19 +258,21 @@ func refuse(w http.ResponseWriter, status int) {
 
 // traced is a call's trace context: the app's trace id and flags, or a new
 // trace id, sampled, when the app sent none the proxy can read, and a new
-// span id for the proxy's own step. It comes with the integration's trace
-// settings.
-func (h *handler) traced(id string, header http.Header, start time.Time) (trace.SpanContext, config.Trace) {
+// span id for the proxy's call span. It comes with the app's span id, the
+// call span's parent, not valid when there is none, and with the
+// integration's trace settings.
+func (h *handler) traced(id string, header http.Header, start time.Time) (trace.SpanContext, trace.SpanID, config.Trace) {
 	settings := h.cfg.Load().Trace(id)
-	traceID, flags, ok := settings.Format.Read(header)
+	app, ok := settings.Format.Read(header)
+	traceID, flags, parent := app.TraceID(), app.TraceFlags(), app.SpanID()
 	if !ok {
-		traceID, flags = settings.Format.NewTraceID(start), trace.FlagsSampled
+		traceID, flags, parent = settings.Format.NewTraceID(start), trace.FlagsSampled, trace.SpanID{}
 	}
 	return trace.NewSpanContext(trace.SpanContextConfig{
 		TraceID:    traceID,
 		SpanID:     tracectx.NewSpanID(),
 		TraceFlags: flags,
-	}), settings
+	}), parent, settings
 }
 
 // recordContext carries a record's trace context to the exporters, which
@@ -307,8 +310,12 @@ type call struct {
 	cfg     *config.Config
 	start   time.Time
 	ingress string
-	// trace is the call's trace context, which its record carries.
-	trace trace.SpanContext
+	// trace is the call's trace context, which its record carries; its
+	// span id is the call span's. parent is the app's span, the call
+	// span's parent, and vendorSpan the id of the vendor call's span.
+	trace      trace.SpanContext
+	parent     trace.SpanID
+	vendorSpan trace.SpanID
 	// target is the vendor address the app named.
 	target  *url.URL
 	id      string
@@ -318,9 +325,11 @@ type call struct {
 	port    string
 	in      *http.Request
 	timeout time.Duration
-	// appTLS is how long setting up TLS with the app took, when this is
-	// the first call on its connection and appTimed is set.
-	appTLS   time.Duration
+	// appStart and appEnd are when setting up TLS with the app started
+	// and ended, when this is the first call on its connection and
+	// appTimed is set.
+	appStart time.Time
+	appEnd   time.Time
 	appTimed bool
 	// transport makes the vendor call.
 	transport *http.Transport
@@ -337,6 +346,10 @@ type call struct {
 	firstByte time.Time
 	vendorIn  time.Time
 	vendorOut time.Time
+	// gotAt is when the call had its connection, and wrote when the
+	// call was fully sent on it.
+	gotAt     time.Time
+	wrote     time.Time
 	connected bool
 	reused    bool
 	peer      string
@@ -344,6 +357,8 @@ type call struct {
 	resp      *http.Response
 	status    int
 	errorType string
+	// failedStep is the step the call failed in, if one did.
+	failedStep string
 }
 
 type phase string
@@ -358,9 +373,10 @@ const (
 // RoundTrip makes the vendor call. It waits for the vendor's answer up to
 // vendorTimeout; the app giving up does not stop it.
 func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
+	c.mark(func() { c.vendorIn = c.h.clock.Now() })
 	c.times = map[phase][2]time.Time{}
 	trace := &httptrace.ClientTrace{
-		GetConn:              func(string) { c.mark(func() { c.vendorIn = c.h.clock.Now(); c.phase = phaseReply }) },
+		GetConn:              func(string) { c.mark(func() { c.phase = phaseReply }) },
 		DNSStart:             func(i httptrace.DNSStartInfo) { c.lookup(i.Host) },
 		DNSDone:              func(httptrace.DNSDoneInfo) { c.end(phaseDNS) },
 		ConnectStart:         func(string, string) { c.begin(phaseConnect) },
@@ -368,6 +384,7 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 		TLSHandshakeStart:    func() { c.begin(phaseTLS) },
 		TLSHandshakeDone:     func(tls.ConnectionState, error) { c.end(phaseTLS) },
 		GotConn:              c.gotConn,
+		WroteRequest:         c.wroteRequest,
 		GotFirstResponseByte: func() { c.mark(func() { c.firstByte = c.h.clock.Now() }) },
 	}
 	ctx := context.WithValue(req.Context(), deadlineKey{}, c.h.clock.Now().Add(c.timeout))
@@ -448,6 +465,7 @@ func (c *call) gotConn(info httptrace.GotConnInfo) {
 	c.mark(func() {
 		c.phase = phaseReply
 		c.connected = true
+		c.gotAt = c.h.clock.Now()
 		c.reused = info.Reused
 		if info.Reused {
 			// A lookup or connect already started was for a connection
@@ -459,6 +477,14 @@ func (c *call) gotConn(info httptrace.GotConnInfo) {
 	})
 }
 
+// wroteRequest notes when the call was fully sent. A call that broke off
+// while it was sent was never fully sent.
+func (c *call) wroteRequest(info httptrace.WroteRequestInfo) {
+	if info.Err == nil {
+		c.mark(func() { c.wrote = c.h.clock.Now() })
+	}
+}
+
 // fail answers the app when the proxy could not get a reply from the
 // vendor, with the RFC 9209 error name in Proxy-Status.
 func (c *call) fail(w http.ResponseWriter, _ *http.Request, err error) {
@@ -466,9 +492,31 @@ func (c *call) fail(w http.ResponseWriter, _ *http.Request, err error) {
 	status, name := classify(c.phase, c.timedOut.Load(), err)
 	c.status, c.errorType = status, name
 	c.vendorOut = c.h.clock.Now()
+	// A call refused before the vendor call started, such as one asking
+	// to switch to a protocol with a broken name, starts it as it fails.
+	c.vendorIn = orTime(c.vendorIn, c.vendorOut)
+	if !errors.Is(err, errProhibited) {
+		c.failedStep = c.step()
+	}
 	c.mu.Unlock()
 	w.Header().Set("Proxy-Status", "hotline; error="+name)
 	w.WriteHeader(status)
+}
+
+// step is the name of the step the call is in.
+func (c *call) step() string {
+	switch {
+	case c.phase == phaseDNS:
+		return "dns lookup"
+	case c.phase == phaseConnect:
+		return "tcp connect"
+	case c.phase == phaseTLS:
+		return "vendor tls handshake"
+	case c.wrote.IsZero():
+		return "send call"
+	}
+	// No reply came, or the proxy would not be here.
+	return "wait for vendor"
 }
 
 func classify(p phase, timedOut bool, err error) (int, string) {

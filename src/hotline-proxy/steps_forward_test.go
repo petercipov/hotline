@@ -425,8 +425,8 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		if firstByte, _ := secondsOf(record["hotline.timing.first_byte_us"]); firstByte < 0.3 {
-			return failf("first_byte is %v, want at least the vendor's 0.3 seconds", record["hotline.timing.first_byte_us"])
+		if total, _ := secondsOf(record["hotline.timing.total_us"]); total < 0.3 {
+			return failf("total is %v, want at least the vendor's 0.3 seconds", record["hotline.timing.total_us"])
 		}
 		return has(record, "http.response.status_code", 200)
 	})

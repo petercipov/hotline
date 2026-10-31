@@ -3,8 +3,8 @@
 // trace is all the steps of one request, across services, tied together by
 // one trace id; a span is one of those steps.
 //
-// Only the trace id and the flags are read. The app's span id is checked
-// but not kept (Peter, 2026-10-31).
+// The app's span id is read too: the proxy's own spans sit under it. It is
+// not on the record (Peter, 2026-10-31).
 package tracectx
 
 import (
@@ -44,9 +44,11 @@ func Parse(name string) (Format, bool) {
 	return "", false
 }
 
-// Read finds the app's trace id and flags. It says false when the headers
-// are missing or broken in any way, so the proxy makes a new trace id.
-func (f Format) Read(h http.Header) (trace.TraceID, trace.TraceFlags, bool) {
+// Read finds the app's trace id, span id and flags. It says false when the
+// headers are missing or broken in any way, so the proxy makes a new trace
+// id. The span id is not valid when the app sent none: X-Ray may leave it
+// out.
+func (f Format) Read(h http.Header) (trace.SpanContext, bool) {
 	switch f {
 	case B3:
 		return readB3(h)
@@ -103,24 +105,24 @@ func NewSpanID() trace.SpanID {
 
 // readW3C reads "traceparent: 00-<trace id>-<span id>-<flags>". A later
 // version may add more parts at the end.
-func readW3C(h http.Header) (trace.TraceID, trace.TraceFlags, bool) {
+func readW3C(h http.Header) (trace.SpanContext, bool) {
 	value, ok := one(h, "traceparent")
 	parts := strings.Split(value, "-")
 	if !ok || len(parts) < 4 || !isHex(parts[0], 2) || parts[0] == "ff" || (parts[0] == "00" && len(parts) != 4) ||
 		!isID(parts[2], 16) || !isHex(parts[3], 2) {
-		return trace.TraceID{}, 0, false
+		return trace.SpanContext{}, false
 	}
-	return traceID(parts[1], parts[3])
+	return spanContext(parts[1], parts[2], parts[3])
 }
 
 // readB3 reads "b3: <trace id>-<span id>[-<sampled>[-<parent span id>]]",
 // or, without it, the X-B3-* headers. A trace id may be 16 hex digits long.
-func readB3(h http.Header) (trace.TraceID, trace.TraceFlags, bool) {
+func readB3(h http.Header) (trace.SpanContext, bool) {
 	var id, span, sampled, debug string
 	if value, ok := one(h, "b3"); ok {
 		parts := strings.Split(value, "-")
 		if len(parts) < 2 || len(parts) > 4 || (len(parts) == 4 && !isID(parts[3], 16)) {
-			return trace.TraceID{}, 0, false
+			return trace.SpanContext{}, false
 		}
 		parts = append(parts, "")
 		id, span, sampled = parts[0], parts[1], parts[2]
@@ -138,14 +140,14 @@ func readB3(h http.Header) (trace.TraceID, trace.TraceFlags, bool) {
 		id = strings.Repeat("0", 16) + id
 	}
 	if !known || !isID(span, 16) {
-		return trace.TraceID{}, 0, false
+		return trace.SpanContext{}, false
 	}
-	return traceID(id, flags)
+	return spanContext(id, span, flags)
 }
 
 // readXRay reads "X-Amzn-Trace-Id: Root=1-<time>-<id>;Parent=<span id>;Sampled=1",
 // its parts in any order, and others among them.
-func readXRay(h http.Header) (trace.TraceID, trace.TraceFlags, bool) {
+func readXRay(h http.Header) (trace.SpanContext, bool) {
 	value, _ := one(h, "X-Amzn-Trace-Id")
 	parts := map[string]string{}
 	for _, part := range strings.Split(value, ";") {
@@ -156,43 +158,46 @@ func readXRay(h http.Header) (trace.TraceID, trace.TraceFlags, bool) {
 	parent, hasParent := parts["Parent"]
 	flags, known := map[string]string{"": "00", "0": "00", "?": "00", "1": "01"}[parts["Sampled"]]
 	if len(root) != 3 || !known || root[0] != "1" || !isHex(root[1], 8) || (hasParent && !isID(parent, 16)) {
-		return trace.TraceID{}, 0, false
+		return trace.SpanContext{}, false
 	}
-	return traceID(root[1]+root[2], flags)
+	return spanContext(root[1]+root[2], parent, flags)
 }
 
 // readJaeger reads "uber-trace-id: <trace id>:<span id>:<parent>:<flags>",
 // which may be URL-encoded. The ids may leave out leading zeros. The flags
 // are sampled when either the sampled or the debug bit is set.
-func readJaeger(h http.Header) (trace.TraceID, trace.TraceFlags, bool) {
+func readJaeger(h http.Header) (trace.SpanContext, bool) {
 	value, _ := one(h, "uber-trace-id")
 	value, err := url.PathUnescape(value)
 	parts := strings.Split(value, ":")
 	if err != nil || len(parts) != 4 || len(parts[0]) > 32 || len(parts[1]) > 16 ||
 		!isID(strings.Repeat("0", 16-len(parts[1]))+parts[1], 16) {
-		return trace.TraceID{}, 0, false
+		return trace.SpanContext{}, false
 	}
 	bits, err := strconv.ParseUint(parts[3], 16, 8)
 	if err != nil {
-		return trace.TraceID{}, 0, false
+		return trace.SpanContext{}, false
 	}
 	flags := "00"
 	if bits&3 != 0 {
 		flags = "01"
 	}
-	return traceID(strings.Repeat("0", 32-len(parts[0]))+parts[0], flags)
+	return spanContext(strings.Repeat("0", 32-len(parts[0]))+parts[0], strings.Repeat("0", 16-len(parts[1]))+parts[1], flags)
 }
 
-// traceID turns a trace id and flags, both in hex, into their values.
-func traceID(id, flags string) (trace.TraceID, trace.TraceFlags, bool) {
+// spanContext turns a trace id, a span id and flags, all in hex, into their
+// values. An empty span id stays not valid.
+func spanContext(id, span, flags string) (trace.SpanContext, bool) {
 	var t trace.TraceID
 	if !isID(id, 32) {
-		return t, 0, false
+		return trace.SpanContext{}, false
 	}
+	var s trace.SpanID
 	var f [1]byte
 	_, _ = hex.Decode(t[:], []byte(id))
+	_, _ = hex.Decode(s[:], []byte(span))
 	_, _ = hex.Decode(f[:], []byte(flags))
-	return t, trace.TraceFlags(f[0]), true
+	return trace.NewSpanContext(trace.SpanContextConfig{TraceID: t, SpanID: s, TraceFlags: trace.TraceFlags(f[0]), Remote: true}), true
 }
 
 // one is a header's value when the call holds it exactly once.

@@ -42,7 +42,7 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return has(record, "server.port", 443)
 	})
-	sc.Step(`^the allowed headers, phase timings, network and TLS fields are recorded$`, func() error {
+	sc.Step(`^the allowed headers, the total timing, network and TLS fields are recorded$`, func() error {
 		record, err := w.lastRecord()
 		if err != nil {
 			return err
@@ -50,14 +50,11 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 		if err := has(record, "http.request.header.content-type", []string{"application/json"}); err != nil {
 			return err
 		}
-		return hasAll(record, "http.response.header.x-request-id",
-			"hotline.timing.dns_us", "hotline.timing.connect_us", "hotline.timing.tls_us", "hotline.timing.first_byte_us",
-			"hotline.timing.total_us", "hotline.timing.proxy_request_us", "hotline.timing.proxy_response_us",
-			"network.peer.address", "network.protocol.version", "tls.protocol.version", "tls.server.not_after",
+		return hasAll(record, "http.response.header.x-request-id", "hotline.timing.total_us", "network.peer.address", "network.protocol.version", "tls.protocol.version", "tls.server.not_after",
 			"http.request.body.size", "http.response.body.size")
 	})
-	sc.Step(`^hotline.client.cancelled, hotline.connection.reused and hotline.config.version are recorded$`, func() error {
-		return w.lastHasAll("hotline.client.cancelled", "hotline.connection.reused", "hotline.config.version")
+	sc.Step(`^hotline.client.cancelled and hotline.config.version are recorded$`, func() error {
+		return w.lastHasAll("hotline.client.cancelled", "hotline.config.version")
 	})
 	sc.Step(`^there are no (\S+) or (\S+)$`, func(first, second string) error {
 		record, err := w.lastRecord()
@@ -118,7 +115,7 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and the hotline.timing fields$`, func() error {
+	sc.Step(`^the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and hotline.timing.total_us$`, func() error {
 		record, err := w.lastRecord()
 		if err != nil {
 			return err
@@ -128,7 +125,7 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 			"http.request.method": true, "http.response.status_code": true, "error.type": true,
 		}
 		for key := range record {
-			if !allowed[key] && !strings.HasPrefix(key, "hotline.timing.") {
+			if !allowed[key] && key != "hotline.timing.total_us" {
 				return failf("the minimal record has %s", key)
 			}
 		}

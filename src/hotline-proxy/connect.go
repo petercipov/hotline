@@ -25,8 +25,11 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"hotline-proxy/internal/config"
+	"hotline-proxy/internal/export"
+	"hotline-proxy/internal/tracectx"
 )
 
 // tunnel is what a CONNECT named: the vendor host and port, and the
@@ -145,13 +148,16 @@ func (h *handler) tunnelFailed(r *http.Request, start time.Time, t *tunnel, a *a
 		semconv.ServerAddress(t.host),
 		semconv.HTTPRequestMethodKey.String(r.Method),
 		semconv.ErrorTypeKey.String(errorType),
-		attribute.Int64("hotline.timing.total_us", h.clock.Now().Sub(start).Microseconds()),
 	}
-	if took, timed := a.handshakeTime(); timed {
-		attrs = append(attrs, attribute.Int64("hotline.timing.app_tls_us", took.Microseconds()))
+	end := h.clock.Now()
+	traced, parent, _ := h.traced(t.id, r.Header, start)
+	spans := []export.Span{callSpan(traced, parent, start, end, true)}
+	if from, to, timed := a.handshakeTime(); timed {
+		spans = append(spans, export.Span{ID: tracectx.NewSpanID(), Parent: traced.SpanID(), Name: "app tls handshake",
+			Kind: trace.SpanKindInternal, Start: from, End: to, Failed: true})
 	}
-	traced, _ := h.traced(t.id, r.Header, start)
-	h.record(r, traced, start, attrs)
+	attrs = append(attrs, attribute.Int64("hotline.timing.total_us", end.Sub(start).Microseconds()))
+	h.record(r, finished{sc: traced, at: start, attrs: attrs, spans: spans})
 }
 
 // find works out the vendor address of a call inside the tunnel. The call

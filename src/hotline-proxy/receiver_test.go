@@ -17,6 +17,7 @@ import (
 	coltrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	common "go.opentelemetry.io/proto/otlp/common/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -43,6 +44,24 @@ type receivedRecord struct {
 	traceID string
 	spanID  string
 	flags   uint32
+}
+
+// receivedSpan is one span the fake OTLP receiver got, the ids in hex.
+type receivedSpan struct {
+	traceID string
+	spanID  string
+	// parent is empty for a span with no parent.
+	parent string
+	name   string
+	// kind is server, client or internal.
+	kind string
+	// start and end are in nanoseconds since 1970.
+	start int64
+	end   int64
+	// status is unset, ok or error.
+	status   string
+	attrs    map[string]any
+	resource map[string]any
 }
 
 // receivedCount is one data point of the hotline.requests counter.
@@ -117,7 +136,7 @@ type receiver struct {
 	points      []receivedPoint
 	histograms  int
 	otherMetric []string
-	spanCount   int
+	spanList    []receivedSpan
 	// logsHeld counts log exports that are waiting on hold.
 	logsHeld int
 	// hold, while open, keeps every export waiting.
@@ -171,7 +190,7 @@ func newReceiverWith(setup receiverSetup) *receiver {
 	return r
 }
 
-// ServeHTTP is the HTTP side: protobuf exports on /v1/logs and /v1/metrics,
+// ServeHTTP is the HTTP side: protobuf exports on /v1/logs, /v1/metrics and /v1/traces,
 // after any path the endpoint has.
 func (r *receiver) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	logs := strings.HasSuffix(req.URL.Path, "/v1/logs")
@@ -223,6 +242,13 @@ func (r *receiver) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 		reply, _ = r.Export(req.Context(), in)
+	case strings.HasSuffix(req.URL.Path, "/v1/traces"):
+		in := &coltrace.ExportTraceServiceRequest{}
+		if proto.Unmarshal(data, in) != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		reply, _ = r.exportTraces(req.Context(), in)
 	case strings.HasSuffix(req.URL.Path, "/v1/metrics"):
 		in := &colmetrics.ExportMetricsServiceRequest{}
 		if proto.Unmarshal(data, in) != nil {
@@ -412,21 +438,50 @@ type traceService struct {
 	*receiver
 }
 
-func (t traceService) Export(_ context.Context, req *coltrace.ExportTraceServiceRequest) (*coltrace.ExportTraceServiceResponse, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+func (t traceService) Export(ctx context.Context, req *coltrace.ExportTraceServiceRequest) (*coltrace.ExportTraceServiceResponse, error) {
+	t.sawGRPC(ctx, false)
+	return t.exportTraces(ctx, req)
+}
+
+func (r *receiver) exportTraces(ctx context.Context, req *coltrace.ExportTraceServiceRequest) (*coltrace.ExportTraceServiceResponse, error) {
+	r.wait(ctx)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	kinds := map[tracepb.Span_SpanKind]string{
+		tracepb.Span_SPAN_KIND_SERVER: "server", tracepb.Span_SPAN_KIND_CLIENT: "client",
+		tracepb.Span_SPAN_KIND_INTERNAL: "internal", tracepb.Span_SPAN_KIND_PRODUCER: "producer",
+		tracepb.Span_SPAN_KIND_CONSUMER: "consumer",
+	}
+	statuses := map[tracepb.Status_StatusCode]string{
+		tracepb.Status_STATUS_CODE_UNSET: "unset", tracepb.Status_STATUS_CODE_OK: "ok", tracepb.Status_STATUS_CODE_ERROR: "error",
+	}
 	for _, rs := range req.GetResourceSpans() {
+		res := values(rs.GetResource().GetAttributes())
 		for _, ss := range rs.GetScopeSpans() {
-			t.spanCount += len(ss.GetSpans())
+			for _, s := range ss.GetSpans() {
+				r.spanList = append(r.spanList, receivedSpan{
+					traceID:  hex.EncodeToString(s.GetTraceId()),
+					spanID:   hex.EncodeToString(s.GetSpanId()),
+					parent:   hex.EncodeToString(s.GetParentSpanId()),
+					name:     s.GetName(),
+					kind:     kinds[s.GetKind()],
+					start:    int64(s.GetStartTimeUnixNano()), //nolint:gosec // nanoseconds since 1970 fit until 2262
+					end:      int64(s.GetEndTimeUnixNano()),   //nolint:gosec // as above
+					status:   statuses[s.GetStatus().GetCode()],
+					attrs:    values(s.GetAttributes()),
+					resource: res,
+				})
+			}
 		}
 	}
 	return &coltrace.ExportTraceServiceResponse{}, nil
 }
 
-func (r *receiver) spans() int {
+// spans are every span the receiver got, in the order they came.
+func (r *receiver) spans() []receivedSpan {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.spanCount
+	return append([]receivedSpan(nil), r.spanList...)
 }
 
 // waitForLogsHeld waits until a log export is held.

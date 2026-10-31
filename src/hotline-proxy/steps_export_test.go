@@ -114,7 +114,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^standard names come from the semconv constants, such as http.request.method and url.full$`, func() error {
 		return w.lastHasAll("http.request.method", "url.full", "url.scheme", "server.address", "server.port",
 			"network.peer.address", "network.protocol.version", "http.request.body.size", "http.response.body.size",
-			"tls.protocol.version", "tls.server.not_after", "dns.question.name")
+			"tls.protocol.version", "tls.server.not_after")
 	})
 	sc.Step(`^every other field has the exact hotline. name from the spec$`, func() error {
 		record, err := w.lastRecord()
@@ -124,11 +124,9 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		standard := []string{"http.request.method", "url.full", "url.scheme", "url.template", "server.address",
 			"server.port", "network.peer.address", "network.protocol.version", "http.response.status_code",
 			"error.type", "http.request.body.size", "http.response.body.size", "tls.protocol.version",
-			"tls.server.not_after", "dns.question.name"}
-		hotline := []string{"hotline.integration.id", "hotline.ingress", "hotline.timing.dns_us",
-			"hotline.timing.connect_us", "hotline.timing.tls_us", "hotline.timing.first_byte_us", "hotline.timing.total_us",
-			"hotline.timing.proxy_request_us", "hotline.timing.proxy_response_us", "hotline.client.cancelled",
-			"hotline.connection.reused", "hotline.config.version", "hotline.schema.request.errors",
+			"tls.server.not_after"}
+		hotline := []string{"hotline.integration.id", "hotline.ingress", "hotline.timing.total_us",
+			"hotline.client.cancelled", "hotline.config.version", "hotline.trace.signature", "hotline.schema.request.errors",
 			"hotline.schema.response.errors", "hotline.schema.request.errors_total", "hotline.schema.response.errors_total",
 			"hotline.schema.skipped", "hotline.signature", "hotline.signature_key_id",
 			"hotline.request.body.signature", "hotline.response.body.signature"}
@@ -150,7 +148,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		checks := map[string]string{
 			"http.response.status_code": "int64", "server.port": "int64", "hotline.timing.total_us": "int64",
-			"hotline.connection.reused": "bool", "hotline.client.cancelled": "bool",
+			"hotline.client.cancelled":         "bool",
 			"http.request.header.content-type": "[]interface {}", "url.full": "string",
 		}
 		for key, kind := range checks {
@@ -366,14 +364,6 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return w.defaultCall()
 	})
-	sc.Step(`^it sends no trace spans$`, func() error {
-		w.settle()
-		if n := w.receivers[0].spans(); n > 0 {
-			return failf("the proxy sent %d spans", n)
-		}
-		return nil
-	})
-
 	sc.Step(`^records waiting in the queue$`, func() error {
 		w.exportInterval = time.Hour
 		return w.defaultCall()

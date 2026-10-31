@@ -178,7 +178,7 @@ func telemetrySteps(sc *godog.ScenarioContext, w *world) {
 			return nil
 		})
 	})
-	sc.Step(`^(\S+) counts (\d+) records? with (no|an) error.type (?:(\S+) )?for that destination$`,
+	sc.Step(`^(\S+) counts (\d+) (?:records?|spans?) with (no|an) error.type (?:(\S+) )?for that destination$`,
 		func(name string, want int, which, errorType string) error {
 			return w.eventually(func() error {
 				var got float64

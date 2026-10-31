@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -94,11 +95,10 @@ func (o *own) started(r *http.Request, ingress string) func() {
 }
 
 // ended measures a finished call from its record: its total time, and the
-// proxy's own part of it once the call got as far as the vendor.
-func (o *own) ended(r *http.Request, attrs []attribute.KeyValue) {
+// proxy's own part of it, overhead, once the call reached the vendor.
+func (o *own) ended(r *http.Request, attrs []attribute.KeyValue, overhead time.Duration, reached bool) {
 	labels := []attribute.KeyValue{semconv.URLScheme(appScheme(r))}
-	var total, proxyUS int64
-	reached := false
+	var total int64
 	var ingress attribute.KeyValue
 	for _, kv := range attrs {
 		switch kv.Key {
@@ -111,17 +111,12 @@ func (o *own) ended(r *http.Request, attrs []attribute.KeyValue) {
 			labels = append(labels, kv)
 		case "hotline.timing.total_us":
 			total = kv.Value.AsInt64()
-		case "hotline.timing.proxy_request_us":
-			reached = true
-			proxyUS += kv.Value.AsInt64()
-		case "hotline.timing.proxy_response_us":
-			proxyUS += kv.Value.AsInt64()
 		}
 	}
 	ctx := context.Background()
 	o.duration.Record(ctx, float64(total)/1e6, metric.WithAttributes(labels...))
 	if reached {
-		o.overhead.Record(ctx, float64(proxyUS)/1e6, metric.WithAttributes(ingress))
+		o.overhead.Record(ctx, float64(overhead.Microseconds())/1e6, metric.WithAttributes(ingress))
 	}
 }
 

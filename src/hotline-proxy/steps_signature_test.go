@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -112,6 +114,8 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 			changed.attrs["hotline.integration.id"] = "talon-shop-b"
 		case "shop.order.item is changed":
 			changed.attrs["shop.order.item"] = "A2"
+		case "hotline.trace.signature is changed":
+			changed.attrs["hotline.trace.signature"] = hmacOf([]byte("{}"))
 		case "hotline.request.body.signature is changed":
 			changed.attrs["hotline.request.body.signature"] = hmacOf([]byte("{}"))
 		case "an attribute is added":
@@ -128,6 +132,64 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the signature no longer checks out$`, func() error {
 		if checkSignature(changed, signingKey) == nil {
 			return failf("the changed record still checks out")
+		}
+		return nil
+	})
+	var changedTrace callTrace
+	sc.Step(`^the record has (no )?hotline.trace.signature$`, func(no string) error {
+		record, err := w.lastRecord()
+		if err != nil {
+			return err
+		}
+		if no != "" {
+			return hasNo(record, "hotline.trace.signature")
+		}
+		return hasAll(record, "hotline.trace.signature")
+	})
+	sc.Step(`^the trace signature checks out when rebuilt from the spans alone, with the key$`, func() error {
+		t, err := w.lastTrace()
+		if err != nil {
+			return err
+		}
+		return checkTraceSignature(t, signingKey)
+	})
+	sc.Step(`^(.+) in the received trace$`, func(change string) error {
+		t, err := w.lastTrace()
+		if err != nil {
+			return err
+		}
+		changedTrace = callTrace{record: t.record}
+		for _, s := range t.spans {
+			s.attrs = maps.Clone(s.attrs)
+			changedTrace.spans = append(changedTrace.spans, s)
+		}
+		last := len(changedTrace.spans) - 1
+		victim := &changedTrace.spans[last]
+		switch change {
+		case "a span's end is changed":
+			victim.end++
+		case "a span's name is changed":
+			victim.name += " too"
+		case "a span's parent is changed":
+			victim.parent = strings.Repeat("ab", 8)
+		case "a span's status is changed":
+			victim.status = map[string]string{"error": "unset", "unset": "error"}[victim.status]
+		case "an attribute is changed":
+			for i, s := range changedTrace.spans {
+				if s.name == "vendor call" {
+					changedTrace.spans[i].attrs["hotline.connection.reused"] = s.attrs["hotline.connection.reused"] != true
+				}
+			}
+		case "a span is removed":
+			changedTrace.spans = changedTrace.spans[:last]
+		default:
+			return godog.ErrPending
+		}
+		return nil
+	})
+	sc.Step(`^the trace signature no longer checks out$`, func() error {
+		if checkTraceSignature(changedTrace, signingKey) == nil {
+			return failf("the changed trace still checks out")
 		}
 		return nil
 	})
@@ -197,6 +259,48 @@ func checkSignature(r receivedRecord, key string) error {
 	mac.Write([]byte(strings.Join(lines, "\n")))
 	if want := base64.StdEncoding.EncodeToString(mac.Sum(nil)); signature != want {
 		return failf("the signature %q does not check out", signature)
+	}
+	return nil
+}
+
+// checkTraceSignature rebuilds a trace's signed text from its spans as
+// docs/proxy-traces.md describes it, and checks it against the record's
+// hotline.trace.signature with the key.
+func checkTraceSignature(t callTrace, key string) error {
+	signature, _ := t.record.attrs["hotline.trace.signature"].(string)
+	spans := slices.Clone(t.spans)
+	sort.Slice(spans, func(i, j int) bool {
+		if spans[i].start != spans[j].start {
+			return spans[i].start < spans[j].start
+		}
+		return spans[i].spanID < spans[j].spanID
+	})
+	line := func(name string, v any) string {
+		// The receiver's values are plain types and finite numbers.
+		value, _ := json.Marshal(v) //nolint:errchkjson // see above
+		return strconv.Quote(name) + ": " + string(value)
+	}
+	lines := []string{line("trace.trace_id", t.record.traceID)}
+	for _, s := range spans {
+		lines = append(lines,
+			line("span.span_id", s.spanID),
+			line("span.parent_span_id", s.parent),
+			line("span.name", s.name),
+			line("span.kind", s.kind),
+			line("span.start_time", s.start),
+			line("span.end_time", s.end),
+			line("span.status", s.status))
+		var attrs []string
+		for name, v := range s.attrs {
+			attrs = append(attrs, line(name, v))
+		}
+		sort.Strings(attrs)
+		lines = append(lines, attrs...)
+	}
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(strings.Join(lines, "\n")))
+	if want := base64.StdEncoding.EncodeToString(mac.Sum(nil)); signature != want {
+		return failf("the trace signature %q does not check out", signature)
 	}
 	return nil
 }

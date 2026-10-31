@@ -8,7 +8,8 @@ Feature: Records carry the app's trace context
   The ids go in the log record's own fields, not in attributes:
   trace_id, span_id and flags, as OpenTelemetry defines them. A span is one
   step of a trace; the proxy's step gets a new span id of its own. The
-  app's span id is not recorded (Peter, 2026-10-31). The flags say whether
+  app's span id is not on the record; it is the parent of the call's
+  trace (timing.feature). The flags say whether
   the trace is sampled, that is kept by whoever records traces.
 
   Each integration picks the format its app sends with traceFormat: w3c,
@@ -16,7 +17,8 @@ Feature: Records carry the app's trace context
   cannot read it, the proxy makes a new one, so every record has one.
 
   The proxy only reads the trace headers. With traceForward on, which is
-  off by default, it also sends its own trace id and span id to the vendor.
+  off by default, it also sends its own trace id and the "vendor call" span's id to the
+  vendor, so the vendor's own spans sit under that step.
 
   The trace id, span id and flags are signed with the rest of the record:
   see signature.feature.
@@ -137,7 +139,7 @@ Feature: Records carry the app's trace context
     Scenario Outline: With traceForward on, the vendor gets the proxy's own step
       Given the integration's traceForward is on, with traceFormat <format>
       When the app sends GET /orders with "<headers>"
-      Then the vendor gets <sent>, with the record's trace_id and span_id
+      Then the vendor gets <sent>, with the record's trace_id and the "vendor call" span's id
       And the vendor gets none of <gone>
 
       Examples:
@@ -153,4 +155,4 @@ Feature: Records carry the app's trace context
     Scenario: With traceForward on and no trace id from the app, the vendor gets the new one
       Given the integration's traceForward is on, with traceFormat w3c
       When the app sends GET /orders
-      Then the vendor gets traceparent: 00-TRACE-SPAN-01, with the record's trace_id and span_id
+      Then the vendor gets traceparent: 00-TRACE-SPAN-01, with the record's trace_id and the "vendor call" span's id
