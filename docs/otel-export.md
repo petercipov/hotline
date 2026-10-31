@@ -215,8 +215,4 @@ Any of them can be turned off with `telemetry.disable`. Units, labels and detail
 
 ## Where the spec and the code differ
 
-1. **Error type examples.** The spec's table gives `timeout` and `dns` as examples; the real values are longer, such as `dns_timeout` (table above).
-2. **Minimal record and status code.** The spec says every minimal record has `http.response.status_code`. A failed tunnel's record has none.
-3. **`hotline.schema.skipped=overloaded`.** In the spec's list, never set by the code.
-4. **Send timing.** One second and ten seconds are fixed in the program; the spec does not mention them and they are not in the config.
-5. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces. The body fingerprints are replaced by the record's signature (Peter, 2026-10-30).
+They match since 2026-10-31. Two things in the spec are not built yet: traces (an optional span per call), and `hotline.schema.skipped=overloaded`, which comes with the load test.
