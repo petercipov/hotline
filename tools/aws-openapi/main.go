@@ -8,6 +8,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -16,12 +17,14 @@ import (
 	"hotline-tools/aws-openapi/smithy"
 )
 
+var errRecord = errors.New("not FIELD=NAME")
+
 func main() {
 	record := map[string]string{}
 	flag.Func("record", "FIELD=NAME: copy FIELD of every action's input into records as NAME", func(v string) error {
 		field, name, ok := strings.Cut(v, "=")
 		if !ok || field == "" || name == "" {
-			return fmt.Errorf("%q is not FIELD=NAME", v)
+			return fmt.Errorf("%w: %q", errRecord, v)
 		}
 		record[field] = name
 		return nil

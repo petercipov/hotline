@@ -34,7 +34,9 @@ var recordName = regexp.MustCompile(`^[A-Za-z0-9_.]+$`)
 
 // ownNames start the names of the attributes the proxy writes itself, so a
 // copied field can never pass for one of them.
-var ownNames = []string{"hotline.", "http.", "url.", "server.", "network.", "error.", "dns.", "tls.", "log."}
+func ownNames() []string {
+	return []string{"hotline.", "http.", "url.", "server.", "network.", "error.", "dns.", "tls.", "log."}
+}
 
 // fields finds the marked fields of a body schema. Only properties are
 // followed, through objects; a field inside a list has no one value, so
@@ -82,8 +84,8 @@ func (b *builder) mark(mark any, types []string, pointer string) (field, bool) {
 		problem = "must be a name, such as messaging.destination.name"
 	case !recordName.MatchString(name):
 		problem = fmt.Sprintf("names %q, but a name may only hold letters, digits, dots and underscores", name)
-	case slices.ContainsFunc(ownNames, func(own string) bool { return strings.HasPrefix(name, own) }):
-		problem = fmt.Sprintf("names %s, which starts like the proxy's own names (%s)", name, strings.Join(ownNames, " "))
+	case slices.ContainsFunc(ownNames(), func(own string) bool { return strings.HasPrefix(name, own) }):
+		problem = fmt.Sprintf("names %s, which starts like the proxy's own names (%s)", name, strings.Join(ownNames(), " "))
 	case len(types) == 0 || slices.ContainsFunc(types, func(t string) bool { return !slices.Contains([]string{"string", "number", "integer", "boolean"}, t) }):
 		problem = "must be on a field of text, a number, or true or false, with its type given"
 	}
