@@ -125,7 +125,7 @@ func (c *call) full() []attribute.KeyValue {
 		semconv.HTTPRequestBodySize(int(sent)),
 		attribute.Bool("hotline.client.cancelled", c.app.gone),
 		attribute.Bool("hotline.connection.reused", c.reused),
-		attribute.String("hotline.config.version", c.h.cfg.Version),
+		attribute.String("hotline.config.version", c.cfg.Label()),
 	}
 	if redacted.Template != "" {
 		attrs = append(attrs, semconv.URLFull(redacted.URLFull), semconv.URLTemplate(redacted.Template))

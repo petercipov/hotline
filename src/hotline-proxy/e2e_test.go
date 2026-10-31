@@ -151,7 +151,7 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 	sc.Step(`^the hotline-proxy program runs with "([^"]*)" and integration test-shop for the test vendor$`, func(flags string) error {
 		return p.run(strings.Fields(flags)...)
 	})
-	sc.Step(`^the program gets (SIGTERM|SIGINT)$`, p.signal)
+	sc.Step(`^the program gets (SIGTERM|SIGINT|SIGHUP)$`, p.signal)
 	sc.Step(`^the program gets (SIGTERM|SIGINT) again$`, p.signalAgain)
 	sc.Step(`^it exits with code (\d+)$`, func(code int) error {
 		return p.exitsWith(code, 30*time.Second)
@@ -285,6 +285,43 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 			return failf("the receiver got %d records, want 1", len(records))
 		}
 		return has(records[0].attrs, "hotline.integration.id", "test-shop")
+	})
+
+	// Reloading.
+	sc.Step(`^an app's call is in progress$`, func() error {
+		p.callInBackground()
+		select {
+		case <-p.arrived:
+			return nil
+		case <-time.After(5 * time.Second):
+			return failf("the call did not reach the test vendor")
+		}
+	})
+	sc.Step(`^the config's version changes to (\S+)$`, func(version string) error {
+		p.writeConfig(strings.Replace(p.config(false), "version: e2e-1\n", "version: "+version+"\n", 1))
+		return nil
+	})
+	sc.Step(`^within (\d+) seconds standard error says "(.*)"$`, func(seconds int, text string) error {
+		for deadline := time.Now().Add(time.Duration(seconds) * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+			if strings.Contains(p.stderr.String(), text) {
+				return nil
+			}
+		}
+		return failf("standard error does not say %q:\n%s", text, p.stderr.String())
+	})
+	sc.Step(`^the records carry the config versions (.+), in that order$`, func(list string) error {
+		records, _ := p.receiver.got()
+		want := strings.Split(strings.ReplaceAll(list, " and ", ", "), ", ")
+		if len(records) != len(want) {
+			return failf("the receiver got %d records, want %d", len(records), len(want))
+		}
+		for i, r := range records {
+			got, _ := r.attrs["hotline.config.version"].(string)
+			if !strings.HasPrefix(got, want[i]+"+") {
+				return failf("record %d carries hotline.config.version %q, want %s and a fingerprint", i+1, got, want[i])
+			}
+		}
+		return nil
 	})
 
 	// The health checks.
@@ -672,10 +709,7 @@ func (p *program) exitsWith(code int, limit time.Duration) error {
 }
 
 func (p *program) signal(name string) error {
-	sig := syscall.SIGTERM
-	if name == "SIGINT" {
-		sig = syscall.SIGINT
-	}
+	sig := map[string]syscall.Signal{"SIGTERM": syscall.SIGTERM, "SIGINT": syscall.SIGINT, "SIGHUP": syscall.SIGHUP}[name]
 	p.signalled = time.Now()
 	return p.process.Process.Signal(sig)
 }

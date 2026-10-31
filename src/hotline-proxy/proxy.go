@@ -88,6 +88,9 @@ type Proxy struct {
 	adminServed chan struct{}
 	// stopping is set from the first stop signal on, so /readyz says no.
 	stopping atomic.Bool
+	// appCert is the certificate of the proxy port, when it takes TLS.
+	appCert *certHolder
+	reload  *reloader
 }
 
 // Start loads the config, listens on its proxy address and serves calls
@@ -116,11 +119,11 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	sink := export.New(cfg.Exporters, o.RootCAs, export.Service{Version: o.Version, InstanceID: o.InstanceID},
 		export.Timing{Interval: o.ExportInterval, Timeout: o.ExportTimeout}, o.Logger)
 	h := &handler{
-		cfg:    cfg,
 		clock:  o.Clock,
 		logger: o.Logger,
 		sink:   sink,
 	}
+	h.cfg.Store(cfg)
 	if cfg.Connect != nil {
 		h.intercept = newInterceptor(cfg.Connect, o.Clock, o.Logger)
 	}
@@ -158,8 +161,11 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	if cfg.TLS != nil {
 		// The proxy sets up TLS itself, so the server sees plain
 		// connections.
-		port = tlsOnlyListener{Listener: listener, config: newAppCert(cfg.TLS, o.Clock, o.Logger).tlsConfig(), clock: o.Clock, logger: o.Logger}
+		p.appCert = newAppCert(cfg.TLS, o.Logger)
+		port = tlsOnlyListener{Listener: listener, config: p.appCert.tlsConfig(), clock: o.Clock, logger: o.Logger}
 	}
+	p.reload = &reloader{path: o.ConfigPath, clock: o.Clock, lookupEnv: o.LookupEnv, logger: o.Logger}
+	p.reload.seen = stat(cfg.Files)
 	go func() {
 		defer close(p.served)
 		_ = p.server.Serve(port)
@@ -174,7 +180,7 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 	for _, w := range cfg.Warnings {
 		o.Logger.Warn("config warning", "reason", w)
 	}
-	o.Logger.Info("hotline proxy started", "address", listener.Addr().String(), "config_version", cfg.Version)
+	o.Logger.Info("hotline proxy started", "address", listener.Addr().String(), "config_version", cfg.Label())
 	return p, nil
 }
 

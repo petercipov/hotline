@@ -77,12 +77,21 @@ Feature: TLS from apps to the proxy
     Given an app that trusts the test issuer
     And the app has a connection open to the proxy
     When the cert and key files are replaced with a second certificate
+    And the proxy checks its files
     Then a new connection gets the second certificate
     And the open connection still takes calls
+
+  Scenario: A reload with the same certificate keeps it
+    Given an app that trusts the test issuer
+    And the proxy is running
+    When the proxy is told to reload
+    Then a new connection still gets the first certificate
+    And the proxy does not log that a new TLS certificate is in use
 
   Scenario: A broken renewal keeps the old certificate
     Given an app that trusts the test issuer
     And the proxy is running
     When the key file is replaced with a key that does not belong to the certificate
+    And the proxy checks its files
     Then a new connection still gets the first certificate
-    And the proxy logs a warning that it kept the certificate
+    And the proxy logs a warning that the reload failed, naming listen.tls

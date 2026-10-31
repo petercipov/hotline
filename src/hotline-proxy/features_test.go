@@ -70,6 +70,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	overlaySteps(sc, w)
 	awsSteps(sc, w)
 	traceSteps(sc, w)
+	reloadSteps(sc, w)
 }
 
 var errCheck = errors.New("check failed")

@@ -3,6 +3,7 @@ package proxy_test
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,11 +21,19 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 	sc.Step(`^a valid config file with version (\S+)$`, func(string) error { return nil })
-	sc.Step(`^every record carries hotline.config.version (\S+)$`, func(version string) error {
+	sc.Step(`^every record carries hotline.config.version (\S+) and a fingerprint$`, func(version string) error {
 		if err := w.defaultCall(); err != nil {
 			return err
 		}
-		return w.lastHas("hotline.config.version", version)
+		record, err := w.lastRecord()
+		if err != nil {
+			return err
+		}
+		got, _ := record["hotline.config.version"].(string)
+		if !regexp.MustCompile(`^` + regexp.QuoteMeta(version) + `\+[0-9a-f]{12}$`).MatchString(got) {
+			return failf("hotline.config.version is %q, want %s+ and 12 hex characters", got, version)
+		}
+		return nil
 	})
 	sc.Step(`^the proxy listen address is read$`, func() error {
 		if w.startErr != nil {

@@ -9,56 +9,40 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"hotline-proxy/internal/config"
 )
 
-// certFiles is a certificate and key the proxy reads from files: the
-// certificate it shows apps, or the issuer it signs certificates for
-// vendor hosts with. It follows its files: when they change, new
-// connections get the new pair, and connections already open keep the old
-// one. A pair that is broken or expired is not taken; the last good one
-// stays.
-type certFiles struct {
-	certFile, keyFile string
-	load              func(certFile, keyFile string, now time.Time) (*tls.Certificate, error)
-	clock             Clock
-	logger            *slog.Logger
-	// kept and taken are the log lines for a new pair that is not usable,
-	// and for one that is.
-	kept, taken string
-
+// certHolder is a certificate the proxy shows: its own, from listen.tls,
+// or the issuer it signs certificates for vendor hosts with, from
+// listen.connect. A reload puts a new one in; new connections get it, and
+// connections already open keep the old one.
+type certHolder struct {
+	logger *slog.Logger
+	// taken is the log line for a new certificate in use.
+	taken   string
 	current atomic.Pointer[tls.Certificate]
-
-	mu sync.Mutex
-	// seen are the files as last read, good or not, so a broken pair is
-	// read and reported only once.
-	seen [2]os.FileInfo
 }
 
-// newAppCert follows the proxy's own certificate, from listen.tls.
-func newAppCert(t *config.TLS, clock Clock, logger *slog.Logger) *certFiles {
-	return newCertFiles(t, config.LoadCertificate, clock, logger,
-		"kept the TLS certificate, the new files are not usable", "new TLS certificate in use")
+// newAppCert holds the proxy's own certificate, from listen.tls.
+func newAppCert(t *config.TLS, logger *slog.Logger) *certHolder {
+	return newCertHolder(t, logger, "new TLS certificate in use")
 }
 
-func newCertFiles(t *config.TLS, load func(string, string, time.Time) (*tls.Certificate, error), clock Clock, logger *slog.Logger, kept, taken string) *certFiles {
-	c := &certFiles{certFile: t.CertFile, keyFile: t.KeyFile, load: load, clock: clock, logger: logger, kept: kept, taken: taken}
+func newCertHolder(t *config.TLS, logger *slog.Logger, taken string) *certHolder {
+	c := &certHolder{logger: logger, taken: taken}
 	c.current.Store(t.Certificate)
-	c.seen = c.stat()
 	return c
 }
 
 // tlsConfig is the TLS setup of the proxy port: TLS 1.2 and 1.3 with Go's
 // default ciphers, offering HTTP/2 and HTTP/1.1, with the same certificate
 // whatever name the app asks for.
-func (c *certFiles) tlsConfig() *tls.Config {
+func (c *certHolder) tlsConfig() *tls.Config {
 	return &tls.Config{
 		MinVersion:     tls.VersionTLS12,
 		NextProtos:     []string{"h2", "http/1.1"},
@@ -66,43 +50,18 @@ func (c *certFiles) tlsConfig() *tls.Config {
 	}
 }
 
-// get gives the pair for a new connection. It first checks whether the
-// files changed, which costs two file lookups per new connection.
-func (c *certFiles) get() *tls.Certificate {
-	files := c.stat()
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !changed(c.seen, files) {
-		return c.current.Load()
+// get gives the certificate for a new connection.
+func (c *certHolder) get() *tls.Certificate {
+	return c.current.Load()
+}
+
+// set puts in the certificate of a new config, when it is another one.
+func (c *certHolder) set(t *config.TLS) {
+	if bytes.Equal(c.get().Certificate[0], t.Certificate.Certificate[0]) {
+		return
 	}
-	c.seen = files
-	cert, err := c.load(c.certFile, c.keyFile, c.clock.Now())
-	if err != nil {
-		c.logger.Warn(c.kept, "reason", err.Error())
-		return c.current.Load()
-	}
-	c.current.Store(cert)
-	c.logger.Info(c.taken, "not_after", cert.Leaf.NotAfter)
-	return cert
-}
-
-func (c *certFiles) stat() [2]os.FileInfo {
-	var files [2]os.FileInfo
-	files[0], _ = os.Stat(c.certFile) // a missing file shows up when it is read
-	files[1], _ = os.Stat(c.keyFile)
-	return files
-}
-
-// changed tells whether either file is another file than before, or was
-// written since. Kubernetes swaps a Secret's files for new ones, and an
-// editor writes in place.
-func changed(before, now [2]os.FileInfo) bool {
-	return !same(before[0], now[0]) || !same(before[1], now[1])
-}
-
-func same(a, b os.FileInfo) bool {
-	return a == nil && b == nil ||
-		a != nil && b != nil && os.SameFile(a, b) && a.ModTime().Equal(b.ModTime()) && a.Size() == b.Size()
+	c.current.Store(t.Certificate)
+	c.logger.Info(c.taken, "not_after", t.Certificate.Leaf.NotAfter)
 }
 
 // serverLog routes the HTTP server's own log lines to the proxy's log, as

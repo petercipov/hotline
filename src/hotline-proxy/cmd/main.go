@@ -48,13 +48,18 @@ var (
 	errTrustFile = errors.New("trust file")
 )
 
+// checkEvery is how often the proxy looks at its files for a change.
+const checkEvery = 5 * time.Second
+
 func main() {
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr, signals))
+	reloads := make(chan os.Signal, 1)
+	signal.Notify(reloads, syscall.SIGHUP)
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr, signals, reloads))
 }
 
-func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int {
+func run(args []string, stdout, stderr io.Writer, signals, reloads <-chan os.Signal) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprint(stderr, usage)
 		return exitUsage
@@ -127,7 +132,7 @@ func run(args []string, stdout, stderr io.Writer, signals <-chan os.Signal) int 
 		Version:        version(),
 		InstanceID:     instanceID(),
 		LookupEnv:      os.LookupEnv,
-	}, stopping{timeout: *shutdownTimeout, drainDelay: *drainDelay}, signals)
+	}, stopping{timeout: *shutdownTimeout, drainDelay: *drainDelay}, signals, reloads)
 }
 
 // makeOverlay writes to stdout an overlay that turns the --from spec into
@@ -181,16 +186,17 @@ type stopping struct {
 }
 
 // serve runs the proxy until the first signal, then stops it within the
-// timeout. For the drain delay it still takes new calls while /readyz says
-// no, so Kubernetes has time to stop sending them. A second signal cuts the
-// stop short.
-func serve(logger *slog.Logger, o proxy.Options, stop stopping, signals <-chan os.Signal) int {
+// timeout. Until then it checks the config's files every few seconds, and
+// SIGHUP reloads the config at once. For the drain delay it still takes
+// new calls while /readyz says no, so Kubernetes has time to stop sending
+// them. A second signal cuts the stop short.
+func serve(logger *slog.Logger, o proxy.Options, stop stopping, signals, reloads <-chan os.Signal) int {
 	p, err := proxy.Start(context.Background(), o)
 	if err != nil {
 		logProblems(logger, "hotline proxy did not start", err)
 		return exitFail
 	}
-	sig := <-signals
+	sig := watch(p, signals, reloads)
 	p.Drain()
 	logger.Info("hotline proxy stopping", "signal", sig.String(), "timeout", stop.timeout.String(), "drain_delay", stop.drainDelay.String())
 	ctx, cancel := context.WithTimeoutCause(context.Background(), stop.timeout, errOutOfTime)
@@ -216,6 +222,23 @@ func serve(logger *slog.Logger, o proxy.Options, stop stopping, signals <-chan o
 	}
 	logger.Info("hotline proxy stopped")
 	return exitOK
+}
+
+// watch keeps the config up to date until a stop signal comes, and gives
+// that signal.
+func watch(p *proxy.Proxy, signals, reloads <-chan os.Signal) os.Signal {
+	check := time.NewTicker(checkEvery)
+	defer check.Stop()
+	for {
+		select {
+		case sig := <-signals:
+			return sig
+		case <-reloads:
+			p.Reload()
+		case <-check.C:
+			p.CheckFiles()
+		}
+	}
 }
 
 // trustPool is the system's trusted issuers plus those in the trust file,

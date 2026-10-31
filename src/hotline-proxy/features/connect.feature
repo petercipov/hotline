@@ -162,6 +162,7 @@ Feature: The CONNECT ingress, with interception
   Scenario: A renewed issuer is used without a restart
     Given the app has opened a tunnel to api.stripe.com:443
     When the listen.connect files are replaced with a second issuer
+    And the proxy checks its files
     And the app opens a tunnel to api.stripe.com:443
     Then the app sees a certificate for api.stripe.com signed by the second issuer
 

@@ -47,7 +47,7 @@ The proxy is built in small slices, tests first.
    - body fields in the record: a spec marks a body field `x-hotline-record: <attribute name>`, and the proxy copies its plain value (text cut at 256, number, true or false; never inside a list) into full records, signed, never into the counter. Names like the proxy's own are refused. The same mark on a call header (never a login header) copies the header as text. The SQS spec marks `QueueUrl` as `messaging.destination.name`, the full address, and lists `X-Amz-Target` on every action as `messaging.operation.name` (Peter, 2026-10-31). Built. Detail: [docs/proxy-body-fields.md](docs/proxy-body-fields.md);
    - overlays on an api's spec: OpenAPI Overlay 1.1 only, on the api only, applied at load in order, a target matching nothing is a warning, library `speakeasy-api/openapi/overlay`, plus the `hotline-proxy overlay` command that makes one from two specs (Peter, 2026-10-30). Built; needed by the SQS example. Detail: [docs/proxy-overlays.md](docs/proxy-overlays.md);
    - timings are whole microseconds, each name ending in `_us`, such as `hotline.timing.first_byte_us` (Peter, 2026-10-31). Detail: [docs/otel-export.md](docs/otel-export.md);
-   - config reload without a restart;
+   - config reload without a restart: built. The files are checked every 5 seconds and SIGHUP reloads at once; certificates use the same check; listen addresses and exporters need a restart; `hotline.config.version` is the version, `+` and a 12 character fingerprint. Detail: [docs/proxy-config-reload.md](docs/proxy-config-reload.md);
    - the load test, with k6.
 
 ## Slice 1 decisions (Peter, 2026-10-28)
@@ -89,7 +89,7 @@ Full wording in [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
 1. With `listen.tls` set, the proxy port accepts only TLS.
 2. Certificate and key are PEM files; on Kubernetes a Secret, usually from cert-manager.
 3. Hotline builds nothing for apps to trust the proxy and never makes its own certificate; customers use their own issuer.
-4. The files are re-read when they change; a broken new pair keeps the old one.
+4. The files are re-read when they change; a broken new pair keeps the old one. Since 2026-10-31 through the shared config reload (file check every 5 seconds, or SIGHUP).
 5. Client certificates (mutual TLS) come later, with caller authentication.
 6. TLS 1.2 and 1.3 only, Go's default ciphers, nothing to configure.
 7. Only HTTP/1.1 over TLS for now; HTTP/2 comes with the Host header ingress.
@@ -160,7 +160,7 @@ Full wording in [docs/proxy-transparent-redirect.md](docs/proxy-transparent-redi
 
 Full wording in [docs/proxy-connect.md](docs/proxy-connect.md). Why: a proxy deployed apart from the apps needs the hop to it encrypted, with no change in the app.
 
-1. The issuer comes from the customer: `listen.connect: { cert, key }`, re-read on change. Without it, `CONNECT` gets `501`.
+1. The issuer comes from the customer: `listen.connect: { cert, key }`, re-read on change (since 2026-10-31 through the shared config reload). Without it, `CONNECT` gets `501`.
 2. Hotline builds nothing for apps to trust the issuer; the setup guide shows how per language.
 3. Every host is intercepted; pinned hosts go in `NO_PROXY`. No blind tunnel.
 4. The integration ID comes from `Proxy-Authorization` on the `CONNECT`, for the whole tunnel; one inside is ignored. `CONNECT` works on plain and TLS ports.
@@ -206,6 +206,17 @@ Full wording in [docs/proxy-health-checks.md](docs/proxy-health-checks.md).
 4. No `listen.admin` means no health checks and one warning; the proxy still runs.
 5. Plain HTTP, only `/livez` and `/readyz`, no records. No detail page: the state of each part comes with the proxy's own telemetry, a chapter of its own.
 6. The end-to-end tests pass `--drain-delay 0s` unless a scenario sets it, so they stop at once.
+
+## Config reload decisions (Peter, 2026-10-31)
+
+Full wording in [docs/proxy-config-reload.md](docs/proxy-config-reload.md).
+
+1. One mechanism for every file, with two triggers: a check every 5 seconds (identity, time and size; no full read) and SIGHUP for "now". Kubernetes sends no signal when a mounted file changes.
+2. Certificates (`listen.tls`, `listen.connect`) use the same check, replacing the check on each new connection.
+3. Watched: exactly the files the last load read or tried to read; a missing overlay is watched until it arrives.
+4. Live: integrations, apis, specs, overlays, keys, trace settings, certificates. Restart: listen addresses, adding or removing listen.tls or listen.connect, exporters (Envoy's split).
+5. `hotline.config.version` = version + `+` + first 12 hex of a SHA-256 over the config, specs and overlays (not keys or certificates).
+6. A failed reload is a warning in the log; a count comes with the proxy's own telemetry.
 
 ## Trace context decisions (Peter, 2026-10-31)
 
