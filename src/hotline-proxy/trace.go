@@ -82,7 +82,7 @@ func (c *call) spans(opened, end time.Time) []export.Span {
 	if !c.firstByte.IsZero() {
 		step(vendor.ID, "receive reply", c.firstByte, out)
 	}
-	step(call.ID, "finish reply", out, end)
+	step(call.ID, "reply to app", out, end)
 	// The app hung up: the vendor did nothing wrong, so only the last step
 	// fails (Peter, 2026-10-31).
 	spans[len(spans)-1].Failed = c.app.failed()

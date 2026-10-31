@@ -21,7 +21,7 @@ No number is split by integration, vendor, host, URL or route: a proxy may hold 
 |---|---|---|---|---|
 | `http.server.active_requests` | up and down count | `{request}` | `http.request.method`, `url.scheme`, `hotline.ingress` | calls from apps in flight now |
 | `http.server.request.duration` | histogram | `s` | `http.request.method`, `url.scheme`, `http.response.status_code`, `error.type`, `hotline.ingress` | how long each call took, from arrival until the last byte went to the app |
-| `hotline.proxy.overhead` | histogram | `s` | `hotline.ingress` | the proxy's own time on each call that got as far as the vendor: the `routing` and `finish reply` steps of its trace |
+| `hotline.proxy.overhead` | histogram | `s` | `hotline.ingress` | the proxy's own time on each call that got as far as the vendor: the `routing` and `reply to app` steps of its trace |
 | `otel.sdk.processor.log.queue.size` | up and down count | `{log_record}` | destination | records waiting in a destination's queue |
 | `otel.sdk.processor.log.queue.capacity` | up and down count | `{log_record}` | destination | how many records the queue holds at most |
 | `otel.sdk.processor.log.processed` | count | `{log_record}` | destination, `error.type` | records handed on to be sent; with `error.type=queue_full`, dropped from a full queue |

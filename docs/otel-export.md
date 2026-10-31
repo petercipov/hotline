@@ -182,7 +182,7 @@ There is no latency histogram and no pass or fail count: the control plane build
 
 ## Signal 3: the trace of each call
 
-One trace per call, to every destination, with the same resource labels as the records: `hotline call` for the whole call, and under it a span for each step that happened, such as `routing`, `vendor call` with `dns lookup`, `tcp connect`, `vendor tls handshake`, `send call`, `wait for vendor` and `receive reply` under it, and `finish reply`, with `request spec check` and `reply spec check` for the spec checks. `hotline call` has the record's trace id and span id, and sits under the app's span when the app sent one. Spans hold nothing the record holds: only `hotline.connection.reused` on `vendor call` and `dns.question.name` on `dns lookup`. Detail: [proxy-traces.md](proxy-traces.md).
+One trace per call, to every destination, with the same resource labels as the records: `hotline call` for the whole call, and under it a span for each step that happened, such as `routing`, `vendor call` with `dns lookup`, `tcp connect`, `vendor tls handshake`, `send call`, `wait for vendor` and `receive reply` under it, and `reply to app`, with `request spec check` and `reply spec check` for the spec checks. `hotline call` has the record's trace id and span id, and sits under the app's span when the app sent one. Spans hold nothing the record holds: only `hotline.connection.reused` on `vendor call` and `dns.question.name` on `dns lookup`. Detail: [proxy-traces.md](proxy-traces.md).
 
 ## Signal 4: the proxy's own numbers
 

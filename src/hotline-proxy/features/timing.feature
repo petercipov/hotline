@@ -8,7 +8,7 @@ Feature: Each call's timings are a trace
   The call span, "hotline call", runs from the moment the call reached the
   proxy until its last byte went back to the app. Under it are, in order:
   "routing" (finding the ingress, the integration and the vendor),
-  "vendor call" and "finish reply" (sending the last bytes to the app).
+  "vendor call" and "reply to app" (sending the last bytes to the app).
   For a call with a full record, "request spec check" and "reply spec
   check" are under it too: the checks against the spec, which run
   alongside the call, so they may end after it (Peter, 2026-10-31).
@@ -28,8 +28,8 @@ Feature: Each call's timings are a trace
     Scenario: A call on a new https connection
       Given a vendor reached over a new https connection
       When a call ends
-      Then the trace has the spans "hotline call", "routing", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply", "finish reply", "request spec check" and "reply spec check"
-      And "routing", "vendor call" and "finish reply" are under "hotline call", one after another
+      Then the trace has the spans "hotline call", "routing", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply", "reply to app", "request spec check" and "reply spec check"
+      And "routing", "vendor call" and "reply to app" are under "hotline call", one after another
       And "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor" and "receive reply" are under "vendor call", one after another
       And every span but the spec checks is within its parent
       And "request spec check" starts when "send call" ends, under "hotline call"
@@ -111,7 +111,7 @@ Feature: Each call's timings are a trace
       record's hotline.client.cancelled says why (Peter, 2026-10-31).
       Given <vendor>
       When the app disconnects after 100 milliseconds
-      Then the "finish reply" span ends with status error
+      Then the "reply to app" span ends with status error
       And the "hotline call" span ends with status error
       And the "vendor call" span ends with status unset
       And the record says hotline.client.cancelled true
@@ -143,7 +143,7 @@ Feature: Each call's timings are a trace
     Scenario: A call without an integration gets a trace too
       Given the app sends no integration ID
       When a call ends
-      Then the trace has the spans "hotline call", "routing", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply" and "finish reply"
+      Then the trace has the spans "hotline call", "routing", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply" and "reply to app"
 
   Rule: Spans are sent like records
 

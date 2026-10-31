@@ -204,8 +204,12 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(fmt.Sprint(record), secret) {
-			return failf("the record holds %s: %v", secret, record)
+		// Signatures are random-looking base64, which can hold any short
+		// text by chance, so they are left out of the search.
+		for name, value := range record {
+			if !strings.HasSuffix(name, "signature") && strings.Contains(fmt.Sprint(value), secret) {
+				return failf("the record holds %s in %s: %v", secret, name, record)
+			}
 		}
 		return nil
 	})

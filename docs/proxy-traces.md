@@ -18,7 +18,7 @@ A trace is a set of spans; a span is one step with a start time and an end time.
 | `send call`, under `vendor call` | internal | the call had its connection | the call was fully sent |
 | `wait for vendor`, under `vendor call` | internal | the call was fully sent | the vendor's first reply byte |
 | `receive reply`, under `vendor call` | internal | the first reply byte | the vendor's reply ended |
-| `finish reply` | internal | the vendor's reply ended | the last byte went to the app |
+| `reply to app` | internal | the vendor's reply ended | the last byte went to the app |
 | `request spec check` | internal | the call was fully sent | the request's check against the spec ended. Full records only |
 | `reply spec check` | internal | the vendor's reply ended | the reply's check ended. Full records with a reply only |
 
@@ -37,7 +37,7 @@ Only a breakdown fails a span; the vendor's own answer never does, a 404 or a 50
 | `hotline call` | any span below failed, but for the spec checks, or the proxy refused the call |
 | `app tls handshake` | TLS setup with the app failed |
 | `routing` | never |
-| `finish reply` | the app did not get the whole reply: it hung up, or a write to it failed. `hotline.client.cancelled` on the record says so; `vendor call` stays unset |
+| `reply to app` | the app did not get the whole reply: it hung up, or a write to it failed. `hotline.client.cancelled` on the record says so; `vendor call` stays unset |
 | `vendor call` | one of its steps failed, or the guard refused an internal address |
 | `dns lookup` | the name could not be looked up |
 | `tcp connect` | no address could be connected to |
@@ -90,7 +90,7 @@ To check a call, take its record and its spans (found by trace id), and rebuild 
 - OTLP traces over gRPC, or over HTTP to `/v1/traces`, with each exporter's endpoint, TLS, login headers, gzip, resource labels and timing.
 - Each destination has a queue of spans next to its queue of records, of the same `queueSize`, counted in spans. A full queue drops its oldest span and warns, at most once a minute.
 - The proxy's own telemetry counts them like records: `otel.sdk.processor.span.queue.size`, `otel.sdk.processor.span.queue.capacity`, `otel.sdk.processor.span.processed` and `otel.sdk.exporter.span.exported`.
-- `hotline.proxy.overhead` still measures the proxy's own time: `routing` plus `finish reply`.
+- `hotline.proxy.overhead` still measures the proxy's own time: `routing` plus `reply to app`.
 
 ## Where it lives
 
