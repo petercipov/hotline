@@ -80,6 +80,8 @@ type Proxy struct {
 	handler      *handler
 	transports   []*http.Transport
 	sink         *export.Sink
+	// telemetry sends the proxy's own numbers.
+	telemetry    *export.Own
 	served       chan struct{}
 	tunnelServed chan struct{}
 	// admin serves the health checks, when the config names an admin
@@ -116,12 +118,15 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 			return nil, err
 		}
 	}
-	sink := export.New(cfg.Exporters, o.RootCAs, export.Service{Version: o.Version, InstanceID: o.InstanceID},
-		export.Timing{Interval: o.ExportInterval, Timeout: o.ExportTimeout}, o.Logger)
+	service := export.Service{Version: o.Version, InstanceID: o.InstanceID}
+	timing := export.Timing{Interval: o.ExportInterval, Timeout: o.ExportTimeout}
+	telemetry := export.NewOwn(cfg.Telemetry, o.RootCAs, service, timing)
+	sink := export.New(cfg.Exporters, o.RootCAs, service, timing, o.Logger, telemetry.Meter())
 	h := &handler{
 		clock:  o.Clock,
 		logger: o.Logger,
 		sink:   sink,
+		own:    newOwn(telemetry.Meter()),
 	}
 	h.cfg.Store(cfg)
 	if cfg.Connect != nil {
@@ -154,6 +159,7 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		tunnelServer: newServer(),
 		transports:   []*http.Transport{h.transport, h.internal},
 		sink:         sink,
+		telemetry:    telemetry,
 		served:       make(chan struct{}),
 		tunnelServed: make(chan struct{}),
 	}
@@ -162,9 +168,10 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		// The proxy sets up TLS itself, so the server sees plain
 		// connections.
 		p.appCert = newAppCert(cfg.TLS, o.Logger)
-		port = tlsOnlyListener{Listener: listener, config: p.appCert.tlsConfig(), clock: o.Clock, logger: o.Logger}
+		port = tlsOnlyListener{Listener: listener, config: p.appCert.tlsConfig(), clock: o.Clock, logger: o.Logger, own: h.own}
 	}
-	p.reload = &reloader{path: o.ConfigPath, clock: o.Clock, lookupEnv: o.LookupEnv, logger: o.Logger}
+	p.reload = &reloader{path: o.ConfigPath, clock: o.Clock, lookupEnv: o.LookupEnv, logger: o.Logger, own: h.own, started: cfg}
+	h.own.observe(p)
 	p.reload.seen = stat(cfg.Files)
 	go func() {
 		defer close(p.served)
@@ -265,7 +272,8 @@ func (p *Proxy) Shutdown(ctx context.Context) error {
 	for _, t := range p.transports {
 		t.CloseIdleConnections()
 	}
-	err = errors.Join(err, p.sink.Shutdown(ctx))
+	// The proxy's own numbers go last, so they count the final sends.
+	err = errors.Join(err, p.sink.Shutdown(ctx), p.telemetry.Shutdown(ctx))
 	if p.admin != nil {
 		_ = p.admin.Close()
 		<-p.adminServed

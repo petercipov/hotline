@@ -5,9 +5,13 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
 // batchSize is how many records one send carries at most.
@@ -25,6 +29,12 @@ type queue struct {
 	size     int
 	interval time.Duration
 	logger   *slog.Logger
+	// stats count what the queue did, as the queue's processor and the
+	// destination's sender; up is the destination's state.
+	stats     sendStats
+	processor attribute.Set
+	sender    attribute.Set
+	up        *atomic.Int64
 
 	mu      sync.Mutex
 	records []sdklog.Record
@@ -62,6 +72,8 @@ func (q *queue) OnEmit(_ context.Context, r *sdklog.Record) error {
 	if len(q.records) == q.size {
 		q.records = q.records[1:]
 		q.crowded.count++
+		q.stats.processed.Add(context.Background(), 1,
+			metric.WithAttributes(append(q.processor.ToSlice(), semconv.ErrorTypeKey.String("queue_full"))...))
 	}
 	q.records = append(q.records, r.Clone())
 	if len(q.records) >= batchSize {
@@ -103,7 +115,9 @@ func (q *queue) send(ctx context.Context, all bool) error {
 		if len(batch) == 0 {
 			return nil
 		}
+		q.stats.processed.Add(ctx, int64(len(batch)), metric.WithAttributeSet(q.processor))
 		err := q.exporter.Export(ctx, batch)
+		measured(ctx, q.stats.logs, len(batch), q.sender, err, q.up)
 		if err != nil {
 			q.mu.Lock()
 			q.failed.count += len(batch)
@@ -145,6 +159,13 @@ func (q *queue) warnDropped(last bool) {
 		q.logger.Warn("export failed, dropped the records it held", "endpoint", q.endpoint, "dropped", q.failed.count, "error", q.lastErr.Error())
 		q.failed.count = 0
 	}
+}
+
+// fill is how many records wait, and how many the queue holds at most.
+func (q *queue) fill() (int, int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.records), q.size
 }
 
 // ForceFlush sends everything queued.

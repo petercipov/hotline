@@ -137,11 +137,8 @@ func (f flushWriter) Write(p []byte) (int, error) {
 // the CONNECT said, so the record tells which app is missing the issuer.
 func (h *handler) tunnelFailed(r *http.Request, start time.Time, t *tunnel, a *appConn, err error) {
 	h.logger.Debug("app TLS setup inside a tunnel failed", "host", t.host, "reason", err.Error())
-	errorType := "tls_handshake_failed"
-	if text := err.Error(); strings.Contains(text, "remote error: tls: ") && strings.Contains(text, "certificate") {
-		// The app refused the certificate it was shown.
-		errorType = "tls_untrusted_by_app"
-	}
+	h.own.tlsFailed(err, attribute.String("hotline.ingress", "connect"))
+	errorType := untrustedOr(err)
 	attrs := []attribute.KeyValue{
 		attribute.String("hotline.integration.id", orNotPassed(t.id)),
 		attribute.String("hotline.ingress", "connect"),
@@ -154,7 +151,7 @@ func (h *handler) tunnelFailed(r *http.Request, start time.Time, t *tunnel, a *a
 		attrs = append(attrs, attribute.Int64("hotline.timing.app_tls_us", took.Microseconds()))
 	}
 	traced, _ := h.traced(t.id, r.Header, start)
-	h.sink.Record(recordContext(traced), start, attrs)
+	h.record(r, traced, start, attrs)
 }
 
 // find works out the vendor address of a call inside the tunnel. The call

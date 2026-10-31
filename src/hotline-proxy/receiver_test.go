@@ -55,6 +55,19 @@ type receivedCount struct {
 	value       int64
 }
 
+// receivedPoint is one data point of any metric the receiver got.
+type receivedPoint struct {
+	name string
+	unit string
+	// kind is sum, gauge or histogram.
+	kind  string
+	attrs map[string]any
+	// value is a sum's or gauge's value, or a histogram's total.
+	value  float64
+	count  uint64
+	bounds []float64
+}
+
 // seenRequest is one export request the receiver got, of either kind.
 type seenRequest struct {
 	logs        bool
@@ -83,6 +96,8 @@ type receiverSetup struct {
 	path string
 	// tls, when set, makes the receiver accept only TLS, with this setup.
 	tls *tls.Config
+	// listener, when set, is where the receiver listens.
+	listener net.Listener
 }
 
 // receiver is a fake OTLP destination on a local port. It has a gRPC side
@@ -99,6 +114,7 @@ type receiver struct {
 	mu          sync.Mutex
 	records     []receivedRecord
 	counts      []receivedCount
+	points      []receivedPoint
 	histograms  int
 	otherMetric []string
 	spanCount   int
@@ -122,7 +138,10 @@ func newReceiver() *receiver {
 }
 
 func newReceiverWith(setup receiverSetup) *receiver {
-	listener := listenLocal()
+	listener := setup.listener
+	if listener == nil {
+		listener = listenLocal()
+	}
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
 	r := &receiver{http: setup.http, endpoint: listener.Addr().String()}
 	if setup.tls != nil {
@@ -331,6 +350,7 @@ func (r *receiver) exportMetrics(ctx context.Context, req *colmetrics.ExportMetr
 		res := values(rm.GetResource().GetAttributes())
 		for _, sm := range rm.GetScopeMetrics() {
 			for _, m := range sm.GetMetrics() {
+				r.points = append(r.points, pointsOf(m)...)
 				if m.GetHistogram() != nil || m.GetExponentialHistogram() != nil {
 					r.histograms++
 				}
@@ -353,6 +373,38 @@ func (r *receiver) exportMetrics(ctx context.Context, req *colmetrics.ExportMetr
 		}
 	}
 	return &colmetrics.ExportMetricsServiceResponse{}, nil
+}
+
+// pointsOf are the data points of one metric, of the kinds the proxy sends.
+func pointsOf(m *metrics.Metric) []receivedPoint {
+	var points []receivedPoint
+	number := func(kind string, dp *metrics.NumberDataPoint) {
+		v := float64(dp.GetAsInt())
+		if _, ok := dp.GetValue().(*metrics.NumberDataPoint_AsDouble); ok {
+			v = dp.GetAsDouble()
+		}
+		points = append(points, receivedPoint{name: m.GetName(), unit: m.GetUnit(), kind: kind, attrs: values(dp.GetAttributes()), value: v})
+	}
+	for _, dp := range m.GetSum().GetDataPoints() {
+		number("sum", dp)
+	}
+	for _, dp := range m.GetGauge().GetDataPoints() {
+		number("gauge", dp)
+	}
+	for _, dp := range m.GetHistogram().GetDataPoints() {
+		points = append(points, receivedPoint{
+			name: m.GetName(), unit: m.GetUnit(), kind: "histogram", attrs: values(dp.GetAttributes()),
+			value: dp.GetSum(), count: dp.GetCount(), bounds: dp.GetExplicitBounds(),
+		})
+	}
+	return points
+}
+
+// metricPoints are every data point the receiver got, oldest first.
+func (r *receiver) metricPoints() []receivedPoint {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]receivedPoint(nil), r.points...)
 }
 
 type traceService struct {

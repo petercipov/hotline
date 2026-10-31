@@ -9,7 +9,7 @@ In short, the proxy sends two things:
 1. **One log record per call**, named `hotline.request`. It holds everything known about the call.
 2. **One counter**, `hotline.requests`, that goes up by one per call.
 
-It sends no traces and none of its own health data yet. Each record carries the app's trace id, or a new one, in its own trace fields: [proxy-trace-context.md](proxy-trace-context.md).
+It sends no traces. Numbers about the proxy itself go only to the `telemetry` destination: [proxy-telemetry.md](proxy-telemetry.md). Each record carries the app's trace id, or a new one, in its own trace fields: [proxy-trace-context.md](proxy-trace-context.md).
 
 ## How it is sent
 
@@ -198,7 +198,6 @@ There is no latency histogram and no pass or fail count: the control plane build
 ## What is not sent
 
 - **Traces.** No spans at all. The spec plans an optional span per call, off by default.
-- **The proxy's own health data.** The `telemetry` section of the config is accepted but nothing is sent there. Dropped records show only in the warning log line.
 - **Bodies, cookies, `Authorization` and `Proxy-Authorization`.** Never sent, by design. Only the body fields a spec marks `x-hotline-record` are copied.
 - **The proxy's own log lines.** They go to standard error as JSON, not over OTLP.
 
@@ -208,4 +207,4 @@ There is no latency histogram and no pass or fail count: the control plane build
 2. **Minimal record and status code.** The spec says every minimal record has `http.response.status_code`. A failed tunnel's record has none.
 3. **`hotline.schema.skipped=overloaded`.** In the spec's list, never set by the code.
 4. **Send timing.** One second and ten seconds are fixed in the program; the spec does not mention them and they are not in the config.
-5. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces and health data to `telemetry`. The body fingerprints are replaced by the record's signature (Peter, 2026-10-30).
+5. **Not built yet, as the spec and decision 12 of slice 1 allow:** traces. The body fingerprints are replaced by the record's signature (Peter, 2026-10-30).

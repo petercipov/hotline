@@ -46,6 +46,12 @@ type world struct {
 	// telemetry, when set, is the destination for the proxy's own health
 	// data.
 	telemetry *receiver
+	// telemetryDisable are the metrics the telemetry section turns off.
+	telemetryDisable []string
+	// lastMetric is the proxy's own metric a scenario last looked at.
+	lastMetric string
+	// callDone gets the result of a call started in the background.
+	callDone chan error
 	// downEndpoints are exporter endpoints where nothing listens.
 	downEndpoints []string
 	// exporterExtra are more lines for the exporter of each receiver.
@@ -371,6 +377,12 @@ func (w *world) config() string {
 	}
 	if w.telemetry != nil {
 		fmt.Fprintf(&b, "telemetry:\n  otlp:\n    endpoint: %s\n", w.telemetry.endpoint)
+		for i, name := range w.telemetryDisable {
+			if i == 0 {
+				b.WriteString("  disable:\n")
+			}
+			fmt.Fprintf(&b, "    - %q\n", name)
+		}
 	}
 	b.WriteString(w.apisSection())
 	if len(w.integrations) > 0 {

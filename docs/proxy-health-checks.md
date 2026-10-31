@@ -9,7 +9,7 @@ Kubernetes asks each copy of the proxy two questions over plain HTTP, on the adm
 - `GET /livez`: "is the process alive?" If the answer is no, Kubernetes restarts the proxy.
 - `GET /readyz`: "should I send you calls?" If the answer is no, Kubernetes stops sending new calls to this copy but leaves it running.
 
-Yes is `200`, no is `503`. `HEAD` works too. Any other path gets `404`, any other method `405`. Health check calls make no records and no counts. The answer is only a yes or a no: the state of each part comes with the proxy's own telemetry, a later chapter.
+Yes is `200`, no is `503`. `HEAD` works too. Any other path gets `404`, any other method `405`. Health check calls make no records and no counts. The answer is only a yes or a no: the state of each part comes with the proxy's own telemetry: [proxy-telemetry.md](proxy-telemetry.md).
 
 ## Decisions (Peter, 2026-10-31)
 
