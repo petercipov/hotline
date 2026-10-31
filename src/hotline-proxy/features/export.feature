@@ -90,4 +90,3 @@ Feature: Sending OpenTelemetry data
   Scenario: Left for later slices
     When the proxy runs
     Then it sends no trace spans
-    And it sends no proxy health data to the telemetry exporter

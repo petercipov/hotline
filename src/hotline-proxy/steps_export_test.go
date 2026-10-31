@@ -361,21 +361,15 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 	})
 
 	sc.Step(`^the proxy runs$`, func() error {
-		w.telemetry = newReceiver()
+		if w.telemetry == nil {
+			w.telemetry = newReceiver()
+		}
 		return w.defaultCall()
 	})
 	sc.Step(`^it sends no trace spans$`, func() error {
 		w.settle()
 		if n := w.receivers[0].spans(); n > 0 {
 			return failf("the proxy sent %d spans", n)
-		}
-		return nil
-	})
-	sc.Step(`^it sends no proxy health data to the telemetry exporter$`, func() error {
-		w.settle()
-		records, counts := w.telemetry.got()
-		if len(records)+len(counts) > 0 || w.telemetry.spans() > 0 {
-			return failf("the telemetry exporter got %d records and %d counts", len(records), len(counts))
 		}
 		return nil
 	})

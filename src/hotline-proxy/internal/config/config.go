@@ -42,6 +42,9 @@ type Config struct {
 	// certificate the proxy shows for each vendor host inside a tunnel.
 	Connect   *TLS
 	Exporters []Exporter
+	// Telemetry, when set, is where the proxy sends numbers about itself;
+	// nil means they are not sent.
+	Telemetry *Telemetry
 	// NotPassed applies to calls without a known integration ID, and to
 	// calls to a host outside the integration's apis.
 	NotPassed Settings
@@ -148,8 +151,7 @@ func (c *Config) API(integrationID, host string) *API {
 	return c.integrations[integrationID][strings.ToLower(host)]
 }
 
-// file is the config file's layout. Settings that later slices use, such
-// as telemetry, are listed so that they do not count as unknown.
+// file is the config file's layout.
 type file struct {
 	Version string `yaml:"version"`
 	Listen  struct {
@@ -158,7 +160,7 @@ type file struct {
 		TLS     *pairFile `yaml:"tls"`
 		Connect *pairFile `yaml:"connect"`
 	} `yaml:"listen"`
-	Telemetry any `yaml:"telemetry"`
+	Telemetry *telemetryFile `yaml:"telemetry"`
 	// APIs are the vendor apis, each written once and named by the
 	// integrations that use it.
 	APIs map[string]struct {
@@ -336,6 +338,7 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 	for _, e := range f.Exporters {
 		c.Exporters = append(c.Exporters, l.exporter(e.OTLP, now))
 	}
+	c.Telemetry = l.telemetry(f.Telemetry, now)
 	apis := map[string]*API{}
 	hosts := map[string][]string{}
 	for _, name := range slices.Sorted(maps.Keys(f.APIs)) {

@@ -148,6 +148,8 @@ func (w *world) changeConfig(change string) error {
 		cert := w.issuer.leaf("hotline-proxy", time.Now().Add(24*time.Hour), false)
 		w.writeKeyPair(cert, cert)
 		w.listenTLS = "  tls: { cert: ./tls/cert.pem, key: ./tls/key.pem }\n"
+	case "the telemetry section turns off go.*":
+		w.telemetryDisable = append(w.telemetryDisable, "go.*")
 	case "listen.connect is added":
 		w.useInterceptionIssuer(newIssuer())
 	default:

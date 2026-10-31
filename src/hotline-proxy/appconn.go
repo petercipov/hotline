@@ -53,7 +53,7 @@ func (a *appConn) handshakeTime() (time.Duration, bool) {
 // secureAppConn sets up TLS with an app on the proxy's TLS port, timed,
 // on its first read. A failed setup never becomes a call: it is a debug
 // log line only.
-func secureAppConn(raw net.Conn, config *tls.Config, clock Clock, logger *slog.Logger) *appConn {
+func secureAppConn(raw net.Conn, config *tls.Config, clock Clock, logger *slog.Logger, own *own) *appConn {
 	conn := tls.Server(&tlsOnlyConn{Conn: raw}, config)
 	a := &appConn{Conn: conn, secure: true}
 	a.setUp = func() {
@@ -61,6 +61,7 @@ func secureAppConn(raw net.Conn, config *tls.Config, clock Clock, logger *slog.L
 		a.handshake, err = timeHandshake(context.Background(), conn, clock)
 		if err != nil {
 			logger.Debug("app TLS setup failed", "address", raw.RemoteAddr().String(), "reason", err.Error())
+			own.tlsFailed(err)
 		}
 	}
 	return a

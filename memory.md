@@ -7,7 +7,7 @@ Decisions already made, so a new session does not have to dig through old thread
 - How to test and the TDD loop: [CLAUDE.md](CLAUDE.md).
 - How to write, test and review proxy code in Go: the [`hotline-go-proxy` skill](.claude/skills/hotline-go-proxy/SKILL.md). It covers the system under test, testing only through the proxy's ways in and out, and no test-only code.
 - The proxy's spec and examples: `proxy-spec.md` and `proxy-example/` in the `hotline-strategic` repo.
-- What the proxy sends over OpenTelemetry, field by field: [docs/otel-export.md](docs/otel-export.md).
+- What the proxy sends over OpenTelemetry, field by field: [docs/otel-export.md](docs/otel-export.md). Its own numbers, for the `telemetry` destination: [docs/proxy-telemetry.md](docs/proxy-telemetry.md).
 
 ## Code layout
 
@@ -48,6 +48,7 @@ The proxy is built in small slices, tests first.
    - overlays on an api's spec: OpenAPI Overlay 1.1 only, on the api only, applied at load in order, a target matching nothing is a warning, library `speakeasy-api/openapi/overlay`, plus the `hotline-proxy overlay` command that makes one from two specs (Peter, 2026-10-30). Built; needed by the SQS example. Detail: [docs/proxy-overlays.md](docs/proxy-overlays.md);
    - timings are whole microseconds, each name ending in `_us`, such as `hotline.timing.first_byte_us` (Peter, 2026-10-31). Detail: [docs/otel-export.md](docs/otel-export.md);
    - config reload without a restart: built. The files are checked every 5 seconds and SIGHUP reloads at once; certificates use the same check; listen addresses and exporters need a restart; `hotline.config.version` is the version, `+` and a 12 character fingerprint. Detail: [docs/proxy-config-reload.md](docs/proxy-config-reload.md);
+   - the proxy's own telemetry: metrics to the `telemetry` destination only, never split by integration, vendor, host, URL or route. Built. Detail: [docs/proxy-telemetry.md](docs/proxy-telemetry.md);
    - the load test, with k6.
 
 ## Slice 1 decisions (Peter, 2026-10-28)
@@ -216,7 +217,20 @@ Full wording in [docs/proxy-config-reload.md](docs/proxy-config-reload.md).
 3. Watched: exactly the files the last load read or tried to read; a missing overlay is watched until it arrives.
 4. Live: integrations, apis, specs, overlays, keys, trace settings, certificates. Restart: listen addresses, adding or removing listen.tls or listen.connect, exporters (Envoy's split).
 5. `hotline.config.version` = version + `+` + first 12 hex of a SHA-256 over the config, specs and overlays (not keys or certificates).
-6. A failed reload is a warning in the log; a count comes with the proxy's own telemetry.
+6. A failed reload is a warning in the log, and counted in the proxy's own telemetry (since 2026-10-31).
+
+## Proxy telemetry decisions (Peter, 2026-10-31)
+
+Full wording in [docs/proxy-telemetry.md](docs/proxy-telemetry.md).
+
+1. Metrics only, to `telemetry` only. No `telemetry` section: nothing measured, one warning at start.
+2. No label grows with traffic: never by integration, vendor, host, URL or route.
+3. Standard names where they exist, even "development" ones: `otel.sdk.*` for queues and sends, `http.server.active_requests`, `http.server.request.duration` (seconds, standard labels, no `http.route`). Our own: `hotline.proxy.overhead` (seconds, by ingress, 8 fixed limits from 0.00005 to 0.1).
+4. State as 1 or 0 gauges: `hotline.destination.state`, `hotline.config.reload.last_success`, `hotline.config.restart_needed`; plus `hotline.config.reloads` and `hotline.config.info`.
+5. Certificates: `hotline.certificate.not_after`, a time; failed app TLS setups: `hotline.app_tls.failures`.
+6. The Go runtime numbers, from the OpenTelemetry contrib module.
+7. Every metric can be turned off with `telemetry.disable` (exact name or ending in `*`); an unknown name is a warning.
+8. The dropped records and reload warnings stay in the log.
 
 ## Trace context decisions (Peter, 2026-10-31)
 

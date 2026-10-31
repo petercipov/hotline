@@ -87,6 +87,7 @@ type tlsOnlyListener struct {
 	config *tls.Config
 	clock  Clock
 	logger *slog.Logger
+	own    *own
 }
 
 func (l tlsOnlyListener) Accept() (net.Conn, error) {
@@ -96,7 +97,7 @@ func (l tlsOnlyListener) Accept() (net.Conn, error) {
 	}
 	// The server sets its own read deadlines once a call starts.
 	_ = conn.SetReadDeadline(time.Now().Add(handshakeTimeout))
-	return secureAppConn(conn, l.config, l.clock, l.logger), nil
+	return secureAppConn(conn, l.config, l.clock, l.logger, l.own), nil
 }
 
 // tlsOnlyConn checks the first byte an app sends: TLS always starts with a

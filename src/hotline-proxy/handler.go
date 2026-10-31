@@ -51,6 +51,8 @@ type handler struct {
 	intercept *interceptor
 	// tunnels takes each tunnel once it is set up.
 	tunnels *tunnels
+	// own are the proxy's own numbers.
+	own *own
 	// calls counts calls in flight, including upgraded ones, which the
 	// server stops tracking once they take over the connection.
 	calls sync.WaitGroup
@@ -75,6 +77,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	default:
 		ingress, target, status = findIngress(r)
+	}
+	if ingress != "" {
+		defer h.own.started(r, ingress)()
 	}
 	if status != 0 {
 		refuse(w, status)

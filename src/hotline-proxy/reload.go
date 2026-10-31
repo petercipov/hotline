@@ -17,6 +17,10 @@ type reloader struct {
 	clock     Clock
 	lookupEnv func(string) (string, bool)
 	logger    *slog.Logger
+	own       *own
+	// started is the config the proxy started with: settings that need a
+	// restart are still as it says.
+	started *config.Config
 
 	// mu lets one check or reload run at a time.
 	mu sync.Mutex
@@ -75,6 +79,7 @@ func (p *Proxy) load() {
 		for _, problem := range strings.Split(err.Error(), "\n") {
 			r.logger.Warn("config reload failed, the old config stays in use", "problem", problem)
 		}
+		r.own.reloaded(false, false)
 		return
 	}
 	for _, setting := range needRestart(old, cfg) {
@@ -90,6 +95,7 @@ func (p *Proxy) load() {
 		p.handler.intercept.issuer.set(cfg.Connect)
 	}
 	p.handler.cfg.Store(cfg)
+	r.own.reloaded(true, len(needRestart(r.started, cfg)) > 0)
 	r.logger.Info("config reloaded", "config_version", cfg.Label())
 }
 
@@ -111,6 +117,9 @@ func needRestart(old, cfg *config.Config) []string {
 	}
 	if !reflect.DeepEqual(old.Exporters, cfg.Exporters) {
 		changed = append(changed, "exporters")
+	}
+	if !reflect.DeepEqual(old.Telemetry, cfg.Telemetry) {
+		changed = append(changed, "telemetry")
 	}
 	return changed
 }

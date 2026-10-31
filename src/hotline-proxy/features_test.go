@@ -71,6 +71,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	awsSteps(sc, w)
 	traceSteps(sc, w)
 	reloadSteps(sc, w)
+	telemetrySteps(sc, w)
 }
 
 var errCheck = errors.New("check failed")
