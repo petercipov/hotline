@@ -180,6 +180,13 @@ These protect the customer's traffic. Breaking one is a bug even if tests pass.
 - Any new module is named and justified.
 - No secret or body value can reach a log, error or record.
 
+### When the pull request is merged
+
+Mark the chapter as done everywhere it is tracked, in the same session:
+- The chapter's requirement file in the project files (for example `connect-interception/requirements.md`): change its status line to say it is built and merged, with the pull request number and the `docs/` file where the detail now lives. Take "(draft)" out of the title.
+- `memory.md`: mark the chapter as built in the slice plan, with the pull request and the `docs/` file.
+- `proxy-spec.md` in `hotline-strategic`: if it still lists the chapter as "Later" or not built, open a pull request there to fix it.
+
 ## 10. Reviewing proxy code
 
 Use this when asked to review a change, your own or someone else's. For a plain bug hunt, the built-in `/code-review` command works well too; this section adds what only this repo knows.
