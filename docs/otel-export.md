@@ -132,6 +132,7 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 | `hotline.connection.reused` | true or false | The call used a connection that was already open. |
 | `hotline.config.version` | text | The `version` field of the config. |
 | `hotline.schema.*` | see below | What the check against the spec found. |
+| any name the spec gives | text, number, or true or false | A body field the spec marks `x-hotline-record`, such as `messaging.destination.name` for SQS's `QueueUrl`. Detail: [proxy-body-fields.md](proxy-body-fields.md). |
 
 **Headers.** Kept by default: `content-type`, `content-length`, `date`, `retry-after`, `request-id`, `x-request-id` and any `ratelimit-*`. A header marked `x-hotline-redact: false` in the spec is kept; one marked `true` shows as `REDACTED`. Never recorded: `authorization`, `proxy-authorization`, `cookie`, `set-cookie` and the login headers named in the spec. Every other header is left out, name and all.
 
@@ -198,7 +199,7 @@ There is no latency histogram and no pass or fail count: the control plane build
 
 - **Traces.** No spans at all. The spec plans an optional span per call, off by default.
 - **The proxy's own health data.** The `telemetry` section of the config is accepted but nothing is sent there. Dropped records show only in the warning log line.
-- **Bodies, cookies, `Authorization` and `Proxy-Authorization`.** Never sent, by design.
+- **Bodies, cookies, `Authorization` and `Proxy-Authorization`.** Never sent, by design. Only the body fields a spec marks `x-hotline-record` are copied.
 - **The proxy's own log lines.** They go to standard error as JSON, not over OTLP.
 
 ## Where the spec and the code differ

@@ -1324,6 +1324,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue to which permissions are added. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - AWSAccountIds
                 - Actions
@@ -1404,6 +1405,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue whose messages' visibility is changed. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - Entries
                 - QueueUrl
@@ -1459,6 +1461,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue whose message's visibility is changed. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
                 ReceiptHandle:
                     $ref: '#/components/schemas/String'
                     description: The receipt handle associated with the message, whose visibility timeout is changed. This parameter is returned by the ReceiveMessage action.
@@ -1499,6 +1502,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue from which messages are deleted. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - Entries
                 - QueueUrl
@@ -1551,6 +1555,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue from which messages are deleted. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
                 ReceiptHandle:
                     $ref: '#/components/schemas/String'
                     description: The receipt handle associated with the message to delete.
@@ -1563,6 +1568,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue to delete. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - QueueUrl
             type: object
@@ -1574,6 +1580,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue whose attribute information is retrieved. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - QueueUrl
             type: object
@@ -1614,6 +1621,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of a dead-letter queue. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - QueueUrl
             type: object
@@ -1686,6 +1694,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the queue.
+                    x-hotline-record: messaging.destination.name
             required:
                 - QueueUrl
             type: object
@@ -1837,6 +1846,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the queue from which the PurgeQueue action deletes messages. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - QueueUrl
             type: object
@@ -1891,6 +1901,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue from which messages are received. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
                 ReceiveRequestAttemptId:
                     $ref: '#/components/schemas/String'
                     description: This parameter applies only to FIFO (first-in-first-out) queues. The token used for deduplication of ReceiveMessage calls. If a networking issue occurs after a ReceiveMessage action, and instead of a response you receive a generic error, it is possible to retry the same action with an identical ReceiveRequestAttemptId to retrieve the same set of messages, even if their visibility timeout has not yet expired. You can use ReceiveRequestAttemptId only for 5 minutes after a ReceiveMessage action. When you set FifoQueue , a caller of the ReceiveMessage action can provide a ReceiveRequestAttemptId explicitly. It is possible to retry the ReceiveMessage action with the same ReceiveRequestAttemptId if none of the messages have been modified (deleted or had their visibility changes). During a visibility timeout, subsequent calls with the same ReceiveRequestAttemptId return the same messages and receipt handles. If a retry occurs within the deduplication interval, it resets the visibility timeout. For more information, see Visibility Timeout in the Amazon SQS Developer Guide . If a caller of the ReceiveMessage action still processes messages when the visibility timeout expires and messages become visible, another worker consuming from the same queue can receive the same messages and therefore process duplicates. Also, if a consumer whose message processing time is longer than the visibility timeout tries to delete the processed messages, the action fails with an error. To mitigate this effect, ensure that your application observes a safe threshold before the visibility timeout expires and extend the visibility timeout as necessary. While messages with a particular MessageGroupId are invisible, no more messages belonging to the same MessageGroupId are returned until the visibility timeout expires. You can still receive messages with another MessageGroupId from your FIFO queue as long as they are visible. If a caller of ReceiveMessage can't track the ReceiveRequestAttemptId , no retries work until the original visibility timeout expires. As a result, delays might occur but the messages in the queue remain in a strict order. The maximum length of ReceiveRequestAttemptId is 128 characters. ReceiveRequestAttemptId can contain alphanumeric characters ( a-z , A-Z , 0-9 ) and punctuation ( !"#$%&'()*+,-./:; ?@[\]^_`{|}~ ). For best practices of using ReceiveRequestAttemptId , see Using the ReceiveRequestAttemptId Request Parameter in the Amazon SQS Developer Guide .
@@ -1918,6 +1929,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue from which permissions are removed. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - Label
                 - QueueUrl
@@ -1930,6 +1942,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue to which batched messages are sent. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - Entries
                 - QueueUrl
@@ -2032,6 +2045,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue to which a message is sent. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - MessageBody
                 - QueueUrl
@@ -2063,6 +2077,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the Amazon SQS queue whose attributes are set. Queue URLs and names are case-sensitive.
+                    x-hotline-record: messaging.destination.name
             required:
                 - Attributes
                 - QueueUrl
@@ -2108,6 +2123,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the queue.
+                    x-hotline-record: messaging.destination.name
                 Tags:
                     $ref: '#/components/schemas/TagMap'
                     description: The list of tags to be added to the specified queue.
@@ -2124,6 +2140,7 @@ components:
                 QueueUrl:
                     $ref: '#/components/schemas/String'
                     description: The URL of the queue.
+                    x-hotline-record: messaging.destination.name
                 TagKeys:
                     $ref: '#/components/schemas/TagKeyList'
                     description: The list of tags to be removed from the specified queue.

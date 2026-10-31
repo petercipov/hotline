@@ -190,12 +190,12 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		w.appID = ""
 		return w.defaultCall()
 	})
-	sc.Step(`^hotline.requests carries no url.template$`, func() error {
+	sc.Step(`^hotline.requests carries no (\S+)$`, func(name string) error {
 		counts := w.counts()
 		if len(counts) == 0 {
 			return failf("no count arrived")
 		}
-		return hasNo(counts[len(counts)-1].attrs, "url.template")
+		return hasNo(counts[len(counts)-1].attrs, name)
 	})
 
 	sc.Step(`^an exporter that (does not set temporality|sets temporality to delta)$`, func(sets string) error {

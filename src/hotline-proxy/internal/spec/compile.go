@@ -35,6 +35,8 @@ type builder struct {
 	compiler *jsonschema.Compiler
 	schemes  map[string]*credential
 	problems []error
+	// reported holds the x-hotline-record marks already found broken.
+	reported map[string]bool
 }
 
 // outside refuses every document but the spec itself, so a $ref to
@@ -46,7 +48,7 @@ func (outside) Load(address string) (any, error) {
 }
 
 func newBuilder(name string, data []byte) *builder {
-	b := &builder{name: name, schemes: map[string]*credential{}}
+	b := &builder{name: name, schemes: map[string]*credential{}, reported: map[string]bool{}}
 	var raw any
 	_ = yaml.Unmarshal(data, &raw)
 	plain, err := json.Marshal(normalize(raw))
@@ -265,6 +267,7 @@ func (b *builder) checks(template, method, where string) *checks {
 			c.replies[code] = b.reply(r, pointer, where, code)
 		}
 	}
+	b.clashes(c, where)
 	return c
 }
 
@@ -355,11 +358,16 @@ func (b *builder) bodySpec(m map[string]any, pointer, where, what string) *bodyS
 		if marked && mark != "json" {
 			b.problem("%s: x-hotline-body of %s %s must be json", where, what, mediaType)
 		}
-		body.content = append(body.content, content{
+		at := pointer + "/content" + token(mediaType)
+		ct := content{
 			mediaType: mediaType,
 			json:      mark == "json",
-			schema:    b.schema(media, pointer+"/content"+token(mediaType), where, what+" "+mediaType),
-		})
+			schema:    b.schema(media, at, where, what+" "+mediaType),
+		}
+		if schema, ok := media["schema"]; ok {
+			ct.fields = b.fields(schema, at+"/schema")
+		}
+		body.content = append(body.content, ct)
 	}
 	return body
 }
