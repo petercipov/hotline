@@ -17,7 +17,7 @@ Feature: Reloading the config of the running program
     When a new call through the proxy reaches the test vendor
     And the program gets SIGTERM
     Then it exits with code 0
-    And the records carry the config versions e2e-1 and e2e-2, in that order
+    And the records carry the config versions e2e-1 and e2e-2
 
   Scenario: A changed config file is picked up with no signal
     Given a fake OTLP receiver
@@ -27,4 +27,4 @@ Feature: Reloading the config of the running program
     When a new call through the proxy reaches the test vendor
     And the program gets SIGTERM
     Then it exits with code 0
-    And the records carry the config versions e2e-2, in that order
+    And the records carry the config versions e2e-2

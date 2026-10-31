@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -257,11 +258,8 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 		return nil
 	})
 	sc.Step(`^an app's call is in progress and the program gets (SIGTERM|SIGINT)$`, func(name string) error {
-		p.callInBackground()
-		select {
-		case <-p.arrived:
-		case <-time.After(5 * time.Second):
-			return failf("the call did not reach the test vendor")
+		if err := p.callInProgress(); err != nil {
+			return err
 		}
 		return p.signal(name)
 	})
@@ -288,15 +286,7 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 	})
 
 	// Reloading.
-	sc.Step(`^an app's call is in progress$`, func() error {
-		p.callInBackground()
-		select {
-		case <-p.arrived:
-			return nil
-		case <-time.After(5 * time.Second):
-			return failf("the call did not reach the test vendor")
-		}
-	})
+	sc.Step(`^an app's call is in progress$`, p.callInProgress)
 	sc.Step(`^the config's version changes to (\S+)$`, func(version string) error {
 		p.writeConfig(strings.Replace(p.config(false), "version: e2e-1\n", "version: "+version+"\n", 1))
 		return nil
@@ -309,17 +299,23 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 		}
 		return failf("standard error does not say %q:\n%s", text, p.stderr.String())
 	})
-	sc.Step(`^the records carry the config versions (.+), in that order$`, func(list string) error {
+	// A call's record is made just after its answer is sent, so the
+	// records of two calls in a row can reach the receiver in either order.
+	sc.Step(`^the records carry the config versions (.+)$`, func(list string) error {
 		records, _ := p.receiver.got()
 		want := strings.Split(strings.ReplaceAll(list, " and ", ", "), ", ")
-		if len(records) != len(want) {
-			return failf("the receiver got %d records, want %d", len(records), len(want))
-		}
-		for i, r := range records {
-			got, _ := r.attrs["hotline.config.version"].(string)
-			if !strings.HasPrefix(got, want[i]+"+") {
-				return failf("record %d carries hotline.config.version %q, want %s and a fingerprint", i+1, got, want[i])
+		var got []string
+		for _, r := range records {
+			version, _ := r.attrs["hotline.config.version"].(string)
+			if !regexp.MustCompile(`^\S+\+[0-9a-f]{12}$`).MatchString(version) {
+				return failf("a record carries hotline.config.version %q, want a version and a fingerprint", version)
 			}
+			got = append(got, strings.Split(version, "+")[0])
+		}
+		slices.Sort(got)
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			return failf("the records carry the config versions %v, want %v", got, want)
 		}
 		return nil
 	})
@@ -769,6 +765,20 @@ func (p *program) callInBackground() {
 		defer close(p.answered)
 		p.respond(goCase2(p.proxyAddr, target, "test-shop"))
 	}()
+}
+
+// callInProgress makes a case 2 call and waits until it reaches the
+// holding test vendor.
+func (p *program) callInProgress() error {
+	p.callInBackground()
+	select {
+	case <-p.arrived:
+		return nil
+	case <-p.answered:
+		return failf("the call ended before it reached the test vendor: %v\n%s", p.respErr, p.stderr.String())
+	case <-time.After(5 * time.Second):
+		return failf("the call did not reach the test vendor:\n%s", p.stderr.String())
+	}
 }
 
 func (p *program) releaseVendor() {
