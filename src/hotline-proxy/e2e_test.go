@@ -550,8 +550,16 @@ paths:
 // issuer, and waits until its proxy port takes calls.
 func (p *program) run(flags ...string) error {
 	p.startVendors()
+	p.pickPorts()
 	p.writeConfig(p.config(false))
 	return p.launch(flags...)
+}
+
+// pickPorts chooses the program's ports again, once the test's own
+// servers listen. A port chosen before them can be handed to one of them,
+// and the program's calls would then reach the test vendor directly.
+func (p *program) pickPorts() {
+	p.proxyAddr, p.adminAddr = freePort(), freePort()
 }
 
 // launch starts the program with the config already written, trusting the

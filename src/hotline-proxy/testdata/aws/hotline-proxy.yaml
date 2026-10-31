@@ -10,7 +10,11 @@ listen:
 
 exporters:
   - otlp:
-      endpoint: localhost:4317     # an OpenTelemetry collector
+      endpoint: &collector localhost:4317   # an OpenTelemetry collector
+
+telemetry:                         # the proxy's own numbers, to the same collector
+  otlp:
+    endpoint: *collector
 
 apis:
   aws-sqs-invoices:                # the invoices queue
@@ -27,3 +31,4 @@ apis:
 integrations:
   - id: invoices                   # the user name in HOTLINE_PROXY
     apis: [aws-sqs-invoices, aws-s3-invoices]
+    fingerprintKey: { file: ./invoices.key }   # signs this integration's records
