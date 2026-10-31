@@ -16,6 +16,17 @@ func bodyFieldSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return has(record, key, value)
 	})
+	sc.Step(`^the record holds (\S+) = "([^"]*)"$`, func(key, value string) error {
+		record, err := w.lastRecord()
+		if err != nil {
+			return err
+		}
+		return has(record, key, value)
+	})
+	sc.Step(`^the app sends POST /orders with an Idempotency-Key (\d+) characters long$`, func(n int) error {
+		item = strings.Repeat("ab", n/2+1)[:n]
+		return w.shopCall("POST", "/orders", true, "Idempotency-Key: "+item, "json", `{"item":"A1","quantity":1}`)
+	})
 	sc.Step(`^the record holds (\S+) = (\S+) as a (true or false|number|whole number)$`, func(key, value, kind string) error {
 		record, err := w.lastRecord()
 		if err != nil {

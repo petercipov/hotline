@@ -1,4 +1,4 @@
-# Body fields in the record
+# Body fields and headers in the record
 
 *Agreed with Peter and built, 2026-10-31. Scenarios: `src/hotline-proxy/features/record-body-fields.feature`.*
 
@@ -28,6 +28,27 @@ QueueUrl:
 8. **Full records only.** Calls with a known integration and api get these fields. They are signed with the rest of the record ([proxy-signatures.md](proxy-signatures.md)) (Peter, 2026-10-31).
 9. **Not in the counter.** The fields go into records only, never into `hotline.requests`, since a field could have very many values and make the counter costly (Peter, 2026-10-31).
 
+## Headers
+
+The same mark on a header parameter of the call copies that header (Peter, 2026-10-31):
+
+```yaml
+parameters:
+  - name: X-Amz-Target
+    in: header
+    required: true
+    schema: { type: string, const: AmazonSQS.SendMessage }
+    x-hotline-record: messaging.operation.name
+```
+
+1. Only headers of the call. A mark on a path, query or cookie parameter, or on a reply header, stops the proxy at start.
+2. Never a login header: `Authorization`, `Proxy-Authorization`, `Cookie`, or a header the spec's security section names. Such a mark stops the proxy at start.
+3. The value is copied as text, cut at 256 characters. A header sent more than once is joined with ", ". A missing header is not copied.
+4. The name rules are the same as for body fields. A name may not be used on a header and in the call's body of one route.
+5. Signed with the rest of the record, never in the counter.
+
 ## SQS
 
 The shared SQS spec marks `QueueUrl` in every action's input with `x-hotline-record: messaging.destination.name`, so every queue's records name the full queue address, such as `https://sqs.eu-west-1.amazonaws.com/192325781350/invoices` (Peter, 2026-10-31). `tools/aws-openapi` writes the mark when run with `-record QueueUrl=messaging.destination.name`; action outputs are never marked.
+
+It also lists the `X-Amz-Target` header on every action, with the action's own value, marked `x-hotline-record: messaging.operation.name`, so records hold the exact header value, such as `AmazonSQS.SendMessage` (Peter, 2026-10-31). The tool writes it when run with `-record-action messaging.operation.name`.

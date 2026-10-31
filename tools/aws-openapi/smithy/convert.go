@@ -58,11 +58,21 @@ type document struct {
 	Components   map[string]any `yaml:"components"`
 }
 
+// Options say what the proxy copies into its records, by marking it
+// x-hotline-record in the spec.
+type Options struct {
+	// Record maps a field of an action's input, such as QueueUrl, to the
+	// record attribute it is copied to, such as messaging.destination.name.
+	Record map[string]string
+	// Action, when set, lists the action header on every action, with the
+	// action's own value, copied to this record attribute, such as
+	// messaging.operation.name.
+	Action string
+}
+
 // Convert reads a Smithy model holding one AWS JSON service and writes its
-// OpenAPI spec as YAML. record maps a field of an action's input, such as
-// QueueUrl, to the record attribute the proxy copies it to, such as
-// messaging.destination.name; the field is marked x-hotline-record.
-func Convert(data []byte, record map[string]string) ([]byte, error) {
+// OpenAPI spec as YAML.
+func Convert(data []byte, options Options) ([]byte, error) {
 	var m model
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("%w: not a Smithy JSON model: %w", ErrUnsupported, err)
@@ -80,12 +90,13 @@ func Convert(data []byte, record map[string]string) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("%w: %s is not on AWS's JSON protocol", ErrUnsupported, serviceID)
 	}
-	c := converter{model: m, mediaType: mediaType, schemas: map[string]any{}, record: record}
+	c := converter{model: m, mediaType: mediaType, schemas: map[string]any{}, options: options}
 	prefix := name(serviceID)
 
 	paths := map[string]any{}
 	for _, op := range service.Operations {
-		paths["/#"+actionHeader+"="+prefix+"."+name(op.Target)] = map[string]any{"post": c.operation(op.Target)}
+		action := prefix + "." + name(op.Target)
+		paths["/#"+actionHeader+"="+action] = map[string]any{"post": c.operation(op.Target, action)}
 	}
 	c.schemas["AwsJsonError"] = map[string]any{
 		"type":        "object",
@@ -150,10 +161,10 @@ type converter struct {
 	model     model
 	mediaType string
 	schemas   map[string]any
-	record    map[string]string
+	options   Options
 }
 
-func (c *converter) operation(id string) map[string]any {
+func (c *converter) operation(id, action string) map[string]any {
 	op := c.model.Shapes[id]
 	requestID := map[string]any{"x-amzn-RequestId": map[string]any{"schema": map[string]any{"type": "string"}, "x-hotline-redact": false}}
 	errorHeaders := map[string]any{
@@ -176,6 +187,13 @@ func (c *converter) operation(id string) map[string]any {
 			"5XX": errorReply,
 		},
 	}
+	if c.options.Action != "" {
+		out["parameters"] = []any{map[string]any{
+			"name": actionHeader, "in": "header", "required": true,
+			"schema":           map[string]any{"type": "string", "const": action},
+			"x-hotline-record": c.options.Action,
+		}}
+	}
 	if doc := text(op.Traits); doc != "" {
 		out["description"] = doc
 	}
@@ -190,7 +208,7 @@ func (c *converter) mark(r *ref) {
 	}
 	schema, _ := c.schemas[name(r.Target)].(map[string]any)
 	props, _ := schema["properties"].(map[string]any)
-	for field, attribute := range c.record {
+	for field, attribute := range c.options.Record {
 		if prop, ok := props[field].(map[string]any); ok {
 			prop["x-hotline-record"] = attribute
 		}
