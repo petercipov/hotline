@@ -174,6 +174,11 @@ func (r *receiver) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	r.mu.Unlock()
 	if refuse != nil {
+		// Reading the body first keeps the connection usable. A reply sent
+		// with the body unread makes the HTTP server close the connection
+		// and wait half a second in a goroutine of its own, which outlives
+		// the scenario and fails its check for leftover goroutines.
+		_, _ = io.Copy(io.Discard, req.Body)
 		if refuse.retryAfter != "" {
 			rw.Header().Set("Retry-After", refuse.retryAfter)
 		}
