@@ -42,8 +42,9 @@ func signature(attrs []attribute.KeyValue, at, now time.Time, key []byte) []attr
 				Name: strings.TrimPrefix(name, "http.response.header."), Param: "resp", Value: strings.Join(kv.Value.AsStringSlice(), ", "),
 			})
 		default:
-			// The values are plain types, so they always turn into JSON.
-			value, _ := json.Marshal(plain(kv.Value))
+			// The values are plain types and finite numbers, so they always
+			// turn into JSON.
+			value, _ := json.Marshal(plain(kv.Value)) //nolint:errchkjson // see above
 			rest = append(rest, httpsig.Component{Name: name, Value: string(value)})
 		}
 	}

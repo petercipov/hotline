@@ -26,7 +26,11 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^the shop spec, with no fingerprintKey$`, func() error {
 		last := len(w.integrations) - 1
-		w.integrations[last] = w.integrations[last][:strings.Index(w.integrations[last], "    fingerprintKey:")]
+		before, _, found := strings.Cut(w.integrations[last], "    fingerprintKey:")
+		if !found {
+			return failf("the integration has no fingerprintKey: %s", w.integrations[last])
+		}
+		w.integrations[last] = before
 		return nil
 	})
 	sc.Step(`^the record has hotline.signature and hotline.signature_input$`, func() error {
@@ -245,7 +249,10 @@ func checkSignature(r receivedRecord, key string) error {
 			respHeaders = append(respHeaders, line{strconv.Quote(strings.TrimPrefix(name, "http.response.header.")) + ";resp", headerValue(v)})
 		case isCallPart(name):
 		default:
-			value, _ := json.Marshal(v)
+			value, err := json.Marshal(v)
+			if err != nil {
+				return err
+			}
 			rest = append(rest, line{strconv.Quote(name), string(value)})
 		}
 	}
