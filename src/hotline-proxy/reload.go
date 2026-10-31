@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"reflect"
@@ -79,7 +78,7 @@ func (p *Proxy) load() {
 		return
 	}
 	for _, setting := range needRestart(old, cfg) {
-		r.logger.Warn(fmt.Sprintf("%s changed and needs a restart; the rest of the config is in use", setting))
+		r.logger.Warn(setting + " changed and needs a restart; the rest of the config is in use")
 	}
 	for _, w := range cfg.Warnings {
 		r.logger.Warn("config warning", "reason", w)
