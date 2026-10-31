@@ -109,7 +109,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 			return err
 		}
 		return hasAll(record, "hotline.integration.id", "hotline.ingress", "url.full", "url.template",
-			"http.response.status_code", "hotline.timing.total", "hotline.config.version")
+			"http.response.status_code", "hotline.timing.total_us", "hotline.config.version")
 	})
 	sc.Step(`^standard names come from the semconv constants, such as http.request.method and url.full$`, func() error {
 		return w.lastHasAll("http.request.method", "url.full", "url.scheme", "server.address", "server.port",
@@ -125,9 +125,9 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 			"server.port", "network.peer.address", "network.protocol.version", "http.response.status_code",
 			"error.type", "http.request.body.size", "http.response.body.size", "tls.protocol.version",
 			"tls.server.not_after", "dns.question.name"}
-		hotline := []string{"hotline.integration.id", "hotline.ingress", "hotline.timing.dns",
-			"hotline.timing.connect", "hotline.timing.tls", "hotline.timing.first_byte", "hotline.timing.total",
-			"hotline.timing.proxy_request", "hotline.timing.proxy_response", "hotline.client.cancelled",
+		hotline := []string{"hotline.integration.id", "hotline.ingress", "hotline.timing.dns_us",
+			"hotline.timing.connect_us", "hotline.timing.tls_us", "hotline.timing.first_byte_us", "hotline.timing.total_us",
+			"hotline.timing.proxy_request_us", "hotline.timing.proxy_response_us", "hotline.client.cancelled",
 			"hotline.connection.reused", "hotline.config.version", "hotline.schema.request.errors",
 			"hotline.schema.response.errors", "hotline.schema.request.errors_total", "hotline.schema.response.errors_total",
 			"hotline.schema.skipped", "hotline.signature", "hotline.signature_key_id",
@@ -149,7 +149,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 			return err
 		}
 		checks := map[string]string{
-			"http.response.status_code": "int64", "server.port": "int64", "hotline.timing.total": "float64",
+			"http.response.status_code": "int64", "server.port": "int64", "hotline.timing.total_us": "int64",
 			"hotline.connection.reused": "bool", "hotline.client.cancelled": "bool",
 			"http.request.header.content-type": "[]interface {}", "url.full": "string",
 		}

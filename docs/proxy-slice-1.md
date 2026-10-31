@@ -69,7 +69,7 @@ Peter answered these on 2026-10-28. The feature files and the code follow them.
 7. **Config version.** A `version` field in the config file, written by whoever changes it. A config without it is refused.
 8. **Strict config.** Lenient: unknown fields and an `apis` list on `not-passed` are accepted, and each gets a warning log line.
 9. **Matching routes.** A trailing slash is ignored. The path of the first `servers` address goes in front of every route.
-10. **Timing definitions.** Each timing is the length of its own phase, except `first_byte`, which counts from when the call reached the proxy. The proxy's own time is split in two: `hotline.timing.proxy_request` (before the vendor call starts) and `hotline.timing.proxy_response` (after the vendor's reply ends). Together they are the total minus the vendor's part.
+10. **Timing definitions.** Each timing is the length of its own phase, except `first_byte`, which counts from when the call reached the proxy. The proxy's own time is split in two: `hotline.timing.proxy_request_us` (before the vendor call starts) and `hotline.timing.proxy_response_us` (after the vendor's reply ends). Together they are the total minus the vendor's part.
 11. **Empty query values.** `customer=` stays as it is.
 12. **Fields not built yet.** The schema and fingerprint fields are left out.
 13. **Dropped records.** A warning log line, at most once a minute per destination, and always one on the final send at shutdown. Each exporter's queue holds 10 000 records unless `queueSize` says otherwise.

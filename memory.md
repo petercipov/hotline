@@ -46,6 +46,7 @@ The proxy is built in small slices, tests first.
    - a signature on every full record: HMAC-SHA256 with the integration's `fingerprintKey` over every attribute sorted by name plus the timestamp, no list of names (`hotline.signature`, `hotline.signature_key_id`), and each body signed on its own as it passes (`hotline.request.body.signature`, `hotline.response.body.signature`), covered by the record's signature (Peter, 2026-10-31; replaces the RFC 9421 form of 2026-10-30). Detail: [docs/proxy-signatures.md](docs/proxy-signatures.md);
    - body fields in the record: a spec marks a body field `x-hotline-record: <attribute name>`, and the proxy copies its plain value (text cut at 256, number, true or false; never inside a list) into full records, signed, never into the counter. Names like the proxy's own are refused. The same mark on a call header (never a login header) copies the header as text. The SQS spec marks `QueueUrl` as `messaging.destination.name`, the full address, and lists `X-Amz-Target` on every action as `messaging.operation.name` (Peter, 2026-10-31). Built. Detail: [docs/proxy-body-fields.md](docs/proxy-body-fields.md);
    - overlays on an api's spec: OpenAPI Overlay 1.1 only, on the api only, applied at load in order, a target matching nothing is a warning, library `speakeasy-api/openapi/overlay`, plus the `hotline-proxy overlay` command that makes one from two specs (Peter, 2026-10-30). Built; needed by the SQS example. Detail: [docs/proxy-overlays.md](docs/proxy-overlays.md);
+   - timings are whole microseconds, each name ending in `_us`, such as `hotline.timing.first_byte_us` (Peter, 2026-10-31). Detail: [docs/otel-export.md](docs/otel-export.md);
    - config reload without a restart;
    - the load test, with k6.
 
@@ -62,7 +63,7 @@ Full wording is at the end of [docs/proxy-slice-1.md](docs/proxy-slice-1.md).
 7. The config file needs a `version` field. A config without it is refused.
 8. Config checks are lenient: unknown fields are accepted, with a warning log line each.
 9. Route matching ignores a trailing slash, and puts the path of the first `servers` address in front of every route.
-10. Each timing is its own phase, except `first_byte`, counted from arrival. The proxy's own time is split into `hotline.timing.proxy_request` and `hotline.timing.proxy_response`.
+10. Each timing is its own phase, except `first_byte`, counted from arrival. The proxy's own time is split into `hotline.timing.proxy_request_us` and `hotline.timing.proxy_response_us`.
 11. Empty query values like `customer=` stay as they are.
 12. Fields not built yet (schema, fingerprints) are left out of the record.
 13. Dropped records: a warning at most once a minute per destination, plus one at shutdown. Queues hold 10 000 records unless `queueSize` says otherwise.
@@ -92,7 +93,7 @@ Full wording in [docs/proxy-tls-from-apps.md](docs/proxy-tls-from-apps.md).
 5. Client certificates (mutual TLS) come later, with caller authentication.
 6. TLS 1.2 and 1.3 only, Go's default ciphers, nothing to configure.
 7. Only HTTP/1.1 over TLS for now; HTTP/2 comes with the Host header ingress.
-8. No record field for it; the proxy's own health data says it once. Changed 2026-10-29: the TLS setup time is recorded as `hotline.timing.app_tls`.
+8. No record field for it; the proxy's own health data says it once. Changed 2026-10-29: the TLS setup time is recorded as `hotline.timing.app_tls_us`.
 9. A missing, broken, mismatched or expired certificate stops the proxy at start. A failed app TLS setup is a debug log line and, later, a count in health data.
 10. The warning before the proxy's own certificate expires comes with the health data.
 
@@ -166,8 +167,8 @@ Full wording in [docs/proxy-connect.md](docs/proxy-connect.md). Why: a proxy dep
 5. Host certificates: made on first use, memory only, 24 hours.
 6. HTTP/2 and HTTP/1.1 inside the tunnel. `CONNECT` over HTTP/2 works too: the tunnel is that `CONNECT`'s own stream, so many tunnels share one connection (Peter, 2026-10-30).
 7. Calls go to the `CONNECT` host and port; another host gets `421`.
-8. One record per call, `hotline.ingress=connect`; `hotline.timing.app_tls` on the first call of each connection; an app that doesn't trust the issuer gets a minimal record with `tls_untrusted_by_app`.
-9. `hotline.timing.app_tls` also on TLS from apps (changes TLS from apps decision 8).
+8. One record per call, `hotline.ingress=connect`; `hotline.timing.app_tls_us` on the first call of each connection; an app that doesn't trust the issuer gets a minimal record with `tls_untrusted_by_app`.
+9. `hotline.timing.app_tls_us` also on TLS from apps (changes TLS from apps decision 8).
 10. The issuer is made only for Hotline; files that are not an issuer stop the start; over a year gets a warning.
 11. Plain HTTP inside a tunnel is allowed, handled like a forward proxy `http` call.
 

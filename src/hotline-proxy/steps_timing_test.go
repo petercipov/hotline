@@ -24,10 +24,10 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		sum := 0.0
 		for _, phase := range []string{"dns", "connect", "tls"} {
-			v, _ := record["hotline.timing."+phase].(float64)
+			v, _ := secondsOf(record["hotline.timing."+phase+"_us"])
 			sum += v
 		}
-		if firstByte, _ := record["hotline.timing.first_byte"].(float64); firstByte < sum || sum < 0.02 {
+		if firstByte, _ := secondsOf(record["hotline.timing.first_byte_us"]); firstByte < sum || sum < 0.02 {
 			return failf("first_byte is %v, want at least dns, connect and tls together, %v", firstByte, sum)
 		}
 		return nil
@@ -42,9 +42,9 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return w.defaultCall()
 	})
-	sc.Step(`^the record has hotline.timing.dns, connect, tls, first_byte and total$`, func() error {
-		return w.lastHasAll("hotline.timing.dns", "hotline.timing.connect", "hotline.timing.tls",
-			"hotline.timing.first_byte", "hotline.timing.total")
+	sc.Step(`^the record has hotline.timing.dns_us, connect_us, tls_us, first_byte_us and total_us$`, func() error {
+		return w.lastHasAll("hotline.timing.dns_us", "hotline.timing.connect_us", "hotline.timing.tls_us",
+			"hotline.timing.first_byte_us", "hotline.timing.total_us")
 	})
 	sc.Step(`^network.peer.address holds the vendor IP$`, func() error {
 		return w.lastHas("network.peer.address", w.vendor("api.talon.one").ip.String())
@@ -61,14 +61,14 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^network.protocol.version holds the HTTP version used to the vendor$`, func() error {
 		return w.lastHas("network.protocol.version", "2")
 	})
-	sc.Step(`^hotline.timing.proxy_request and proxy_response hold the proxy's own added time$`, func() error {
+	sc.Step(`^hotline.timing.proxy_request_us and proxy_response_us hold the proxy's own added time$`, func() error {
 		record, err := w.lastRecord()
 		if err != nil {
 			return err
 		}
-		total, _ := record["hotline.timing.total"].(float64)
-		for _, key := range []string{"hotline.timing.proxy_request", "hotline.timing.proxy_response"} {
-			if v, ok := record[key].(float64); !ok || v < 0 || v > total {
+		total, _ := secondsOf(record["hotline.timing.total_us"])
+		for _, key := range []string{"hotline.timing.proxy_request_us", "hotline.timing.proxy_response_us"} {
+			if v, ok := secondsOf(record[key]); !ok || v < 0 || v > total {
 				return failf("%s is %v, want between 0 and the total %v", key, record[key], total)
 			}
 		}
@@ -95,8 +95,8 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		total, _ := record["hotline.timing.total"].(float64)
-		firstByte, _ := record["hotline.timing.first_byte"].(float64)
+		total, _ := secondsOf(record["hotline.timing.total_us"])
+		firstByte, _ := secondsOf(record["hotline.timing.first_byte_us"])
 		if total < firstByte+0.14 || total > w.appTook.Seconds() {
 			return failf("total is %v with first_byte %v, want it after the last part and within the app's %v", total, firstByte, w.appTook)
 		}
@@ -113,7 +113,7 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		return hasNo(record, "hotline.timing."+phase)
+		return hasNo(record, "hotline.timing."+phase+"_us")
 	})
 	sc.Step(`^a vendor whose host is an IP address$`, func() error {
 		w.appID = ""
@@ -171,7 +171,7 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the waiting call's record says hotline.connection.reused true, with no dns, connect or tls timings$`, func() error {
 		for _, r := range w.records() {
 			if r.attrs["hotline.connection.reused"] == true {
-				return hasNo(r.attrs, "hotline.timing.dns", "hotline.timing.connect", "hotline.timing.tls")
+				return hasNo(r.attrs, "hotline.timing.dns_us", "hotline.timing.connect_us", "hotline.timing.tls_us")
 			}
 		}
 		return failf("no call reused a connection")
@@ -182,7 +182,7 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		return hasNo(record, "hotline.timing.dns", "hotline.timing.connect", "hotline.timing.tls")
+		return hasNo(record, "hotline.timing.dns_us", "hotline.timing.connect_us", "hotline.timing.tls_us")
 	})
 	sc.Step(`^network.peer.address is still recorded$`, func() error {
 		return w.lastHas("network.peer.address", w.vendor("api.talon.one").ip.String())
@@ -196,17 +196,17 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		}[failure])
 	})
 	sc.Step(`^the record has the dns timing up to the failure and the total$`, func() error {
-		return w.lastHasAll("hotline.timing.dns", "hotline.timing.total")
+		return w.lastHasAll("hotline.timing.dns_us", "hotline.timing.total_us")
 	})
 	sc.Step(`^the record has the dns and connect timings and the total$`, func() error {
-		return w.lastHasAll("hotline.timing.dns", "hotline.timing.connect", "hotline.timing.total")
+		return w.lastHasAll("hotline.timing.dns_us", "hotline.timing.connect_us", "hotline.timing.total_us")
 	})
 	sc.Step(`^the record has no first_byte timing$`, func() error {
 		record, err := w.lastRecord()
 		if err != nil {
 			return err
 		}
-		return hasNo(record, "hotline.timing.first_byte")
+		return hasNo(record, "hotline.timing.first_byte_us")
 	})
 
 	sc.Step(`^a vendor whose IPv6 address cannot be reached and whose IPv4 address can$`, func() error {
@@ -241,7 +241,7 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		if connect, _ := record["hotline.timing.connect"].(float64); connect < 5 || connect > 6 {
+		if connect, _ := secondsOf(record["hotline.timing.connect_us"]); connect < 5 || connect > 6 {
 			return failf("connect is %v, want just over the first address's 5 seconds", connect)
 		}
 		return nil
@@ -254,8 +254,8 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		connect, _ := record["hotline.timing.connect"].(float64)
-		total, _ := record["hotline.timing.total"].(float64)
+		connect, _ := secondsOf(record["hotline.timing.connect_us"])
+		total, _ := secondsOf(record["hotline.timing.total_us"])
 		if connect <= 0 || connect > total {
 			return failf("connect is %v, want above 0 and within the total %v", connect, total)
 		}
@@ -285,4 +285,10 @@ func (w *world) lastHasAll(keys ...string) error {
 		return err
 	}
 	return hasAll(record, keys...)
+}
+
+// secondsOf reads a timing, recorded in whole microseconds, as seconds.
+func secondsOf(v any) (float64, bool) {
+	us, ok := v.(int64)
+	return float64(us) / 1e6, ok
 }

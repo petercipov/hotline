@@ -63,7 +63,7 @@ func (h *handler) refused(r *http.Request, start time.Time, ingress, id string, 
 		semconv.HTTPRequestMethodKey.String(r.Method),
 		semconv.HTTPResponseStatusCode(status),
 		semconv.ErrorTypeKey.String("http_request_error"),
-		attribute.Float64("hotline.timing.total", h.clock.Now().Sub(start).Seconds()),
+		attribute.Int64("hotline.timing.total_us", h.clock.Now().Sub(start).Microseconds()),
 	)
 	h.sink.Record(context.Background(), start, attrs)
 }
@@ -75,26 +75,27 @@ func orNotPassed(id string) string {
 	return id
 }
 
-// timings are the phase lengths in seconds. A phase that did not happen,
-// such as DNS for a reused connection, has no timing.
+// timings are the phase lengths in whole microseconds, each name ending in
+// _us (Peter, 2026-10-31). A phase that did not happen, such as DNS for a
+// reused connection, has no timing.
 func (c *call) timings(end time.Time) []attribute.KeyValue {
-	seconds := func(from, to time.Time) float64 { return to.Sub(from).Seconds() }
+	micros := func(from, to time.Time) int64 { return to.Sub(from).Microseconds() }
 	var attrs []attribute.KeyValue
 	for _, p := range []phase{phaseDNS, phaseConnect, phaseTLS} {
 		if t := c.times[p]; !t[1].IsZero() {
-			attrs = append(attrs, attribute.Float64("hotline.timing."+string(p), seconds(t[0], t[1])))
+			attrs = append(attrs, attribute.Int64("hotline.timing."+string(p)+"_us", micros(t[0], t[1])))
 		}
 	}
 	if c.appTimed {
-		attrs = append(attrs, attribute.Float64("hotline.timing.app_tls", c.appTLS.Seconds()))
+		attrs = append(attrs, attribute.Int64("hotline.timing.app_tls_us", c.appTLS.Microseconds()))
 	}
 	if !c.firstByte.IsZero() {
-		attrs = append(attrs, attribute.Float64("hotline.timing.first_byte", seconds(c.start, c.firstByte)))
+		attrs = append(attrs, attribute.Int64("hotline.timing.first_byte_us", micros(c.start, c.firstByte)))
 	}
 	return append(attrs,
-		attribute.Float64("hotline.timing.total", seconds(c.start, end)),
-		attribute.Float64("hotline.timing.proxy_request", seconds(c.start, c.vendorIn)),
-		attribute.Float64("hotline.timing.proxy_response", seconds(c.vendorOut, end)),
+		attribute.Int64("hotline.timing.total_us", micros(c.start, end)),
+		attribute.Int64("hotline.timing.proxy_request_us", micros(c.start, c.vendorIn)),
+		attribute.Int64("hotline.timing.proxy_response_us", micros(c.vendorOut, end)),
 	)
 }
 

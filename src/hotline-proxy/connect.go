@@ -148,10 +148,10 @@ func (h *handler) tunnelFailed(r *http.Request, start time.Time, t *tunnel, a *a
 		semconv.ServerAddress(t.host),
 		semconv.HTTPRequestMethodKey.String(r.Method),
 		semconv.ErrorTypeKey.String(errorType),
-		attribute.Float64("hotline.timing.total", h.clock.Now().Sub(start).Seconds()),
+		attribute.Int64("hotline.timing.total_us", h.clock.Now().Sub(start).Microseconds()),
 	}
 	if took, timed := a.handshakeTime(); timed {
-		attrs = append(attrs, attribute.Float64("hotline.timing.app_tls", took.Seconds()))
+		attrs = append(attrs, attribute.Int64("hotline.timing.app_tls_us", took.Microseconds()))
 	}
 	h.sink.Record(context.Background(), start, attrs)
 }
