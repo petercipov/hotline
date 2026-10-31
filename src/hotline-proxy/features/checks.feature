@@ -9,8 +9,57 @@ Feature: Checking calls against the vendor's spec
   what the spec expects, never a value from the call. A result is written
   here as "part place rule expected"; several are joined by "; ".
 
+  The request is checked as soon as it has been sent, while the proxy
+  waits for the vendor, and the reply as soon as it has arrived, while the
+  proxy sends it on: never in the call's way (Peter, 2026-10-31).
+
+  The check's status, hotline.schema.status, is on the record: valid when
+  nothing was found, invalid when the call or the reply broke the spec,
+  and skipped when nothing was found but part of the check did not run.
+  The trace has a "request spec check" and a "reply spec check" span, with
+  no attribute. Each is ok when its side passed and error when it broke
+  the spec; a skipped check leaves it unset, since nothing was proven
+  (Peter, 2026-10-31).
+
   Background:
     Given the shop spec
+
+  Rule: The status of the check
+
+    Scenario Outline: The status is on the record, and each span says how its side went
+      Given the vendor answers <answer>
+      When the app sends <call>
+      Then the record says hotline.schema.status=<status>
+      And the "request spec check" span ends with status <request>
+      And the "reply spec check" span ends with status <reply>
+
+      Examples:
+        | answer                                                         | call                                                                                 | status  | request | reply |
+        | 201                                                            | POST /orders with "Idempotency-Key: k1" and the json body {"item":"A1","quantity":2} | valid   | ok      | ok    |
+        | 400                                                            | GET /orders?limit=abc                                                                | invalid | error   | ok    |
+        | 418                                                            | GET /orders                                                                          | invalid | ok      | error |
+        | 201                                                            | POST /orders with "Idempotency-Key: k1" and a json body of 2 MiB                     | skipped | unset   | ok    |
+        | 200 with "Content-Type: text/event-stream" and the body data: x | GET /orders                                                                          | skipped | ok      | unset |
+
+    Scenario: A call that got no reply has no reply check
+      Given the vendor refuses the connection
+      When the app sends GET /orders
+      Then the "request spec check" span ends with status ok
+      And the trace has no "reply spec check" span
+
+    Scenario Outline: An error answer from the vendor fails no span
+      Only a breakdown fails a span: a timeout, a lost connection, a
+      failed TLS setup. The vendor's own answer, even a 5xx, does not
+      (Peter, 2026-10-31).
+      Given the vendor answers <status>
+      When the app sends GET /orders
+      Then the "vendor call" span ends with status unset
+      And the "hotline call" span ends with status unset
+
+      Examples:
+        | status |
+        | 404    |
+        | 503    |
 
   Rule: Every part of the request is checked
 

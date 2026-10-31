@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -62,7 +63,13 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		children := t.children(p)
+		want := quoted(list)
+		var children []receivedSpan
+		for _, c := range t.children(p) {
+			if slices.Contains(want, c.name) {
+				children = append(children, c)
+			}
+		}
 		var got []string
 		for i, c := range children {
 			got = append(got, c.name)
@@ -70,22 +77,53 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 				return failf("%q starts before %q ends", c.name, children[i-1].name)
 			}
 		}
-		if want := quoted(list); strings.Join(got, ", ") != strings.Join(want, ", ") {
+		if strings.Join(got, ", ") != strings.Join(want, ", ") {
 			return failf("under %q are %q, want %q", parent, got, want)
 		}
 		return nil
 	})
-	sc.Step(`^every span is within its parent$`, func() error {
+	sc.Step(`^every span( but the spec checks)? is within its parent$`, func(except string) error {
 		t, err := w.lastTrace()
 		if err != nil {
 			return err
 		}
 		for _, s := range t.spans {
+			if except != "" && strings.HasSuffix(s.name, " spec check") {
+				continue
+			}
 			for _, p := range t.spans {
 				if p.spanID == s.parent && (s.start < p.start || s.end > p.end) {
 					return failf("%q runs from %d to %d, outside %q from %d to %d", s.name, s.start, s.end, p.name, p.start, p.end)
 				}
 			}
+		}
+		return nil
+	})
+	sc.Step(`^"([^"]+)" starts when "([^"]+)" ends(?:, under "([^"]+)")?$`, func(later, earlier, parent string) error {
+		t, err := w.lastTrace()
+		if err != nil {
+			return err
+		}
+		l, err := t.one(later)
+		if err != nil {
+			return err
+		}
+		e, err := t.one(earlier)
+		if err != nil {
+			return err
+		}
+		if l.start != e.end || l.end < l.start {
+			return failf("%q runs from %d to %d; %q ends at %d", later, l.start, l.end, earlier, e.end)
+		}
+		if parent == "" {
+			return nil
+		}
+		p, err := t.one(parent)
+		if err != nil {
+			return err
+		}
+		if l.parent != p.spanID {
+			return failf("%q is not under %q", later, parent)
 		}
 		return nil
 	})
@@ -267,6 +305,16 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^a call reuses it$`, func() error { return w.defaultCall() })
 
+	sc.Step(`^a vendor that sends half of its reply, and the rest (\d+) milliseconds later$`, func(after int) error {
+		w.vendor("api.talon.one").setAnswer(func(rw http.ResponseWriter, _ *http.Request) {
+			rw.Header().Set("Content-Length", "100")
+			_, _ = io.WriteString(rw, strings.Repeat("a", 50))
+			rw.(http.Flusher).Flush()
+			time.Sleep(time.Duration(after) * time.Millisecond)
+			_, _ = io.WriteString(rw, strings.Repeat("a", 50))
+		})
+		return nil
+	})
 	sc.Step(`^a call where the app's body breaks off$`, func() error {
 		w.pending = &request{
 			method: "PUT", target: w.target, headers: []string{basic(w.appID + ":x"), "Content-Type: application/json"},
@@ -281,11 +329,9 @@ func timingSteps(sc *godog.ScenarioContext, w *world) {
 			"the vendor never answers": "a vendor slower than vendorTimeout",
 		}[failure])
 	})
-	sc.Step(`^the "([^"]+)" span ends with status error$`, func(name string) error {
-		return w.failed(name)
-	})
+	sc.Step(`^the "([^"]+)" span ends with status (error|unset|ok)$`, w.spanStatus)
 	sc.Step(`^"vendor call" and "hotline call" end with status error$`, func() error {
-		return errors.Join(w.failed("vendor call"), w.failed("hotline call"))
+		return errors.Join(w.spanStatus("vendor call", "error"), w.spanStatus("hotline call", "error"))
 	})
 	sc.Step(`^no span has an error.type$`, func() error {
 		t, err := w.lastTrace()
@@ -564,7 +610,7 @@ func (w *world) lasts(name string, least, most time.Duration) error {
 	return nil
 }
 
-func (w *world) failed(name string) error {
+func (w *world) spanStatus(name, status string) error {
 	t, err := w.lastTrace()
 	if err != nil {
 		return err
@@ -573,8 +619,8 @@ func (w *world) failed(name string) error {
 	if err != nil {
 		return err
 	}
-	if s.status != "error" {
-		return failf("%q has the status %s, want error", name, s.status)
+	if s.status != status {
+		return failf("%q has the status %s, want %s", name, s.status, status)
 	}
 	return nil
 }

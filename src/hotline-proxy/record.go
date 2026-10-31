@@ -14,12 +14,36 @@ import (
 
 	"hotline-proxy/internal/export"
 	"hotline-proxy/internal/spec"
+	"hotline-proxy/internal/tracectx"
 )
 
-// finish builds the call's record and trace once the reply has gone back to
-// the app, and hands them to the exporters without waiting for them.
+// finish ends the call once the reply has gone back to the app. A side not
+// yet checked, such as a request never sent, is checked now. The record and
+// trace are made once the checks end, apart from the call, so the app never
+// waits for them; Shutdown does.
 func (c *call) finish() {
 	end := c.h.clock.Now()
+	if c.api == nil {
+		c.record(end)
+		return
+	}
+	c.checkRequest(end)
+	c.mu.Lock()
+	resp := c.resp
+	c.mu.Unlock()
+	c.checkReply(end, resp)
+	c.h.calls.Add(1)
+	go func() {
+		defer c.h.calls.Done()
+		c.record(end)
+	}()
+}
+
+// record builds the call's record and trace, and hands them to the
+// exporters without waiting for them.
+func (c *call) record(end time.Time) {
+	c.reqCheck.wait()
+	replied := c.replyCheck.wait()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	attrs := []attribute.KeyValue{
@@ -46,7 +70,14 @@ func (c *call) finish() {
 	attrs = append(attrs, attribute.Int64("hotline.timing.total_us", end.Sub(opened).Microseconds()))
 	spans := c.spans(opened, end)
 	if c.api != nil {
-		attrs = append(attrs, c.full()...)
+		req, reply := c.reqCheck.found, c.replyCheck.found
+		attrs = append(attrs, c.full(req.With(reply))...)
+		// Each side was checked alongside the call, so its step may end
+		// after the call span (Peter, 2026-10-31).
+		spans = append(spans, c.checkSpan("request spec check", c.reqCheck, req.Request, req.Skipped))
+		if replied {
+			spans = append(spans, c.checkSpan("reply spec check", c.replyCheck, reply.Reply, reply.Skipped))
+		}
 		attrs = append(attrs, traceSignature(c.trace, spans, c.api.SigningKey))
 		attrs = append(attrs, signature(attrs, c.start, c.trace, c.api.SigningKey)...)
 	}
@@ -54,6 +85,15 @@ func (c *call) finish() {
 		sc: c.trace, at: c.start, attrs: attrs, spans: spans,
 		overhead: c.vendorIn.Sub(c.start) + end.Sub(orTime(c.vendorOut, end)), reached: true,
 	})
+}
+
+// checkSpan is the step of one side's check: error when that side broke
+// the spec, ok when it passed, unset when part of it was skipped.
+func (c *call) checkSpan(name string, s *specCheck, found []spec.Result, skipped string) export.Span {
+	return export.Span{
+		ID: tracectx.NewSpanID(), Parent: c.trace.SpanID(), Name: name, Kind: trace.SpanKindInternal,
+		Start: s.start, End: s.end, Failed: len(found) > 0, OK: len(found) == 0 && skipped == "",
+	}
 }
 
 // refused records a request the proxy read but did not forward, with a
@@ -105,8 +145,9 @@ func orNotPassed(id string) string {
 	return id
 }
 
-// full is the rest of the record, for calls with a known integration and api.
-func (c *call) full() []attribute.KeyValue {
+// full is the rest of the record, for calls with a known integration and
+// api, and the status of the check against the spec, which is part of it.
+func (c *call) full(found spec.Checked) []attribute.KeyValue {
 	origin := c.scheme + "://" + c.host
 	if c.target.Port() != "" {
 		origin += ":" + c.port
@@ -129,7 +170,7 @@ func (c *call) full() []attribute.KeyValue {
 		semconv.URLScheme(c.scheme),
 		semconv.ServerPort(port),
 		semconv.HTTPRequestBodySize(int(sent)),
-		attribute.Bool("hotline.client.cancelled", c.app.gone),
+		attribute.Bool("hotline.client.cancelled", c.app.failed()),
 		attribute.String("hotline.config.version", c.cfg.Label()),
 	}
 	if redacted.Template != "" {
@@ -158,25 +199,16 @@ func (c *call) full() []attribute.KeyValue {
 	for name, values := range redacted.ReplyHeaders {
 		attrs = append(attrs, attribute.StringSlice("http.response.header."+name, values))
 	}
-	return append(attrs, c.checked()...)
+	return append(attrs, checked(found)...)
 }
 
 // shownResults is how many results of one side a record holds at most.
 const shownResults = 20
 
-// checked checks the call against the spec and says what was found.
-func (c *call) checked() []attribute.KeyValue {
-	e := spec.Exchange{
-		Method:      c.in.Method,
-		EscapedPath: c.target.EscapedPath(),
-		RawQuery:    c.target.RawQuery,
-		Header:      c.in.Header,
-		Body:        c.reqBody.copied(),
-	}
-	if c.resp != nil {
-		e.Status, e.ReplyHeader, e.ReplyBody = c.resp.StatusCode, c.resp.Header, c.respBody.copied()
-	}
-	found := c.api.Spec.Check(e)
+// checked is what the checks found, as the record holds it, with the
+// status: valid, invalid, or skipped when nothing was found but part of
+// the check did not run (Peter, 2026-10-31).
+func checked(found spec.Checked) []attribute.KeyValue {
 	var attrs []attribute.KeyValue
 	for _, f := range found.Copied {
 		switch v := f.Value.(type) {
@@ -190,9 +222,15 @@ func (c *call) checked() []attribute.KeyValue {
 			attrs = append(attrs, attribute.Float64(f.Name, v))
 		}
 	}
+	status := "valid"
 	if found.Skipped != "" {
 		attrs = append(attrs, attribute.String("hotline.schema.skipped", found.Skipped))
+		status = "skipped"
 	}
+	if len(found.Request) > 0 || len(found.Reply) > 0 {
+		status = "invalid"
+	}
+
 	for side, results := range map[string][]spec.Result{"request": found.Request, "response": found.Reply} {
 		if len(results) == 0 {
 			continue
@@ -215,5 +253,5 @@ func (c *call) checked() []attribute.KeyValue {
 		}
 		attrs = append(attrs, attribute.Slice(key, values...))
 	}
-	return attrs
+	return append(attrs, attribute.String("hotline.schema.status", status))
 }

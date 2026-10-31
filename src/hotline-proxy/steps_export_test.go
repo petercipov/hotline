@@ -128,7 +128,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		hotline := []string{"hotline.integration.id", "hotline.ingress", "hotline.timing.total_us",
 			"hotline.client.cancelled", "hotline.config.version", "hotline.trace.signature", "hotline.schema.request.errors",
 			"hotline.schema.response.errors", "hotline.schema.request.errors_total", "hotline.schema.response.errors_total",
-			"hotline.schema.skipped", "hotline.signature", "hotline.signature_key_id",
+			"hotline.schema.skipped", "hotline.schema.status", "hotline.signature", "hotline.signature_key_id",
 			"hotline.request.body.signature", "hotline.response.body.signature"}
 		known := map[string]bool{}
 		for _, k := range append(standard, hotline...) {

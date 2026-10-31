@@ -10,7 +10,7 @@ A trace is a set of spans; a span is one step with a start time and an end time.
 |---|---|---|---|
 | `hotline call` | server | the call reached the proxy, or the app TLS handshake started on a connection's first call | its last byte went back to the app |
 | `app tls handshake` | internal | TLS setup with the app started | it ended. First call of a connection only |
-| `prepare call` | internal | the call reached the proxy | the vendor call started: finding the ingress, the integration and the vendor api |
+| `routing` | internal | the call reached the proxy | the vendor call started: finding the ingress, the integration and the vendor api |
 | `vendor call` | client | the vendor call started | the vendor's reply ended |
 | `dns lookup`, under `vendor call` | internal | the lookup started | it ended |
 | `tcp connect`, under `vendor call` | internal | the first try to connect | connected; several addresses tried count once |
@@ -19,13 +19,35 @@ A trace is a set of spans; a span is one step with a start time and an end time.
 | `wait for vendor`, under `vendor call` | internal | the call was fully sent | the vendor's first reply byte |
 | `receive reply`, under `vendor call` | internal | the first reply byte | the vendor's reply ended |
 | `finish reply` | internal | the vendor's reply ended | the last byte went to the app |
+| `request spec check` | internal | the call was fully sent | the request's check against the spec ended. Full records only |
+| `reply spec check` | internal | the vendor's reply ended | the reply's check ended. Full records with a reply only |
 
 - A step that did not happen has no span: no `dns lookup` for an IP address, no `vendor tls handshake` for plain http, none of the three on a reused connection.
-- The spec checks run after the reply has gone back, so they are not in the trace.
+- Each side is checked against the spec as soon as it is whole, alongside the call: the request while the proxy waits for the vendor, the reply while the proxy sends it on (Peter, 2026-10-31). Both spans sit under `hotline call` and may end after it. A request never sent, such as when the vendor refused the connection, is checked when the call ends. The record waits for both checks, but the app never does.
 - A refused call, and a `CONNECT` tunnel whose TLS setup failed, have only `hotline call` (with `app tls handshake` for the tunnel, when it was timed).
-- A failed step ends at the failure with status error, and so do `vendor call` and `hotline call`. Why it failed is only in the record's `error.type`. A call to an internal address the guard refused marks only `vendor call` and `hotline call`.
 - Every call gets a trace: there is no sampling, and the app's sampled flag does not change that (Peter, 2026-10-31).
 - Times come from the proxy's clock, the same as the record's.
+
+## When a span fails
+
+Only a breakdown fails a span; the vendor's own answer never does, a 404 or a 503 included (Peter, 2026-10-31). Why it failed is only in the record's `error.type`.
+
+| Span | Status error when |
+|---|---|
+| `hotline call` | any span below failed, but for the spec checks, or the proxy refused the call |
+| `app tls handshake` | TLS setup with the app failed |
+| `routing` | never |
+| `finish reply` | the app did not get the whole reply: it hung up, or a write to it failed. `hotline.client.cancelled` on the record says so; `vendor call` stays unset |
+| `vendor call` | one of its steps failed, or the guard refused an internal address |
+| `dns lookup` | the name could not be looked up |
+| `tcp connect` | no address could be connected to |
+| `vendor tls handshake` | TLS setup with the vendor failed |
+| `send call` | the app's body broke off while it was sent |
+| `wait for vendor` | the vendor did not answer in time |
+| `receive reply` | the vendor's reply broke off |
+| `request spec check`, `reply spec check` | that side broke the spec |
+
+A failed step ends at the failure. The two spec checks are the only spans set to ok on purpose: when their side passed. A skipped check leaves it unset, since nothing was proven. The check's status itself is only on the record, as `hotline.schema.status`: `valid`, `invalid` or `skipped`.
 
 ## Nothing on both
 
@@ -47,7 +69,7 @@ Each piece of data is either on the trace or on the record, never on both, unles
 
 The trace of a full record is signed with the integration's key, the same as the record (Peter, 2026-10-31). The signature goes on the record as `hotline.trace.signature`, so the record's own signature covers it, as with the body signatures. Minimal records are not signed, so their traces are not either.
 
-The signed text is one line with the trace id, then one block per span in start order, a tie going by span id. Each block has the span's id, parent span id (empty for none), name, kind (`server`, `client` or `internal`), start and end in nanoseconds since 1970, and status (`unset` or `error`), then its attributes sorted by name. Each line is a name and a value, both as JSON, joined by new lines:
+The signed text is one line with the trace id, then one block per span in start order, a tie going by span id. Each block has the span's id, parent span id (empty for none), name, kind (`server`, `client` or `internal`), start and end in nanoseconds since 1970, and status (`unset`, `ok` or `error`), then its attributes sorted by name. Each line is a name and a value, both as JSON, joined by new lines:
 
 ```
 "trace.trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
@@ -68,7 +90,7 @@ To check a call, take its record and its spans (found by trace id), and rebuild 
 - OTLP traces over gRPC, or over HTTP to `/v1/traces`, with each exporter's endpoint, TLS, login headers, gzip, resource labels and timing.
 - Each destination has a queue of spans next to its queue of records, of the same `queueSize`, counted in spans. A full queue drops its oldest span and warns, at most once a minute.
 - The proxy's own telemetry counts them like records: `otel.sdk.processor.span.queue.size`, `otel.sdk.processor.span.queue.capacity`, `otel.sdk.processor.span.processed` and `otel.sdk.exporter.span.exported`.
-- `hotline.proxy.overhead` still measures the proxy's own time: `prepare call` plus `finish reply`.
+- `hotline.proxy.overhead` still measures the proxy's own time: `routing` plus `finish reply`.
 
 ## Where it lives
 

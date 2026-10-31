@@ -7,8 +7,11 @@ Feature: Each call's timings are a trace
 
   The call span, "hotline call", runs from the moment the call reached the
   proxy until its last byte went back to the app. Under it are, in order:
-  "prepare call" (finding the ingress, the integration and the vendor),
+  "routing" (finding the ingress, the integration and the vendor),
   "vendor call" and "finish reply" (sending the last bytes to the app).
+  For a call with a full record, "request spec check" and "reply spec
+  check" are under it too: the checks against the spec, which run
+  alongside the call, so they may end after it (Peter, 2026-10-31).
   Under "vendor call" are "dns lookup", "tcp connect", "vendor tls
   handshake", "send call", "wait for vendor" and "receive reply". On the
   first call of an app's TLS connection, "app tls handshake" comes first,
@@ -25,10 +28,12 @@ Feature: Each call's timings are a trace
     Scenario: A call on a new https connection
       Given a vendor reached over a new https connection
       When a call ends
-      Then the trace has the spans "hotline call", "prepare call", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply" and "finish reply"
-      And "prepare call", "vendor call" and "finish reply" are under "hotline call", one after another
+      Then the trace has the spans "hotline call", "routing", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply", "finish reply", "request spec check" and "reply spec check"
+      And "routing", "vendor call" and "finish reply" are under "hotline call", one after another
       And "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor" and "receive reply" are under "vendor call", one after another
-      And every span is within its parent
+      And every span but the spec checks is within its parent
+      And "request spec check" starts when "send call" ends, under "hotline call"
+      And "reply spec check" starts when "receive reply" ends, under "hotline call"
       And "hotline call" is a server span, "vendor call" a client span, and the others internal
       And "dns lookup" has dns.question.name api.talon.one
       And "vendor call" has hotline.connection.reused false
@@ -101,6 +106,21 @@ Feature: Each call's timings are a trace
         | the vendor never answers | wait for vendor      | receive reply |
         | the app's body breaks off | send call           | wait for vendor |
 
+    Scenario Outline: The app hangs up before it has the whole reply
+      The vendor did nothing wrong, so "vendor call" is not marked. The
+      record's hotline.client.cancelled says why (Peter, 2026-10-31).
+      Given <vendor>
+      When the app disconnects after 100 milliseconds
+      Then the "finish reply" span ends with status error
+      And the "hotline call" span ends with status error
+      And the "vendor call" span ends with status unset
+      And the record says hotline.client.cancelled true
+
+      Examples:
+        | vendor                                                                  |
+        | a vendor that answers after 300 milliseconds and a vendorTimeout of 10 seconds |
+        | a vendor that sends half of its reply, and the rest 300 milliseconds later |
+
     Scenario: A refused call has only the call span
       When an app sends "GET /v2/x" with "traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
       Then the trace has only the span "hotline call", with status error
@@ -123,7 +143,7 @@ Feature: Each call's timings are a trace
     Scenario: A call without an integration gets a trace too
       Given the app sends no integration ID
       When a call ends
-      Then the trace has the spans "hotline call", "prepare call", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply" and "finish reply"
+      Then the trace has the spans "hotline call", "routing", "vendor call", "dns lookup", "tcp connect", "vendor tls handshake", "send call", "wait for vendor", "receive reply" and "finish reply"
 
   Rule: Spans are sent like records
 

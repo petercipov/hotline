@@ -66,7 +66,7 @@ Feature: The proxy's own telemetry
   Scenario: Spans sent fine are counted
     Given a vendor reached over a new https connection
     When a call ends
-    Then otel.sdk.exporter.span.exported counts 10 spans with no error.type for that destination
+    Then otel.sdk.exporter.span.exported counts 12 spans with no error.type for that destination
 
   Scenario: Records dropped from a full queue are counted
     Given an exporter with queueSize 3 whose destination is busy with the first record

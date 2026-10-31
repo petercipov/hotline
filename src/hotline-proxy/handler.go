@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"cmp"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -103,20 +104,22 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		transport = h.internal
 	}
 	c := &call{
-		h:         h,
-		cfg:       cfg,
-		start:     start,
-		ingress:   ingress,
-		target:    target,
-		id:        id,
-		api:       api,
-		scheme:    scheme,
-		host:      host,
-		port:      port,
-		in:        r,
-		timeout:   settings.VendorTimeout,
-		transport: transport,
-		reqBody:   &tap{ReadCloser: r.Body, limit: keepFor(api), mac: macFor(api)},
+		h:          h,
+		cfg:        cfg,
+		start:      start,
+		ingress:    ingress,
+		target:     target,
+		id:         id,
+		api:        api,
+		scheme:     scheme,
+		host:       host,
+		port:       port,
+		in:         r,
+		timeout:    settings.VendorTimeout,
+		transport:  transport,
+		reqBody:    &tap{ReadCloser: r.Body, limit: keepFor(api), mac: macFor(api)},
+		reqCheck:   newSpecCheck(),
+		replyCheck: newSpecCheck(),
 	}
 	traced, parent, tracing := h.traced(id, r.Header, start)
 	c.trace, c.parent, c.vendorSpan = traced, parent, tracectx.NewSpanID()
@@ -153,17 +156,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	app := &toApp{ResponseWriter: w, appLeft: r.Context().Done()}
 	c.app = app
 	proxy.ServeHTTP(app, r.WithContext(ctx))
-	_ = http.NewResponseController(w).Flush()
+	_ = http.NewResponseController(app).Flush()
 }
 
 // toApp writes the reply to the app and notes whether the app had already
-// gone when a part of the reply was ready for it. Checking before each
-// write, not at the end, keeps an app that leaves after reading the whole
-// reply from counting as gone.
+// gone when a part of the reply was ready for it, or a write to it failed.
+// Checking before each write, not at the end, keeps an app that leaves
+// after reading the whole reply from counting as gone.
 type toApp struct {
 	http.ResponseWriter
 	appLeft <-chan struct{}
 	gone    bool
+	err     error
 }
 
 func (a *toApp) WriteHeader(status int) {
@@ -173,8 +177,20 @@ func (a *toApp) WriteHeader(status int) {
 
 func (a *toApp) Write(b []byte) (int, error) {
 	a.check()
-	return a.ResponseWriter.Write(b)
+	n, err := a.ResponseWriter.Write(b)
+	a.err = cmp.Or(a.err, err)
+	return n, err
 }
+
+// FlushError sends what is written so far, and notes it when that fails.
+func (a *toApp) FlushError() error {
+	err := http.NewResponseController(a.ResponseWriter).Flush()
+	a.err = cmp.Or(a.err, err)
+	return err
+}
+
+// failed says the app did not get the whole reply (Peter, 2026-10-31).
+func (a *toApp) failed() bool { return a.gone || a.err != nil }
 
 func (a *toApp) check() {
 	select {
@@ -339,6 +355,10 @@ type call struct {
 	reqBody  *tap
 	respBody *tap
 	timedOut atomic.Bool
+	// reqCheck and replyCheck check each side against the spec as soon as
+	// it is whole.
+	reqCheck   *specCheck
+	replyCheck *specCheck
 
 	mu        sync.Mutex
 	phase     phase
@@ -398,7 +418,11 @@ func (c *call) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.respBody = &tap{ReadCloser: resp.Body, limit: keepFor(c.api), mac: macFor(c.api), done: func() { c.mark(func() { c.vendorOut = c.h.clock.Now() }) }}
+	c.respBody = &tap{ReadCloser: resp.Body, limit: keepFor(c.api), mac: macFor(c.api), done: func() {
+		out := c.h.clock.Now()
+		c.mark(func() { c.vendorOut = out })
+		c.checkReply(out, resp)
+	}}
 	if both, ok := resp.Body.(io.Writer); ok && resp.StatusCode == http.StatusSwitchingProtocols {
 		// An upgraded connection, such as a WebSocket, carries data both
 		// ways, so the proxy must be able to write to it too. It may stay
@@ -481,7 +505,9 @@ func (c *call) gotConn(info httptrace.GotConnInfo) {
 // while it was sent was never fully sent.
 func (c *call) wroteRequest(info httptrace.WroteRequestInfo) {
 	if info.Err == nil {
-		c.mark(func() { c.wrote = c.h.clock.Now() })
+		wrote := c.h.clock.Now()
+		c.mark(func() { c.wrote = wrote })
+		c.checkRequest(wrote)
 	}
 }
 
@@ -640,6 +666,13 @@ func (t *tap) signed() string {
 		return ""
 	}
 	return base64.StdEncoding.EncodeToString(t.mac.Sum(nil))
+}
+
+// drop lets go of the copy, once it has been checked.
+func (t *tap) drop() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.kept, t.limit = nil, 0
 }
 
 // copied is the copy of the body kept so far.

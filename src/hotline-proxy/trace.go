@@ -33,7 +33,7 @@ func (c *call) opened() time.Time {
 // that did not happen has no span. Spans hold nothing the record holds, so
 // only two of them have an attribute.
 func (c *call) spans(opened, end time.Time) []export.Span {
-	call := callSpan(c.trace, c.parent, opened, end, c.errorType != "")
+	call := callSpan(c.trace, c.parent, opened, end, c.errorType != "" || c.app.failed())
 	spans := []export.Span{call}
 	step := func(parent trace.SpanID, name string, from, to time.Time, attrs ...attribute.KeyValue) {
 		spans = append(spans, export.Span{
@@ -44,7 +44,7 @@ func (c *call) spans(opened, end time.Time) []export.Span {
 	if c.appTimed {
 		step(call.ID, "app tls handshake", c.appStart, c.appEnd)
 	}
-	step(call.ID, "prepare call", c.start, c.vendorIn)
+	step(call.ID, "routing", c.start, c.vendorIn)
 	// The reply ends when the vendor's reply ended, or when the call
 	// failed.
 	out := orTime(c.vendorOut, end)
@@ -83,6 +83,9 @@ func (c *call) spans(opened, end time.Time) []export.Span {
 		step(vendor.ID, "receive reply", c.firstByte, out)
 	}
 	step(call.ID, "finish reply", out, end)
+	// The app hung up: the vendor did nothing wrong, so only the last step
+	// fails (Peter, 2026-10-31).
+	spans[len(spans)-1].Failed = c.app.failed()
 	return spans
 }
 
@@ -131,6 +134,9 @@ func traceSignature(sc trace.SpanContext, spans []export.Span, key []byte) attri
 		}
 		if s.Failed {
 			status = "error"
+		}
+		if s.OK {
+			status = "ok"
 		}
 		kind := map[trace.SpanKind]string{trace.SpanKindServer: "server", trace.SpanKindClient: "client"}[s.Kind]
 		if kind == "" {
