@@ -112,7 +112,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 			"http.response.status_code", "hotline.timing.total_us", "hotline.config.version")
 	})
 	sc.Step(`^standard names come from the semconv constants, such as http.request.method and url.full$`, func() error {
-		return w.lastHasAll("http.request.method", "url.full", "url.scheme", "server.address", "server.port",
+		return w.lastHasAll("http.request.method", "url.full", "url.scheme", "client.address", "server.address", "server.port",
 			"network.peer.address", "network.protocol.version", "http.request.body.size", "http.response.body.size",
 			"tls.protocol.version", "tls.server.not_after")
 	})
@@ -121,7 +121,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		standard := []string{"http.request.method", "url.full", "url.scheme", "url.template", "server.address",
+		standard := []string{"http.request.method", "url.full", "url.scheme", "url.template", "client.address", "server.address",
 			"server.port", "network.peer.address", "network.protocol.version", "http.response.status_code",
 			"error.type", "http.request.body.size", "http.response.body.size", "tls.protocol.version",
 			"tls.server.not_after"}

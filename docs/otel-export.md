@@ -92,6 +92,7 @@ There are two sizes of record:
 |---|---|---|
 | `hotline.integration.id` | text | The ID from `Proxy-Authorization`, as sent, or `not-passed`. |
 | `hotline.ingress` | text | How the app reached the proxy: `forward_proxy`, `url_in_path`, `host_header` or `connect`. |
+| `client.address` | text | The app's IP address, from its connection, never from a header the app could set (Peter, 2026-10-31). Inside a `CONNECT` tunnel it is the address the tunnel came from. |
 | `server.address` | text | The vendor host, in lower case. |
 | `http.request.method` | text | The method, such as `GET`. |
 | `http.response.status_code` | whole number | The status the app got, also when the proxy made it up (`502`, `504`, `403`). |

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -49,6 +50,7 @@ func (c *call) record(end time.Time) {
 	attrs := []attribute.KeyValue{
 		attribute.String("hotline.integration.id", orNotPassed(c.id)),
 		attribute.String("hotline.ingress", c.ingress),
+		clientAddress(c.in),
 		semconv.ServerAddress(c.host),
 		semconv.HTTPRequestMethodKey.String(c.in.Method),
 		semconv.HTTPResponseStatusCode(c.status),
@@ -100,7 +102,7 @@ func (c *call) checkSpan(name string, s *specCheck, found []spec.Result, skipped
 // minimal record and a trace of the call span alone. The vendor host is in
 // it only when the request named one.
 func (h *handler) refused(r *http.Request, start time.Time, ingress, id string, target *url.URL, status int) {
-	attrs := []attribute.KeyValue{attribute.String("hotline.integration.id", orNotPassed(id))}
+	attrs := []attribute.KeyValue{attribute.String("hotline.integration.id", orNotPassed(id)), clientAddress(r)}
 	if ingress != "" {
 		attrs = append(attrs, attribute.String("hotline.ingress", ingress))
 	}
@@ -136,6 +138,13 @@ func (h *handler) record(r *http.Request, f finished) {
 	h.sink.Record(recordContext(f.sc), f.at, f.attrs)
 	h.sink.Trace(f.sc, f.spans)
 	h.own.ended(r, f.attrs, f.overhead, f.reached)
+}
+
+// clientAddress is the IP address the app's connection came from, never a
+// header the app could set (Peter, 2026-10-31).
+func clientAddress(r *http.Request) attribute.KeyValue {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return semconv.ClientAddress(host)
 }
 
 func orNotPassed(id string) string {

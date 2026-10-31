@@ -115,13 +115,16 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and hotline.timing.total_us$`, func() error {
+	sc.Step(`^client.address is the app's IP address$`, func() error {
+		return w.lastHas("client.address", "127.0.0.1")
+	})
+	sc.Step(`^the record holds only hotline.integration.id, hotline.ingress, client.address, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and hotline.timing.total_us$`, func() error {
 		record, err := w.lastRecord()
 		if err != nil {
 			return err
 		}
 		allowed := map[string]bool{
-			"hotline.integration.id": true, "hotline.ingress": true, "server.address": true, "network.peer.address": true,
+			"hotline.integration.id": true, "hotline.ingress": true, "client.address": true, "server.address": true, "network.peer.address": true,
 			"http.request.method": true, "http.response.status_code": true, "error.type": true,
 		}
 		for key := range record {
@@ -129,7 +132,7 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 				return failf("the minimal record has %s", key)
 			}
 		}
-		if err := hasAll(record, "hotline.integration.id", "hotline.ingress", "server.address",
+		if err := hasAll(record, "hotline.integration.id", "hotline.ingress", "client.address", "server.address",
 			"http.request.method", "http.response.status_code", "hotline.timing.total_us"); err != nil {
 			return err
 		}

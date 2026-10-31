@@ -119,8 +119,19 @@ func stream(w http.ResponseWriter, r *http.Request) (net.Conn, <-chan struct{}) 
 		defer close(done)
 		_, _ = io.Copy(flushWriter{w: w, rc: rc}, end)
 	}()
-	return tunnel, done
+	// The pipe has no address of its own: calls inside the tunnel come
+	// from the app's.
+	from, _ := netip.ParseAddrPort(r.RemoteAddr)
+	return fromApp{Conn: tunnel, remote: net.TCPAddrFromAddrPort(from)}, done
 }
+
+// fromApp is a tunnel over an HTTP/2 stream, with the app's address.
+type fromApp struct {
+	net.Conn
+	remote net.Addr
+}
+
+func (c fromApp) RemoteAddr() net.Addr { return c.remote }
 
 // flushWriter sends each write to the app at once.
 type flushWriter struct {
@@ -145,6 +156,7 @@ func (h *handler) tunnelFailed(r *http.Request, start time.Time, t *tunnel, a *a
 	attrs := []attribute.KeyValue{
 		attribute.String("hotline.integration.id", orNotPassed(t.id)),
 		attribute.String("hotline.ingress", "connect"),
+		clientAddress(r),
 		semconv.ServerAddress(t.host),
 		semconv.HTTPRequestMethodKey.String(r.Method),
 		semconv.ErrorTypeKey.String(errorType),
