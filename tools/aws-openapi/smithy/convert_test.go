@@ -214,8 +214,8 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		Expect(at(doc, "paths", "/#X-Amz-Target=Queues.Send", "post", "requestBody", "content")).To(HaveKey("application/x-amz-json-1.1"))
 	})
 
-	It("refuses a model that is not an AWS JSON service", func() {
-		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#restXml")), smithy.Options{})
+	It("refuses a model on a protocol it doesn't know", func() {
+		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#awsQuery")), smithy.Options{})
 		Expect(err).To(MatchError(smithy.ErrUnsupported))
 	})
 
