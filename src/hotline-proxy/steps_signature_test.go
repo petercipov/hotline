@@ -33,8 +33,31 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 		w.integrations[last] = before
 		return nil
 	})
-	sc.Step(`^the record has hotline.signature and hotline.signature_input$`, func() error {
-		return w.lastHasAll("hotline.signature", "hotline.signature_input")
+	sc.Step(`^the record has hotline.signature and hotline.signature_key_id (\S+)$`, func(keyID string) error {
+		if err := w.lastHasAll("hotline.signature"); err != nil {
+			return err
+		}
+		return w.lastHas("hotline.signature_key_id", keyID)
+	})
+	sc.Step(`^the record has (hotline\.schema\.request\.errors)$`, func(name string) error {
+		return w.lastHasAll(name)
+	})
+	sc.Step(`^hotline.request.body.signature is the HMAC of the body the vendor got, with the key$`, func() error {
+		calls := w.vendor("api.shop.test").received()
+		if len(calls) == 0 {
+			return failf("the vendor got no call")
+		}
+		return w.lastHas("hotline.request.body.signature", hmacOf(calls[len(calls)-1].body))
+	})
+	sc.Step(`^hotline.response.body.signature is the HMAC of the body the app got, with the key$`, func() error {
+		return w.lastHas("hotline.response.body.signature", hmacOf(w.respBody))
+	})
+	sc.Step(`^the record has no hotline.request.body.signature or hotline.response.body.signature$`, func() error {
+		record, err := w.lastRecord()
+		if err != nil {
+			return err
+		}
+		return hasNo(record, "hotline.request.body.signature", "hotline.response.body.signature")
 	})
 	sc.Step(`^the record has no hotline.signature$`, func() error {
 		record, err := w.lastRecord()
@@ -43,69 +66,6 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		if _, signed := record["hotline.signature"]; signed {
 			return failf("the minimal record is signed: %v", record)
-		}
-		return nil
-	})
-	sc.Step(`^the signature input starts with (.+)$`, func(want string) error {
-		covered, _, err := w.signatureInput()
-		if err != nil {
-			return err
-		}
-		if !strings.HasPrefix(covered, want+" ") {
-			return failf("the signature input covers %s", covered)
-		}
-		return nil
-	})
-	sc.Step(`^the signature input names ("[^"]+";resp)$`, func(want string) error {
-		covered, _, err := w.signatureInput()
-		if err != nil {
-			return err
-		}
-		if !strings.Contains(" "+covered+" ", " "+want+" ") {
-			return failf("the signature input covers %s", covered)
-		}
-		return nil
-	})
-	sc.Step(`^the signature input names ([a-z]+\.\S+)$`, func(name string) error {
-		covered, _, err := w.signatureInput()
-		if err != nil {
-			return err
-		}
-		if !strings.Contains(covered, strconv.Quote(name)) {
-			return failf("the signature input covers %s", covered)
-		}
-		return nil
-	})
-	sc.Step(`^the signature input names every other attribute and log.record.timestamp$`, func() error {
-		record, err := w.lastRecord()
-		if err != nil {
-			return err
-		}
-		covered, _, err := w.signatureInput()
-		if err != nil {
-			return err
-		}
-		for name := range record {
-			if name == "hotline.signature" || name == "hotline.signature_input" || isCallPart(name) {
-				continue
-			}
-			if !strings.Contains(covered, strconv.Quote(name)) {
-				return failf("the signature input leaves out %s: %s", name, covered)
-			}
-		}
-		if !strings.Contains(covered, `"log.record.timestamp"`) {
-			return failf("the signature input leaves out the timestamp: %s", covered)
-		}
-		return nil
-	})
-	sc.Step(`^the signature input says keyid (\S+) and alg (\S+)$`, func(keyID, alg string) error {
-		_, params, err := w.signatureInput()
-		if err != nil {
-			return err
-		}
-		if !strings.Contains(params, `;keyid="`+keyID+`"`) || !strings.Contains(params, `;alg="`+alg+`"`) ||
-			!strings.Contains(params, ";created=") {
-			return failf("the signature parameters are %s", params)
 		}
 		return nil
 	})
@@ -145,6 +105,12 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 			changed.attrs["hotline.integration.id"] = "talon-shop-b"
 		case "shop.order.item is changed":
 			changed.attrs["shop.order.item"] = "A2"
+		case "hotline.request.body.signature is changed":
+			changed.attrs["hotline.request.body.signature"] = hmacOf([]byte("{}"))
+		case "an attribute is added":
+			changed.attrs["shop.added"] = "x"
+		case "an attribute is removed":
+			delete(changed.attrs, "hotline.ingress")
 		case "the timestamp is changed":
 			changed.timestamp++
 		default:
@@ -155,18 +121,6 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the signature no longer checks out$`, func() error {
 		if checkSignature(changed, signingKey) == nil {
 			return failf("the changed record still checks out")
-		}
-		return nil
-	})
-	sc.Step(`^the signature input names no authorization, proxy-authorization, cookie or body$`, func() error {
-		covered, _, err := w.signatureInput()
-		if err != nil {
-			return err
-		}
-		for _, name := range []string{"authorization", "proxy-authorization", "cookie", "content-digest", "body"} {
-			if strings.Contains(covered, strconv.Quote(name)) {
-				return failf("the signature input covers %s: %s", name, covered)
-			}
 		}
 		return nil
 	})
@@ -203,88 +157,33 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 	})
 }
 
-// signatureInput splits the record's signature input into the covered
-// list, without its brackets, and the parameters after it.
-func (w *world) signatureInput() (covered, params string, err error) {
-	record, err := w.lastRecord()
-	if err != nil {
-		return "", "", err
-	}
-	input, _ := record["hotline.signature_input"].(string)
-	end := strings.Index(input, ")")
-	if !strings.HasPrefix(input, "(") || end < 0 {
-		return "", "", failf("the signature input is %q", input)
-	}
-	return input[1:end], input[end+1:], nil
+// hmacOf is a body's signature, as the proxy makes it with the key.
+func hmacOf(body []byte) string {
+	mac := hmac.New(sha256.New, []byte(signingKey))
+	mac.Write(body)
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
 
-func isCallPart(name string) bool {
-	return name == "http.request.method" || name == "url.full" || name == "http.response.status_code" ||
-		strings.HasPrefix(name, "http.request.header.") || strings.HasPrefix(name, "http.response.header.")
-}
-
-// checkSignature rebuilds the signature base from a record as
+// checkSignature rebuilds the signed text from a record as
 // docs/proxy-signatures.md describes it, and checks the signature with the
 // key, the way any checker that has only the record would.
 func checkSignature(r receivedRecord, key string) error {
-	input, _ := r.attrs["hotline.signature_input"].(string)
 	signature, _ := r.attrs["hotline.signature"].(string)
-	end := strings.Index(input, ")")
-	if !strings.HasPrefix(input, "(") || end < 0 {
-		return failf("the signature input is %q", input)
-	}
-	type line struct{ name, value string }
-	var call, reqHeaders, respHeaders, rest []line
-	headerValue := func(v any) string {
-		var parts []string
-		for _, item := range v.([]any) {
-			parts = append(parts, item.(string))
-		}
-		return strings.Join(parts, ", ")
-	}
+	lines := make([]string, 0, len(r.attrs))
 	for name, v := range r.attrs {
-		switch {
-		case name == "hotline.signature" || name == "hotline.signature_input":
-		case strings.HasPrefix(name, "http.request.header."):
-			reqHeaders = append(reqHeaders, line{strconv.Quote(strings.TrimPrefix(name, "http.request.header.")), headerValue(v)})
-		case strings.HasPrefix(name, "http.response.header."):
-			respHeaders = append(respHeaders, line{strconv.Quote(strings.TrimPrefix(name, "http.response.header.")) + ";resp", headerValue(v)})
-		case isCallPart(name):
-		default:
-			value, err := json.Marshal(v)
-			if err != nil {
-				return err
-			}
-			rest = append(rest, line{strconv.Quote(name), string(value)})
+		if name == "hotline.signature" {
+			continue
 		}
+		value, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		lines = append(lines, strconv.Quote(name)+": "+string(value))
 	}
-	rest = append(rest, line{`"log.record.timestamp"`, strconv.FormatUint(r.timestamp, 10)})
-	byName := func(lines []line) { sort.Slice(lines, func(i, j int) bool { return lines[i].name < lines[j].name }) }
-	byName(reqHeaders)
-	byName(respHeaders)
-	byName(rest)
-	call = append(call, line{`"@method"`, fmt.Sprint(r.attrs["http.request.method"])})
-	if u, ok := r.attrs["url.full"]; ok {
-		call = append(call, line{`"@target-uri"`, fmt.Sprint(u)})
-	}
-	call = append(call, reqHeaders...)
-	if status, ok := r.attrs["http.response.status_code"]; ok {
-		call = append(call, line{`"@status"`, fmt.Sprint(status)})
-	}
-	call = append(call, respHeaders...)
-	call = append(call, rest...)
-	var base strings.Builder
-	names := make([]string, len(call))
-	for i, l := range call {
-		names[i] = l.name
-		base.WriteString(l.name + ": " + l.value + "\n")
-	}
-	if got := strings.Join(names, " "); got != input[1:end] {
-		return failf("the record holds %s, the signature covers %s", got, input[1:end])
-	}
-	base.WriteString(`"@signature-params": ` + input)
+	sort.Strings(lines)
+	lines = append(lines, `"log.record.timestamp": `+strconv.FormatUint(r.timestamp, 10))
 	mac := hmac.New(sha256.New, []byte(key))
-	mac.Write([]byte(base.String()))
+	mac.Write([]byte(strings.Join(lines, "\n")))
 	if want := base64.StdEncoding.EncodeToString(mac.Sum(nil)); signature != want {
 		return failf("the signature %q does not check out", signature)
 	}

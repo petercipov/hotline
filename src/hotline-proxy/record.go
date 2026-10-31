@@ -44,7 +44,7 @@ func (c *call) finish() {
 	attrs = append(attrs, c.timings(end)...)
 	if c.api != nil {
 		attrs = append(attrs, c.full()...)
-		attrs = append(attrs, signature(attrs, c.start, end, c.api.SigningKey)...)
+		attrs = append(attrs, signature(attrs, c.start, c.api.SigningKey)...)
 	}
 	c.h.sink.Record(context.Background(), c.start, attrs)
 }
@@ -132,7 +132,13 @@ func (c *call) full() []attribute.KeyValue {
 	if c.looked != "" {
 		attrs = append(attrs, semconv.DNSQuestionName(c.looked))
 	}
+	if body := c.reqBody.signed(); body != "" {
+		attrs = append(attrs, attribute.String("hotline.request.body.signature", body))
+	}
 	if c.resp != nil {
+		if body := c.respBody.signed(); body != "" {
+			attrs = append(attrs, attribute.String("hotline.response.body.signature", body))
+		}
 		got, _ := c.respBody.counts()
 		attrs = append(attrs,
 			semconv.NetworkProtocolVersion(strings.TrimSuffix(strings.TrimPrefix(c.resp.Proto, "HTTP/"), ".0")),
