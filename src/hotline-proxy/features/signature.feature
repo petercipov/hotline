@@ -39,7 +39,7 @@ Feature: Each record is signed
         | url.full is changed                        |
         | a kept header's value is changed           |
         | http.response.status_code is changed       |
-        | hotline.timing.total is changed            |
+        | hotline.timing.total_us is changed            |
         | hotline.integration.id is changed          |
         | hotline.request.body.signature is changed  |
         | an attribute is added                      |

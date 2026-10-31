@@ -51,8 +51,8 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 			return err
 		}
 		return hasAll(record, "http.response.header.x-request-id",
-			"hotline.timing.dns", "hotline.timing.connect", "hotline.timing.tls", "hotline.timing.first_byte",
-			"hotline.timing.total", "hotline.timing.proxy_request", "hotline.timing.proxy_response",
+			"hotline.timing.dns_us", "hotline.timing.connect_us", "hotline.timing.tls_us", "hotline.timing.first_byte_us",
+			"hotline.timing.total_us", "hotline.timing.proxy_request_us", "hotline.timing.proxy_response_us",
 			"network.peer.address", "network.protocol.version", "tls.protocol.version", "tls.server.not_after",
 			"http.request.body.size", "http.response.body.size")
 	})
@@ -133,7 +133,7 @@ func recordSteps(sc *godog.ScenarioContext, w *world) {
 			}
 		}
 		if err := hasAll(record, "hotline.integration.id", "hotline.ingress", "server.address",
-			"http.request.method", "http.response.status_code", "hotline.timing.total"); err != nil {
+			"http.request.method", "http.response.status_code", "hotline.timing.total_us"); err != nil {
 			return err
 		}
 		// The vendor IP is the one the proxy connected to.

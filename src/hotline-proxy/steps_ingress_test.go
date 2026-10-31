@@ -213,7 +213,7 @@ func (w *world) minimalWith(fields string) error {
 			return err
 		}
 	}
-	return hasAll(record, "hotline.integration.id", "http.request.method", "hotline.timing.total")
+	return hasAll(record, "hotline.integration.id", "http.request.method", "hotline.timing.total_us")
 }
 
 func (w *world) nothingSent() error {

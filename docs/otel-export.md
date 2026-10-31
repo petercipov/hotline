@@ -95,7 +95,7 @@ There are two sizes of record:
 | `http.response.status_code` | whole number | The status the app got, also when the proxy made it up (`502`, `504`, `403`). |
 | `error.type` | text | Only when the call failed. Values are listed below. |
 | `network.peer.address` | text | The vendor IP the proxy connected to, after DNS. Only when a connection was made. |
-| `hotline.timing.*` | number, seconds | The timings below. |
+| `hotline.timing.*_us` | whole number, microseconds | The timings below (Peter, 2026-10-31: whole microseconds, the unit in the name, since a log attribute has no unit field). |
 
 ### Timings
 
@@ -103,14 +103,14 @@ Measured with Go's `httptrace` hooks (hooks that fire as each step of a connecti
 
 | Attribute | What it measures |
 |---|---|
-| `hotline.timing.dns` | Looking up the vendor's IP. |
-| `hotline.timing.connect` | Opening the connection to the vendor. |
-| `hotline.timing.tls` | Setting up TLS with the vendor. |
-| `hotline.timing.first_byte` | From the call reaching the proxy until the vendor's first reply byte. |
-| `hotline.timing.total` | From the call reaching the proxy until its last byte went back to the app. |
-| `hotline.timing.proxy_request` | The proxy's own time before calling the vendor. |
-| `hotline.timing.proxy_response` | The proxy's own time after the vendor's reply ended. |
-| `hotline.timing.app_tls` | Setting up TLS between the app and the proxy, on a TLS port or inside a `CONNECT` tunnel. Only on the first call of each connection. |
+| `hotline.timing.dns_us` | Looking up the vendor's IP. |
+| `hotline.timing.connect_us` | Opening the connection to the vendor. |
+| `hotline.timing.tls_us` | Setting up TLS with the vendor. |
+| `hotline.timing.first_byte_us` | From the call reaching the proxy until the vendor's first reply byte. |
+| `hotline.timing.total_us` | From the call reaching the proxy until its last byte went back to the app. |
+| `hotline.timing.proxy_request_us` | The proxy's own time before calling the vendor. |
+| `hotline.timing.proxy_response_us` | The proxy's own time after the vendor's reply ended. |
+| `hotline.timing.app_tls_us` | Setting up TLS between the app and the proxy, on a TLS port or inside a `CONNECT` tunnel. Only on the first call of each connection. |
 
 ### Fields only in a full record
 
@@ -179,9 +179,9 @@ Each problem is a map with these keys. It never holds a value from the call.
 
 ### Refused calls and failed tunnels
 
-A request the proxy reads and refuses still gets a minimal record, with `error.type=http_request_error`. `hotline.ingress` and `server.address` are there only when the proxy could work them out. The only timing is `hotline.timing.total`.
+A request the proxy reads and refuses still gets a minimal record, with `error.type=http_request_error`. `hotline.ingress` and `server.address` are there only when the proxy could work them out. The only timing is `hotline.timing.total_us`.
 
-A `CONNECT` tunnel whose TLS setup with the app fails gets a minimal record with the ID and host from the `CONNECT`, `http.request.method=CONNECT`, `hotline.ingress=connect`, `hotline.timing.total`, and `hotline.timing.app_tls` when it was measured. It has no status code, since no HTTP reply was sent.
+A `CONNECT` tunnel whose TLS setup with the app fails gets a minimal record with the ID and host from the `CONNECT`, `http.request.method=CONNECT`, `hotline.ingress=connect`, `hotline.timing.total_us`, and `hotline.timing.app_tls_us` when it was measured. It has no status code, since no HTTP reply was sent.
 
 Plain HTTP sent to a TLS port is a failed TLS setup, not a request, so it has no record.
 

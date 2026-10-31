@@ -99,8 +99,8 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 			changed.attrs["http.request.header.content-type"] = []any{"text/plain"}
 		case "http.response.status_code is changed":
 			changed.attrs["http.response.status_code"] = int64(200)
-		case "hotline.timing.total is changed":
-			changed.attrs["hotline.timing.total"] = changed.attrs["hotline.timing.total"].(float64) + 0.001
+		case "hotline.timing.total_us is changed":
+			changed.attrs["hotline.timing.total_us"] = changed.attrs["hotline.timing.total_us"].(int64) + 1
 		case "hotline.integration.id is changed":
 			changed.attrs["hotline.integration.id"] = "talon-shop-b"
 		case "shop.order.item is changed":
