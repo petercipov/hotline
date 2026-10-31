@@ -280,10 +280,18 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		l := listenLocal()
 		w.listeners = append(w.listeners, l)
 		w.addr = l.Addr().String()
+		w.busy = w.addr
+		return nil
+	})
+	sc.Step(`^another program listens on the admin address$`, func() error {
+		l := listenLocal()
+		w.listeners = append(w.listeners, l)
+		w.adminAddr = l.Addr().String()
+		w.busy = w.adminAddr
 		return nil
 	})
 	sc.Step(`^the proxy does not start, and says the address is in use$`, func() error {
-		return w.refusedWith(w.addr, "address already in use")
+		return w.refusedWith(w.busy, "address already in use")
 	})
 
 	sc.Step(`^an app sends "([A-Z]+) ([^"]+)" with "([^"]+)"$`, func(method, target, header string) error {
@@ -423,6 +431,8 @@ func (w *world) brokenConfig(problem string) error {
 		w.rawConfig = w.raw(start+exporters, integration("not-passed", w.apiFor("api.x.com", "")))
 	case "a field name has a typo, such as tlsOrigintion":
 		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", "    tlsOrigintion: false\n")))
+	case "there is no admin listen address":
+		w.rawConfig = one("")
 	case "an integration changes tlsOrigination of an api it names":
 		w.apiFor("api.x.com", "")
 		w.rawConfig = w.raw(start+exporters, integration("shop", "      - { api: api.x.com, tlsOrigination: false }\n"))

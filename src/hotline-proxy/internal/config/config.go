@@ -30,6 +30,8 @@ var ErrInvalid = errors.New("config: invalid")
 // Config is a loaded, checked config. It never changes after Load.
 type Config struct {
 	ProxyAddr string
+	// AdminAddr is where the health checks listen; empty means none.
+	AdminAddr string
 	// TLS, when set, makes the proxy port accept only TLS, with this
 	// certificate.
 	TLS *TLS
@@ -135,7 +137,7 @@ type file struct {
 	Version string `yaml:"version"`
 	Listen  struct {
 		Proxy   string    `yaml:"proxy"`
-		Admin   any       `yaml:"admin"`
+		Admin   string    `yaml:"admin"`
 		TLS     *pairFile `yaml:"tls"`
 		Connect *pairFile `yaml:"connect"`
 	} `yaml:"listen"`
@@ -286,6 +288,7 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		Version:      f.Version,
 		Warnings:     warnings,
 		ProxyAddr:    f.Listen.Proxy,
+		AdminAddr:    f.Listen.Admin,
 		NotPassed:    Settings{VendorTimeout: time.Minute},
 		integrations: map[string]map[string]*API{},
 		traces:       map[string]Trace{},
@@ -295,6 +298,9 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 	}
 	if f.Listen.Proxy == "" {
 		l.problem("there is no listen.proxy address")
+	}
+	if f.Listen.Admin == "" {
+		c.Warnings = append(c.Warnings, "there is no listen.admin address, so the proxy has no health checks")
 	}
 	if t := f.Listen.TLS; t != nil {
 		c.TLS = l.pair("listen.tls", t, LoadCertificate, now)
