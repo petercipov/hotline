@@ -41,26 +41,18 @@ The end-to-end tests reuse the client matrix from the research folder: `research
 
 Unlike the research runs, these tests never call the real Stripe. They use a local TLS test vendor whose certificate issuer is trusted through `SSL_CERT_FILE` (an environment variable Go reads on Linux to find trusted issuers), and a local fake OTLP receiver. The Java and Rust clients from the first milestone come in a later slice.
 
-## Left for later slices
+## What came after slice 1
 
-- The Host header ingress and the vendor URL in path ingress (and with them HTTP/2 from apps, matrix cases 3 and 6 to 10).
-- JSON and form body checks against the spec, and the `hotline.schema.*` fields.
-- Body fingerprints (`hotline.body.*.hmac_sha256`) and the `fingerprintKey` files.
-- Config reload without a restart, and `hotline-proxy validate`.
-- The admin port with `/livez` and `/readyz`.
-- The proxy's own health data on the `telemetry` exporter.
-- Streaming replies, WebSockets and the body size limit.
-- Trace spans.
-- TLS from apps to the proxy (`listen.tls`), which matrix cases 4 and 5 need.
-- The `hotline-proxy` program itself (a `main` package with flags), and the `@e2e` scenarios that run it.
-- The load test, which uses **k6** (Grafana's open source load testing tool, scripted in JavaScript), as Peter decided on 2026-10-27.
-- The container image.
+Checked against `main` on 2026-10-31. Most of what slice 1 left for later is now built:
+
+- **Built:** the Host header ingress with HTTP/2 from apps ([proxy-host-header.md](proxy-host-header.md)), the vendor URL in path ingress ([proxy-url-in-path.md](proxy-url-in-path.md)), the CONNECT ingress ([proxy-connect.md](proxy-connect.md)), the transparent redirect ingress ([proxy-transparent-redirect.md](proxy-transparent-redirect.md)), body checks against the spec and the 1 MiB body limit ([proxy-spec-checks.md](proxy-spec-checks.md)), body and record signatures with the `fingerprintKey` ([proxy-signatures.md](proxy-signatures.md)), config reload ([proxy-config-reload.md](proxy-config-reload.md)), the admin port health checks ([proxy-health-checks.md](proxy-health-checks.md)), the proxy's own telemetry ([proxy-telemetry.md](proxy-telemetry.md)), TLS from apps ([proxy-tls-from-apps.md](proxy-tls-from-apps.md)), streaming replies and WebSockets passing through, trace context on records ([proxy-trace-context.md](proxy-trace-context.md)), and the `hotline-proxy` program with `validate` and the `@e2e` scenarios ([proxy-program.md](proxy-program.md)).
+- **Still later:** trace spans, the load test with **k6** (Grafana's open source load testing tool, scripted in JavaScript; Peter, 2026-10-27) and with it `hotline.schema.skipped=overloaded`, and the container image.
 
 ## Answers to the open questions
 
-Peter answered these on 2026-10-28. The feature files and the code follow them.
+Peter answered these on 2026-10-28. Answers 1, 12, 13 and 14 were overtaken by later slices; the note after each says what holds now. `proxy-spec.md` in `hotline-strategic` is the source of truth.
 
-1. **Other requests on the proxy port.** A path, a Host header request or `CONNECT` gets `501` with `Proxy-Status: hotline; error=http_request_error`. A full address the proxy can't use, such as `ftp://` or one with no host, gets `400`.
+1. **Other requests on the proxy port.** A path, a Host header request or `CONNECT` gets `501` with `Proxy-Status: hotline; error=http_request_error`. A full address the proxy can't use, such as `ftp://` or one with no host, gets `400`. *Now:* the Host header, vendor URL in path and CONNECT requests are ingresses of their own. `CONNECT` still gets `501` when `listen.connect` is not set. Every refused request gets a minimal record with `error.type=http_request_error`.
 2. **Broken `Proxy-Authorization`.** Every broken form counts as no ID, so the record says `not-passed`.
 3. **A path with no route in the spec.** `url.full` and `url.template` are left out.
 4. **Turning `http` into `https`.** The app's own port stays: `http://api.x.com:8080` goes out as `https` on 8080.
@@ -71,8 +63,8 @@ Peter answered these on 2026-10-28. The feature files and the code follow them.
 9. **Matching routes.** A trailing slash is ignored. The path of the first `servers` address goes in front of every route.
 10. **Timing definitions.** Each timing is the length of its own phase, except `first_byte`, which counts from when the call reached the proxy. The proxy's own time is split in two: `hotline.timing.proxy_request_us` (before the vendor call starts) and `hotline.timing.proxy_response_us` (after the vendor's reply ends). Together they are the total minus the vendor's part.
 11. **Empty query values.** `customer=` stays as it is.
-12. **Fields not built yet.** The schema and fingerprint fields are left out.
-13. **Dropped records.** A warning log line, at most once a minute per destination, and always one on the final send at shutdown. Each exporter's queue holds 10 000 records unless `queueSize` says otherwise.
-14. **TLS from apps to the proxy.** A later slice. Its scenario is tagged `@later`.
+12. **Fields not built yet.** The schema and fingerprint fields are left out. *Now:* body checks fill the `hotline.schema.*` fields, and bodies and records are signed instead of fingerprinted (see [proxy-signatures.md](proxy-signatures.md)).
+13. **Dropped records.** A warning log line, at most once a minute per destination, and always one on the final send at shutdown. Each exporter's queue holds 10 000 records unless `queueSize` says otherwise. *Now:* dropped records are also counted in the proxy's own telemetry, as `otel.sdk.processor.log.processed` with `error.type=queue_full`.
+14. **TLS from apps to the proxy.** A later slice. *Now:* built (see [proxy-tls-from-apps.md](proxy-tls-from-apps.md)).
 
 One more answer came from the review of the pull request (Peter, 2026-10-28): `vendorTimeout` also limits how long a reply may go quiet between its parts. A vendor that stays silent longer is cut off, and the record says `http_response_incomplete`. A WebSocket may stay quiet as long as it likes.
