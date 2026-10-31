@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"hotline-example/aws-sqs-invoices/internal/fakes3"
 	"hotline-example/aws-sqs-invoices/internal/fakesqs"
 )
 
@@ -79,6 +82,81 @@ var _ = Describe("The example program", func() {
 		Expect(stderr.String()).NotTo(BeEmpty())
 	})
 
+	Describe("with the invoices bucket", func() {
+		var files *fakes3.S3
+
+		BeforeEach(func() {
+			files = fakes3.Start("shop-invoices", fake)
+			GinkgoT().Setenv("HOTLINE_PROXY", "http://invoices:x@"+files.Addr)
+			GinkgoT().Setenv("INVOICES_BUCKET", "shop-invoices")
+		})
+
+		It("stores the invoice in the bucket, and the shop fetches it", func() {
+			Expect(run("request", "--order", "A-1001", "--template", "invoice-standard-v2", "--language", "en")).To(Equal(0))
+			Expect(run("work", "--once")).To(Equal(0))
+			Expect(files.File("A-1001.pdf")).To(HavePrefix("%PDF-1.4"))
+
+			out := filepath.Join(GinkgoT().TempDir(), "a.pdf")
+			Expect(run("fetch", "--order", "A-1001", "--out", out)).To(Equal(0))
+			pdf, err := os.ReadFile(out) //nolint:gosec // the test's own file
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pdf).To(Equal(files.File("A-1001.pdf")))
+		})
+
+		It("says when there is no invoice to fetch", func() {
+			Expect(run("fetch", "--order", "A-9999", "--out", filepath.Join(GinkgoT().TempDir(), "a.pdf"))).To(Equal(1))
+			Expect(stderr.String()).To(ContainSubstring("no invoice"))
+		})
+
+		It("lists the invoices, one per line", func() {
+			files.Put("A-1001.pdf", []byte("12345"), time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC))
+			Expect(run("list")).To(Equal(0))
+			Expect(stdout.String()).To(Equal("A-1001.pdf\t5\t2026-10-01T08:00:00Z\n"))
+		})
+
+		It("cleans up the invoices stored before a day", func() {
+			files.Put("A-1001.pdf", []byte("a"), time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC))
+			files.Put("A-1002.pdf", []byte("b"), time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC))
+			Expect(run("cleanup", "--before", "2026-11-01")).To(Equal(0))
+			Expect(stdout.String()).To(Equal("deleted A-1001.pdf\n"))
+			Expect(files.Keys()).To(Equal([]string{"A-1002.pdf"}))
+		})
+
+		It("takes the bucket from a flag too", func() {
+			GinkgoT().Setenv("INVOICES_BUCKET", "")
+			Expect(run("list", "--bucket", "shop-invoices")).To(Equal(0))
+		})
+
+		It("reports a failed list", func() {
+			GinkgoT().Setenv("HOTLINE_PROXY", "http://invoices:x@127.0.0.1:1")
+			Expect(run("list")).To(Equal(1))
+			Expect(run("cleanup", "--before", "2026-11-01")).To(Equal(1))
+		})
+
+		It("can reach a local S3 without Hotline", func() {
+			GinkgoT().Setenv("HOTLINE_PROXY", "")
+			Expect(run("list", "--s3-endpoint", "http://"+files.Addr)).To(Equal(0))
+			Expect(files.Calls()[0].RequestURI).To(HavePrefix("/shop-invoices?list-type=2"))
+		})
+
+		DescribeTable("refuses a wrong command line with exit code 2",
+			func(args ...string) {
+				Expect(run(args...)).To(Equal(2))
+				Expect(stderr.String()).NotTo(BeEmpty())
+			},
+			Entry("fetch without an order", "fetch", "--out", "a.pdf"),
+			Entry("fetch without a file", "fetch", "--order", "A-1001"),
+			Entry("cleanup without a day", "cleanup"),
+			Entry("cleanup with a day it can't read", "cleanup", "--before", "soon"),
+		)
+
+		It("needs a bucket for the bucket's commands", func() {
+			GinkgoT().Setenv("INVOICES_BUCKET", "")
+			Expect(run("list")).To(Equal(2))
+			Expect(stderr.String()).To(ContainSubstring("bucket"))
+		})
+	})
+
 	DescribeTable("refuses a wrong command line with exit code 2",
 		func(args ...string) {
 			Expect(run(args...)).To(Equal(2))
@@ -89,7 +167,7 @@ var _ = Describe("The example program", func() {
 		Entry("an unknown flag", "work", "--fast"),
 		Entry("request without an order", "request", "--template", "t", "--language", "en"),
 		Entry("send without a body", "send"),
-		Entry("work without a folder", "work"),
+		Entry("work without a folder or a bucket", "work"),
 	)
 
 	It("needs a queue", func() {
