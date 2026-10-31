@@ -46,6 +46,7 @@ Feature: Each record is signed
         | hotline.timing.total_us is changed            |
         | hotline.integration.id is changed          |
         | hotline.request.body.signature is changed  |
+        | hotline.trace.signature is changed         |
         | an attribute is added                      |
         | an attribute is removed                    |
         | the timestamp is changed                   |
@@ -92,6 +93,38 @@ Feature: Each record is signed
       Given the vendor answers 201
       When the app sends GET /orders
       Then the record has no hotline.request.body.signature or hotline.response.body.signature
+
+  Rule: The call's trace is signed too
+
+    The trace's signed text is a line with its trace id, then one block
+    per span in start order (a tie goes by span id): its span id, parent
+    span id, name, kind, start, end and status, then its attributes sorted
+    by name, each as JSON. The signature goes on the record as
+    hotline.trace.signature, so the record's own signature covers it
+    (Peter, 2026-10-31).
+
+    Scenario: A trace is signed
+      When the app sends GET /orders
+      Then the record has hotline.trace.signature
+      And the trace signature checks out when rebuilt from the spans alone, with the key
+
+    Scenario Outline: A change to the trace shows
+      When the app sends GET /orders
+      And <change> in the received trace
+      Then the trace signature no longer checks out
+
+      Examples:
+        | change                         |
+        | a span's end is changed        |
+        | a span's name is changed       |
+        | a span's parent is changed     |
+        | a span's status is changed     |
+        | an attribute is changed        |
+        | a span is removed              |
+
+    Scenario: A minimal record's trace is not signed
+      When the app sends GET /orders with no integration ID
+      Then the record has no hotline.trace.signature
 
   Rule: An integration without a key
 

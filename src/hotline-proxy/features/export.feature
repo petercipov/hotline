@@ -86,7 +86,3 @@ Feature: Sending OpenTelemetry data
     Given records waiting in the queue
     When the proxy shuts down
     Then they are sent first, within a time limit
-
-  Scenario: Left for later slices
-    When the proxy runs
-    Then it sends no trace spans

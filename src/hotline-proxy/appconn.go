@@ -26,10 +26,11 @@ type appConn struct {
 	// nobody.
 	setUp func()
 	once  sync.Once
-	// secure says the app set up TLS with the proxy, and handshake how
-	// long that took, making the certificate it was shown included.
+	// secure says the app set up TLS with the proxy, and handshake when
+	// that started and ended, making the certificate it was shown
+	// included.
 	secure    bool
-	handshake time.Duration
+	handshake [2]time.Time
 	// timed is set once a call has carried the handshake time.
 	timed atomic.Bool
 }
@@ -41,13 +42,13 @@ func (a *appConn) Read(p []byte) (int, error) {
 	return a.Conn.Read(p)
 }
 
-// handshakeTime is the time setting up TLS took, for the first call on the
-// connection that asks; later calls skipped that phase.
-func (a *appConn) handshakeTime() (time.Duration, bool) {
+// handshakeTime is when setting up TLS started and ended, for the first
+// call on the connection that asks; later calls skipped that step.
+func (a *appConn) handshakeTime() (time.Time, time.Time, bool) {
 	if a == nil || !a.secure || !a.timed.CompareAndSwap(false, true) {
-		return 0, false
+		return time.Time{}, time.Time{}, false
 	}
-	return a.handshake, true
+	return a.handshake[0], a.handshake[1], true
 }
 
 // secureAppConn sets up TLS with an app on the proxy's TLS port, timed,
@@ -67,11 +68,12 @@ func secureAppConn(raw net.Conn, config *tls.Config, clock Clock, logger *slog.L
 	return a
 }
 
-// timeHandshake sets up TLS with an app and says how long it took.
-func timeHandshake(ctx context.Context, conn *tls.Conn, clock Clock) (time.Duration, error) {
+// timeHandshake sets up TLS with an app and says when that started and
+// ended.
+func timeHandshake(ctx context.Context, conn *tls.Conn, clock Clock) ([2]time.Time, error) {
 	start := clock.Now()
 	err := conn.HandshakeContext(ctx)
-	return clock.Now().Sub(start), err
+	return [2]time.Time{start, clock.Now()}, err
 }
 
 // appConnKey holds, in a call's context, the appConn the call came on.

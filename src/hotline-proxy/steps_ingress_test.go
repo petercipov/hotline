@@ -203,7 +203,7 @@ func (w *world) minimalWith(fields string) error {
 		"http.request.method": true, "http.response.status_code": true, "error.type": true,
 	}
 	for key := range record {
-		if !allowed[key] && !strings.HasPrefix(key, "hotline.timing.") {
+		if !allowed[key] && key != "hotline.timing.total_us" {
 			return failf("the minimal record has %s", key)
 		}
 	}

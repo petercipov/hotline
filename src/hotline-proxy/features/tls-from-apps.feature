@@ -23,8 +23,8 @@ Feature: TLS from apps to the proxy
     that did not happen.
     Given an app that trusts the test issuer
     When the app sends two calls on one TLS connection
-    Then the first record has hotline.timing.app_tls_us
-    And the second record has no hotline.timing.app_tls_us
+    Then the first call's trace has an "app tls handshake" span at the start of "hotline call"
+    And the second call's trace has no "app tls handshake" span
 
   Scenario: The proxy shows its one certificate whatever name the app asks for
     When an app opens TLS to the proxy asking for the name api.talon.one

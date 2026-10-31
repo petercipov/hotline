@@ -78,8 +78,8 @@ Feature: The CONNECT ingress, with interception
     The proxy's own cost includes setting up TLS with the app, and making
     the host's certificate when needed (Peter, 2026-10-29).
     When the app sends two calls through one tunnel
-    Then the first record has hotline.timing.app_tls_us
-    And the second record has no hotline.timing.app_tls_us
+    Then the first call's trace has an "app tls handshake" span at the start of "hotline call"
+    And the second call's trace has no "app tls handshake" span
 
   Scenario: An app that does not trust the interception issuer
     The proxy has read the CONNECT, so it knows the integration and the

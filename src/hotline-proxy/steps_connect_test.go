@@ -289,16 +289,6 @@ func connectSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^the (first|second) record (has|has no) hotline.timing.app_tls_us$`, func(which, has string) error {
-		if len(w.sentRecords) != 2 {
-			return failf("got %d records, want two", len(w.sentRecords))
-		}
-		record := w.sentRecords[map[string]int{"first": 0, "second": 1}[which]].attrs
-		if has == "has" {
-			return hasAll(record, "hotline.timing.app_tls_us")
-		}
-		return hasNo(record, "hotline.timing.app_tls_us")
-	})
 
 	sc.Step(`^the listen.connect cert is not an issuer certificate$`, func() error {
 		w.problem = "not an issuer"

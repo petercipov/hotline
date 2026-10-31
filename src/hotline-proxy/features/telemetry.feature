@@ -56,6 +56,18 @@ Feature: The proxy's own telemetry
     Then otel.sdk.processor.log.queue.capacity is 7 for that destination
     And otel.sdk.processor.log.queue.size is sent for that destination
 
+  Scenario: The span queue of each destination
+    Spans have their own queue, of the same size, next to the records'.
+    Given a product destination with queueSize 7
+    When a call ends
+    Then otel.sdk.processor.span.queue.capacity is 7 for that destination
+    And otel.sdk.processor.span.queue.size is sent for that destination
+
+  Scenario: Spans sent fine are counted
+    Given a vendor reached over a new https connection
+    When a call ends
+    Then otel.sdk.exporter.span.exported counts 10 spans with no error.type for that destination
+
   Scenario: Records dropped from a full queue are counted
     Given an exporter with queueSize 3 whose destination is busy with the first record
     When 4 more calls end

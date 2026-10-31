@@ -21,11 +21,12 @@ No number is split by integration, vendor, host, URL or route: a proxy may hold 
 |---|---|---|---|---|
 | `http.server.active_requests` | up and down count | `{request}` | `http.request.method`, `url.scheme`, `hotline.ingress` | calls from apps in flight now |
 | `http.server.request.duration` | histogram | `s` | `http.request.method`, `url.scheme`, `http.response.status_code`, `error.type`, `hotline.ingress` | how long each call took, from arrival until the last byte went to the app |
-| `hotline.proxy.overhead` | histogram | `s` | `hotline.ingress` | the proxy's own time on each call that got as far as the vendor: `proxy_request` plus `proxy_response` |
+| `hotline.proxy.overhead` | histogram | `s` | `hotline.ingress` | the proxy's own time on each call that got as far as the vendor: the `prepare call` and `finish reply` steps of its trace |
 | `otel.sdk.processor.log.queue.size` | up and down count | `{log_record}` | destination | records waiting in a destination's queue |
 | `otel.sdk.processor.log.queue.capacity` | up and down count | `{log_record}` | destination | how many records the queue holds at most |
 | `otel.sdk.processor.log.processed` | count | `{log_record}` | destination, `error.type` | records handed on to be sent; with `error.type=queue_full`, dropped from a full queue |
 | `otel.sdk.exporter.log.exported` | count | `{log_record}` | destination, `error.type` | records sent; with `error.type`, lost in a send that failed |
+| `otel.sdk.processor.span.queue.size`, `otel.sdk.processor.span.queue.capacity`, `otel.sdk.processor.span.processed`, `otel.sdk.exporter.span.exported` | as the four above | `{span}` | as above | the same for each destination's queue of spans ([proxy-traces.md](proxy-traces.md)) |
 | `otel.sdk.exporter.metric_data_point.exported` | count | `{data_point}` | destination, `error.type` | the same for the `hotline.requests` count |
 | `hotline.destination.state` | gauge | `1` | `server.address`, `server.port`, `otel.component.name` | 1 while sends to the destination work, 0 from a failed send until one works again |
 | `hotline.config.info` | gauge, always 1 | `1` | `hotline.config.version`, `hotline.listen.tls`, `hotline.listen.connect` | which config is in use, and whether the proxy port takes TLS and CONNECT |

@@ -95,17 +95,22 @@ func traceSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
-	sc.Step(`^the vendor gets (.+), with the record's trace_id and span_id$`, func(headers string) error {
-		r, err := w.lastReceived()
+	sc.Step(`^the vendor gets (.+), with the record's trace_id and the "vendor call" span's id$`, func(headers string) error {
+		t, err := w.lastTrace()
 		if err != nil {
 			return err
 		}
+		vendor, err := t.one("vendor call")
+		if err != nil {
+			return err
+		}
+		r := t.record
 		trace := r.traceID
 		if strings.HasPrefix(headers, "X-Amzn-Trace-Id") {
 			trace = trace[:8] + "-" + trace[8:]
 		}
 		got := w.shopVendorCall().header
-		for _, h := range splitHeaders(strings.NewReplacer("TRACE", trace, "SPAN", r.spanID).Replace(headers)) {
+		for _, h := range splitHeaders(strings.NewReplacer("TRACE", trace, "SPAN", vendor.spanID).Replace(headers)) {
 			name, value, _ := strings.Cut(h, ": ")
 			if values := got.Values(name); len(values) != 1 || values[0] != value {
 				return failf("the vendor got %s %q, want %q", name, values, value)

@@ -46,7 +46,8 @@ Unlike the research runs, these tests never call the real Stripe. They use a loc
 Checked against `main` on 2026-10-31. Most of what slice 1 left for later is now built:
 
 - **Built:** the Host header ingress with HTTP/2 from apps ([proxy-host-header.md](proxy-host-header.md)), the vendor URL in path ingress ([proxy-url-in-path.md](proxy-url-in-path.md)), the CONNECT ingress ([proxy-connect.md](proxy-connect.md)), the transparent redirect ingress ([proxy-transparent-redirect.md](proxy-transparent-redirect.md)), body checks against the spec and the 1 MiB body limit ([proxy-spec-checks.md](proxy-spec-checks.md)), body and record signatures with the `fingerprintKey` ([proxy-signatures.md](proxy-signatures.md)), config reload ([proxy-config-reload.md](proxy-config-reload.md)), the admin port health checks ([proxy-health-checks.md](proxy-health-checks.md)), the proxy's own telemetry ([proxy-telemetry.md](proxy-telemetry.md)), TLS from apps ([proxy-tls-from-apps.md](proxy-tls-from-apps.md)), streaming replies and WebSockets passing through, trace context on records ([proxy-trace-context.md](proxy-trace-context.md)), and the `hotline-proxy` program with `validate` and the `@e2e` scenarios ([proxy-program.md](proxy-program.md)).
-- **Still later:** trace spans, the load test with **k6** (Grafana's open source load testing tool, scripted in JavaScript; Peter, 2026-10-27) and with it `hotline.schema.skipped=overloaded`, and the container image.
+- **Built since:** each call's timings as a trace ([proxy-traces.md](proxy-traces.md)).
+- **Still later:** the load test with **k6** (Grafana's open source load testing tool, scripted in JavaScript; Peter, 2026-10-27) and with it `hotline.schema.skipped=overloaded`, and the container image.
 
 ## Answers to the open questions
 
