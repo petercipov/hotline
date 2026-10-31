@@ -124,7 +124,7 @@ const (
 // Check checks a finished call against the spec. A call with no route is
 // not checked.
 func (s *Spec) Check(e Exchange) Checked {
-	r := s.match(e.Method, e.EscapedPath, e.Header)
+	r := s.match(e.Method, e.EscapedPath, e.RawQuery, e.Header)
 	if r.segments == nil {
 		return Checked{Skipped: "no_spec_route"}
 	}
@@ -134,12 +134,12 @@ func (s *Spec) Check(e Exchange) Checked {
 	for _, cookie := range (&http.Request{Header: e.Header}).Cookies() {
 		cookies[cookie.Name] = cookie.Value
 	}
-	segments := strings.Split(strings.TrimSuffix(e.EscapedPath, "/"), "/")
+	segments := r.split(strings.TrimSuffix(e.EscapedPath, "/"))
 	for _, p := range r.checks.params {
 		values := p.values(r, segments, query, e.Header, cookies)
 		c.Request = append(c.Request, p.check(values)...)
 	}
-	c.Request = append(c.Request, s.unknownQuery(r.checks.params, query)...)
+	c.Request = append(c.Request, s.unknownQuery(r, query)...)
 	c.Copied = r.checks.copiedHeaders(e.Header)
 	c.Request = append(c.Request, r.checks.loggedIn(e.Header, query, cookies)...)
 	results, skipped, copied := r.checks.body.check(e.Header.Get("Content-Type"), e.Body)
@@ -186,7 +186,7 @@ func (p param) values(r route, segments []string, query url.Values, header http.
 	switch p.in {
 	case "path":
 		for i, segment := range r.segments {
-			if segment == "{"+p.name+"}" {
+			if isValue(segment) && valueName(segment) == p.name {
 				// The proxy only forwards paths that unescape.
 				value, _ := url.PathUnescape(segments[i])
 				return []string{value}
@@ -262,11 +262,12 @@ func (p param) shape(list []string) any {
 }
 
 // unknownQuery reports query names the spec does not know. A login key
-// sent in the query is known.
-func (s *Spec) unknownQuery(params []param, query url.Values) []Result {
+// sent in the query, and a word the route needs, are known.
+func (s *Spec) unknownQuery(r route, query url.Values) []Result {
 	var results []Result
 	for _, key := range slices.Sorted(maps.Keys(query)) {
-		if !s.secretQuery[key] && !knownQuery(params, key) {
+		isWord := slices.ContainsFunc(r.words, func(w queryWord) bool { return w.name == key })
+		if !s.secretQuery[key] && !isWord && !knownQuery(r.checks.params, key) {
 			results = append(results, Result{Part: "query", Place: key, Rule: "not_in_spec"})
 		}
 	}

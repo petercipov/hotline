@@ -70,6 +70,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	overlaySteps(sc, w)
 	awsSteps(sc, w)
 	xmlSteps(sc, w)
+	routeSteps(sc, w)
 	traceSteps(sc, w)
 	reloadSteps(sc, w)
 	telemetrySteps(sc, w)
