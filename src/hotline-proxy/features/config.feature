@@ -130,6 +130,8 @@ Feature: Loading the config file
       | an exporter's resource sets service.version          |
       | an exporter's resource has the name "my label"       |
       | an exporter's resource environment variable is not set |
+      | an integration's fingerprintKey is written out       |
+      | an integration's fingerprintKey file does not exist  |
       | two integrations have the same ID                    |
       | one integration names two apis with the same host    |
       | an integration names an api that is not in apis      |

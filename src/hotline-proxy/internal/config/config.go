@@ -95,6 +95,9 @@ type Settings struct {
 type API struct {
 	Settings
 	Spec *spec.Spec
+	// SigningKey signs the integration's records: its fingerprintKey, or
+	// its ID when it has none.
+	SigningKey []byte
 }
 
 // API finds the api an integration uses for a host, or nil when the ID is
@@ -128,7 +131,7 @@ type file struct {
 	} `yaml:"exporters"`
 	Integrations []struct {
 		ID             string       `yaml:"id"`
-		FingerprintKey any          `yaml:"fingerprintKey"`
+		FingerprintKey *secret      `yaml:"fingerprintKey"`
 		Settings       settingsFile `yaml:",inline"`
 		APIs           []apiRef     `yaml:"apis"`
 	} `yaml:"integrations"`
@@ -308,6 +311,15 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		if _, seen := c.integrations[in.ID]; seen {
 			l.problem("two integrations have the ID %s", in.ID)
 		}
+		key := []byte(in.ID)
+		switch {
+		case in.FingerprintKey == nil:
+			c.Warnings = append(c.Warnings, "integration "+in.ID+" has no fingerprintKey, so its records are signed with its ID, which is not secret")
+		case in.FingerprintKey.written:
+			l.problem("integration %s: fingerprintKey must be read from { file: path } or { env: NAME }, never written in the config", in.ID)
+		default:
+			key = []byte(l.secret("integration "+in.ID+": fingerprintKey", *in.FingerprintKey))
+		}
 		byHost := map[string]*API{}
 		for _, ref := range in.APIs {
 			for _, u := range ref.unknown {
@@ -318,11 +330,13 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 				l.problem("integration %s names the api %s, which is not in apis", in.ID, ref.name)
 				continue
 			}
+			// Each integration gets its own copy, with its own key.
+			changed := *api
+			changed.SigningKey = key
 			if ref.vendorTimeout != nil {
-				changed := *api
 				changed.Settings = l.settings("integration "+in.ID, settingsFile{VendorTimeout: ref.vendorTimeout}, api.Settings)
-				api = &changed
 			}
+			api = &changed
 			for _, host := range hosts[ref.name] {
 				if _, seen := byHost[host]; seen {
 					l.problem("integration %s names two apis with the host %s", in.ID, host)

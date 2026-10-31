@@ -410,6 +410,12 @@ func (w *world) brokenConfig(problem string) error {
 	case "an exporter's resource environment variable is not set":
 		w.rawConfig = start + exporters + "      resource:\n        deployment.environment.name: { env: HOTLINE_ENV }\n"
 		w.problem = "resource deployment.environment.name: the environment variable HOTLINE_ENV is not set"
+	case "an integration's fingerprintKey is written out":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", ""))+"    fingerprintKey: s3cret\n")
+		w.problem = "integration shop: fingerprintKey must be read from { file: path } or { env: NAME }, never written in the config"
+	case "an integration's fingerprintKey file does not exist":
+		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", ""))+"    fingerprintKey: { file: missing-key }\n")
+		w.problem = "integration shop: fingerprintKey: the file missing-key cannot be read"
 	case "an exporter's queueSize is zero":
 		w.rawConfig = start + exporters + "      queueSize: 0\n"
 		w.problem = "queueSize must be at least 1"
