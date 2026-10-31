@@ -19,6 +19,7 @@ Feature: The CONNECT ingress, with interception
     And the app gets the vendor's status, headers and body unchanged
     And the record says hotline.ingress connect and ID talon-shop-a
     And the record has url.template /v2/customer_sessions/{customerSessionId}
+    And client.address is the app's IP address
 
   Scenario: A signed call stays valid
     Signed calls, such as AWS calls, are checked by the vendor against the
@@ -123,6 +124,7 @@ Feature: The CONNECT ingress, with interception
     And sends a call inside it with Proxy-Authorization for talon-shop-b
     Then the app gets the vendor's status, headers and body unchanged
     And the record says hotline.ingress connect and ID talon-shop-a
+    And client.address is the app's IP address
     And the test vendor never saw Proxy-Authorization
 
   Scenario: Many tunnels share one HTTP/2 connection

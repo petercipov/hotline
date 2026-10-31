@@ -98,7 +98,8 @@ Feature: Each record is signed
 
     The trace's signed text is a line with its trace id, then one block
     per span in start order (a tie goes by span id): its span id, parent
-    span id, name, kind, start, end and status, then its attributes sorted
+    span id, name, kind, start, end and status (unset, ok or error), then
+    its attributes sorted
     by name, each as JSON. The signature goes on the record as
     hotline.trace.signature, so the record's own signature covers it
     (Peter, 2026-10-31).
@@ -118,9 +119,16 @@ Feature: Each record is signed
         | a span's end is changed        |
         | a span's name is changed       |
         | a span's parent is changed     |
-        | a span's status is changed     |
+        | a span's status is changed from ok to unset    |
+        | a span's status is changed from unset to ok    |
+        | a span's status is changed from unset to error |
         | an attribute is changed        |
         | a span is removed              |
+
+    Scenario: A failed span's status is signed too
+      When the app sends GET /orders?limit=abc
+      And a span's status is changed from error to ok in the received trace
+      Then the trace signature no longer checks out
 
     Scenario: A minimal record's trace is not signed
       When the app sends GET /orders with no integration ID

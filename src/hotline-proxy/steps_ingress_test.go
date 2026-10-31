@@ -199,7 +199,7 @@ func (w *world) minimalWith(fields string) error {
 		return err
 	}
 	allowed := map[string]bool{
-		"hotline.integration.id": true, "hotline.ingress": true, "server.address": true,
+		"hotline.integration.id": true, "hotline.ingress": true, "client.address": true, "server.address": true,
 		"http.request.method": true, "http.response.status_code": true, "error.type": true,
 	}
 	for key := range record {
@@ -213,7 +213,7 @@ func (w *world) minimalWith(fields string) error {
 			return err
 		}
 	}
-	return hasAll(record, "hotline.integration.id", "http.request.method", "hotline.timing.total_us")
+	return hasAll(record, "hotline.integration.id", "client.address", "http.request.method", "hotline.timing.total_us")
 }
 
 func (w *world) nothingSent() error {

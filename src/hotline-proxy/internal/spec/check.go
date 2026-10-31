@@ -2,6 +2,7 @@ package spec
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -121,9 +122,25 @@ const (
 	whole      = "$"
 )
 
-// Check checks a finished call against the spec. A call with no route is
-// not checked.
+// Check checks a finished call against the spec, both sides. A call with
+// no route is not checked.
 func (s *Spec) Check(e Exchange) Checked {
+	return s.CheckRequest(e).With(s.CheckReply(e))
+}
+
+// With joins the check of a request with the check of its reply. When both
+// left part out, the request's reason is kept.
+func (c Checked) With(reply Checked) Checked {
+	c.Reply = reply.Reply
+	c.Copied = append(c.Copied, reply.Copied...)
+	c.Skipped = cmp.Or(c.Skipped, reply.Skipped)
+	return c
+}
+
+// CheckRequest checks the request side of a call: its parameters, login
+// and body. It can run as soon as the request has been sent (Peter,
+// 2026-10-31).
+func (s *Spec) CheckRequest(e Exchange) Checked {
 	r := s.match(e.Method, e.EscapedPath, e.RawQuery, e.Header)
 	if r.segments == nil {
 		return Checked{Skipped: "no_spec_route"}
@@ -146,6 +163,17 @@ func (s *Spec) Check(e Exchange) Checked {
 	c.Request = append(c.Request, results...)
 	c.Skipped = skipped
 	c.Copied = append(c.Copied, copied...)
+	return c
+}
+
+// CheckReply checks the reply side of a call: its status, headers and
+// body. It can run as soon as the reply has arrived (Peter, 2026-10-31).
+func (s *Spec) CheckReply(e Exchange) Checked {
+	r := s.match(e.Method, e.EscapedPath, e.RawQuery, e.Header)
+	if r.segments == nil {
+		return Checked{Skipped: "no_spec_route"}
+	}
+	var c Checked
 	if e.Status == 0 || r.checks.replies == nil {
 		return c
 	}
@@ -158,17 +186,12 @@ func (s *Spec) Check(e Exchange) Checked {
 		c.Reply = append(c.Reply, h.check(h.values(r, nil, nil, e.ReplyHeader, nil))...)
 	}
 	if mt, _, _ := mime.ParseMediaType(e.ReplyHeader.Get("Content-Type")); mt == "text/event-stream" {
-		if c.Skipped == "" {
-			c.Skipped = "streaming"
-		}
+		c.Skipped = "streaming"
 		return c
 	}
-	results, skipped, copied = rp.body.check(e.ReplyHeader.Get("Content-Type"), e.ReplyBody)
+	results, skipped, copied := rp.body.check(e.ReplyHeader.Get("Content-Type"), e.ReplyBody)
 	c.Reply = append(c.Reply, results...)
-	c.Copied = append(c.Copied, copied...)
-	if c.Skipped == "" {
-		c.Skipped = skipped
-	}
+	c.Skipped, c.Copied = skipped, copied
 	return c
 }
 

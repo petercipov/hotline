@@ -25,6 +25,13 @@ Feature: Building the request record
     And url.template is /v2/customer_sessions/{customerSessionId}
     And http.response.header.x-request-id is req-5521
 
+  Scenario: The app's address
+    The IP address the app's connection came from, never a header the app
+    could set. Every record has it, minimal ones too (Peter, 2026-10-31).
+    Given integration talon-shop-a with an api for api.talon.one
+    When the Talon.One sample call ends
+    Then client.address is the app's IP address
+
   Scenario: The scheme actually sent
     Given an api with TLS origination on
     When an app sends an http address
@@ -48,7 +55,7 @@ Feature: Building the request record
   Scenario Outline: Minimal record
     Given <call>
     When the call ends
-    Then the record holds only hotline.integration.id, hotline.ingress, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and hotline.timing.total_us
+    Then the record holds only hotline.integration.id, hotline.ingress, client.address, server.address, network.peer.address, http.request.method, http.response.status_code, error.type and hotline.timing.total_us
     And hotline.integration.id is <id>
 
     Examples:

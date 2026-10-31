@@ -112,7 +112,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 			"http.response.status_code", "hotline.timing.total_us", "hotline.config.version")
 	})
 	sc.Step(`^standard names come from the semconv constants, such as http.request.method and url.full$`, func() error {
-		return w.lastHasAll("http.request.method", "url.full", "url.scheme", "server.address", "server.port",
+		return w.lastHasAll("http.request.method", "url.full", "url.scheme", "client.address", "server.address", "server.port",
 			"network.peer.address", "network.protocol.version", "http.request.body.size", "http.response.body.size",
 			"tls.protocol.version", "tls.server.not_after")
 	})
@@ -121,14 +121,14 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		standard := []string{"http.request.method", "url.full", "url.scheme", "url.template", "server.address",
+		standard := []string{"http.request.method", "url.full", "url.scheme", "url.template", "client.address", "server.address",
 			"server.port", "network.peer.address", "network.protocol.version", "http.response.status_code",
 			"error.type", "http.request.body.size", "http.response.body.size", "tls.protocol.version",
 			"tls.server.not_after"}
 		hotline := []string{"hotline.integration.id", "hotline.ingress", "hotline.timing.total_us",
 			"hotline.client.cancelled", "hotline.config.version", "hotline.trace.signature", "hotline.schema.request.errors",
 			"hotline.schema.response.errors", "hotline.schema.request.errors_total", "hotline.schema.response.errors_total",
-			"hotline.schema.skipped", "hotline.signature", "hotline.signature_key_id",
+			"hotline.schema.skipped", "hotline.schema.status", "hotline.signature", "hotline.signature_key_id",
 			"hotline.request.body.signature", "hotline.response.body.signature"}
 		known := map[string]bool{}
 		for _, k := range append(standard, hotline...) {

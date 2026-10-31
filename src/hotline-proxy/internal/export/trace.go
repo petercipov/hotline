@@ -30,7 +30,10 @@ type Span struct {
 	Start  time.Time
 	End    time.Time
 	Failed bool
-	Attrs  []attribute.KeyValue
+	// OK marks a step that proved something went right, such as a check
+	// that passed (Peter, 2026-10-31). Other spans leave it unset.
+	OK    bool
+	Attrs []attribute.KeyValue
 }
 
 // Trace queues the spans of one call, in the trace sc names, for every
@@ -64,6 +67,9 @@ func readOnly(sc trace.SpanContext, s Span, d destination) sdktrace.ReadOnlySpan
 	}
 	if s.Failed {
 		stub.Status = sdktrace.Status{Code: codes.Error}
+	}
+	if s.OK {
+		stub.Status = sdktrace.Status{Code: codes.Ok}
 	}
 	return stub.Snapshot()
 }

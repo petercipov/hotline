@@ -92,6 +92,7 @@ There are two sizes of record:
 |---|---|---|
 | `hotline.integration.id` | text | The ID from `Proxy-Authorization`, as sent, or `not-passed`. |
 | `hotline.ingress` | text | How the app reached the proxy: `forward_proxy`, `url_in_path`, `host_header` or `connect`. |
+| `client.address` | text | The app's IP address, from its connection, never from a header the app could set (Peter, 2026-10-31). Inside a `CONNECT` tunnel it is the address the tunnel came from. |
 | `server.address` | text | The vendor host, in lower case. |
 | `http.request.method` | text | The method, such as `GET`. |
 | `http.response.status_code` | whole number | The status the app got, also when the proxy made it up (`502`, `504`, `403`). |
@@ -114,7 +115,7 @@ There are two sizes of record:
 | `tls.server.not_after` | text | When the vendor's certificate expires, as an RFC 3339 time in UTC. Only over TLS. |
 | `http.request.header.<name>` | list of text | Allowed request headers, name in lower case. |
 | `http.response.header.<name>` | list of text | Allowed reply headers, name in lower case. |
-| `hotline.client.cancelled` | true or false | The app gave up before the vendor answered. |
+| `hotline.client.cancelled` | true or false | The app did not get the whole reply: it gave up or hung up first. |
 | `hotline.config.version` | text | The config's `version`, a `+`, and the first 12 hex characters of a SHA-256 over the config, its specs and overlays, such as `2026-10-31.2+a3f9c21e07b4`. |
 | `hotline.schema.*` | see below | What the check against the spec found. |
 | any name the spec gives | text, number, or true or false | A body field or call header the spec marks `x-hotline-record`, such as `messaging.destination.name` for SQS's `QueueUrl` and `messaging.operation.name` for its `X-Amz-Target`. Detail: [proxy-body-fields.md](proxy-body-fields.md). |
@@ -182,7 +183,7 @@ There is no latency histogram and no pass or fail count: the control plane build
 
 ## Signal 3: the trace of each call
 
-One trace per call, to every destination, with the same resource labels as the records: `hotline call` for the whole call, and under it a span for each step that happened, such as `prepare call`, `vendor call` with `dns lookup`, `tcp connect`, `vendor tls handshake`, `send call`, `wait for vendor` and `receive reply` under it, and `finish reply`. `hotline call` has the record's trace id and span id, and sits under the app's span when the app sent one. Spans hold nothing the record holds: only `hotline.connection.reused` on `vendor call` and `dns.question.name` on `dns lookup`. Detail: [proxy-traces.md](proxy-traces.md).
+One trace per call, to every destination, with the same resource labels as the records: `hotline call` for the whole call, and under it a span for each step that happened, such as `routing`, `vendor call` with `dns lookup`, `tcp connect`, `vendor tls handshake`, `send call`, `wait for vendor` and `receive reply` under it, and `reply to app`, with `request spec check` and `reply spec check` for the spec checks. `hotline call` has the record's trace id and span id, and sits under the app's span when the app sent one. Spans hold nothing the record holds: only `hotline.connection.reused` on `vendor call` and `dns.question.name` on `dns lookup`. Detail: [proxy-traces.md](proxy-traces.md).
 
 ## Signal 4: the proxy's own numbers
 

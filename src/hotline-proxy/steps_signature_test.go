@@ -172,8 +172,14 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 			victim.name += " too"
 		case "a span's parent is changed":
 			victim.parent = strings.Repeat("ab", 8)
-		case "a span's status is changed":
-			victim.status = map[string]string{"error": "unset", "unset": "error"}[victim.status]
+		case "a span's status is changed from ok to unset", "a span's status is changed from unset to ok",
+			"a span's status is changed from unset to error", "a span's status is changed from error to ok":
+			from, to, _ := strings.Cut(strings.TrimPrefix(change, "a span's status is changed from "), " to ")
+			i := slices.IndexFunc(changedTrace.spans, func(s receivedSpan) bool { return s.status == from })
+			if i < 0 {
+				return failf("no span has the status %s", from)
+			}
+			changedTrace.spans[i].status = to
 		case "an attribute is changed":
 			for i, s := range changedTrace.spans {
 				if s.name == "vendor call" {
@@ -198,8 +204,12 @@ func signatureSteps(sc *godog.ScenarioContext, w *world) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(fmt.Sprint(record), secret) {
-			return failf("the record holds %s: %v", secret, record)
+		// Signatures are random-looking base64, which can hold any short
+		// text by chance, so they are left out of the search.
+		for name, value := range record {
+			if !strings.HasSuffix(name, "signature") && strings.Contains(fmt.Sprint(value), secret) {
+				return failf("the record holds %s in %s: %v", secret, name, record)
+			}
 		}
 		return nil
 	})
