@@ -59,7 +59,7 @@ Peter answered these on 2026-10-28. Answers 1, 12, 13 and 14 were overtaken by l
 4. **Turning `http` into `https`.** The app's own port stays: `http://api.x.com:8080` goes out as `https` on 8080.
 5. **`not-passed` and `https`.** An `https` call stays `https`. *Since 2026-11-01:* a `not-passed` call, or a call to a host outside the integration's apis, also turns `http` into `https`, unless the `not-passed` entry sets `tlsOrigination: false` (Peter, 2026-11-01).
 6. **Forwarding headers.** The proxy adds none.
-7. **Config version.** A `version` field in the config file, written by whoever changes it. A config without it is refused.
+7. **Config version.** ~~A `version` field in the config file, written by whoever changes it.~~ Replaced (Peter, 2026-11-01): records carry the config file's name and a fingerprint of its files; the config has no `version` field.
 8. **Strict config.** Lenient: unknown fields and an `apis` list on `not-passed` are accepted, and each gets a warning log line.
 9. **Matching routes.** A trailing slash is ignored. The path of the first `servers` address goes in front of every route.
 10. **Timing definitions.** Each timing is the length of its own phase, except `first_byte`, which counts from when the call reached the proxy. The proxy's own time is split in two: `hotline.timing.proxy_request_us` (before the vendor call starts) and `hotline.timing.proxy_response_us` (after the vendor's reply ends). Together they are the total minus the vendor's part.

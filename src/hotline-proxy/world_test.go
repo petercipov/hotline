@@ -83,6 +83,8 @@ type world struct {
 	// busy is the address another program already listens on.
 	busy       string
 	configPath string
+	// configName is the config file's name; empty means hotline-proxy.yaml.
+	configName string
 
 	proxy    *proxy.Proxy
 	addr     string
@@ -358,7 +360,6 @@ func freePort() string {
 
 func (w *world) config() string {
 	var b strings.Builder
-	b.WriteString("version: 2026-10-28.1\n")
 	admin := w.adminAddr
 	if admin == "" {
 		admin = "127.0.0.1:0"
@@ -426,7 +427,11 @@ func (w *world) start() error {
 		if content == "" {
 			content = w.config()
 		}
-		w.configPath = w.writeFile("hotline-proxy.yaml", content)
+		name := w.configName
+		if name == "" {
+			name = "hotline-proxy.yaml"
+		}
+		w.configPath = w.writeFile(name, content)
 	}
 	if w.exportTimeout == 0 {
 		w.exportTimeout = 2 * time.Second

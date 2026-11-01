@@ -58,10 +58,10 @@ Feature: The hotline-proxy program
     And standard error says "listen.tls: the cert or key file cannot be read"
 
   Scenario: validate lists every problem of a config
-    Given a config file with no version and no exporters
+    Given a config file with no proxy listen address and no exporters
     When hotline-proxy is run with "validate --config hotline-proxy.yaml"
     Then it exits with code 1
-    And standard error says "there is no version"
+    And standard error says "there is no listen.proxy address"
     And standard error says "there are no exporters"
 
   Scenario Outline: A trust file the program cannot use is refused
@@ -77,10 +77,10 @@ Feature: The hotline-proxy program
       | run      | a file trust.pem that holds no certificate | holds no certificate        |
 
   Scenario: run refuses a config with problems
-    Given a config file with no version and no exporters
+    Given a config file with no proxy listen address and no exporters
     When hotline-proxy is run with "run --config hotline-proxy.yaml"
     Then it exits with code 1
-    And standard error says "there is no version"
+    And standard error says "there is no listen.proxy address"
 
   Scenario: run stops with exit code 1 when the proxy port is taken
     Given a valid config file

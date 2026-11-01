@@ -48,11 +48,10 @@ type Config struct {
 	// NotPassed applies to calls without a known integration ID, and to
 	// calls to a host outside the integration's apis.
 	NotPassed Settings
-	// Version is the config's own version field.
-	Version string
+	// Name is the config file's name, without its folder.
+	Name string
 	// Fingerprint is the first 12 hex characters of a SHA-256 of the
-	// config, specs and overlays, so configs differ even when someone
-	// forgot to change Version. Key and certificate files are left out: a
+	// config, specs and overlays, so every edit gives a new one. Key and certificate files are left out: a
 	// renewal is not a new config, and secrets stay out of it.
 	Fingerprint string
 	// Files are every file the load read or tried to read, so the proxy
@@ -68,9 +67,9 @@ type Config struct {
 }
 
 // Label is what every record carries as hotline.config.version: the
-// version, a +, and the fingerprint.
+// config file's name, a +, and the fingerprint.
 func (c *Config) Label() string {
-	return c.Version + "+" + c.Fingerprint
+	return c.Name + "+" + c.Fingerprint
 }
 
 // Trace says how an integration's app sends its trace context, and whether
@@ -159,8 +158,7 @@ func (c *Config) API(integrationID, host string) *API {
 
 // file is the config file's layout.
 type file struct {
-	Version string `yaml:"version"`
-	Listen  struct {
+	Listen struct {
 		Proxy   string    `yaml:"proxy"`
 		Admin   string    `yaml:"admin"`
 		TLS     *pairFile `yaml:"tls"`
@@ -319,16 +317,13 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		hashed:    map[string][]byte{path: data},
 	}
 	c := &Config{
-		Version:      f.Version,
+		Name:         filepath.Base(path),
 		Warnings:     warnings,
 		ProxyAddr:    f.Listen.Proxy,
 		AdminAddr:    f.Listen.Admin,
 		NotPassed:    Settings{TLSOrigination: true, VendorTimeout: time.Minute},
 		integrations: map[string]map[string]*API{},
 		traces:       map[string]Trace{},
-	}
-	if f.Version == "" {
-		l.problem("there is no version")
 	}
 	if f.Listen.Proxy == "" {
 		l.problem("there is no listen.proxy address")

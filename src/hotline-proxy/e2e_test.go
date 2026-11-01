@@ -231,8 +231,8 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 		p.writeConfig(p.config(true))
 		return nil
 	})
-	sc.Step(`^a config file with no version and no exporters$`, func() error {
-		p.writeConfig(fmt.Sprintf("listen:\n  proxy: %q\n", p.proxyAddr))
+	sc.Step(`^a config file with no proxy listen address and no exporters$`, func() error {
+		p.writeConfig(fmt.Sprintf("listen:\n  admin: %q\n", p.adminAddr))
 		return nil
 	})
 	sc.Step(`^a config file whose listen.tls key file does not exist$`, func() error {
@@ -308,8 +308,8 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 
 	// Reloading.
 	sc.Step(`^an app's call is in progress$`, p.callInProgress)
-	sc.Step(`^the config's version changes to (\S+)$`, func(version string) error {
-		p.writeConfig(strings.Replace(p.config(false), "version: e2e-1\n", "version: "+version+"\n", 1))
+	sc.Step(`^the config file changes$`, func() error {
+		p.writeConfig(p.config(false) + "# changed\n")
 		return nil
 	})
 	sc.Step(`^within (\d+) seconds standard error says "(.*)"$`, func(seconds int, text string) error {
@@ -322,21 +322,23 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 	})
 	// A call's record is made just after its answer is sent, so the
 	// records of two calls in a row can reach the receiver in either order.
-	sc.Step(`^the records carry the config versions (.+)$`, func(list string) error {
-		records, _ := p.receiver.got()
-		want := strings.Split(strings.ReplaceAll(list, " and ", ", "), ", ")
-		var got []string
-		for _, r := range records {
-			version, _ := r.attrs["hotline.config.version"].(string)
-			if !regexp.MustCompile(`^\S+\+[0-9a-f]{12}$`).MatchString(version) {
-				return failf("a record carries hotline.config.version %q, want a version and a fingerprint", version)
-			}
-			got = append(got, strings.Split(version, "+")[0])
+	sc.Step(`^the records carry two different config fingerprints$`, func() error {
+		got, err := p.configLabels()
+		if err != nil {
+			return err
 		}
-		slices.Sort(got)
-		slices.Sort(want)
-		if !slices.Equal(got, want) {
-			return failf("the records carry the config versions %v, want %v", got, want)
+		if len(got) != 2 || got[0] == got[1] {
+			return failf("the records carry hotline.config.version %v, want two different ones", got)
+		}
+		return nil
+	})
+	sc.Step(`^the records carry one config fingerprint, not the first one$`, func() error {
+		got, err := p.configLabels()
+		if err != nil {
+			return err
+		}
+		if len(got) != 1 || got[0] == p.startLabel() {
+			return failf("the records carry hotline.config.version %v, want one that is not %s", got, p.startLabel())
 		}
 		return nil
 	})
@@ -672,8 +674,7 @@ func (p *program) config(validateOnly bool) string {
 	}
 	// The test vendor runs on this computer, an internal address, so the
 	// config allows internal IPs.
-	return fmt.Sprintf(`version: e2e-1
-listen:
+	return fmt.Sprintf(`listen:
   proxy: %q
   admin: %q
 %sexporters:
@@ -693,6 +694,31 @@ integrations:
   - id: not-passed
     allowInternalIPs: true
 `, p.proxyAddr, p.adminAddr, listenTLS, endpoint)
+}
+
+// configLabels are the hotline.config.version of each record, each checked
+// to be the config's file name, a + and a fingerprint.
+func (p *program) configLabels() ([]string, error) {
+	records, _ := p.receiver.got()
+	got := make([]string, 0, len(records))
+	for _, r := range records {
+		label, _ := r.attrs["hotline.config.version"].(string)
+		if !regexp.MustCompile(`^hotline-proxy\.yaml\+[0-9a-f]{12}$`).MatchString(label) {
+			return nil, failf("a record carries hotline.config.version %q, want hotline-proxy.yaml+ and a fingerprint", label)
+		}
+		got = append(got, label)
+	}
+	slices.Sort(got)
+	return got, nil
+}
+
+// startLabel is the config_version the program logged when it started.
+func (p *program) startLabel() string {
+	m := regexp.MustCompile(`hotline proxy started.*config_version=(\S+)`).FindStringSubmatch(p.stderr.String())
+	if m == nil {
+		return ""
+	}
+	return m[1]
 }
 
 func (p *program) writeConfig(content string) {
