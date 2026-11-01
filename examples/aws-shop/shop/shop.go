@@ -133,6 +133,10 @@ func NewApp(ctx context.Context, name string, s Settings, names Names, opts ...f
 	if client != nil {
 		cfg.HTTPClient = client
 	}
+	// Newer SDKs may send DynamoDB and Kinesis calls to a host named after
+	// the account, once the keys say which account they belong to, as keys
+	// from STS do. This keeps the one host per service the proxy config names.
+	cfg.AccountIDEndpointMode = aws.AccountIDEndpointModeDisabled
 	if name == "invoices" && names.WorkerRole != "" {
 		// One set of keys for every client, fetched on the first call and
 		// kept until it runs out, an hour later.
@@ -151,16 +155,12 @@ func NewApp(ctx context.Context, name string, s Settings, names Names, opts ...f
 		return App{}, err
 	}
 	return App{
-		Name:  name,
-		Names: names,
-		Log:   slog.New(slog.DiscardHandler),
-		SQS:   queue,
-		Files: invoice.Files{Client: files, Bucket: names.Bucket},
-		DynamoDB: dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-			// Newer SDKs may send DynamoDB calls to a host named after the
-			// account; this keeps the one host the proxy config names.
-			o.AccountIDEndpointMode = aws.AccountIDEndpointModeDisabled
-		}),
+		Name:        name,
+		Names:       names,
+		Log:         slog.New(slog.DiscardHandler),
+		SQS:         queue,
+		Files:       invoice.Files{Client: files, Bucket: names.Bucket},
+		DynamoDB:    dynamodb.NewFromConfig(cfg),
 		Kinesis:     kinesis.NewFromConfig(cfg),
 		EventBridge: eventbridge.NewFromConfig(cfg),
 		SSM:         ssm.NewFromConfig(cfg),

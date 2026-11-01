@@ -181,6 +181,10 @@ var _ = Describe("The shop's four apps", func() {
 			for _, c := range calls[1:] {
 				Expect(c.Target).NotTo(Equal("STS.AssumeRole"), "the keys are kept for the whole run")
 				Expect(c.Authorization).To(ContainSubstring("Credential="+fakeaws.RoleAccessKey+"/"), c.Target)
+				// Keys from STS name their account, and newer SDKs would then
+				// send DynamoDB and Kinesis to a host named after it, one the
+				// proxy config doesn't list.
+				Expect(c.Host).NotTo(HavePrefix("192325781350."), c.Target)
 			}
 			for _, c := range sqs.Calls() {
 				Expect(c.Authorization).To(ContainSubstring("Credential="+fakeaws.RoleAccessKey+"/"), c.Target)

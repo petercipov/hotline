@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,8 +28,18 @@ func shopHosts() []string {
 		"events.eu-west-1.amazonaws.com", "ssm.eu-west-1.amazonaws.com",
 		"secretsmanager.eu-west-1.amazonaws.com", "kms.eu-west-1.amazonaws.com",
 		"logs.eu-west-1.amazonaws.com", "states.eu-west-1.amazonaws.com",
+		"sns.eu-west-1.amazonaws.com", "sts.eu-west-1.amazonaws.com",
+		"lambda.eu-west-1.amazonaws.com", "email.eu-west-1.amazonaws.com",
 	}
 }
+
+// The keys the fake STS gives for the invoice-worker role. No record or
+// span may hold them.
+const (
+	roleAccessKey = "ASIAFAKEROLEKEY00001"
+	roleSecret    = "fake-role-secret-key"
+	roleToken     = "fake-role-session-token"
+)
 
 // fakeShopAWS answers the few actions the shop calls on AWS's JSON apis,
 // the way AWS does. Like the shop's EventBridge rule, it puts each event
@@ -40,6 +51,7 @@ type fakeShopAWS struct {
 	records int
 	rows    map[string]map[string]any // "table/orderId", then the row
 	runs    int
+	emails  []string // the whole emails SES was asked to send
 }
 
 func newFakeShopAWS(sqs *fakeSQS) *fakeShopAWS {
@@ -47,6 +59,14 @@ func newFakeShopAWS(sqs *fakeSQS) *fakeShopAWS {
 }
 
 func (f *fakeShopAWS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch service, _, _ := strings.Cut(r.Host, "."); service {
+	case "sns", "sts":
+		f.serveQuery(w, r)
+		return
+	case "lambda", "email":
+		f.serveREST(w, r, service)
+		return
+	}
 	data, _ := io.ReadAll(r.Body)
 	var in map[string]any
 	_ = json.Unmarshal(data, &in)
@@ -113,6 +133,66 @@ func (f *fakeShopAWS) answer(target string, in map[string]any) (int, any) {
 		}
 	}
 	return http.StatusBadRequest, map[string]any{"__type": "UnknownOperationException", "message": "the fake doesn't know " + target}
+}
+
+// serveQuery answers SNS and STS on AWS's query protocol: a form body
+// naming the action, and an XML reply. Like the topic's subscription with
+// raw delivery, each message published goes, as is, on the invoices queue.
+func (f *fakeShopAWS) serveQuery(w http.ResponseWriter, r *http.Request) {
+	data, _ := io.ReadAll(r.Body)
+	form, _ := url.ParseQuery(string(data))
+	action := form.Get("Action")
+	var result string
+	switch action {
+	case "Publish":
+		f.sqs.put(invoicesQueue, form.Get("Message"))
+		result = "<MessageId>6a7e8feb-b491-4cf7-a9f1-bf3703467718</MessageId>"
+	case "AssumeRole":
+		result = "<Credentials><AccessKeyId>" + roleAccessKey + "</AccessKeyId><SecretAccessKey>" + roleSecret +
+			"</SecretAccessKey><SessionToken>" + roleToken + "</SessionToken><Expiration>" +
+			time.Now().Add(time.Hour).UTC().Format(time.RFC3339) + "</Expiration></Credentials>" +
+			"<AssumedRoleUser><Arn>arn:aws:sts::" + shopAccount + ":assumed-role/invoice-worker/invoices</Arn>" +
+			"<AssumedRoleId>AROAFAKE:invoices</AssumedRoleId></AssumedRoleUser>"
+	default:
+		w.Header().Set("Content-Type", "text/xml")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("<ErrorResponse><Error><Type>Sender</Type><Code>InvalidAction</Code></Error><RequestId>r-1</RequestId></ErrorResponse>"))
+		return
+	}
+	w.Header().Set("Content-Type", "text/xml")
+	_, _ = fmt.Fprintf(w, "<%sResponse><%sResult>%s</%sResult><ResponseMetadata><RequestId>r-1</RequestId></ResponseMetadata></%sResponse>",
+		action, action, result, action, action)
+}
+
+// serveREST answers Lambda's payment-qr function and SES's SendEmail, on
+// AWS's REST and JSON protocol.
+func (f *fakeShopAWS) serveREST(w http.ResponseWriter, r *http.Request, service string) {
+	data, _ := io.ReadAll(r.Body)
+	w.Header().Set("Content-Type", "application/json")
+	switch {
+	case service == "lambda" && r.URL.Path == "/2015-03-31/functions/payment-qr/invocations":
+		var in struct{ OrderID, Amount, Currency string }
+		_ = json.Unmarshal(data, &in)
+		_, _ = fmt.Fprintf(w, `{"qrText":"SPD*1.0*AM:%s*CC:%s*MSG:%s"}`, in.Amount, in.Currency, in.OrderID)
+	case service == "email" && r.URL.Path == "/v2/email/outbound-emails":
+		var in struct{ Content struct{ Raw struct{ Data []byte } } }
+		_ = json.Unmarshal(data, &in)
+		f.mu.Lock()
+		f.emails = append(f.emails, string(in.Content.Raw.Data))
+		f.mu.Unlock()
+		_, _ = w.Write([]byte(`{"MessageId":"m-1"}`))
+	default:
+		w.Header().Set("X-Amzn-ErrorType", "ResourceNotFoundException")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"the fake doesn't know this"}`))
+	}
+}
+
+// sent lists the whole emails SES was asked to send.
+func (f *fakeShopAWS) sent() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.emails...)
 }
 
 // ruleEvent is EventBridge's event for an entry, as a rule puts it on a

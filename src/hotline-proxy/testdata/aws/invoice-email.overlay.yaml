@@ -1,0 +1,21 @@
+# The invoice email on the shared SES v2 spec (specs/aws/sesv2/2019-09-27.openapi.yaml):
+# the mailer sends each invoice as a whole email, PDF attached (Content.Raw).
+# Addresses are personal data, so none is copied into the record.
+overlay: 1.1.0
+info:
+  title: Invoice email
+  version: "1"
+actions:
+  - target: $.components.schemas.SendEmailRequest
+    update:
+      required: [FromEmailAddress, Destination]   # added to Content, which the spec needs already
+  - target: $.components.schemas.Destination
+    update:
+      required: [ToAddresses]
+  - target: $.components.schemas.EmailAddress
+    update:
+      format: email
+  # Only whole emails: the PDF goes as an attachment.
+  - target: $.components.schemas.EmailContent
+    update:
+      required: [Raw]

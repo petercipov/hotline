@@ -13,7 +13,7 @@ import (
 // The fake's keys for a role taken on through STS. Calls signed with them
 // show the app used the role.
 const (
-	RoleAccessKey = "ASIAFAKEROLE"
+	RoleAccessKey = "ASIAFAKEROLEKEY00001"
 	roleSecret    = "role-secret"
 	roleToken     = "role-session-token"
 )

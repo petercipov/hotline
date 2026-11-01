@@ -3,7 +3,8 @@ Feature: The shop's AWS apis through the proxy
   The shop example (examples/aws-shop) is four apps, each its own
   integration, using AWS's JSON apis: DynamoDB, Kinesis, EventBridge, Step
   Functions, SSM, Secrets Manager, KMS and CloudWatch Logs, beside SQS and
-  S3. Each resource is an api in testdata/aws/hotline-proxy.yaml, with the
+  S3; SNS and STS on AWS's query protocol; and Lambda and SES v2 on its
+  REST and JSON protocol. Each resource is an api in testdata/aws/hotline-proxy.yaml, with the
   stable spec from specs/aws and an overlay naming that resource and the
   shape of what is sent to it (Peter, 2026-11-01).
 
@@ -121,6 +122,101 @@ Feature: The shop's AWS apis through the proxy
         | aws-kms-invoice-signing | TrentService.Sign              | {"KeyId":"alias/other","Message":"AAAA","MessageType":"DIGEST","SigningAlgorithm":"ECDSA_SHA_256"} | body $.KeyId const alias/invoice-signing |
         | aws-logs-shop           | Logs_20140328.PutLogEvents     | {"logGroupName":"/shop/aws-shop","logStreamName":"payments","logEvents":[{"timestamp":1793527200000,"message":"hello"}]} | body $.logStreamName enum checkout, invoices, mailer, refunds |
 
+  Rule: Checkout publishes the invoice job on the order-paid topic, in SNS's form body
+
+    SNS names the action in the form field Action, so its spec carries
+    x-hotline-action-field: Action. Docs: docs/proxy-aws-query.md.
+
+    Background:
+      Given the shop api aws-sns-order-paid
+      And AWS answers 200 and the xml body <PublishResponse><PublishResult><MessageId>p-1</MessageId></PublishResult><ResponseMetadata><RequestId>r-1</RequestId></ResponseMetadata></PublishResponse>
+
+    Scenario: A valid job has no results, and the record names the topic and the action
+      When the app publishes {"schemaVersion":1,"eventId":"5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10","orderId":"A-1001","templateId":"invoice-standard-v2","language":"en","requestedAt":"2026-11-01T10:00:00Z"} to the topic arn:aws:sns:eu-west-1:192325781350:order-paid
+      Then the record has url.template /#Action=Publish
+      And the record has no request results
+      And the record has no reply results
+      And the record holds messaging.destination.name = arn:aws:sns:eu-west-1:192325781350:order-paid
+      And the record holds messaging.operation.name = Publish
+
+    Scenario: A mistake in the job is reported at its place
+      When the app publishes {"orderId":"A-1001"} to the topic arn:aws:sns:eu-west-1:192325781350:order-paid
+      Then the request results are body $.Message.eventId required; body $.Message.language required; body $.Message.requestedAt required; body $.Message.schemaVersion required; body $.Message.templateId required
+
+    Scenario: A job for another topic is reported
+      When the app publishes {"schemaVersion":1,"eventId":"5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10","orderId":"A-1001","templateId":"invoice-standard-v2","language":"en","requestedAt":"2026-11-01T10:00:00Z"} to the topic arn:aws:sns:eu-west-1:192325781350:other
+      Then the request results are body $.TopicArn const arn:aws:sns:eu-west-1:192325781350:order-paid
+
+    Scenario: SNS's error reply is a normal error reply
+      Given AWS answers 403 and the xml body <ErrorResponse><Error><Type>Sender</Type><Code>AuthorizationError</Code><Message>no</Message></Error><RequestId>r-1</RequestId></ErrorResponse>
+      When the app publishes {"schemaVersion":1,"eventId":"5f0c1b6e-3a52-4f7e-9d0e-2b8f6f1f2a10","orderId":"A-1001","templateId":"invoice-standard-v2","language":"en","requestedAt":"2026-11-01T10:00:00Z"} to the topic arn:aws:sns:eu-west-1:192325781350:order-paid
+      Then the record has no request results
+      And the record has no reply results
+
+  Rule: The invoices worker takes on the invoice-worker role through STS
+
+    Background:
+      Given the shop api aws-sts-invoice-worker
+      And AWS answers 200 and the xml body <AssumeRoleResponse><AssumeRoleResult><Credentials><AccessKeyId>ASIAFAKEROLEKEY00001</AccessKeyId><SecretAccessKey>fake-role-secret-key</SecretAccessKey><SessionToken>fake-role-session-token</SessionToken><Expiration>2026-11-01T11:00:00Z</Expiration></Credentials></AssumeRoleResult></AssumeRoleResponse>
+
+    Scenario: Taking on the role is recorded, and its keys never are
+      When the app takes on the role arn:aws:iam::192325781350:role/invoice-worker
+      Then the record has url.template /#Action=AssumeRole
+      And the record has no request results
+      And the record has no reply results
+      And the record holds rpc.method = AssumeRole
+      And no record and no span holds ASIAFAKEROLEKEY00001 or fake-role-secret-key or fake-role-session-token
+
+    Scenario: Taking on another role is reported
+      When the app takes on the role arn:aws:iam::192325781350:role/admin
+      Then the request results are body $.RoleArn const arn:aws:iam::192325781350:role/invoice-worker
+
+  Rule: The invoices worker asks the payment-qr function for the invoice's payment text
+
+    Background:
+      Given the shop api aws-lambda-payment-qr
+
+    Scenario: The function's input and output are checked, and the record names the function
+      Given AWS answers 200 and the json body {"qrText":"SPD*1.0*AM:10.00*CC:EUR*MSG:A-1001"}
+      When the app sends AWS POST /2015-03-31/functions/payment-qr/invocations with the application/octet-stream body {"orderId":"A-1001","amount":"10.00","currency":"EUR"}
+      Then the record has url.template /2015-03-31/functions/{FunctionName}/invocations
+      And the record has no request results
+      And the record has no reply results
+      And the record's url.full ends with /2015-03-31/functions/payment-qr/invocations
+
+    Scenario: A mistake in the input is reported at its place
+      Given AWS answers 200 and the json body {"qrText":"x"}
+      When the app sends AWS POST /2015-03-31/functions/payment-qr/invocations with the application/octet-stream body {"orderId":"A-1001"}
+      Then the request results are body $.amount required; body $.currency required
+
+    Scenario: A failing function is reported, and its error header kept
+      Given AWS answers 200 with "X-Amz-Function-Error: Unhandled" and the json body {"errorMessage":"boom","errorType":"ValueError"}
+      When the app sends AWS POST /2015-03-31/functions/payment-qr/invocations with the application/octet-stream body {"orderId":"A-1001","amount":"10.00","currency":"EUR"}
+      Then the reply results are body $.qrText required
+      And the record keeps the reply header X-Amz-Function-Error as Unhandled
+
+    Scenario: Calling another function is reported
+      Given AWS answers 200 and the json body {"qrText":"x"}
+      When the app sends AWS POST /2015-03-31/functions/admin-tool/invocations with the application/octet-stream body {"orderId":"A-1001","amount":"10.00","currency":"EUR"}
+      Then the request results are path FunctionName const payment-qr
+
+  Rule: The mailer sends the invoice email with SES, and no address reaches a record
+
+    Background:
+      Given the shop api aws-ses-invoice-email
+      And AWS answers 200 and the json body {"MessageId":"m-1"}
+
+    Scenario: A whole email has no results
+      When the app sends AWS POST /v2/email/outbound-emails with the application/json body {"FromEmailAddress":"invoices@shop.example","Destination":{"ToAddresses":["success@simulator.amazonses.com"]},"Content":{"Raw":{"Data":"RnJvbTogaW52b2ljZXM="}}}
+      Then the record has url.template /v2/email/outbound-emails
+      And the record has no request results
+      And no record and no span holds success@simulator.amazonses.com or invoices@shop.example
+
+    Scenario: A wrong address is reported, without the address
+      When the app sends AWS POST /v2/email/outbound-emails with the application/json body {"FromEmailAddress":"invoices@shop.example","Destination":{"ToAddresses":["not an address"]},"Content":{"Raw":{"Data":"RnJvbTogaW52b2ljZXM="}}}
+      Then the request results are body $.Destination.ToAddresses[0] format email
+      And no result holds address
+
   Rule: The whole story goes through Hotline, each app as its own integration
 
     The apps run as the real aws-shop program and talk to AWS's real host
@@ -142,3 +238,19 @@ Feature: The shop's AWS apis through the proxy
       And both queues are empty
       And every record has no results
       And the records come from the integrations checkout, invoices, mailer and refunds
+      And the first invoices record is AssumeRole, and checkout made no SQS call
+
+    Scenario: The mailer sends the invoice with SES, and no address reaches a record
+      When checkout takes the payment for order A-1001, sending the invoice to success@simulator.amazonses.com
+      And the invoices app works through its queue once, into the bucket
+      And the mailer sends its queue's emails once with SES, from invoices@shop.example
+      Then SES got one email for A-1001 with the PDF attached
+      And every record has no results
+      And no record and no span holds success@simulator.amazonses.com or invoices@shop.example
+
+    Scenario: A broken job is reported by both checkout and the invoices worker
+      When checkout publishes the text {"orderId":"A-1001"} to the order-paid topic
+      And the invoices app tries its queue once
+      Then the checkout record for /#Action=Publish has the request results body $.Message.eventId required; body $.Message.language required; body $.Message.requestedAt required; body $.Message.schemaVersion required; body $.Message.templateId required
+      And the invoices record for /#X-Amz-Target=AmazonSQS.ReceiveMessage has the reply results body $.Messages[0].Body.eventId required; body $.Messages[0].Body.language required; body $.Messages[0].Body.requestedAt required; body $.Messages[0].Body.schemaVersion required; body $.Messages[0].Body.templateId required
+      And the invoices queue still holds the job

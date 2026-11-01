@@ -1,0 +1,32 @@
+# The order-paid topic on the shared SNS spec (specs/aws/sns/2010-03-31.openapi.yaml):
+# checkout publishes each paid order's invoice job to it, and the topic
+# passes the job, as is, to the invoices queue. The job schema is the same
+# as in invoices.overlay.yaml and examples/aws-shop/invoice/invoice-job.schema.json.
+overlay: 1.1.0
+info:
+  title: Order-paid topic
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      InvoiceJob:
+        type: object
+        additionalProperties: false
+        required: [schemaVersion, eventId, orderId, templateId, language, requestedAt]
+        properties:
+          schemaVersion: { type: integer, const: 1 }
+          eventId: { type: string, format: uuid }
+          orderId: { type: string, pattern: '^[A-Z]-[0-9]+$' }
+          templateId: { type: string, pattern: '^[a-z0-9-]+$' }
+          language: { type: string, enum: [en, de, sk, cs] }
+          requestedAt: { type: string, format: date-time }
+          sendTo: { type: string, format: email }
+  # Checkout publishes to this topic only.
+  - target: $.paths['/#Action=Publish'].post.requestBody.content['application/x-www-form-urlencoded'].schema.properties.TopicArn
+    update:
+      const: arn:aws:sns:eu-west-1:192325781350:order-paid
+  # The message is an invoice job, written as JSON text.
+  - target: $.paths['/#Action=Publish'].post.requestBody.content['application/x-www-form-urlencoded'].schema.properties.Message
+    update:
+      contentMediaType: application/json
+      contentSchema: { $ref: '#/components/schemas/InvoiceJob' }
