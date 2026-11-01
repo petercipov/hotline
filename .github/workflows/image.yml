@@ -106,7 +106,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Keyless: the signature names this workflow, with no key to keep.
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.2   # this action has no major version tag
         if: github.event_name == 'push'
       - name: sign
         if: github.event_name == 'push'
