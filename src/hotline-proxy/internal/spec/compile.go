@@ -233,19 +233,18 @@ func (b *builder) compileSchema(v any, pointer string) (*jsonschema.Schema, erro
 	if !standsAlone(v) {
 		return b.compile(pointer)
 	}
-	text, err := json.Marshal(v)
-	if err != nil {
-		return b.compile(pointer)
-	}
+	// The spec was read as JSON, so it always writes back as JSON.
+	text, _ := json.Marshal(v)
 	if s, ok := b.inlined[string(text)]; ok {
 		return s, nil
 	}
 	b.inlineNext++
 	address := fmt.Sprintf("%s/inline/%d.json", strings.TrimSuffix(specURL, "/openapi.json"), b.inlineNext)
-	if err := b.inline.AddResource(address, v); err != nil {
-		return b.compile(pointer)
+	var s *jsonschema.Schema
+	err := b.inline.AddResource(address, v)
+	if err == nil {
+		s, err = b.inline.Compile(address)
 	}
-	s, err := b.inline.Compile(address)
 	if err != nil {
 		// Built again in place, so the problem names where it is in the
 		// spec. Only a broken spec gets here.

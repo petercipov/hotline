@@ -20,6 +20,13 @@ var _ = Describe("Loading a spec", func() {
 		Expect(written(got.Request)).To(Equal("body $ type integer"))
 	})
 
+	It("checks a schema that holds a $ref deeper inside", func() {
+		s := parsed(route("requestBody:\n  content:\n    application/json:\n      schema: { allOf: [ { $ref: \"#/components/schemas/Count\" } ] }\nresponses: {}\n") + shared)
+		header, b := jsonBody(`"x"`)
+		got := s.Check(spec.Exchange{Method: "GET", EscapedPath: "/a", Header: header, Body: b})
+		Expect(written(got.Request)).To(Equal("body $ type integer"))
+	})
+
 	It("keeps the rules written beside a $ref", func() {
 		s := parsed(route("requestBody:\n  content:\n    application/json:\n      schema: { $ref: \"#/components/schemas/Count\", minimum: 5 }\nresponses: {}\n") + shared)
 		header, b := jsonBody(`3`)
