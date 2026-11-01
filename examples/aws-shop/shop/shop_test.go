@@ -51,6 +51,13 @@ var _ = Describe("The shop's four apps", func() {
 		names.LogGroup = "" // the log group tests turn it on
 		aws.Secrets[names.PaymentSecret] = "pk_test_123"
 		aws.Parameters[names.TemplateParameter] = "invoice-compact-v1"
+		// The topic's subscription puts each message on the invoices queue,
+		// unwrapped (raw message delivery).
+		aws.OnPublish = func(topic, message string) {
+			if topic == names.OrderPaidTopic {
+				sqs.Put(names.InvoicesQueue, message)
+			}
+		}
 		now = time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)
 		logs = &bytes.Buffer{}
 	})
@@ -70,13 +77,21 @@ var _ = Describe("The shop's four apps", func() {
 	}
 
 	Describe("checkout", func() {
-		It("reads the payment key, saves the order, announces it, and asks for the invoice", func() {
+		It("reads the payment key, saves the order, announces it, and publishes the invoice job on the order-paid topic", func() {
 			pay()
 			Expect(aws.Targets()).To(Equal([]string{
 				"secretsmanager.GetSecretValue",
 				"DynamoDB_20120810.PutItem",
 				"Kinesis_20131202.PutRecord",
+				"SNS.Publish",
 			}))
+			published := aws.Published()
+			Expect(published).To(HaveLen(1))
+			Expect(published[0].TopicArn).To(Equal("arn:aws:sns:eu-west-1:192325781350:order-paid"))
+			job, err := invoice.Check([]byte(published[0].Message))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(job.OrderID).To(Equal("A-1001"))
+			Expect(sqs.Calls()).To(BeEmpty(), "checkout no longer calls SQS itself")
 			Expect(aws.Item("orders", "A-1001")).To(Equal(map[string]any{
 				"orderId":  map[string]any{"S": "A-1001"},
 				"total":    map[string]any{"N": "65.97"},
@@ -96,6 +111,13 @@ var _ = Describe("The shop's four apps", func() {
 			}
 			Expect(aws.Calls()[1].Host).To(Equal("dynamodb.eu-west-1.amazonaws.com"))
 			Expect(aws.Calls()[2].Host).To(Equal("kinesis.eu-west-1.amazonaws.com"))
+			Expect(aws.Calls()[3].Host).To(Equal("sns.eu-west-1.amazonaws.com"))
+		})
+
+		It("publishes any text on the topic, unchanged, to try Hotline's checks", func() {
+			_, err := app("checkout").Publish(ctx, `{"orderId":"A-1001"}`)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(aws.Published()[0].Message).To(Equal(`{"orderId":"A-1001"}`))
 		})
 
 		It("stops before saving anything when the payment key is missing", func() {
@@ -146,6 +168,61 @@ var _ = Describe("The shop's four apps", func() {
 			Expect(sqs.WaitingIn(names.InvoicesQueue)).To(Equal(0))
 		})
 
+		It("takes on the invoice-worker role through STS first, and signs every later call with its keys", func() {
+			pay()
+			before := len(aws.Calls())
+			work()
+			calls := aws.Calls()[before:]
+			Expect(calls[0].Target).To(Equal("STS.AssumeRole"))
+			Expect(calls[0].Host).To(Equal("sts.eu-west-1.amazonaws.com"))
+			Expect(calls[0].ProxyAuth).To(Equal("Basic " + base64.StdEncoding.EncodeToString([]byte("invoices:x"))))
+			Expect(calls[0].Body).To(HaveKeyWithValue("RoleArn", "arn:aws:iam::192325781350:role/invoice-worker"))
+			Expect(calls[0].Authorization).To(ContainSubstring("Credential=AKIDEXAMPLE/"))
+			for _, c := range calls[1:] {
+				Expect(c.Target).NotTo(Equal("STS.AssumeRole"), "the keys are kept for the whole run")
+				Expect(c.Authorization).To(ContainSubstring("Credential="+fakeaws.RoleAccessKey+"/"), c.Target)
+			}
+			for _, c := range sqs.Calls() {
+				Expect(c.Authorization).To(ContainSubstring("Credential="+fakeaws.RoleAccessKey+"/"), c.Target)
+			}
+		})
+
+		It("takes on no role when none is set", func() {
+			names.WorkerRole = ""
+			pay()
+			work()
+			Expect(aws.Targets()).NotTo(ContainElement("STS.AssumeRole"))
+		})
+
+		It("puts the payment text from the payment-qr function on the invoice", func() {
+			pay()
+			work()
+			var invoke fakeaws.Call
+			for _, c := range aws.Calls() {
+				if c.Target == "Lambda.Invoke" {
+					invoke = c
+				}
+			}
+			Expect(invoke.Host).To(Equal("lambda.eu-west-1.amazonaws.com"))
+			Expect(invoke.Path).To(Equal("/2015-03-31/functions/payment-qr/invocations"))
+			Expect(invoke.Payload).To(MatchJSON(`{"orderId":"A-1001","amount":"65.97","currency":"EUR"}`))
+			Expect(string(files.File("A-1001.pdf"))).To(ContainSubstring("SPD*1.0*AM:65.97*CC:EUR*MSG:A-1001"))
+		})
+
+		It("leaves the job on the queue when the payment-qr function fails", func() {
+			aws.Functions["payment-qr"] = func([]byte) ([]byte, bool) { return []byte(`{"errorMessage":"boom"}`), true }
+			pay()
+			Expect(app("invoices").Work(ctx, true, "")).NotTo(Succeed())
+			Expect(sqs.WaitingIn(names.InvoicesQueue)).To(Equal(1))
+		})
+
+		It("calls no function when none is set", func() {
+			names.PaymentQRFunction = ""
+			pay()
+			work()
+			Expect(aws.Targets()).NotTo(ContainElement("Lambda.Invoke"))
+		})
+
 		It("signs the PDF's SHA-256 fingerprint with the invoice key", func() {
 			pay()
 			work()
@@ -186,7 +263,7 @@ var _ = Describe("The shop's four apps", func() {
 	})
 
 	Describe("mailer", func() {
-		It("mails the ready invoice, here as a file, and deletes the message", func() {
+		ready := func() {
 			pay()
 			Expect(app("invoices").Work(ctx, true, "")).To(Succeed())
 			// The EventBridge rule on the bus puts the event on the mail queue.
@@ -196,7 +273,38 @@ var _ = Describe("The shop's four apps", func() {
 			event["detail"] = detail
 			body, _ := json.Marshal(event)
 			sqs.Put(names.MailQueue, string(body))
+		}
 
+		It("sends the ready invoice by email with SES, with the PDF attached, and deletes the message", func() {
+			names.MailFrom = "invoices@shop.example"
+			ready()
+			Expect(app("mailer").Mail(ctx, true, "")).To(Succeed())
+			emails := aws.Emails()
+			Expect(emails).To(HaveLen(1))
+			Expect(emails[0]).To(HaveKeyWithValue("FromEmailAddress", "invoices@shop.example"))
+			Expect(emails[0]).To(HaveKeyWithValue("Destination", map[string]any{"ToAddresses": []any{"jana@example.com"}}))
+			raw, err := base64.StdEncoding.DecodeString(emails[0]["Content"].(map[string]any)["Raw"].(map[string]any)["Data"].(string))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(raw)).To(ContainSubstring("To: jana@example.com"))
+			Expect(string(raw)).To(ContainSubstring("From: invoices@shop.example"))
+			Expect(string(raw)).To(ContainSubstring("Content-Type: application/pdf"))
+			Expect(sqs.WaitingIn(names.MailQueue)).To(Equal(0))
+			for _, c := range aws.Calls() {
+				if c.Target == "SES.SendEmail" {
+					Expect(c.Host).To(Equal("email.eu-west-1.amazonaws.com"))
+					Expect(c.ProxyAuth).To(Equal("Basic " + base64.StdEncoding.EncodeToString([]byte("mailer:x"))))
+				}
+			}
+		})
+
+		It("needs a sender or a folder", func() {
+			names.MailFrom = ""
+			Expect(app("mailer").Mail(ctx, true, "")).To(MatchError(shop.ErrNoMailWay))
+		})
+
+		It("writes the ready invoice to the folder instead, sending nothing, when given one", func() {
+			names.MailFrom = "invoices@shop.example"
+			ready()
 			out := GinkgoT().TempDir()
 			Expect(app("mailer").Mail(ctx, true, out)).To(Succeed())
 			mail, err := os.ReadFile(filepath.Join(out, "A-1001.eml")) //nolint:gosec // the test's own file
@@ -204,6 +312,7 @@ var _ = Describe("The shop's four apps", func() {
 			Expect(string(mail)).To(ContainSubstring("To: jana@example.com"))
 			Expect(string(mail)).To(ContainSubstring("Content-Type: application/pdf"))
 			Expect(sqs.WaitingIn(names.MailQueue)).To(Equal(0))
+			Expect(aws.Emails()).To(BeEmpty())
 		})
 
 		It("leaves a message it can't read on the queue", func() {

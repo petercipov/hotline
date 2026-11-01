@@ -1,6 +1,7 @@
-// Package fakeaws is a small stand-in for the AWS JSON apis the shop uses
-// beside SQS: DynamoDB, Kinesis, EventBridge, SSM, Secrets Manager, KMS,
-// CloudWatch Logs and Step Functions. It answers the few actions the shop
+// Package fakeaws is a small stand-in for the AWS apis the shop uses beside
+// SQS and S3: DynamoDB, Kinesis, EventBridge, SSM, Secrets Manager, KMS,
+// CloudWatch Logs and Step Functions on AWS's JSON protocol; SNS and STS on
+// its query protocol; Lambda and SES on its REST and JSON protocol. It answers the few actions the shop
 // calls, the way AWS does, and keeps what it was sent so a test can look.
 package fakeaws
 
@@ -23,23 +24,34 @@ type Call struct {
 	ProxyAuth     string
 	Authorization string
 	Body          map[string]any
+	// Path and Payload are the path and the raw body, for the REST apis.
+	Path    string
+	Payload []byte
 }
 
-// AWS answers calls named by X-Amz-Target. A call for SQS, or with no
-// target, goes to Other, such as a fake SQS.
+// AWS answers calls named by X-Amz-Target, and calls to SNS, STS, Lambda
+// and SES by their host. A call for SQS, or with no target, goes to Other,
+// such as a fake SQS.
 type AWS struct {
 	Other http.Handler
 	// Parameters and Secrets are what SSM and Secrets Manager hold, by name.
 	Parameters map[string]string
 	Secrets    map[string]string
+	// Functions are the Lambda functions, by name.
+	Functions map[string]Function
+	// OnPublish, when set, hears of each message published to SNS, as a
+	// topic's subscribers do.
+	OnPublish func(topicArn, message string)
 
-	mu      sync.Mutex
-	calls   []Call
-	items   map[string]map[string]map[string]any // table, then key, then the item
-	records []string                             // Kinesis data, decoded
-	events  []map[string]any                     // EventBridge entries
-	logs    []string                             // CloudWatch Logs messages
-	runs    []map[string]any                     // Step Functions executions
+	mu        sync.Mutex
+	calls     []Call
+	items     map[string]map[string]map[string]any // table, then key, then the item
+	records   []string                             // Kinesis data, decoded
+	events    []map[string]any                     // EventBridge entries
+	logs      []string                             // CloudWatch Logs messages
+	runs      []map[string]any                     // Step Functions executions
+	published []Published                          // SNS messages
+	emails    []map[string]any                     // SES SendEmail bodies
 }
 
 // New makes a fake AWS in front of other.
@@ -48,11 +60,15 @@ func New(other http.Handler) *AWS {
 		Other:      other,
 		Parameters: map[string]string{},
 		Secrets:    map[string]string{},
+		Functions:  map[string]Function{"payment-qr": PaymentQR},
 		items:      map[string]map[string]map[string]any{},
 	}
 }
 
 func (f *AWS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if f.serveNewer(w, r) {
+		return
+	}
 	target := r.Header.Get("X-Amz-Target")
 	if target == "" || strings.HasPrefix(target, "AmazonSQS.") {
 		f.Other.ServeHTTP(w, r)

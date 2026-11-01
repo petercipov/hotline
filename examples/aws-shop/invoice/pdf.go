@@ -53,8 +53,9 @@ func OrderTotal(orderID string) (string, string, error) {
 	return money(total(o)), o.currency, nil
 }
 
-// Render makes the one-page invoice PDF the job asks for.
-func Render(job Job) ([]byte, error) {
+// Render makes the one-page invoice PDF the job asks for, with any extra
+// lines at the end.
+func Render(job Job, extra ...string) ([]byte, error) {
 	o, ok := orders()[job.OrderID]
 	if !ok {
 		return nil, ErrUnknownOrder
@@ -63,7 +64,7 @@ func Render(job Job) ([]byte, error) {
 	if !ok {
 		return nil, ErrUnknownTemplate
 	}
-	return page(template(job, o)), nil
+	return page(append(template(job, o), extra...)), nil
 }
 
 // page writes a minimal PDF: one A4 page of text lines in Helvetica. It is
