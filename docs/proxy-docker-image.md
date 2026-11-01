@@ -73,7 +73,7 @@ docker buildx build -f src/hotline-proxy/Dockerfile --build-arg VERSION=v0.1.0 \
   --platform linux/amd64,linux/arm64 -t hotline-proxy .
 ```
 
-The workflow first builds for `linux/amd64` and runs a smoke test (version, `validate` and `run` of the sidecar example's config on a read-only filesystem, `/readyz`, the user), then builds both platforms. Pull requests build both and push nothing.
+The workflow has three jobs. `build` builds both platforms once, with the SBOM and provenance, and saves the image as a file. `smoke` loads the `linux/amd64` image from that file and checks it (version, `validate` and `run` of the sidecar example's config on a read-only filesystem, `/readyz`, the user). `publish` copies the same file to ghcr.io with `skopeo`, which comes with the GitHub runner, and signs it, so the published image is the one that was checked. Pull requests run `build` and `smoke` and push nothing.
 
 ## Later
 
