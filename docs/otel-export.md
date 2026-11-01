@@ -119,7 +119,7 @@ There are two sizes of record:
 | `http.request.header.<name>` | list of text | Allowed request headers, name in lower case. |
 | `http.response.header.<name>` | list of text | Allowed reply headers, name in lower case. |
 | `hotline.client.cancelled` | true or false | The app did not get the whole reply: it gave up or hung up first. |
-| `hotline.config.version` | text | The config's `version`, a `+`, and the first 12 hex characters of a SHA-256 over the config, its specs and overlays, such as `2026-10-31.2+a3f9c21e07b4`. |
+| `hotline.config.version` | text | The config file's name (without its folder), a `+`, and the first 12 hex characters of a SHA-256 over the config, its specs and overlays, such as `hotline-proxy.aws-shop.yaml+a3f9c21e07b4`. |
 | `hotline.schema.*` | see below | What the check against the spec found. |
 | any name the spec gives | text, number, or true or false | A body field or call header the spec marks `x-hotline-record`, such as `messaging.destination.name` for SQS's `QueueUrl` and `messaging.operation.name` for its `X-Amz-Target`. Detail: [proxy-body-fields.md](proxy-body-fields.md). |
 

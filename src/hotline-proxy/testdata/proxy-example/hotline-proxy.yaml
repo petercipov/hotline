@@ -1,7 +1,6 @@
 # Full example config for the Hotline proxy (first version).
 # It points to the two specs in ./specs. See README.md here for a sample call.
 
-version: "2026-10-29"   # written by whoever changes this file; every record carries it
 listen:
   proxy: ":8080"                  # forward proxy, Host header, vendor URL in path
   admin: ":8081"                  # health checks and admin endpoints only

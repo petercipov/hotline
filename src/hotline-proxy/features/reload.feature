@@ -6,9 +6,8 @@ Feature: Reloading the config without a restart
   read in full only then. The new config is checked like at start and used
   only if all of it is valid; new calls use it, calls in progress finish on
   the old one. A broken config is not used and is logged as a warning.
-  Listen addresses and exporters need a restart. Every record carries the
-  config's version and a fingerprint of the config, specs and overlays
-  (Peter, 2026-10-31).
+  Listen addresses and exporters need a restart. Every record carries a
+  fingerprint of the config, specs and overlays (Peter, 2026-10-31).
 
   Background:
     Given a config with integration talon-shop-a for Talon.One

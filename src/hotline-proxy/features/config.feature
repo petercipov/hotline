@@ -12,14 +12,15 @@ Feature: Loading the config file
     And every integration is read with the apis it names
     And spec files are found relative to the folder of the config file
 
-  Scenario: The config's version and fingerprint go into every record
-    The version is a field in the config file, written by whoever changes
-    it (Peter, 2026-10-28). After it comes a + and a fingerprint: the first
-    12 hex characters of a SHA-256 of the config, specs and overlays, so a
-    forgotten version change still tells configs apart (Peter, 2026-10-31).
-    Given a valid config file with version 2026-10-28.1
+  Scenario: The config's file name and fingerprint go into every record
+    The label is the config file's name, without its folder, a + and a
+    fingerprint: the first 12 hex characters of a SHA-256 of the config,
+    specs and overlays (Peter, 2026-10-31). The fingerprint changes with
+    every edit and the name says which config it is, so the config has no
+    version field of its own (Peter, 2026-11-01).
+    Given a valid config file named hotline-proxy.aws-shop.yaml
     When the proxy loads it
-    Then every record carries hotline.config.version 2026-10-28.1 and a fingerprint
+    Then every record carries hotline.config.version hotline-proxy.aws-shop.yaml and a fingerprint
 
   Scenario: The full example loads
     Given the full example config from proxy-example
@@ -108,7 +109,6 @@ Feature: Loading the config file
       | problem                                              |
       | the file does not exist                              |
       | the file is not valid YAML                           |
-      | there is no version                                  |
       | there is no proxy listen address                     |
       | an integration has no id                             |
       | there are no exporters                               |
@@ -167,6 +167,7 @@ Feature: Loading the config file
       | a field name has a typo, such as tlsOrigintion        | tlsOrigintion |
       | an integration changes tlsOrigination of an api it names | tlsOrigination |
       | there is no admin listen address                      | listen.admin  |
+      | the config still has a version field                  | version       |
 
   Scenario: A busy listen address
     Given another program listens on the proxy address

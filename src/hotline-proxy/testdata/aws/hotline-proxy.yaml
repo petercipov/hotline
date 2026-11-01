@@ -4,7 +4,6 @@
 # The end-to-end test runs the proxy with this file, changing only the
 # addresses, so what you read here is what the test checks.
 
-version: aws-shop-1                # carried by every record
 listen:
   proxy: ":8080"                   # the app sets HOTLINE_PROXY=http://localhost:8080
   admin: ":8081"

@@ -20,7 +20,10 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 		_ = w.start()
 		return nil
 	})
-	sc.Step(`^a valid config file with version (\S+)$`, func(string) error { return nil })
+	sc.Step(`^a valid config file named (\S+)$`, func(name string) error {
+		w.configName = name
+		return nil
+	})
 	sc.Step(`^every record carries hotline.config.version (\S+) and a fingerprint$`, func(version string) error {
 		if err := w.defaultCall(); err != nil {
 			return err
@@ -265,7 +268,7 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^a config file with three problems$`, func() error {
 		w.noIntegrations = true
-		w.rawConfig = w.raw("version: \"1\"\nlisten:\n  proxy: \"127.0.0.1:0\"\n",
+		w.rawConfig = w.raw("listen:\n  proxy: \"127.0.0.1:0\"\n",
 			integration("a", w.apiFor("api.x.com", "    vendorTimeout: 0s\n"))+
 				integration("a", w.apiFor("api.y.com", "")))
 		return nil
@@ -350,7 +353,7 @@ func (w *world) refusedWith(parts ...string) error {
 // refusal must hold.
 func (w *world) brokenConfig(problem string) error {
 	exporters := "exporters:\n  - otlp:\n      endpoint: " + w.receivers[0].endpoint + "\n"
-	start := "version: \"1\"\nlisten:\n  proxy: \"127.0.0.1:0\"\n"
+	start := "listen:\n  proxy: \"127.0.0.1:0\"\n"
 	one := func(extra string) string {
 		return w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", extra)))
 	}
@@ -359,10 +362,8 @@ func (w *world) brokenConfig(problem string) error {
 		w.rawConfig, w.problem = "listen: [proxy\n", "is not valid YAML"
 	case "the file does not exist":
 		w.configPath, w.problem = w.dir+"/nowhere.yaml", "nowhere.yaml"
-	case "there is no version":
-		w.rawConfig, w.problem = strings.TrimPrefix(start, "version: \"1\"\n")+exporters, "there is no version"
 	case "there is no proxy listen address":
-		w.rawConfig = "version: \"1\"\nlisten:\n  admin: \"127.0.0.1:0\"\n" + exporters
+		w.rawConfig = "listen:\n  admin: \"127.0.0.1:0\"\n" + exporters
 		w.problem = "there is no listen.proxy address"
 	case "an integration has no id":
 		w.rawConfig = w.raw(start+exporters, "  - apis:\n"+w.apiFor("api.x.com", ""))
@@ -451,6 +452,8 @@ func (w *world) brokenConfig(problem string) error {
 		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", "    tlsOrigintion: false\n")))
 	case "there is no admin listen address":
 		w.rawConfig = one("")
+	case "the config still has a version field":
+		w.rawConfig = "version: \"1\"\n" + one("")
 	case "an integration changes tlsOrigination of an api it names":
 		w.apiFor("api.x.com", "")
 		w.rawConfig = w.raw(start+exporters, integration("shop", "      - { api: api.x.com, tlsOrigination: false }\n"))

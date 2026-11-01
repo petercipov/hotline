@@ -9,7 +9,7 @@ Feature: Reloading the config of the running program
     And the hotline-proxy program runs with integration test-shop for the test vendor
     And the test vendor holds its answer
     When an app's call is in progress
-    And the config's version changes to e2e-2
+    And the config file changes
     And the program gets SIGHUP
     Then within 2 seconds standard error says "config reloaded"
     When the test vendor then answers
@@ -17,14 +17,14 @@ Feature: Reloading the config of the running program
     When a new call through the proxy reaches the test vendor
     And the program gets SIGTERM
     Then it exits with code 0
-    And the records carry the config versions e2e-1 and e2e-2
+    And the records carry two different config fingerprints
 
   Scenario: A changed config file is picked up with no signal
     Given a fake OTLP receiver
     And the hotline-proxy program runs with integration test-shop for the test vendor
-    When the config's version changes to e2e-2
+    When the config file changes
     Then within 8 seconds standard error says "config reloaded"
     When a new call through the proxy reaches the test vendor
     And the program gets SIGTERM
     Then it exits with code 0
-    And the records carry the config versions e2e-2
+    And the records carry one config fingerprint, not the first one
