@@ -1,6 +1,6 @@
 # AWS through the proxy, starting with SQS: requirements
 
-*Agreed with Peter, 2026-10-29; built 2026-10-30. Scenarios: `src/hotline-proxy/features/aws-sqs.feature` and `end-to-end-aws.feature`. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo. The worked example is [examples/aws-sqs-invoices](../examples/aws-sqs-invoices/README.md); the message check it uses is in [proxy-sqs-example.md](proxy-sqs-example.md).*
+*Agreed with Peter, 2026-10-29; built 2026-10-30. Scenarios: `src/hotline-proxy/features/aws-sqs.feature` and `end-to-end-aws.feature`. The source of truth is `proxy-spec.md` in the `hotline-strategic` repo. The worked example is [examples/aws-shop](../examples/aws-shop/README.md), named `aws-sqs-invoices` until 2026-11-01; the message check it uses is in [proxy-sqs-example.md](proxy-sqs-example.md).*
 
 ## What the feature is
 

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"net/http"
 	"strconv"
@@ -71,11 +72,15 @@ func (f *AWS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Body:          in,
 	})
 	status, out := f.answer(target, in)
-	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(out); err != nil {
+	body, err := json.Marshal(out)
+	if err != nil {
 		panic(err)
 	}
+	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+	// DynamoDB's own checksum of the reply, which its SDK checks.
+	w.Header().Set("X-Amz-Crc32", strconv.FormatUint(uint64(crc32.ChecksumIEEE(body)), 10))
+	w.WriteHeader(status)
+	_, _ = w.Write(body)
 }
 
 func awsError(kind, message string) (int, any) {

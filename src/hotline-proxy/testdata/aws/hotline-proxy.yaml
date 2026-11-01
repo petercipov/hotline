@@ -31,7 +31,7 @@ apis:
     vendorTimeout: 25s
 
   aws-s3-invoices:                 # the invoices bucket
-    hosts: [shop-invoices.s3.eu-west-1.amazonaws.com]   # the bucket is in the host name
+    hosts: [shop-invoices-192325781350.s3.eu-west-1.amazonaws.com]   # the bucket is in the host name
     spec: ../../../../specs/aws/s3/2006-03-01.openapi.yaml
     overlays: [./invoices-bucket.overlay.yaml]
 

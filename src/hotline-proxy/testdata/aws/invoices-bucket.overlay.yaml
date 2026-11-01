@@ -10,7 +10,7 @@ actions:
   # A list of the bucket names this bucket.
   - target: $.components.schemas['ListObjectsV2Output','ListObjectsOutput'].properties.Name
     update:
-      const: shop-invoices
+      const: shop-invoices-192325781350
   # Every file listed, fetched or deleted is an invoice PDF.
   - target: $.components.schemas['Object','ObjectIdentifier'].properties.Key
     update:

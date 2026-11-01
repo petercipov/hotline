@@ -15,6 +15,14 @@ specs/
     s3/
       2006-03-01.openapi.yaml   # S3, REST and XML protocol; the bucket is in the host name
       README.md
+    dynamodb/2012-08-10.openapi.yaml          # and one folder each, with its README, for the JSON apis
+    eventbridge/2015-10-07.openapi.yaml       # the shop example uses (2026-11-01)
+    kinesis/2013-12-02.openapi.yaml
+    secrets-manager/2017-10-17.openapi.yaml
+    ssm/2014-11-06.openapi.yaml
+    kms/2014-11-01.openapi.yaml
+    cloudwatch-logs/2014-03-28.openapi.yaml
+    sfn/2016-11-23.openapi.yaml
 ```
 
 ## Rules

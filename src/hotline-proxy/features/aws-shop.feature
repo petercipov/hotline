@@ -130,7 +130,7 @@ Feature: The shop's AWS apis through the proxy
     queue (Peter, 2026-11-01).
 
     Background:
-      Given a fake AWS for the shop, with the bucket shop-invoices
+      Given a fake AWS for the shop, with the bucket shop-invoices-192325781350
       And the proxy runs with the shop's hotline-proxy.yaml
 
     Scenario: An order is paid, invoiced, mailed and refunded, with no results

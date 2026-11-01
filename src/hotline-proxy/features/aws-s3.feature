@@ -1,7 +1,7 @@
 # Requirements and decisions: docs/proxy-xml-bodies.md.
 Feature: AWS S3 through the proxy, with the shop example
   The shop example (examples/aws-shop) has an invoices app that stores each
-  invoice PDF in the S3 bucket shop-invoices, and fetches, lists and cleans
+  invoice PDF in the S3 bucket shop-invoices-192325781350, and fetches, lists and cleans
   up the PDFs there, with the AWS SDK for Go. S3 drives the proxy's XML checks:
   its lists come back as XML, and deleting several files sends XML (Peter,
   2026-10-31).
@@ -9,10 +9,10 @@ Feature: AWS S3 through the proxy, with the shop example
   The apps run as their own program and talk to AWS's real host names; the
   proxy, with testdata/aws/hotline-proxy.yaml (only its addresses
   changed), reaches a fake AWS by them. The bucket is in the
-  host name, shop-invoices.s3.eu-west-1.amazonaws.com, as the SDK sends it.
+  host name, shop-invoices-192325781350.s3.eu-west-1.amazonaws.com, as the SDK sends it.
 
   Background:
-    Given a fake AWS for the shop, with the bucket shop-invoices
+    Given a fake AWS for the shop, with the bucket shop-invoices-192325781350
     And the proxy runs with the shop's hotline-proxy.yaml
 
   Scenario: The worker stores the PDF and the shop fetches it

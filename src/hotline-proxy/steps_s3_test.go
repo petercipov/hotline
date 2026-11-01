@@ -14,7 +14,7 @@ import (
 	"github.com/cucumber/godog"
 )
 
-const invoicesBucketHost = "shop-invoices.s3.eu-west-1.amazonaws.com"
+const invoicesBucketHost = "shop-invoices-192325781350.s3.eu-west-1.amazonaws.com"
 
 // s3Templates are the routes of the S3 actions the example app uses.
 func s3Templates() map[string]string {
@@ -50,7 +50,7 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 			"AWS_SECRET_ACCESS_KEY=secret",
 			"AWS_EC2_METADATA_DISABLED=true",
 			"INVOICES_QUEUE_URL=" + invoicesQueue,
-			"INVOICES_BUCKET=shop-invoices",
+			"INVOICES_BUCKET=shop-invoices-192325781350",
 			"HOTLINE_PROXY=http://" + w.addr,
 			"HOME=" + w.dir,
 		}
