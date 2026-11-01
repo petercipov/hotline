@@ -50,7 +50,7 @@ func TestEndToEnd(t *testing.T) {
 		Name: "hotline-proxy-e2e",
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
 			p := programScenario(sc, binary)
-			sqsScenario(sc, p, app)
+			snsScenario(sc, p, app)
 		},
 		Options: &godog.Options{
 			Format:   "progress",

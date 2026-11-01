@@ -36,6 +36,7 @@ every command also takes:
                      empty: no proxy)
   --endpoint URL     a local SQS instead of AWS (default: $SQS_ENDPOINT)
   --s3-endpoint URL  a local S3 instead of AWS (default: $S3_ENDPOINT)
+  --sns-endpoint URL a local SNS instead of AWS (default: $SNS_ENDPOINT)
 
 AWS resources, each from its environment variable, else Peter's own:
   INVOICES_QUEUE_URL, MAIL_QUEUE_URL, ORDER_PAID_TOPIC, INVOICES_BUCKET, ORDERS_TABLE,
@@ -63,7 +64,7 @@ func main() {
 }
 
 type options struct {
-	proxy, endpoint, s3Endpoint                          string
+	proxy, endpoint, s3Endpoint, snsEndpoint             string
 	order, language, template, sendTo, body, out, before string
 	amount, reason                                       string
 	once                                                 bool
@@ -83,6 +84,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags.StringVar(&o.proxy, "proxy", os.Getenv("HOTLINE_PROXY"), "")
 	flags.StringVar(&o.endpoint, "endpoint", os.Getenv("SQS_ENDPOINT"), "")
 	flags.StringVar(&o.s3Endpoint, "s3-endpoint", os.Getenv("S3_ENDPOINT"), "")
+	flags.StringVar(&o.snsEndpoint, "sns-endpoint", os.Getenv("SNS_ENDPOINT"), "")
 	flags.StringVar(&o.order, "order", "", "")
 	flags.StringVar(&o.language, "language", "", "")
 	flags.StringVar(&o.template, "template", "default", "")
@@ -106,7 +108,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	a, err := shop.NewApp(ctx, app, shop.Settings{Proxy: o.proxy, SQSEndpoint: o.endpoint, S3Endpoint: o.s3Endpoint}, names())
+	a, err := shop.NewApp(ctx, app, shop.Settings{Proxy: o.proxy, SQSEndpoint: o.endpoint, S3Endpoint: o.s3Endpoint, SNSEndpoint: o.snsEndpoint}, names())
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1

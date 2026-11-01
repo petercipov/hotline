@@ -78,9 +78,9 @@ type Settings struct {
 	// app adds its own name as the user name, its integration ID. Empty:
 	// no proxy.
 	Proxy string
-	// SQSEndpoint and S3Endpoint replace AWS's own addresses, for a local
-	// SQS or S3. Empty: AWS.
-	SQSEndpoint, S3Endpoint string
+	// SQSEndpoint, S3Endpoint and SNSEndpoint replace AWS's own addresses,
+	// for a local SQS, S3 or SNS. Empty: AWS.
+	SQSEndpoint, S3Endpoint, SNSEndpoint string
 }
 
 // App is one of the shop's apps, with its AWS clients.
@@ -168,9 +168,13 @@ func NewApp(ctx context.Context, name string, s Settings, names Names, opts ...f
 		KMS:         kms.NewFromConfig(cfg),
 		Logs:        cloudwatchlogs.NewFromConfig(cfg),
 		SFN:         sfn.NewFromConfig(cfg),
-		SNS:         sns.NewFromConfig(cfg),
-		Lambda:      lambda.NewFromConfig(cfg),
-		SES:         sesv2.NewFromConfig(cfg),
+		SNS: sns.NewFromConfig(cfg, func(o *sns.Options) {
+			if s.SNSEndpoint != "" {
+				o.BaseEndpoint = aws.String(s.SNSEndpoint)
+			}
+		}),
+		Lambda: lambda.NewFromConfig(cfg),
+		SES:    sesv2.NewFromConfig(cfg),
 	}, nil
 }
 

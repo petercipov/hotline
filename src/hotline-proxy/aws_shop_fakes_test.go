@@ -175,7 +175,9 @@ func (f *fakeShopAWS) serveREST(w http.ResponseWriter, r *http.Request, service 
 		_ = json.Unmarshal(data, &in)
 		_, _ = fmt.Fprintf(w, `{"qrText":"SPD*1.0*AM:%s*CC:%s*MSG:%s"}`, in.Amount, in.Currency, in.OrderID)
 	case service == "email" && r.URL.Path == "/v2/email/outbound-emails":
-		var in struct{ Content struct{ Raw struct{ Data []byte } } }
+		var in struct {
+			Content struct{ Raw struct{ Data []byte } }
+		}
 		_ = json.Unmarshal(data, &in)
 		f.mu.Lock()
 		f.emails = append(f.emails, string(in.Content.Raw.Data))

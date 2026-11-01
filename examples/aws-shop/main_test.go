@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"time"
@@ -182,6 +184,20 @@ var _ = Describe("The aws-shop program", func() {
 			Expect(files.Calls()[0].RequestURI).To(HavePrefix("/shop-invoices?list-type=2"))
 			Expect(run("mailer", "work", "--once", "--out", GinkgoT().TempDir(), "--endpoint", "http://"+sqs.Addr)).To(Equal(0), stderr.String())
 			Expect(sqs.Calls()[0].RequestURI).To(Equal("/"))
+		})
+
+		It("can reach a local SNS without Hotline", func() {
+			GinkgoT().Setenv("HOTLINE_PROXY", "")
+			local := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				r.Host = "sns.eu-west-1.amazonaws.com" // the fake knows SNS by its host
+				aws.ServeHTTP(w, r)
+			}))
+			defer local.Close()
+			Expect(run("checkout", "send", "--body", "x", "--sns-endpoint", local.URL)).To(Equal(0), stderr.String())
+			Expect(aws.Published()).To(HaveLen(1))
+			GinkgoT().Setenv("SNS_ENDPOINT", local.URL)
+			Expect(run("checkout", "send", "--body", "y")).To(Equal(0), stderr.String())
+			Expect(aws.Published()).To(HaveLen(2))
 		})
 	})
 
