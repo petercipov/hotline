@@ -78,12 +78,17 @@ mistake() {
 # mailed waits for the shop's EventBridge rule to put InvoiceReady on the
 # mail queue, then mails it: with SES when MAIL_FROM is set, else to ./mail.
 mailed() {
-  local out=(--out mail)
-  if [[ -n "${MAIL_FROM:-}" ]]; then
-    out=()
-  fi
+  local log
   for _ in 1 2 3 4 5; do
-    if shop mailer work --once "${out[@]}" 2>&1 | tee "$work/mailer.log" && grep -q "invoice $order mailed" "$work/mailer.log"; then
+    # Plain if, not an empty array: macOS's bash 3.2 calls an empty array
+    # unbound under set -u.
+    if [[ -n "${MAIL_FROM:-}" ]]; then
+      log="$(shop mailer work --once 2>&1)" || true
+    else
+      log="$(shop mailer work --once --out mail 2>&1)" || true
+    fi
+    echo "$log"
+    if grep -q "invoice $order mailed" <<<"$log"; then
       echo "mailed the invoice of $order"
       return 0
     fi
