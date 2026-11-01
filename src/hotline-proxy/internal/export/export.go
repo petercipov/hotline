@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -90,24 +89,22 @@ func counted(kv attribute.KeyValue) bool {
 func New(exporters []config.Exporter, roots *x509.CertPool, service Service, timing Timing, logger *slog.Logger, meter metric.Meter) *Sink {
 	s := &Sink{}
 	stats := newSendStats(meter)
-	for i, e := range exporters {
+	for _, e := range exporters {
 		logs, traces := grpcLogs, grpcTraces
 		if e.HTTP {
 			logs, traces = httpLogs, httpTraces
 		}
 		metrics := metricSender(e, roots, timing)
-		logKind, metricKind, spanKind := kinds(e)
 		up := &atomic.Int64{}
 		up.Store(1)
 		setup := queueSetup{endpoint: e.Endpoint, size: e.QueueSize, interval: timing.Interval, logger: logger, up: up}
+		setup.sent, setup.dropped = stats.sent, stats.dropped
 		logSetup := setup
-		logSetup.processed, logSetup.exported = stats.processed, stats.logs
-		logSetup.processor, logSetup.sender = component("batching_log_processor", i, e), component(logKind, i, e)
+		logSetup.labels = signal(e, "record")
 		q := newLogQueue(logs(e, tlsFor(e, roots), timing), logSetup)
 		spanSetup := setup
-		spanSetup.processed, spanSetup.exported = stats.spansProcessed, stats.spans
-		spanSetup.processor, spanSetup.sender = component("batching_span_processor", i, e), component(spanKind, i, e)
-		counted := countedMetrics{Exporter: metrics, points: stats.points, set: component(metricKind, i, e), up: up}
+		spanSetup.labels = signal(e, "span")
+		counted := countedMetrics{Exporter: metrics, sent: stats.sent, dropped: stats.dropped, labels: signal(e, "count"), up: up}
 		res := describe(service, e.Resource)
 		d := destination{
 			logs: sdklog.NewLoggerProvider(sdklog.WithResource(res), sdklog.WithProcessor(q)),
@@ -119,8 +116,7 @@ func New(exporters []config.Exporter, roots *x509.CertPool, service Service, tim
 			spans: newSpanQueue(traces(e, tlsFor(e, roots), timing), spanSetup),
 			res:   res,
 			up:    up,
-			place: attribute.NewSet(append(address(e),
-				attribute.String("otel.component.name", logKind+"/"+strconv.Itoa(i)))...),
+			place: attribute.NewSet(exporterLabel(e)),
 		}
 		d.logger = d.logs.Logger("hotline-proxy")
 		// The name and unit are fixed and valid, so there is no error to handle.

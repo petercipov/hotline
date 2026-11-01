@@ -80,7 +80,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ingress, target, status = findIngress(r)
 	}
 	if ingress != "" {
-		defer h.own.started(r, ingress)()
+		defer h.own.started(ingress)()
 	}
 	if status != 0 {
 		refuse(w, status)

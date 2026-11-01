@@ -234,6 +234,8 @@ Full wording in [docs/proxy-telemetry.md](docs/proxy-telemetry.md).
 7. Every metric can be turned off with `telemetry.disable` (exact name or ending in `*`); an unknown name is a warning.
 8. The dropped records and reload warnings stay in the log.
 
+Reworked with Peter on 2026-11-01, from 27 metrics to 14: no unit on 1 or 0 gauges (no `_ratio`); `hotline.exporter.up`, `.queue.size`, `.sent`, `.dropped` replace `otel.sdk.*` and `hotline.destination.state`; config is only `hotline.config.reload_failed` and `hotline.config.restart_needed`; `hotline.proxy.overhead` and the info metrics are gone; four Go numbers; every metric has a description and a unit Grafana can chart. Points 3 and 4 above are replaced by this.
+
 ## Trace context decisions (Peter, 2026-10-31)
 
 Full wording in [docs/proxy-trace-context.md](docs/proxy-trace-context.md).

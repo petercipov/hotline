@@ -189,9 +189,9 @@ One trace per call, to every destination, with the same resource labels as the r
 
 Metrics about the proxy itself, sent only to the `telemetry` destination and never mixed with the records and counts above. Without a `telemetry` section, nothing of this is measured or sent. No number is split by integration, vendor, host or route, so their count stays small however many integrations there are.
 
-- Calls: `http.server.active_requests`, `http.server.request.duration` and `hotline.proxy.overhead`.
-- Sending to each destination: `otel.sdk.processor.log.queue.size`, `otel.sdk.processor.log.queue.capacity`, `otel.sdk.processor.log.processed` (with `error.type=queue_full` for dropped records), `otel.sdk.exporter.log.exported`, `otel.sdk.exporter.metric_data_point.exported`, the same four for spans (`otel.sdk.processor.span.queue.size`, `otel.sdk.processor.span.queue.capacity`, `otel.sdk.processor.span.processed`, `otel.sdk.exporter.span.exported`) and `hotline.destination.state`.
-- Config and certificates: `hotline.config.info`, `hotline.config.reloads`, `hotline.config.reload.last_success`, `hotline.config.restart_needed`, `hotline.certificate.not_after` and `hotline.app_tls.failures`.
+- Calls: `http.server.active_requests`, `http.server.request.duration` and `hotline.app_tls.failures`.
+- Each exporter: `hotline.exporter.up`, `hotline.exporter.queue.size`, `hotline.exporter.sent` and `hotline.exporter.dropped`.
+- Config and certificates: `hotline.config.reload_failed`, `hotline.config.restart_needed` and `hotline.certificate.not_after`.
 - The Go runtime's standard set, such as `go.memory.used` and `go.goroutine.count`.
 
 Any of them can be turned off with `telemetry.disable`. Units, labels and details: [proxy-telemetry.md](proxy-telemetry.md).

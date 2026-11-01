@@ -1,12 +1,10 @@
 package export
 
 import (
-	"cmp"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"strconv"
-	"strings"
+	"slices"
 	"sync/atomic"
 
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
@@ -15,8 +13,6 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
-	"google.golang.org/grpc/status"
 
 	"hotline-proxy/internal/config"
 )
@@ -41,7 +37,9 @@ func NewOwn(t *config.Telemetry, roots *x509.CertPool, service Service, timing T
 			sdkmetric.WithInterval(timing.Interval),
 			sdkmetric.WithTimeout(timing.Timeout))),
 	}
-	for _, name := range t.Disable {
+	// Four of the runtime's numbers are enough (Peter, 2026-11-01).
+	for _, name := range append(slices.Clone(t.Disable), "go.memory.allocated", "go.memory.allocations",
+		"go.processor.limit", "go.config.gogc") {
 		options = append(options, sdkmetric.WithView(sdkmetric.NewView(
 			sdkmetric.Instrument{Name: name},
 			sdkmetric.Stream{Aggregation: sdkmetric.AggregationDrop{}})))
@@ -78,101 +76,69 @@ func destinationTLS(e config.Exporter, roots *x509.CertPool) *tls.Config {
 	return c
 }
 
-// sendStats are the instruments that count what each destination's queue
-// and senders did, the OpenTelemetry SDK's own metrics.
+// sendStats are the instruments that count what each exporter's queues
+// and senders did.
 type sendStats struct {
-	processed      metric.Int64Counter
-	logs           metric.Int64Counter
-	points         metric.Int64Counter
-	spansProcessed metric.Int64Counter
-	spans          metric.Int64Counter
+	sent    metric.Int64Counter
+	dropped metric.Int64Counter
 }
 
 // newSendStats makes the counters. Their names and units are fixed and
 // valid, so there is no error to handle.
 func newSendStats(meter metric.Meter) sendStats {
 	var s sendStats
-	s.processed, _ = meter.Int64Counter("otel.sdk.processor.log.processed", metric.WithUnit("{log_record}"),
-		metric.WithDescription("Records the queue handed on to be sent, or dropped with error.type queue_full."))
-	s.logs, _ = meter.Int64Counter("otel.sdk.exporter.log.exported", metric.WithUnit("{log_record}"),
-		metric.WithDescription("Records sent, or lost in a failed send with an error.type."))
-	s.points, _ = meter.Int64Counter("otel.sdk.exporter.metric_data_point.exported", metric.WithUnit("{data_point}"),
-		metric.WithDescription("Data points of hotline.requests sent, or lost in a failed send with an error.type."))
-	s.spansProcessed, _ = meter.Int64Counter("otel.sdk.processor.span.processed", metric.WithUnit("{span}"),
-		metric.WithDescription("Spans the queue handed on to be sent, or dropped with error.type queue_full."))
-	s.spans, _ = meter.Int64Counter("otel.sdk.exporter.span.exported", metric.WithUnit("{span}"),
-		metric.WithDescription("Spans sent, or lost in a failed send with an error.type."))
+	s.sent, _ = meter.Int64Counter("hotline.exporter.sent", metric.WithUnit("{item}"),
+		metric.WithDescription("Records, spans or counts delivered to this exporter."))
+	s.dropped, _ = meter.Int64Counter("hotline.exporter.dropped", metric.WithUnit("{item}"),
+		metric.WithDescription("Records, spans or counts lost on the way to this exporter: queue_full when the queue "+
+			"overflowed, send_failed when the receiver refused the send or could not be reached."))
 	return s
 }
 
-// observeDestinations sends, for every destination, how full its queue is
-// and whether its last send worked.
+// observeDestinations sends, for every exporter, how many items wait in
+// its queues and whether its last send worked.
 func observeDestinations(meter metric.Meter, destinations []destination) {
-	size, _ := meter.Int64ObservableUpDownCounter("otel.sdk.processor.log.queue.size", metric.WithUnit("{log_record}"),
-		metric.WithDescription("Records waiting to be sent."))
-	capacity, _ := meter.Int64ObservableUpDownCounter("otel.sdk.processor.log.queue.capacity", metric.WithUnit("{log_record}"),
-		metric.WithDescription("Records the queue holds at most."))
-	spanSize, _ := meter.Int64ObservableUpDownCounter("otel.sdk.processor.span.queue.size", metric.WithUnit("{span}"),
-		metric.WithDescription("Spans waiting to be sent."))
-	spanCapacity, _ := meter.Int64ObservableUpDownCounter("otel.sdk.processor.span.queue.capacity", metric.WithUnit("{span}"),
-		metric.WithDescription("Spans the queue holds at most."))
-	state, _ := meter.Int64ObservableGauge("hotline.destination.state", metric.WithUnit("1"),
-		metric.WithDescription("1 while sends to the destination work, 0 from a failed send until one works again."))
+	size, _ := meter.Int64ObservableUpDownCounter("hotline.exporter.queue.size", metric.WithUnit("{item}"),
+		metric.WithDescription("Records or spans waiting to be sent to this exporter. "+
+			"A queue that keeps growing will soon drop items."))
+	up, _ := meter.Int64ObservableGauge("hotline.exporter.up",
+		metric.WithDescription("1 while sends to this exporter work, 0 from the first failed send until one works again."))
 	_, _ = meter.RegisterCallback(func(_ context.Context, o metric.Observer) error {
 		for _, d := range destinations {
-			waiting, room := d.queue.fill()
-			o.ObserveInt64(size, int64(waiting), metric.WithAttributeSet(d.queue.processor))
-			o.ObserveInt64(capacity, int64(room), metric.WithAttributeSet(d.queue.processor))
-			waiting, room = d.spans.fill()
-			o.ObserveInt64(spanSize, int64(waiting), metric.WithAttributeSet(d.spans.processor))
-			o.ObserveInt64(spanCapacity, int64(room), metric.WithAttributeSet(d.spans.processor))
-			o.ObserveInt64(state, d.up.Load(), metric.WithAttributeSet(d.place))
+			waiting, _ := d.queue.fill()
+			o.ObserveInt64(size, int64(waiting), metric.WithAttributeSet(d.queue.labels))
+			waiting, _ = d.spans.fill()
+			o.ObserveInt64(size, int64(waiting), metric.WithAttributeSet(d.spans.labels))
+			o.ObserveInt64(up, d.up.Load(), metric.WithAttributeSet(d.place))
 		}
 		return nil
-	}, size, capacity, spanSize, spanCapacity, state)
+	}, size, up)
 }
 
-// component names one part of one destination the way the SDK metrics
-// do, with the destination's address.
-func component(kind string, index int, e config.Exporter) attribute.Set {
-	return attribute.NewSet(append(address(e),
-		attribute.String("otel.component.type", kind),
-		attribute.String("otel.component.name", kind+"/"+strconv.Itoa(index)))...)
+// exporterLabel names an exporter by its endpoint, as the config writes
+// it.
+func exporterLabel(e config.Exporter) attribute.KeyValue {
+	return attribute.String("hotline.exporter", e.Endpoint)
 }
 
-// address is where a destination is, as server.address and server.port.
-// An endpoint with no port uses its scheme's.
-func address(e config.Exporter) []attribute.KeyValue {
-	port, _ := strconv.Atoi(cmp.Or(e.URL.Port(), map[string]string{"http": "80", "https": "443"}[e.URL.Scheme]))
-	return []attribute.KeyValue{semconv.ServerAddress(e.URL.Hostname()), semconv.ServerPort(port)}
+// signal names an exporter and what it sends: record, span or count.
+func signal(e config.Exporter, what string) attribute.Set {
+	return attribute.NewSet(exporterLabel(e), attribute.String("hotline.signal", what))
 }
 
-// kinds are the SDK's names for the log, metric and span senders of a
-// destination.
-func kinds(e config.Exporter) (string, string, string) {
-	if e.HTTP {
-		return "otlp_http_log_exporter", "otlp_http_metric_exporter", "otlp_http_span_exporter"
-	}
-	return "otlp_grpc_log_exporter", "otlp_grpc_metric_exporter", "otlp_grpc_span_exporter"
-}
-
-// failed adds error.type to a set: the gRPC status, such as unavailable,
-// or _OTHER when the error has none.
-func failed(set attribute.Set, err error) metric.MeasurementOption {
-	kind := "_OTHER"
-	if s, ok := status.FromError(err); ok {
-		kind = strings.ToLower(s.Code().String())
-	}
-	return metric.WithAttributes(append(set.ToSlice(), semconv.ErrorTypeKey.String(kind))...)
+// dropReason adds why items were dropped to an exporter's labels.
+func dropReason(set attribute.Set, reason string) metric.MeasurementOption {
+	return metric.WithAttributes(append(set.ToSlice(), attribute.String("hotline.drop.reason", reason))...)
 }
 
 // countedMetrics counts the data points each send of hotline.requests
-// carried, and keeps the destination's state.
+// carried, and keeps the exporter's state.
 type countedMetrics struct {
 	sdkmetric.Exporter
-	points metric.Int64Counter
-	set    attribute.Set
-	up     *atomic.Int64
+	sent    metric.Int64Counter
+	dropped metric.Int64Counter
+	labels  attribute.Set
+	up      *atomic.Int64
 }
 
 func (c countedMetrics) Export(ctx context.Context, rm *metricdata.ResourceMetrics) error {
@@ -185,17 +151,17 @@ func (c countedMetrics) Export(ctx context.Context, rm *metricdata.ResourceMetri
 			n += len(sum.DataPoints)
 		}
 	}
-	measured(ctx, c.points, n, c.set, err, c.up)
+	measured(ctx, c.sent, c.dropped, n, c.labels, err, c.up)
 	return err
 }
 
-// measured counts n sent or lost, and keeps the state of the destination.
-func measured(ctx context.Context, counter metric.Int64Counter, n int, set attribute.Set, err error, up *atomic.Int64) {
+// measured counts n sent or lost, and keeps the state of the exporter.
+func measured(ctx context.Context, sent, dropped metric.Int64Counter, n int, set attribute.Set, err error, up *atomic.Int64) {
 	if err != nil {
 		up.Store(0)
-		counter.Add(ctx, int64(n), failed(set, err))
+		dropped.Add(ctx, int64(n), dropReason(set, "send_failed"))
 		return
 	}
 	up.Store(1)
-	counter.Add(ctx, int64(n), metric.WithAttributeSet(set))
+	sent.Add(ctx, int64(n), metric.WithAttributeSet(set))
 }
