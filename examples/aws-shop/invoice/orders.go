@@ -1,6 +1,9 @@
 package invoice
 
-import "errors"
+import (
+	"errors"
+	"regexp"
+)
 
 // ErrUnknownOrder and ErrUnknownTemplate mean the job names something the
 // worker doesn't have. The message is well formed, so Hotline's check passes;
@@ -20,6 +23,21 @@ type order struct {
 	customer string
 	currency string
 	lines    []line
+}
+
+// sampleOrder is any other A order, such as A-20261101221714: it has
+// A-1001's lines, so a run can pay a new order each time.
+var sampleOrder = regexp.MustCompile(`^A-[0-9]+$`)
+
+// findOrder looks an order up in the shop's order store.
+func findOrder(id string) (order, bool) {
+	if o, ok := orders()[id]; ok {
+		return o, true
+	}
+	if sampleOrder.MatchString(id) {
+		return orders()["A-1001"], true
+	}
+	return order{}, false
 }
 
 // orders stands in for the shop's own order store, so the example needs no

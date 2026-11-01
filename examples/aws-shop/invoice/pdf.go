@@ -46,7 +46,7 @@ func money(cents int) string {
 
 // OrderTotal is an order's total, such as 65.97, and its currency.
 func OrderTotal(orderID string) (string, string, error) {
-	o, ok := orders()[orderID]
+	o, ok := findOrder(orderID)
 	if !ok {
 		return "", "", ErrUnknownOrder
 	}
@@ -56,7 +56,7 @@ func OrderTotal(orderID string) (string, string, error) {
 // Render makes the one-page invoice PDF the job asks for, with any extra
 // lines at the end.
 func Render(job Job, extra ...string) ([]byte, error) {
-	o, ok := orders()[job.OrderID]
+	o, ok := findOrder(job.OrderID)
 	if !ok {
 		return nil, ErrUnknownOrder
 	}
