@@ -233,9 +233,10 @@ func (b *builder) compileSchema(v any, pointer string) (*jsonschema.Schema, erro
 	if !standsAlone(v) {
 		return b.compile(pointer)
 	}
-	// The spec was read as JSON, so it always writes back as JSON.
-	text, _ := json.Marshal(v)
-	if s, ok := b.inlined[string(text)]; ok {
+	// Printed with Go's syntax, maps in key order, so the same schema
+	// always gives the same text.
+	text := fmt.Sprintf("%#v", v)
+	if s, ok := b.inlined[text]; ok {
 		return s, nil
 	}
 	b.inlineNext++
@@ -250,7 +251,7 @@ func (b *builder) compileSchema(v any, pointer string) (*jsonschema.Schema, erro
 		// spec. Only a broken spec gets here.
 		return b.compile(pointer)
 	}
-	b.inlined[string(text)] = s
+	b.inlined[text] = s
 	return s, nil
 }
 
