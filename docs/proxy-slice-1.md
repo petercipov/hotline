@@ -57,7 +57,7 @@ Peter answered these on 2026-10-28. Answers 1, 12, 13 and 14 were overtaken by l
 2. **Broken `Proxy-Authorization`.** Every broken form counts as no ID, so the record says `not-passed`.
 3. **A path with no route in the spec.** `url.full` and `url.template` are left out.
 4. **Turning `http` into `https`.** The app's own port stays: `http://api.x.com:8080` goes out as `https` on 8080.
-5. **`not-passed` and `https`.** An `https` call stays `https`.
+5. **`not-passed` and `https`.** An `https` call stays `https`. *Since 2026-11-01:* a `not-passed` call, or a call to a host outside the integration's apis, also turns `http` into `https`, unless the `not-passed` entry sets `tlsOrigination: false` (Peter, 2026-11-01).
 6. **Forwarding headers.** The proxy adds none.
 7. **Config version.** A `version` field in the config file, written by whoever changes it. A config without it is refused.
 8. **Strict config.** Lenient: unknown fields and an `apis` list on `not-passed` are accepted, and each gets a warning log line.

@@ -31,9 +31,9 @@ func forwardSteps(sc *godog.ScenarioContext, w *world) {
 		w.appID = ""
 		return nil
 	})
-	sc.Step(`^a not-passed entry with tlsOrigination set to true$`, func() error {
+	sc.Step(`^a not-passed entry with tlsOrigination set to false$`, func() error {
 		w.appID = ""
-		w.addIntegration("  - id: not-passed\n    tlsOrigination: true\n")
+		w.addIntegration("  - id: not-passed\n    tlsOrigination: false\n")
 		return nil
 	})
 	sc.Step(`^the proxy calls the vendor over (https?) on port (\d+)$`, w.calledOver)
