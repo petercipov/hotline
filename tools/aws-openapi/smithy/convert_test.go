@@ -252,9 +252,9 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 
 	DescribeTable("made each committed JSON spec from its committed model",
 		func(model, spec, flags string) {
-			m, err := os.ReadFile("../models/" + model + ".json")
+			m, err := os.ReadFile("../models/" + model + ".json") //nolint:gosec // the test's own files
 			Expect(err).NotTo(HaveOccurred())
-			want, err := os.ReadFile("../../../specs/aws/" + spec + ".openapi.yaml")
+			want, err := os.ReadFile("../../../specs/aws/" + spec + ".openapi.yaml") //nolint:gosec // the test's own files
 			Expect(err).NotTo(HaveOccurred())
 			got, err := smithy.Convert(m, options(flags))
 			Expect(err).NotTo(HaveOccurred())

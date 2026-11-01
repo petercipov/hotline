@@ -45,7 +45,7 @@ func NewClient(ctx context.Context, s Settings, opts ...func(*config.LoadOptions
 	if err != nil {
 		return nil, err
 	}
-	client, err := s.httpClient()
+	client, err := s.HTTPClient()
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +59,8 @@ func NewClient(ctx context.Context, s Settings, opts ...func(*config.LoadOptions
 	}), nil
 }
 
-// httpClient is the HTTP client that reaches Hotline, nil without a proxy.
-func (s Settings) httpClient() (*http.Client, error) {
+// HTTPClient is the HTTP client that reaches Hotline, nil without a proxy.
+func (s Settings) HTTPClient() (*http.Client, error) {
 	if s.ProxyURL == "" {
 		return nil, nil //nolint:nilnil // no proxy: the SDK's own client
 	}
@@ -92,6 +92,12 @@ type Worker struct {
 	OutDir   string
 	Files    *Files
 	Log      *slog.Logger
+	// DefaultTemplate renders a job that asks for the template "default".
+	DefaultTemplate string
+	// Made, when set, hears of each invoice once it is kept, before the
+	// message is deleted. When it fails, the message stays on the queue to
+	// be tried again.
+	Made func(ctx context.Context, job Job, pdf []byte) error
 
 	seen map[string]bool
 }
@@ -139,6 +145,9 @@ func (w *Worker) handle(ctx context.Context, m types.Message) error {
 		w.Log.Info("event already handled", "eventId", job.EventID)
 		return w.delete(ctx, m)
 	}
+	if job.TemplateID == "default" && w.DefaultTemplate != "" {
+		job.TemplateID = w.DefaultTemplate
+	}
 	pdf, err := Render(job)
 	if err != nil {
 		w.Log.Warn("message refused", "messageId", aws.ToString(m.MessageId), "eventId", job.EventID, "reason", err.Error())
@@ -149,6 +158,11 @@ func (w *Worker) handle(ctx context.Context, m types.Message) error {
 		return err
 	}
 	w.Log.Info("invoice written", "eventId", job.EventID, "file", file)
+	if w.Made != nil {
+		if err := w.Made(ctx, job, pdf); err != nil {
+			return err
+		}
+	}
 	if w.seen == nil {
 		w.seen = map[string]bool{}
 	}

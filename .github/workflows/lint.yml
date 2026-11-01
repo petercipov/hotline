@@ -33,11 +33,11 @@ jobs:
         with:
           version: v2.13
           working-directory: ./src/otel-hotline
-      - name: golangci-lint-example-aws-sqs-invoices
+      - name: golangci-lint-example-aws-shop
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.13
-          working-directory: ./examples/aws-sqs-invoices
+          working-directory: ./examples/aws-shop
       - name: golangci-lint-tools-aws-openapi
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:

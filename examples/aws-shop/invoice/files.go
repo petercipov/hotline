@@ -26,7 +26,7 @@ func NewFilesClient(ctx context.Context, s Settings, opts ...func(*config.LoadOp
 	if err != nil {
 		return nil, err
 	}
-	client, err := s.httpClient()
+	client, err := s.HTTPClient()
 	if err != nil {
 		return nil, err
 	}

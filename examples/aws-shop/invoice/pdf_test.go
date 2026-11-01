@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"hotline-example/aws-sqs-invoices/invoice"
+	"hotline-example/aws-shop/invoice"
 )
 
 var _ = Describe("Rendering the invoice PDF", func() {
@@ -26,6 +26,15 @@ var _ = Describe("Rendering the invoice PDF", func() {
 		Expect(string(pdf)).To(ContainSubstring("/Count 1"))
 		Expect(string(pdf)).To(ContainSubstring("(Invoice A-1001)"))
 		Expect(string(pdf)).To(ContainSubstring("Total: 65.97 EUR"))
+	})
+
+	It("gives an order's total and currency, for the shop's own records", func() {
+		total, currency, err := invoice.OrderTotal("A-1001")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(total).To(Equal("65.97"))
+		Expect(currency).To(Equal("EUR"))
+		_, _, err = invoice.OrderTotal("A-9999")
+		Expect(err).To(MatchError(invoice.ErrUnknownOrder))
 	})
 
 	It("uses the job's language", func() {

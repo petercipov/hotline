@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -16,11 +17,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"hotline-example/aws-sqs-invoices/internal/fakesqs"
-	"hotline-example/aws-sqs-invoices/invoice"
+	"hotline-example/aws-shop/internal/fakesqs"
+	"hotline-example/aws-shop/invoice"
 )
 
 const queueURL = "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"
+
+var errBoom = errors.New("boom")
 
 func testAWS() []func(*config.LoadOptions) error {
 	return []func(*config.LoadOptions) error{
@@ -115,6 +118,38 @@ var _ = Describe("Sending and receiving invoice jobs over SQS", func() {
 			}
 			Expect(targets).To(ContainElements("AmazonSQS.ReceiveMessage", "AmazonSQS.DeleteMessage"))
 			Expect(fake.Calls()[1].RequestURI).To(Equal("http://sqs.eu-west-1.amazonaws.com/"))
+		})
+
+		It("tells Made about each invoice it made, before deleting the message", func() {
+			var made []string
+			worker.Made = func(_ context.Context, job invoice.Job, pdf []byte) error {
+				Expect(pdf).To(HavePrefix("%PDF-1.4"))
+				made = append(made, job.OrderID)
+				return nil
+			}
+			_, _ = invoice.Send(ctx, client, queueURL, jobBody("A-1001", "invoice-standard-v2"))
+			Expect(worker.Run(ctx, true)).To(Succeed())
+			Expect(made).To(Equal([]string{"A-1001"}))
+			Expect(fake.Waiting()).To(Equal(0))
+		})
+
+		It("leaves the message on the queue when Made fails, to try again", func() {
+			worker.Made = func(context.Context, invoice.Job, []byte) error { return errBoom }
+			_, _ = invoice.Send(ctx, client, queueURL, jobBody("A-1001", "invoice-standard-v2"))
+			Expect(worker.Run(ctx, true)).To(MatchError(errBoom))
+			Expect(fake.Waiting()).To(Equal(1))
+		})
+
+		It("uses its default template for a job asking for the template default", func() {
+			worker.DefaultTemplate = "invoice-compact-v1"
+			var template string
+			worker.Made = func(_ context.Context, job invoice.Job, _ []byte) error {
+				template = job.TemplateID
+				return nil
+			}
+			_, _ = invoice.Send(ctx, client, queueURL, jobBody("A-1001", "default"))
+			Expect(worker.Run(ctx, true)).To(Succeed())
+			Expect(template).To(Equal("invoice-compact-v1"))
 		})
 
 		It("leaves a broken message on the queue, so SQS moves it to the dead letter queue", func() {

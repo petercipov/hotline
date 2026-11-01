@@ -44,6 +44,15 @@ func money(cents int) string {
 	return fmt.Sprintf("%d.%02d", cents/100, cents%100)
 }
 
+// OrderTotal is an order's total, such as 65.97, and its currency.
+func OrderTotal(orderID string) (string, string, error) {
+	o, ok := orders()[orderID]
+	if !ok {
+		return "", "", ErrUnknownOrder
+	}
+	return money(total(o)), o.currency, nil
+}
+
 // Render makes the one-page invoice PDF the job asks for.
 func Render(job Job) ([]byte, error) {
 	o, ok := orders()[job.OrderID]

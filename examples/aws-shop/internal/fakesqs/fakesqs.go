@@ -24,12 +24,12 @@ type Call struct {
 }
 
 type message struct {
-	id, body, receipt string
-	inFlight          bool
+	queue, id, body, receipt string
+	inFlight                 bool
 }
 
 // SQS answers SendMessage, ReceiveMessage and DeleteMessage the way SQS
-// does over its JSON protocol. It also takes calls meant for a forward proxy,
+// does over its JSON protocol, keeping each queue's messages apart. It also takes calls meant for a forward proxy,
 // so a test can see what the app sends to Hotline.
 type SQS struct {
 	Addr     string
@@ -69,14 +69,12 @@ func (f *SQS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var out any
 	switch strings.TrimPrefix(target, "AmazonSQS.") {
 	case "SendMessage":
-		f.next++
-		m := &message{id: fmt.Sprintf("m-%d", f.next), body: in["MessageBody"].(string), receipt: fmt.Sprintf("r-%d", f.next)}
-		f.messages = append(f.messages, m)
+		m := f.add(queueOf(in), in["MessageBody"].(string))
 		out = map[string]any{"MessageId": m.id, "MD5OfMessageBody": md5Hex(m.body)}
 	case "ReceiveMessage":
 		var got []map[string]any
 		for _, m := range f.messages {
-			if m.inFlight {
+			if m.inFlight || m.queue != queueOf(in) {
 				continue // stays hidden until deleted, like a long visibility timeout
 			}
 			m.inFlight = true
@@ -104,6 +102,39 @@ func (f *SQS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(out); err != nil {
 		panic(err)
 	}
+}
+
+func (f *SQS) add(queue, body string) *message {
+	f.next++
+	m := &message{queue: queue, id: fmt.Sprintf("m-%d", f.next), body: body, receipt: fmt.Sprintf("r-%d", f.next)}
+	f.messages = append(f.messages, m)
+	return m
+}
+
+func queueOf(in map[string]any) string {
+	q, _ := in["QueueUrl"].(string)
+	return q
+}
+
+// Put puts a message on a queue, as another AWS service would, such as an
+// EventBridge rule.
+func (f *SQS) Put(queue, body string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.add(queue, body)
+}
+
+// WaitingIn counts one queue's messages not yet deleted.
+func (f *SQS) WaitingIn(queue string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, m := range f.messages {
+		if m.queue == queue {
+			n++
+		}
+	}
+	return n
 }
 
 // Calls lists every request so far.

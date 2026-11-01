@@ -10,9 +10,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"hotline-example/aws-sqs-invoices/internal/fakes3"
-	"hotline-example/aws-sqs-invoices/internal/fakesqs"
-	"hotline-example/aws-sqs-invoices/invoice"
+	"hotline-example/aws-shop/internal/fakes3"
+	"hotline-example/aws-shop/internal/fakesqs"
+	"hotline-example/aws-shop/invoice"
 )
 
 const bucket = "shop-invoices"

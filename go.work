@@ -1,7 +1,7 @@
 go 1.27.1
 
 use (
-	./examples/aws-sqs-invoices
+	./examples/aws-shop
 	./src/hotline
 	./src/hotline-proxy
 	./src/otel-hotline
