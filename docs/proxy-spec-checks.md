@@ -78,6 +78,7 @@ None. All nine were answered; see the decisions below.
 
 - A JSON body that cannot be read is reported as `{part: body, place: $, rule: json}`; a form body with a broken escape as `rule: form`.
 - Checks use the JSON Schema library `santhosh-tekuri/jsonschema` (Apache-2.0), which follows the JSON Schema version OpenAPI 3.1 uses. Formats other than the agreed list are switched off in it.
+- **Loading a large spec stays cheap** (Peter, 2026-11-01). The JSON Schema library copies all it has read each time it builds a check for a new place in the spec, so one check per call made loading grow with the calls times the shared shapes: the SSM spec (152 calls, 1,189 shapes) took 1.3 seconds and about 950 MB of short-lived memory. Now a schema that is only a `$ref` within the spec uses the check already built for the shape it names, and a schema that needs nothing else from the spec, such as `{ type: string }` on a header, is built apart from the spec, once for each distinct text. SSM now takes about 0.5 seconds and 300 MB, and keeps 4.8 MB instead of 6.3 MB. The vendor spec files are unchanged. The SSM spec is the size test in `internal/spec/load_test.go`.
 - Checks run when the record is made, after the reply has gone back to the app. Skipping them under load (`overloaded`) comes with the checker workers.
 
 ## What changes in the proxy spec
