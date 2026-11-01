@@ -1,0 +1,57 @@
+# On main and on release tags: builds and checks the image (image-build.yml),
+# then publishes it to GitHub's registry with an SBOM, build provenance and a
+# cosign signature (Peter, 2026-11-01). Main gives edge; a release tag v1.2.3
+# gives 1.2.3, 1.2 and latest. Detail: docs/proxy-docker-image.md.
+name: image release
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/petercipov/hotline-proxy
+
+jobs:
+  image:
+    uses: ./.github/workflows/image-build.yml
+
+  # Copies the checked file to ghcr.io under each tag, unchanged, then signs
+  # it.
+  publish:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write   # push to ghcr.io
+      id-token: write   # cosign keyless signing
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: hotline-proxy-image
+
+      # --all keeps both platforms, the SBOM and the provenance;
+      # --preserve-digests fails rather than change the image.
+      - id: push
+        name: push to ghcr.io
+        env:
+          TAGS: ${{ needs.image.outputs.tags }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          echo "$REGISTRY_TOKEN" | skopeo login ghcr.io --username "$REGISTRY_USER" --password-stdin
+          for tag in $TAGS; do
+            skopeo copy --all --preserve-digests --digestfile digest \
+              oci-archive:hotline-proxy.tar "docker://$tag"
+          done
+          echo "digest=$(cat digest)" >> "$GITHUB_OUTPUT"
+
+      # Keyless: the signature names this workflow, with no key to keep.
+      - uses: sigstore/cosign-installer@v4.1.2   # this action has no major version tag
+      - name: sign
+        run: cosign sign --yes "${IMAGE}@${{ steps.push.outputs.digest }}"

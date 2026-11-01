@@ -1,0 +1,12 @@
+# On every pull request: builds and checks the image, and pushes nothing.
+# The jobs are in image-build.yml. Detail: docs/proxy-docker-image.md.
+name: image pr
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    uses: ./.github/workflows/image-build.yml
