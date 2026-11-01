@@ -1,6 +1,6 @@
 # The proxy's Docker image
 
-Agreed with Peter on 2026-11-01. Files: `src/hotline-proxy/Dockerfile`, `.github/workflows/image.yml`, `.github/dependabot.yml` and the sidecar example in `deploy/kubernetes/sidecar/`. Test: the version scenario in `src/hotline-proxy/features/program.feature`, and the smoke test in the image workflow.
+Agreed with Peter on 2026-11-01. Files: `src/hotline-proxy/Dockerfile`, `.github/workflows/image-build.yml`, `image-pr.yml`, `image-release.yml`, `.github/dependabot.yml` and the sidecar example in `deploy/kubernetes/sidecar/`. Test: the version scenario in `src/hotline-proxy/features/program.feature`, and the smoke test in the image workflow.
 
 ## What it is
 
@@ -73,7 +73,7 @@ docker buildx build -f src/hotline-proxy/Dockerfile --build-arg VERSION=v0.1.0 \
   --platform linux/amd64,linux/arm64 -t hotline-proxy .
 ```
 
-The workflow has three jobs. `build` builds both platforms once, with the SBOM and provenance, and saves the image as a file. `smoke` loads the `linux/amd64` image from that file and checks it (version, `validate` and `run` of the sidecar example's config on a read-only filesystem, `/readyz`, the user). `publish` copies the same file to ghcr.io with `skopeo`, which comes with the GitHub runner, and signs it, so the published image is the one that was checked. Pull requests run `build` and `smoke` and push nothing.
+Pull requests run `image-pr.yml`; main and release tags run `image-release.yml`. Both use the same `build` and `smoke` jobs from `image-build.yml`. `build` builds both platforms once, with the SBOM and provenance, and saves the image as a file. `smoke` loads the `linux/amd64` image from that file and checks it (version, `validate` and `run` of the sidecar example's config on a read-only filesystem, `/readyz`, the user). Then `image-release.yml` alone runs `publish`, which copies the same file to ghcr.io with `skopeo`, which comes with the GitHub runner, and signs it, so the published image is the one that was checked. Pull requests run `build` and `smoke` and push nothing.
 
 ## Later
 

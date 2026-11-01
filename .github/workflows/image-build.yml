@@ -1,19 +1,22 @@
-# Builds the hotline-proxy image for linux/amd64 and linux/arm64, checks it,
-# and on main and on release tags publishes it to GitHub's registry, with an
-# SBOM, build provenance and a cosign signature (Peter, 2026-11-01). Detail:
+# Builds the hotline-proxy image for linux/amd64 and linux/arm64 and checks
+# it. Shared by image-pr.yml (pull requests) and image-release.yml (main and
+# release tags), so both run the very same build and smoke test. Detail:
 # docs/proxy-docker-image.md.
 #
-# Three jobs: build makes the image once and saves it as a file; smoke checks
-# that file; publish copies the same file to ghcr.io and signs it. Nothing is
-# built twice, so the image published is the image that was checked.
-name: image
+# build makes the image once and saves it as an OCI file, the artifact
+# hotline-proxy-image; smoke checks that file. Publishing is left to
+# image-release.yml, which copies the same file, so the image published is
+# the image that was checked.
+name: image build
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
-  pull_request:
+  workflow_call:
+    outputs:
+      version:
+        description: what hotline-proxy version prints
+        value: ${{ jobs.build.outputs.version }}
+      tags:
+        description: the image tags, one per line
+        value: ${{ jobs.build.outputs.tags }}
 
 permissions:
   contents: read
@@ -106,40 +109,3 @@ jobs:
           curl -fs http://localhost:8081/readyz
           test "$(docker inspect proxy --format '{{.Config.User}}')" = "65532:65532"
           docker rm -f proxy
-
-  # Copies the checked file to ghcr.io under each tag, unchanged, then signs
-  # it. Only on main and release tags; pull requests stop after smoke.
-  publish:
-    needs: [build, smoke]
-    if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write   # push to ghcr.io
-      id-token: write   # cosign keyless signing
-    steps:
-      - uses: actions/download-artifact@v7
-        with:
-          name: hotline-proxy-image
-
-      # --all keeps both platforms, the SBOM and the provenance;
-      # --preserve-digests fails rather than change the image.
-      - id: push
-        name: push to ghcr.io
-        env:
-          TAGS: ${{ needs.build.outputs.tags }}
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -eu
-          echo "$REGISTRY_TOKEN" | skopeo login ghcr.io --username "$REGISTRY_USER" --password-stdin
-          for tag in $TAGS; do
-            skopeo copy --all --preserve-digests --digestfile digest \
-              oci-archive:hotline-proxy.tar "docker://$tag"
-          done
-          echo "digest=$(cat digest)" >> "$GITHUB_OUTPUT"
-
-      # Keyless: the signature names this workflow, with no key to keep.
-      - uses: sigstore/cosign-installer@v4.1.2   # this action has no major version tag
-      - name: sign
-        run: cosign sign --yes "${IMAGE}@${{ steps.push.outputs.digest }}"
