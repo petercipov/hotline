@@ -658,6 +658,9 @@ listen:
 %sexporters:
   - otlp:
       endpoint: %s
+      metricInterval: 100ms
+      logInterval: 100ms
+      traceInterval: 100ms
 apis:
   test-vendor:
     hosts: [localhost]

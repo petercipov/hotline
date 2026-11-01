@@ -115,6 +115,9 @@ Feature: Loading the config file
       | an exporter's temporality is neither cumulative nor delta |
       | an exporter's endpoint is not a valid address        |
       | an exporter's queueSize is zero                      |
+      | an exporter's metricInterval is zero                 |
+      | an exporter's logInterval is not a duration          |
+      | an exporter's traceInterval is negative              |
       | an exporter's protocol is http/json                  |
       | an HTTP exporter's endpoint has no http:// or https:// |
       | an exporter's endpoint has a query                   |

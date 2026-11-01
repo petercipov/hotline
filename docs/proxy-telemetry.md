@@ -4,7 +4,7 @@ Agreed with Peter on 2026-10-31, reworked with him on 2026-11-01 (from 27 metric
 
 ## What it does
 
-The proxy sends numbers about itself as OpenTelemetry metrics (numbers sent every few seconds) to the `telemetry` destination, and nowhere else: never mixed with the records and counts of vendor calls. An operator builds a Grafana board and alerts on them, such as "an exporter has been down for 5 minutes", "a reload failed" or "the certificate expires within 7 days". This replaces a detail page on `/readyz` (health checks, decision 5).
+The proxy sends numbers about itself as OpenTelemetry metrics (numbers sent once a minute, or as often as `telemetry.otlp.metricInterval` says) to the `telemetry` destination, and nowhere else: never mixed with the records and counts of vendor calls. An operator builds a Grafana board and alerts on them, such as "an exporter has been down for 5 minutes", "a reload failed" or "the certificate expires within 7 days". This replaces a detail page on `/readyz` (health checks, decision 5).
 
 ```yaml
 telemetry:

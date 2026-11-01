@@ -45,6 +45,24 @@ Feature: The proxy's own telemetry
     Then the telemetry receiver gets the histogram http.server.request.duration
     And the telemetry receiver gets no metric hotline.proxy.overhead
 
+  Scenario: The proxy's own numbers go out once a minute
+    As with counts, unless telemetry.otlp.metricInterval says otherwise
+    (Peter, 2026-11-01). The telemetry destination gets only metrics, so a
+    logInterval or traceInterval there is ignored with a warning.
+    Given the telemetry destination does not set metricInterval
+    When a call ends
+    Then the telemetry receiver gets no metric within a second
+    And the telemetry receiver gets the metric http.server.request.duration once the proxy stops
+
+  Scenario Outline: Log and trace intervals mean nothing for telemetry
+    Given the telemetry destination sets <setting>
+    Then the proxy logs a warning naming telemetry.otlp.<setting>
+
+    Examples:
+      | setting       |
+      | logInterval   |
+      | traceInterval |
+
   Scenario: The queue of each exporter
     When a call ends
     Then hotline.exporter.queue.size is sent for that exporter and hotline.signal record

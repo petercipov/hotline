@@ -20,7 +20,7 @@ A fourth kind, numbers about the proxy itself, goes only to the `telemetry` dest
 | Connection to the collector | Plain, or TLS with an `https://` endpoint, with `tls.ca` and a client certificate if needed. Login headers from `headers`. |
 | Compression | gzip, unless `compression: none`. |
 | Destinations | Every entry under `exporters` gets the same records and counts, each with its own resource labels. Each has its own queue, so one that is down never holds up the others or the calls. |
-| How often | Every second, or sooner once 512 records are waiting. Fixed in the program, not in the config. |
+| How often | Counts every 60 seconds (`metricInterval`), records every 15 seconds (`logInterval`) and spans every 15 seconds (`traceInterval`), each set per exporter. Records and spans also go sooner once 512 are waiting. One data point a minute is what Grafana Cloud's standard pricing covers (Peter, 2026-11-01). |
 | Time limit per send | 10 seconds, retries included. Fixed in the program. A busy collector is tried again after about a second at first, then at most every 5 seconds. A send the collector refuses loses its records, counted in a warning line like a full queue. |
 | Records per send | At most 512. |
 | Queue size | 10 000 records per destination, or `queueSize`. When full, the oldest record is dropped, and a warning log line gives the count, at most once a minute per destination and always once at shutdown. |
@@ -38,6 +38,9 @@ exporters:
       endpoint: otel-collector.observability:4317
       temporality: delta
       queueSize: 10000
+      metricInterval: 60s
+      logInterval: 15s
+      traceInterval: 15s
   - otlp:
       protocol: http/protobuf
       endpoint: https://otel.example.com:4318
