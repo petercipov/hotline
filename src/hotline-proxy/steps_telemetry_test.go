@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -418,18 +417,6 @@ func (w *world) eventually(check func() error) error {
 // config writes it.
 func (w *world) exporterLabels() string {
 	return "hotline.exporter " + w.receivers[0].endpoint
-}
-
-// configVersion is the config version the log line with message names.
-func (w *world) configVersion(message string) string {
-	version := regexp.MustCompile(`msg="?` + message + `"? .*config_version=(\S+)`)
-	var found string
-	for _, line := range strings.Split(w.logs.String(), "\n") {
-		if m := version.FindStringSubmatch(line); m != nil {
-			found = m[1]
-		}
-	}
-	return found
 }
 
 // tryTLS opens TLS to the proxy, which may fail.
