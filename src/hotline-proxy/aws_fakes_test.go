@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5" //nolint:gosec // SQS's own message checksum
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -15,7 +14,6 @@ import (
 	"hash/crc32"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,10 +26,8 @@ import (
 )
 
 // fakeSQS answers SendMessage, ReceiveMessage and DeleteMessage the way SQS
-// does over its JSON protocol, keeping each queue's messages apart. The
-// end-to-end test serves it over TLS as localhost.
+// does over its JSON protocol, keeping each queue's messages apart.
 type fakeSQS struct {
-	server   *httptest.Server
 	mu       sync.Mutex
 	calls    []*http.Request
 	messages []sqsMessage
@@ -41,14 +37,6 @@ type fakeSQS struct {
 type sqsMessage struct {
 	queue, id, body, receipt string
 	inFlight                 bool
-}
-
-func newFakeSQS(cert tls.Certificate) *fakeSQS {
-	f := &fakeSQS{}
-	f.server = httptest.NewUnstartedServer(f)
-	f.server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
-	f.server.StartTLS()
-	return f
 }
 
 func (f *fakeSQS) ServeHTTP(w http.ResponseWriter, r *http.Request) {

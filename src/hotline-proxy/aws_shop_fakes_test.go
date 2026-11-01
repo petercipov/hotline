@@ -35,6 +35,8 @@ func shopHosts() []string {
 
 // The keys the fake STS gives for the invoice-worker role. No record or
 // span may hold them.
+//
+//nolint:gosec // made-up keys, for the test
 const (
 	roleAccessKey = "ASIAFAKEROLEKEY00001"
 	roleSecret    = "fake-role-secret-key"

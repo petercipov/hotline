@@ -12,6 +12,8 @@ import (
 
 // The fake's keys for a role taken on through STS. Calls signed with them
 // show the app used the role.
+//
+//nolint:gosec // made-up keys, for the tests
 const (
 	RoleAccessKey = "ASIAFAKEROLEKEY00001"
 	roleSecret    = "role-secret"
@@ -87,8 +89,9 @@ func (f *AWS) serveREST(w http.ResponseWriter, r *http.Request, service string) 
 		Host: r.Host, ProxyAuth: r.Header.Get("Proxy-Authorization"), Authorization: r.Header.Get("Authorization"),
 		Body: body, Path: r.URL.Path, Payload: data,
 	}
-	function, isInvoke := strings.CutPrefix(r.URL.Path, "/2015-03-31/functions/")
-	function, isInvoke = strings.CutSuffix(function, "/invocations")
+	function, isFunction := strings.CutPrefix(r.URL.Path, "/2015-03-31/functions/")
+	function, isInvoke := strings.CutSuffix(function, "/invocations")
+	isInvoke = isInvoke && isFunction
 	switch {
 	case service == "lambda" && isInvoke && r.Method == http.MethodPost:
 		call.Target = "Lambda.Invoke"
@@ -122,7 +125,7 @@ func (f *AWS) serveREST(w http.ResponseWriter, r *http.Request, service string) 
 		w.Header().Set("X-Amzn-ErrorType", "UnknownOperationException")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = fmt.Fprintf(w, `{"message":"the fake doesn't know %s %s"}`, r.Method, r.URL.Path)
+		_, _ = w.Write([]byte(`{"message":"the fake doesn't know this call"}`))
 	}
 }
 
@@ -157,6 +160,9 @@ func PaymentQR(payload []byte) ([]byte, bool) {
 	if err := json.Unmarshal(payload, &in); err != nil || in.OrderID == "" || in.Amount == "" || in.Currency == "" {
 		return []byte(`{"errorMessage":"orderId, amount and currency are needed","errorType":"ValueError"}`), true
 	}
-	out, _ := json.Marshal(map[string]string{"qrText": "SPD*1.0*AM:" + in.Amount + "*CC:" + in.Currency + "*MSG:" + in.OrderID})
+	out, err := json.Marshal(map[string]string{"qrText": "SPD*1.0*AM:" + in.Amount + "*CC:" + in.Currency + "*MSG:" + in.OrderID})
+	if err != nil {
+		panic(err)
+	}
 	return out, false
 }

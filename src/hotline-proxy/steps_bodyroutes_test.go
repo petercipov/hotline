@@ -90,9 +90,7 @@ func bodyRouteSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the SNS api with a spec whose route is (\S+) and (no action mark|.+)$`, func(route, marks string) error {
 		lines := ""
 		if marks != "no action mark" {
-			for _, mark := range strings.Split(marks, " and ") {
-				lines += mark + "\n"
-			}
+			lines = strings.Join(strings.Split(marks, " and "), "\n") + "\n"
 		}
 		spec := "openapi: 3.1.0\ninfo: { title: SNS, version: '1' }\n" + lines +
 			"paths:\n  " + route + ":\n    post:\n      responses:\n        '200': { description: done }\n"
