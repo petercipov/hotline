@@ -58,6 +58,13 @@ func (l *loader) telemetry(f *telemetryFile, now time.Time) *Telemetry {
 		return nil
 	}
 	t := &Telemetry{Exporter: l.exporter(*f.OTLP, now), Disable: f.Disable}
+	// The destination gets only metrics.
+	if f.OTLP.LogInterval != nil {
+		l.warnings = append(l.warnings, "telemetry.otlp.logInterval is ignored: the telemetry destination gets only metrics")
+	}
+	if f.OTLP.TraceInterval != nil {
+		l.warnings = append(l.warnings, "telemetry.otlp.traceInterval is ignored: the telemetry destination gets only metrics")
+	}
 	for _, name := range f.Disable {
 		if !slices.ContainsFunc(OwnMetrics(), func(metric string) bool { return Matches(name, metric) }) {
 			l.warnings = append(l.warnings, "telemetry.disable: "+name+" matches none of the proxy's metrics, and is ignored")

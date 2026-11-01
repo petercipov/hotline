@@ -121,17 +121,16 @@ func run(args []string, stdout, stderr io.Writer, signals, reloads <-chan os.Sig
 		return exitOK
 	}
 	return serve(logger, proxy.Options{
-		ConfigPath:     *configPath,
-		Resolver:       net.DefaultResolver,
-		Dialer:         &net.Dialer{},
-		RootCAs:        roots,
-		Clock:          proxy.SystemClock{},
-		Logger:         logger,
-		ExportInterval: time.Second,
-		ExportTimeout:  10 * time.Second,
-		Version:        version(),
-		InstanceID:     instanceID(),
-		LookupEnv:      os.LookupEnv,
+		ConfigPath:    *configPath,
+		Resolver:      net.DefaultResolver,
+		Dialer:        &net.Dialer{},
+		RootCAs:       roots,
+		Clock:         proxy.SystemClock{},
+		Logger:        logger,
+		ExportTimeout: 10 * time.Second,
+		Version:       version(),
+		InstanceID:    instanceID(),
+		LookupEnv:     os.LookupEnv,
 	}, stopping{timeout: *shutdownTimeout, drainDelay: *drainDelay}, signals, reloads)
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -203,6 +204,51 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
+	sc.Step(`^an exporter that sets no intervals$`, func() error {
+		w.unsetIntervals = true
+		return nil
+	})
+	sc.Step(`^an exporter that sets (metricInterval|logInterval|traceInterval) to 1h$`, func(name string) error {
+		w.exporterExtra = []string{"      " + name + ": 1h\n"}
+		return nil
+	})
+	sc.Step(`^nothing arrives within a second$`, func() error {
+		time.Sleep(time.Second)
+		if got := w.arrived(); len(got) > 0 {
+			return failf("got %v within a second", got)
+		}
+		return nil
+	})
+	sc.Step(`^the record, its spans and the count arrive when the proxy stops$`, func() error {
+		w.settle()
+		if got := w.arrived(); len(got) != 3 {
+			return failf("got only %v", got)
+		}
+		return nil
+	})
+	sc.Step(`^no (count|record|span) arrives within a second, but the others do$`, func(signal string) error {
+		err := w.eventually(func() error {
+			if got := w.arrived(); len(got) < 2 {
+				return failf("got only %v", got)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		time.Sleep(time.Second)
+		if got := w.arrived(); slices.Contains(got, signal) {
+			return failf("the %s arrived within a second", signal)
+		}
+		return nil
+	})
+	sc.Step(`^the (count|record|span) arrives when the proxy stops$`, func(signal string) error {
+		w.settle()
+		if got := w.arrived(); !slices.Contains(got, signal) {
+			return failf("no %s arrived, got %v", signal, got)
+		}
+		return nil
+	})
 	sc.Step(`^calls end$`, func() error {
 		for range 2 {
 			if err := w.defaultCall(); err != nil {
@@ -365,7 +411,7 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		return w.defaultCall()
 	})
 	sc.Step(`^records waiting in the queue$`, func() error {
-		w.exportInterval = time.Hour
+		w.exporterExtra = []string{"      logInterval: 1h\n"}
 		return w.defaultCall()
 	})
 	sc.Step(`^the proxy shuts down$`, func() error {
@@ -383,4 +429,21 @@ func exportSteps(sc *godog.ScenarioContext, w *world) {
 		}
 		return nil
 	})
+}
+
+// arrived names what the first receiver has got so far: record, span and
+// count.
+func (w *world) arrived() []string {
+	var got []string
+	records, counts := w.receivers[0].got()
+	if len(records) > 0 {
+		got = append(got, "record")
+	}
+	if len(w.receivers[0].spans()) > 0 {
+		got = append(got, "span")
+	}
+	if len(counts) > 0 {
+		got = append(got, "count")
+	}
+	return got
 }
