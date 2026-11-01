@@ -32,12 +32,13 @@ Feature: The Host header ingress
     Then the proxy calls the vendor over <scheme> on port <port>
 
     Examples:
-      | settings                                     | host header        | scheme | port |
-      | an api with TLS origination on, the default  | api.talon.one      | https  | 443  |
-      | an api with TLS origination on, the default  | api.talon.one:8080 | https  | 8080 |
-      | an api with TLS origination on, the default  | api.talon.one:80   | https  | 80   |
-      | an api with tlsOrigination set to false      | api.talon.one      | http   | 80   |
-      | a not-passed call with the built-in settings | api.x.com          | https  | 443  |
+      | settings                                            | host header        | scheme | port |
+      | an api with TLS origination on, the default         | api.talon.one      | https  | 443  |
+      | an api with TLS origination on, the default         | api.talon.one:8080 | https  | 8080 |
+      | an api with TLS origination on, the default         | api.talon.one:80   | https  | 80   |
+      | an api with tlsOrigination set to false             | api.talon.one      | http   | 80   |
+      | a not-passed call with the built-in settings        | api.x.com          | https  | 443  |
+      | a not-passed entry with tlsOrigination set to false | api.x.com          | https  | 443  |
 
   Scenario: The record of a Host header call
     When an app sends "PUT /v2/customer_sessions/sess-1" with "Host: api.talon.one"
