@@ -193,6 +193,22 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		Entry("any JSON", "Any", map[string]any{}),
 	)
 
+	DescribeTable("writes AWS's patterns so Go's regular expressions can read them",
+		func(pattern string, want map[string]any) {
+			doc := convert(strings.Replace(model, `"smithy.api#pattern": "^[a-z]+$"`, `"smithy.api#pattern": `+pattern, 1))
+			got := at(doc, "components", "schemas", "SendRequest", "properties", "Short").(map[string]any)
+			delete(got, "type")
+			delete(got, "minLength")
+			delete(got, "maxLength")
+			Expect(got).To(Equal(want))
+		},
+		Entry("a character by its number", `"^[\\u0020-\\u00FF]*$"`, map[string]any{"pattern": `^[\x{0020}-\x{00FF}]*$`}),
+		Entry("Java's printable class, alone", `"^\\p{Print}+$"`, map[string]any{"pattern": `^[\x20-\x7E]+$`}),
+		Entry("Java's printable class, in a class", `"^[\\p{Print}\\t]+$"`, map[string]any{"pattern": `^[\x20-\x7E\t]+$`}),
+		Entry("a look ahead, which Go can't read, is left out and kept aside", `"^(?!\\s*$).+$"`, map[string]any{"x-aws-pattern": `^(?!\s*$).+$`}),
+		Entry("a repeat above 1000, which Go can't read, is left out and kept aside", `"^.{1,100000}$"`, map[string]any{"x-aws-pattern": `^.{1,100000}$`}),
+	)
+
 	DescribeTable("writes named shapes as components",
 		func(name string, want map[string]any) {
 			Expect(at(doc, "components", "schemas", name)).To(Equal(want))
@@ -234,6 +250,26 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		Expect(string(got)).To(Equal(string(want)), "run: cd tools/aws-openapi && go run . -record QueueUrl=messaging.destination.name -record-action messaging.operation.name models/sqs-2012-11-05.json > ../../specs/aws/sqs/2012-11-05.openapi.yaml")
 	})
 
+	DescribeTable("made each committed JSON spec from its committed model",
+		func(model, spec, flags string) {
+			m, err := os.ReadFile("../models/" + model + ".json")
+			Expect(err).NotTo(HaveOccurred())
+			want, err := os.ReadFile("../../../specs/aws/" + spec + ".openapi.yaml")
+			Expect(err).NotTo(HaveOccurred())
+			got, err := smithy.Convert(m, options(flags))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(got)).To(Equal(string(want)), "run: cd tools/aws-openapi && go run . "+flags+" models/"+model+".json > ../../specs/aws/"+spec+".openapi.yaml")
+		},
+		Entry("DynamoDB", "dynamodb-2012-08-10", "dynamodb/2012-08-10", "-record TableName=db.collection.name -record-action db.operation.name"),
+		Entry("EventBridge", "eventbridge-2015-10-07", "eventbridge/2015-10-07", "-record-action rpc.method"),
+		Entry("Kinesis", "kinesis-2013-12-02", "kinesis/2013-12-02", "-record StreamName=messaging.destination.name -record-action messaging.operation.name"),
+		Entry("Secrets Manager", "secrets-manager-2017-10-17", "secrets-manager/2017-10-17", "-record-action rpc.method"),
+		Entry("SSM", "ssm-2014-11-06", "ssm/2014-11-06", "-record-action rpc.method"),
+		Entry("KMS", "kms-2014-11-01", "kms/2014-11-01", "-record-action rpc.method"),
+		Entry("CloudWatch Logs", "cloudwatch-logs-2014-03-28", "cloudwatch-logs/2014-03-28", "-record-action rpc.method"),
+		Entry("Step Functions", "sfn-2016-11-23", "sfn/2016-11-23", "-record-action rpc.method"),
+	)
+
 	It("marks the named fields of every action's input to be copied into records", func() {
 		doc := convertRecording(model, sqsRecord())
 		for _, input := range []string{"SendRequest", "PurgeRequest"} {
@@ -265,3 +301,19 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 		}
 	})
 })
+
+// options reads the tool's -record and -record-action flags.
+func options(flags string) smithy.Options {
+	o := smithy.Options{Record: map[string]string{}}
+	f := strings.Fields(flags)
+	for i := 0; i+1 < len(f); i += 2 {
+		switch f[i] {
+		case "-record":
+			field, name, _ := strings.Cut(f[i+1], "=")
+			o.Record[field] = name
+		case "-record-action":
+			o.Action = f[i+1]
+		}
+	}
+	return o
+}
