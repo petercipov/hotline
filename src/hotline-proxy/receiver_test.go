@@ -78,6 +78,8 @@ type receivedCount struct {
 type receivedPoint struct {
 	name string
 	unit string
+	// description is the metric's help text.
+	description string
 	// kind is sum, gauge or histogram.
 	kind  string
 	attrs map[string]any
@@ -409,7 +411,7 @@ func pointsOf(m *metrics.Metric) []receivedPoint {
 		if _, ok := dp.GetValue().(*metrics.NumberDataPoint_AsDouble); ok {
 			v = dp.GetAsDouble()
 		}
-		points = append(points, receivedPoint{name: m.GetName(), unit: m.GetUnit(), kind: kind, attrs: values(dp.GetAttributes()), value: v})
+		points = append(points, receivedPoint{name: m.GetName(), unit: m.GetUnit(), description: m.GetDescription(), kind: kind, attrs: values(dp.GetAttributes()), value: v})
 	}
 	for _, dp := range m.GetSum().GetDataPoints() {
 		number("sum", dp)
@@ -419,7 +421,7 @@ func pointsOf(m *metrics.Metric) []receivedPoint {
 	}
 	for _, dp := range m.GetHistogram().GetDataPoints() {
 		points = append(points, receivedPoint{
-			name: m.GetName(), unit: m.GetUnit(), kind: "histogram", attrs: values(dp.GetAttributes()),
+			name: m.GetName(), unit: m.GetUnit(), description: m.GetDescription(), kind: "histogram", attrs: values(dp.GetAttributes()),
 			value: dp.GetSum(), count: dp.GetCount(), bounds: dp.GetExplicitBounds(),
 		})
 	}

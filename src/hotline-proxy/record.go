@@ -85,7 +85,6 @@ func (c *call) record(end time.Time) {
 	}
 	c.h.record(c.in, finished{
 		sc: c.trace, at: c.start, attrs: attrs, spans: spans,
-		overhead: c.vendorIn.Sub(c.start) + end.Sub(orTime(c.vendorOut, end)), reached: true,
 	})
 }
 
@@ -121,15 +120,12 @@ func (h *handler) refused(r *http.Request, start time.Time, ingress, id string, 
 	h.record(r, finished{sc: traced, at: start, attrs: attrs, spans: spans})
 }
 
-// finished is what a call leaves: its record, its trace and, once it got as
-// far as the vendor, the proxy's own time on it.
+// finished is what a call leaves: its record and its trace.
 type finished struct {
-	sc       trace.SpanContext
-	at       time.Time
-	attrs    []attribute.KeyValue
-	spans    []export.Span
-	overhead time.Duration
-	reached  bool
+	sc    trace.SpanContext
+	at    time.Time
+	attrs []attribute.KeyValue
+	spans []export.Span
 }
 
 // record hands a record and its trace to the exporters, and measures the
@@ -137,7 +133,7 @@ type finished struct {
 func (h *handler) record(r *http.Request, f finished) {
 	h.sink.Record(recordContext(f.sc), f.at, f.attrs)
 	h.sink.Trace(f.sc, f.spans)
-	h.own.ended(r, f.attrs, f.overhead, f.reached)
+	h.own.ended(f.attrs)
 }
 
 // clientAddress is the IP address the app's connection came from, never a

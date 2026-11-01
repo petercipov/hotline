@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -49,6 +48,16 @@ func telemetrySteps(sc *godog.ScenarioContext, w *world) {
 		}
 		if points[0].kind != "histogram" || points[0].unit != unit {
 			return failf("%s is a %s with unit %q", name, points[0].kind, points[0].unit)
+		}
+		return nil
+	})
+	sc.Step(`^the telemetry receiver gets (\S+) with unit "([^"]*)" and a description$`, func(name, unit string) error {
+		points, err := w.ownPoints(name)
+		if err != nil {
+			return err
+		}
+		if points[0].unit != unit || points[0].description == "" {
+			return failf("%s has the unit %q and the description %q", name, points[0].unit, points[0].description)
 		}
 		return nil
 	})
@@ -98,7 +107,7 @@ func telemetrySteps(sc *godog.ScenarioContext, w *world) {
 		if err := <-w.callDone; err != nil {
 			return err
 		}
-		return w.ownValue("http.server.active_requests", "http.request.method GET, url.scheme http and hotline.ingress forward_proxy", 0)
+		return w.ownValue("http.server.active_requests", "hotline.ingress forward_proxy", 0)
 	})
 	sc.Step(`^an app makes a forward proxy GET call over http(?: and the vendor answers 200)?$`, func() error {
 		return w.call(http.MethodGet, "http://api.talon.one/v2/customer_sessions/sess-8812")
@@ -112,9 +121,10 @@ func telemetrySteps(sc *godog.ScenarioContext, w *world) {
 	})
 
 	sc.Step(`^(\S+) (?:is|turns) (\d+) for (.+)$`, func(name string, want int, labels string) error {
-		if labels == "that destination" {
-			labels = w.destinationLabels()
+		if labels == "that exporter" {
+			labels = w.exporterLabels()
 		}
+		w.lastMetric = name
 		return w.ownValue(name, labels, float64(want))
 	})
 	sc.Step(`^(\S+) counts (\d+) calls? (?:for|with) (.+)$`, func(name string, want uint64, labels string) error {
@@ -166,47 +176,30 @@ func telemetrySteps(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 
-	sc.Step(`^a product destination with queueSize (\d+)$`, func(size int) error {
-		w.exporterExtra = []string{fmt.Sprintf("      queueSize: %d\n", size)}
-		return nil
-	})
-	sc.Step(`^(\S+) is sent for that destination$`, func(name string) error {
+	sc.Step(`^(\S+) is sent for that exporter and hotline.signal (\S+)$`, func(name, signal string) error {
+		if err := w.start(); err != nil {
+			return err
+		}
 		return w.eventually(func() error {
-			if _, ok := w.latest(name, parseLabels(w.destinationLabels())); !ok {
-				return failf("no %s for that destination", name)
+			if _, ok := w.latest(name, parseLabels(w.exporterLabels()+" and hotline.signal "+signal)); !ok {
+				return failf("no %s for that exporter and %s; got %v", name, signal, w.lastPoints(name))
 			}
 			return nil
 		})
 	})
-	sc.Step(`^(\S+) counts (\d+) (?:records?|spans?) with (no|an) error.type (?:(\S+) )?for that destination$`,
-		func(name string, want int, which, errorType string) error {
-			return w.eventually(func() error {
-				var got float64
-				for _, p := range w.lastPoints(name) {
-					_, has := p.attrs["error.type"]
-					if !matches(p, parseLabels(w.destinationLabels())) || has != (which == "an") ||
-						errorType != "" && p.attrs["error.type"] != errorType {
-						continue
-					}
-					got += p.value
-				}
-				if got != float64(want) {
-					return failf("%s counts %v, want %d", name, got, want)
-				}
-				return nil
-			})
-		})
-	sc.Step(`^otel.sdk.processor.log.processed counts (\d+) record with error.type queue_full for that destination$`, func(want int) error {
-		return w.ownValue("otel.sdk.processor.log.processed", w.processorLabels()+" and error.type queue_full", float64(want))
-	})
-	sc.Step(`^(\S+) counts data points with no error.type for that destination$`, func(name string) error {
+	sc.Step(`^(\S+) counts (\d+|some) for that exporter(?:,| and) (.+)$`, func(name, want, labels string) error {
+		labels = strings.Replace(labels, " and ", ", ", 1)
+		labels = w.exporterLabels() + ", " + labels
+		if err := w.start(); err != nil {
+			return err
+		}
 		return w.eventually(func() error {
-			for _, p := range w.lastPoints(name) {
-				if _, has := p.attrs["error.type"]; matches(p, parseLabels(w.destinationLabels())) && !has && p.value > 0 {
-					return nil
-				}
+			p, ok := w.latest(name, parseLabels(labels))
+			n, _ := strconv.Atoi(want)
+			if !ok || want == "some" && p.value <= 0 || want != "some" && p.value != float64(n) {
+				return failf("%s is %v for %q, want %s; got %v", name, p.value, labels, want, w.lastPoints(name))
 			}
-			return failf("%s counted no data points", name)
+			return nil
 		})
 	})
 	sc.Step(`^3 calls end$`, func() error {
@@ -239,26 +232,8 @@ func telemetrySteps(sc *godog.ScenarioContext, w *world) {
 		return w.defaultCall()
 	})
 
-	sc.Step(`^hotline.config.info is 1 with the config's hotline.config.version$`, func() error {
-		return w.ownValue("hotline.config.info", "hotline.config.version "+w.configVersion("hotline proxy started"), 1)
-	})
-	sc.Step(`^it says hotline.listen.tls (true|false) and hotline.listen.connect (true|false)$`, func(tls, connect string) error {
-		return w.ownValue("hotline.config.info", "hotline.listen.tls "+tls+" and hotline.listen.connect "+connect, 1)
-	})
-	sc.Step(`^hotline.config.info says hotline.listen.tls (true|false)$`, func(tls string) error {
-		return w.ownValue("hotline.config.info", "hotline.listen.tls "+tls, 1)
-	})
-	sc.Step(`^hotline.config.info still names the first config version$`, func() error {
-		return w.ownValue("hotline.config.info", "hotline.config.version "+w.configVersion("hotline proxy started"), 1)
-	})
-	sc.Step(`^hotline.config.info names the new config version$`, func() error {
-		return w.ownValue("hotline.config.info", "hotline.config.version "+w.configVersion("config reloaded"), 1)
-	})
 	sc.Step(`^(hotline\.config\.\S+) (?:is|turns) (\d+)$`, func(name string, want int) error {
 		return w.ownValue(name, "", float64(want))
-	})
-	sc.Step(`^hotline.config.reloads counts (\d+) with hotline.reload.result (\S+)$`, func(want int, result string) error {
-		return w.ownValue("hotline.config.reloads", "hotline.reload.result "+result, float64(want))
 	})
 	sc.Step(`^the config file is put back as it was$`, func() error {
 		w.writeFile("hotline-proxy.yaml", w.config())
@@ -415,7 +390,7 @@ func (w *world) ownCount(name, labels string, want uint64) error {
 // noOwnMetric checks that no metric the test names arrived, once the
 // proxy's own numbers have been sent at least once.
 func (w *world) noOwnMetric(unwanted func(string) bool) error {
-	if _, err := w.ownPoints("hotline.config.info"); err != nil {
+	if _, err := w.ownPoints("hotline.config.restart_needed"); err != nil {
 		return err
 	}
 	for _, p := range w.telemetry.metricPoints() {
@@ -438,27 +413,10 @@ func (w *world) eventually(check func() error) error {
 	}
 }
 
-// destinationLabels name the first product destination by its address.
-func (w *world) destinationLabels() string {
-	host, port, _ := net.SplitHostPort(strings.TrimPrefix(w.receivers[0].endpoint, "http://"))
-	return "server.address " + host + " and server.port " + port
-}
-
-// processorLabels name the queue of the first product destination.
-func (w *world) processorLabels() string {
-	return w.destinationLabels() + " and otel.component.type batching_log_processor"
-}
-
-// configVersion is the config version the log line with message names.
-func (w *world) configVersion(message string) string {
-	version := regexp.MustCompile(`msg="?` + message + `"? .*config_version=(\S+)`)
-	var found string
-	for _, line := range strings.Split(w.logs.String(), "\n") {
-		if m := version.FindStringSubmatch(line); m != nil {
-			found = m[1]
-		}
-	}
-	return found
+// exporterLabels name the first product exporter, by its endpoint as the
+// config writes it.
+func (w *world) exporterLabels() string {
+	return "hotline.exporter " + w.receivers[0].endpoint
 }
 
 // tryTLS opens TLS to the proxy, which may fail.

@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
 // batchSize is how many records or spans one send carries at most.
@@ -30,14 +29,12 @@ type queue[T any] struct {
 	size     int
 	interval time.Duration
 	logger   *slog.Logger
-	// processed and exported count what the queue did, as the queue's
-	// processor and the destination's sender; up is the destination's
-	// state.
-	processed metric.Int64Counter
-	exported  metric.Int64Counter
-	processor attribute.Set
-	sender    attribute.Set
-	up        *atomic.Int64
+	// sent and dropped count what the queue did, with labels naming the
+	// exporter and the signal; up is the exporter's state.
+	sent    metric.Int64Counter
+	dropped metric.Int64Counter
+	labels  attribute.Set
+	up      *atomic.Int64
 
 	mu    sync.Mutex
 	items []T
@@ -54,34 +51,32 @@ type queue[T any] struct {
 
 // queueSetup is what a queue needs besides its sender.
 type queueSetup struct {
-	endpoint  string
-	size      int
-	interval  time.Duration
-	logger    *slog.Logger
-	processed metric.Int64Counter
-	exported  metric.Int64Counter
-	processor attribute.Set
-	sender    attribute.Set
-	up        *atomic.Int64
+	endpoint string
+	size     int
+	interval time.Duration
+	logger   *slog.Logger
+	sent     metric.Int64Counter
+	dropped  metric.Int64Counter
+	labels   attribute.Set
+	up       *atomic.Int64
 }
 
 func newQueue[T any](what string, export func(context.Context, []T) error, closeSender func(context.Context) error, s queueSetup) *queue[T] {
 	q := &queue[T]{
-		export:    export,
-		close:     closeSender,
-		endpoint:  s.endpoint,
-		what:      what,
-		size:      s.size,
-		interval:  s.interval,
-		logger:    s.logger,
-		processed: s.processed,
-		exported:  s.exported,
-		processor: s.processor,
-		sender:    s.sender,
-		up:        s.up,
-		full:      make(chan struct{}, 1),
-		stop:      make(chan struct{}),
-		stopped:   make(chan struct{}),
+		export:   export,
+		close:    closeSender,
+		endpoint: s.endpoint,
+		what:     what,
+		size:     s.size,
+		interval: s.interval,
+		logger:   s.logger,
+		sent:     s.sent,
+		dropped:  s.dropped,
+		labels:   s.labels,
+		up:       s.up,
+		full:     make(chan struct{}, 1),
+		stop:     make(chan struct{}),
+		stopped:  make(chan struct{}),
 	}
 	go q.run()
 	return q
@@ -94,8 +89,7 @@ func (q *queue[T]) add(item T) {
 	if len(q.items) == q.size {
 		q.items = q.items[1:]
 		q.crowded.count++
-		q.processed.Add(context.Background(), 1,
-			metric.WithAttributes(append(q.processor.ToSlice(), semconv.ErrorTypeKey.String("queue_full"))...))
+		q.dropped.Add(context.Background(), 1, dropReason(q.labels, "queue_full"))
 	}
 	q.items = append(q.items, item)
 	if len(q.items) >= batchSize {
@@ -136,9 +130,8 @@ func (q *queue[T]) send(ctx context.Context, all bool) error {
 		if len(batch) == 0 {
 			return nil
 		}
-		q.processed.Add(ctx, int64(len(batch)), metric.WithAttributeSet(q.processor))
 		err := q.export(ctx, batch)
-		measured(ctx, q.exported, len(batch), q.sender, err, q.up)
+		measured(ctx, q.sent, q.dropped, len(batch), q.labels, err, q.up)
 		if err != nil {
 			q.mu.Lock()
 			q.failed.count += len(batch)
