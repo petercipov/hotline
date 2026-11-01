@@ -117,9 +117,9 @@ aws iam put-role-policy --role-name invoice-worker --policy-name invoice-worker 
 aws iam create-role --role-name payment-qr-function \
   --assume-role-policy-document '{"Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
 aws iam attach-role-policy --role-name payment-qr-function --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-(cd aws && zip -q ../payment-qr.zip payment_qr.py)
+(cd aws && zip -q ../payment-qr.zip payment_qr.py) && \
 aws lambda create-function --function-name payment-qr --runtime python3.13 --handler payment_qr.handler \
-  --role arn:aws:iam::${ACCOUNT}:role/payment-qr-function --zip-file fileb://payment-qr.zip
+  --role arn:aws:iam::${ACCOUNT}:role/payment-qr-function --zip-file fileb://payment-qr.zip && \
 rm payment-qr.zip
 
 # The SES sender: AWS mails a link to this address, which you click once.
