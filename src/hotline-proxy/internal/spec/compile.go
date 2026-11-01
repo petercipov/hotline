@@ -33,8 +33,15 @@ type builder struct {
 	name     string
 	doc      any
 	compiler *jsonschema.Compiler
-	schemes  map[string]*credential
-	problems []error
+	// inline compiles schemas that need nothing else from the spec, such
+	// as { type: string } on a header, apart from the spec, and inlined
+	// keeps each one by its text, so the same schema is compiled once.
+	inline  *jsonschema.Compiler
+	inlined map[string]*jsonschema.Schema
+	// inlineNext numbers the schemas given to inline.
+	inlineNext int
+	schemes    map[string]*credential
+	problems   []error
 	// reported holds the x-hotline-record marks already found broken.
 	reported map[string]bool
 }
@@ -55,19 +62,9 @@ func newBuilder(name string, data []byte) *builder {
 	if err == nil {
 		b.doc, err = jsonschema.UnmarshalJSON(bytes.NewReader(plain))
 	}
-	b.compiler = jsonschema.NewCompiler()
-	b.compiler.DefaultDraft(jsonschema.Draft2020)
-	b.compiler.UseLoader(outside{})
-	b.compiler.AssertFormat()
-	// A string holding JSON, marked with contentMediaType and
-	// contentSchema, is read and checked too (Peter, 2026-10-30).
-	b.compiler.RegisterVocabulary(jsonText())
-	b.compiler.AssertVocabs()
-	for _, f := range ignoredFormats() {
-		b.compiler.RegisterFormat(&jsonschema.Format{Name: f, Validate: func(any) error { return nil }})
-	}
-	b.compiler.RegisterFormat(&jsonschema.Format{Name: "int32", Validate: bits(32)})
-	b.compiler.RegisterFormat(&jsonschema.Format{Name: "int64", Validate: bits(64)})
+	b.compiler = newCompiler()
+	b.inline = newCompiler()
+	b.inlined = map[string]*jsonschema.Schema{}
 	if err == nil {
 		err = b.compiler.AddResource(specURL, b.doc)
 	}
@@ -78,6 +75,25 @@ func newBuilder(name string, data []byte) *builder {
 	b.readSchemes()
 	b.compileComponents()
 	return b
+}
+
+// newCompiler makes a JSON Schema compiler set up the way the proxy
+// checks: draft 2020-12, formats and JSON text checked, nothing fetched.
+func newCompiler() *jsonschema.Compiler {
+	c := jsonschema.NewCompiler()
+	c.DefaultDraft(jsonschema.Draft2020)
+	c.UseLoader(outside{})
+	c.AssertFormat()
+	// A string holding JSON, marked with contentMediaType and
+	// contentSchema, is read and checked too (Peter, 2026-10-30).
+	c.RegisterVocabulary(jsonText())
+	c.AssertVocabs()
+	for _, f := range ignoredFormats() {
+		c.RegisterFormat(&jsonschema.Format{Name: f, Validate: func(any) error { return nil }})
+	}
+	c.RegisterFormat(&jsonschema.Format{Name: "int32", Validate: bits(32)})
+	c.RegisterFormat(&jsonschema.Format{Name: "int64", Validate: bits(64)})
+	return c
 }
 
 // ignoredFormats are the formats the JSON Schema library knows but the
@@ -191,14 +207,91 @@ func (b *builder) object(v any, pointer, where string) (map[string]any, string) 
 
 // schema compiles the schema under pointer, nil when there is none.
 func (b *builder) schema(owner map[string]any, pointer, where, what string) *jsonschema.Schema {
-	if _, ok := owner["schema"]; !ok {
+	v, ok := owner["schema"]
+	if !ok {
 		return nil
 	}
-	s, err := b.compile(pointer + "/schema")
+	s, err := b.compileSchema(v, pointer+"/schema")
 	if err != nil {
 		b.problem("%s: the schema of %s cannot be used: %v", where, what, err)
 	}
 	return s
+}
+
+// compileSchema compiles the schema v found at pointer, the cheap way
+// when it can. The compiler copies all it has read each time it meets a
+// new place in the spec, so a check per call made loading grow with the
+// calls times the shapes; the SSM spec took about 950 MB of short-lived
+// memory (Peter, 2026-11-01). So a schema that is only a $ref within the
+// spec uses the check of the shape it names, built once, and a schema
+// that needs nothing else from the spec is compiled apart from it, once
+// for each text.
+func (b *builder) compileSchema(v any, pointer string) (*jsonschema.Schema, error) {
+	if target, ok := onlyRef(v); ok {
+		return b.compile(target)
+	}
+	if !standsAlone(v) {
+		return b.compile(pointer)
+	}
+	text, err := json.Marshal(v)
+	if err != nil {
+		return b.compile(pointer)
+	}
+	if s, ok := b.inlined[string(text)]; ok {
+		return s, nil
+	}
+	b.inlineNext++
+	address := fmt.Sprintf("%s/inline/%d.json", strings.TrimSuffix(specURL, "/openapi.json"), b.inlineNext)
+	if err := b.inline.AddResource(address, v); err != nil {
+		return b.compile(pointer)
+	}
+	s, err := b.inline.Compile(address)
+	if err != nil {
+		// Built again in place, so the problem names where it is in the
+		// spec. Only a broken spec gets here.
+		return b.compile(pointer)
+	}
+	b.inlined[string(text)] = s
+	return s, nil
+}
+
+// onlyRef is the pointer of the shape v names, when v holds nothing but a
+// $ref within the spec.
+func onlyRef(v any) (string, bool) {
+	m, ok := v.(map[string]any)
+	if !ok || len(m) != 1 {
+		return "", false
+	}
+	ref, ok := m["$ref"].(string)
+	if !ok || !strings.HasPrefix(ref, "#") {
+		return "", false
+	}
+	target, err := url.PathUnescape(strings.TrimPrefix(ref, "#"))
+	return target, err == nil
+}
+
+// standsAlone tells whether a schema needs nothing else from the spec: it
+// has no reference to elsewhere and names no place others could point to.
+func standsAlone(v any) bool {
+	switch x := v.(type) {
+	case map[string]any:
+		for key, value := range x {
+			switch key {
+			case "$ref", "$dynamicRef", "$id", "$anchor", "$dynamicAnchor", "$schema", "$vocabulary":
+				return false
+			}
+			if !standsAlone(value) {
+				return false
+			}
+		}
+	case []any:
+		for _, value := range x {
+			if !standsAlone(value) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (b *builder) compile(pointer string) (*jsonschema.Schema, error) {
