@@ -359,6 +359,10 @@ type call struct {
 	// it is whole.
 	reqCheck   *specCheck
 	replyCheck *specCheck
+	// action is what the request body names as the action, for a spec
+	// that picks routes by a body field. The request check sets it before
+	// it ends; read it only after reqCheck.done.
+	action string
 
 	mu        sync.Mutex
 	phase     phase
@@ -577,7 +581,7 @@ type upgraded struct {
 }
 
 // keptBody is how much of each body the proxy keeps for the checks.
-const keptBody = 1 << 20
+const keptBody = 2 << 20
 
 // keepFor is how much of a body to keep: none for a call that is not
 // checked.

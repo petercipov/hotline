@@ -23,7 +23,11 @@ type Spec struct {
 	// actionHeader names the header that picks a route written as
 	// /path#Header=value, such as X-Amz-Target. Empty when the spec has
 	// no such routes.
-	actionHeader  string
+	actionHeader string
+	// actionField names the top-level body field that picks a route
+	// written as /path#Field=value, such as Action for SNS and STS. Empty
+	// when the spec has no such routes. A spec has at most one of the two.
+	actionField   string
 	secretHeaders map[string]bool
 	secretQuery   map[string]bool
 }
@@ -41,8 +45,8 @@ type route struct {
 	method   string
 	template string
 	segments []string
-	// action is the value the action header must have, for a route
-	// written as /path#Header=value. Empty for an ordinary route.
+	// action is the value the action header or body field must have, for
+	// a route written as /path#Name=value. Empty for an ordinary route.
 	action string
 	// words are the query words a call must have, for a route written as
 	// /path#?word or /path#?word=value&other.
@@ -61,6 +65,7 @@ type route struct {
 type document struct {
 	OpenAPI      string `yaml:"openapi"`
 	ActionHeader string `yaml:"x-hotline-action-header"` //nolint:tagliatelle // the name of our OpenAPI extension
+	ActionField  string `yaml:"x-hotline-action-field"`  //nolint:tagliatelle // the name of our OpenAPI extension
 	Servers      []struct {
 		URL string `yaml:"url"`
 	} `yaml:"servers"`
@@ -114,7 +119,7 @@ func Parse(name string, data []byte) (*Spec, error) {
 		return nil, fmt.Errorf("%w: %s is not an OpenAPI 3.1 document", ErrInvalid, name)
 	}
 	b := newBuilder(name, data)
-	s := &Spec{actionHeader: doc.ActionHeader, secretHeaders: map[string]bool{}, secretQuery: map[string]bool{}}
+	s := &Spec{actionHeader: doc.ActionHeader, actionField: doc.ActionField, secretHeaders: map[string]bool{}, secretQuery: map[string]bool{}}
 	var problems []error
 	// A base path in the first servers address, such as /v1 in
 	// https://api.x.com/v1, goes in front of every route.
@@ -186,9 +191,12 @@ type queryWord struct {
 
 // splitAction reads a route written as /path#Header=value, the way a
 // vendor that names each action in a header is written (Peter,
-// 2026-10-29), or as /path#?word&other=value, for a vendor that names it
-// with words in the query (Peter, 2026-10-31). The header must be the one
-// the spec names in x-hotline-action-header.
+// 2026-10-29), or as /path#Field=value, for a vendor that names it in a
+// body field (Peter, 2026-11-01), or as /path#?word&other=value, for a
+// vendor that names it with words in the query (Peter, 2026-10-31). The
+// header or field must be the one the spec names in
+// x-hotline-action-header or x-hotline-action-field, and a spec names only
+// one of them.
 func (s *Spec) splitAction(name, template string) (path, action string, words []queryWord, err error) {
 	path, after, found := strings.Cut(template, "#")
 	if !found {
@@ -204,10 +212,20 @@ func (s *Spec) splitAction(name, template string) (path, action string, words []
 		}
 		return path, "", words, nil
 	}
-	header, action, _ := strings.Cut(after, "=")
-	if s.actionHeader == "" || !strings.EqualFold(header, s.actionHeader) || action == "" {
+	key, action, _ := strings.Cut(after, "=")
+	switch {
+	case action == "" || s.actionHeader == "" && s.actionField == "":
+		return path, action, nil, fmt.Errorf("%w: %s: the route %s names %s, but the spec has neither x-hotline-action-header nor x-hotline-action-field",
+			ErrInvalid, name, template, key)
+	case s.actionHeader != "" && s.actionField != "":
+		return path, action, nil, fmt.Errorf("%w: %s: the route %s can't be read: the spec names both x-hotline-action-header %q and x-hotline-action-field %q, and may name only one",
+			ErrInvalid, name, template, s.actionHeader, s.actionField)
+	case s.actionHeader != "" && !strings.EqualFold(key, s.actionHeader):
 		return path, action, nil, fmt.Errorf("%w: %s: the route %s names the header %s, but the spec's x-hotline-action-header is %q",
-			ErrInvalid, name, template, header, s.actionHeader)
+			ErrInvalid, name, template, key, s.actionHeader)
+	case s.actionField != "" && key != s.actionField:
+		return path, action, nil, fmt.Errorf("%w: %s: the route %s names the field %s, but the spec's x-hotline-action-field is %q",
+			ErrInvalid, name, template, key, s.actionField)
 	}
 	return path, action, nil, nil
 }

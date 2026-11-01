@@ -16,6 +16,7 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"hotline-example/aws-shop/invoice"
@@ -32,8 +33,8 @@ type invoiceReady struct {
 }
 
 // Work is the invoices worker: it reads the default template from the
-// shop's settings, then takes jobs off the invoices queue. For each it
-// renders the PDF, stores it in the bucket (or the folder out, when set),
+// shop's settings, then takes jobs off the invoices queue. For each it asks
+// the payment-qr function for the payment text, renders the PDF, stores it in the bucket (or the folder out, when set),
 // signs it, saves its row, announces InvoiceReady on the bus and writes
 // invoice-made to the stream. With once set, it stops when the queue is
 // empty.
@@ -49,6 +50,9 @@ func (a App) Work(ctx context.Context, once bool, out string) error {
 		Log:             a.Log,
 		DefaultTemplate: aws.ToString(param.Parameter.Value),
 		Made:            a.invoiced,
+	}
+	if a.Names.PaymentQRFunction != "" {
+		w.PaymentText = a.paymentText
 	}
 	if out == "" {
 		w.Files = &a.Files
@@ -120,6 +124,37 @@ func (a App) invoiced(ctx context.Context, job invoice.Job, pdf []byte) error {
 }
 
 var errRefusedEvent = errors.New("EventBridge refused the event")
+
+// errFunctionFailed means the payment-qr function ran but failed.
+var errFunctionFailed = errors.New("the payment-qr function failed")
+
+// paymentText asks the payment-qr function for the payment text a bank app
+// reads from a QR code. An order the shop doesn't know gets none: the
+// worker refuses its job anyway.
+func (a App) paymentText(ctx context.Context, job invoice.Job) (string, error) {
+	amount, currency, err := invoice.OrderTotal(job.OrderID)
+	if err != nil {
+		return "", nil //nolint:nilerr // the job is refused when rendered
+	}
+	payload, err := json.Marshal(map[string]string{"orderId": job.OrderID, "amount": amount, "currency": currency})
+	if err != nil {
+		return "", err
+	}
+	out, err := a.Lambda.Invoke(ctx, &lambda.InvokeInput{FunctionName: aws.String(a.Names.PaymentQRFunction), Payload: payload})
+	if err != nil {
+		return "", fmt.Errorf("ask payment-qr: %w", err)
+	}
+	if out.FunctionError != nil {
+		return "", fmt.Errorf("%w: %s", errFunctionFailed, out.Payload)
+	}
+	var reply struct {
+		QRText string `json:"qrText"`
+	}
+	if err := json.Unmarshal(out.Payload, &reply); err != nil || reply.QRText == "" {
+		return "", fmt.Errorf("%w: no qrText in %s", errFunctionFailed, out.Payload)
+	}
+	return reply.QRText, nil
+}
 
 // Status tells what the invoices table holds for the order.
 func (a App) Status(ctx context.Context, orderID string) (string, error) {

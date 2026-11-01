@@ -1,9 +1,12 @@
 // Package smithy turns an AWS service's Smithy model (AWS's own api
 // description language, in its JSON form) into an OpenAPI 3.1 spec Hotline
-// can read. Two of AWS's protocols are handled: its JSON one, where every
-// call is POST / and the action is named in the X-Amz-Target header, and
-// its REST and XML one, used by S3, where actions are told apart by path
-// and query words, and bodies are XML.
+// can read. Four of AWS's protocols are handled: its JSON one, where every
+// call is POST / and the action is named in the X-Amz-Target header; its
+// query one, used by SNS and STS, where every call is POST / with a form
+// body naming the action in its field Action, and replies are XML; its
+// REST and JSON one, used by Lambda and SES, where actions are told apart
+// by path and bodies are JSON; and its REST and XML one, used by S3, where
+// actions are told apart by path and query words, and bodies are XML.
 package smithy
 
 import (
@@ -28,16 +31,26 @@ type model struct {
 }
 
 type shape struct {
-	Type       string            `json:"type"`
-	Version    string            `json:"version"`
-	Operations []ref             `json:"operations"`
-	Input      *ref              `json:"input"`
-	Output     *ref              `json:"output"`
-	Members    map[string]member `json:"members"`
-	Member     *member           `json:"member"`
-	Key        *member           `json:"key"`
-	Value      *member           `json:"value"`
-	Traits     map[string]any    `json:"traits"`
+	Type       string `json:"type"`
+	Version    string `json:"version"`
+	Operations []ref  `json:"operations"`
+	// A resource's own operations, and the resources inside a service or
+	// a resource, as Lambda's model groups its actions.
+	Resources            []ref             `json:"resources"`
+	CollectionOperations []ref             `json:"collectionOperations"`
+	Create               *ref              `json:"create"`
+	Put                  *ref              `json:"put"`
+	Read                 *ref              `json:"read"`
+	Update               *ref              `json:"update"`
+	Delete               *ref              `json:"delete"`
+	List                 *ref              `json:"list"`
+	Input                *ref              `json:"input"`
+	Output               *ref              `json:"output"`
+	Members              map[string]member `json:"members"`
+	Member               *member           `json:"member"`
+	Key                  *member           `json:"key"`
+	Value                *member           `json:"value"`
+	Traits               map[string]any    `json:"traits"`
 }
 
 type ref struct {
@@ -91,14 +104,18 @@ func Convert(data []byte, options Options) ([]byte, error) {
 		mediaType = "application/x-amz-json-1.1"
 	case has(service.Traits, "aws.protocols#restXml"):
 		return convertRestXML(m, serviceID, service, options)
+	case has(service.Traits, "aws.protocols#awsQuery"):
+		return convertQuery(m, serviceID, service, options)
+	case has(service.Traits, "aws.protocols#restJson1"):
+		return convertRestJSON(m, serviceID, service, options)
 	default:
-		return nil, fmt.Errorf("%w: %s is on neither AWS's JSON protocol nor its REST and XML one", ErrUnsupported, serviceID)
+		return nil, fmt.Errorf("%w: %s is on none of AWS's JSON, query, REST and JSON, or REST and XML protocols", ErrUnsupported, serviceID)
 	}
 	c := converter{model: m, mediaType: mediaType, schemas: map[string]any{}, options: options}
 	prefix := name(serviceID)
 
 	paths := map[string]any{}
-	for _, op := range service.Operations {
+	for _, op := range m.operations(service) {
 		action := prefix + "." + name(op.Target)
 		paths["/#"+actionHeader+"="+action] = map[string]any{"post": c.operation(op.Target, action)}
 	}
@@ -152,6 +169,21 @@ func (m model) service() (string, shape, error) {
 	return ids[0], m.Shapes[ids[0]], nil
 }
 
+// operations lists every action of a service or resource: its own, and
+// those of the resources inside it.
+func (m model) operations(s shape) []ref {
+	ops := append(append([]ref{}, s.Operations...), s.CollectionOperations...)
+	for _, r := range []*ref{s.Create, s.Put, s.Read, s.Update, s.Delete, s.List} {
+		if r != nil {
+			ops = append(ops, *r)
+		}
+	}
+	for _, r := range s.Resources {
+		ops = append(ops, m.operations(m.Shapes[r.Target])...)
+	}
+	return ops
+}
+
 func endpointPrefix(service shape, fallback string) string {
 	if s, ok := service.Traits["aws.api#service"].(map[string]any); ok {
 		if p, ok := s["endpointPrefix"].(string); ok {
@@ -169,6 +201,9 @@ type converter struct {
 	// xml says bodies are XML: AWS's XML names, attributes and lists are
 	// written as OpenAPI xml notes, and times as text.
 	xml bool
+	// xmlMaps says maps are written in XML as AWS's query protocol does: an
+	// entry element for each, holding its key and value.
+	xmlMaps bool
 }
 
 func (c *converter) operation(id, action string) map[string]any {
@@ -273,6 +308,17 @@ func (c *converter) shapeSchema(s shape) map[string]any {
 		}
 		out = map[string]any{"type": "array", "items": items}
 	case "map":
+		if c.xmlMaps {
+			out = map[string]any{"type": "array", "items": map[string]any{
+				"type": "object",
+				"xml":  map[string]any{"name": "entry"},
+				"properties": map[string]any{
+					c.elementName("key", *s.Key):     c.memberSchema("", *s.Key),
+					c.elementName("value", *s.Value): c.memberSchema("", *s.Value),
+				},
+			}}
+			break
+		}
 		out = map[string]any{"type": "object", "additionalProperties": c.memberSchema("", *s.Value)}
 	case "enum":
 		var values []string
@@ -385,7 +431,7 @@ func (c *converter) xmlNotes(out map[string]any, n string, mb member, kind strin
 			notes["name"] = local
 		}
 	}
-	if kind == "list" || kind == "set" {
+	if kind == "list" || kind == "set" || kind == "map" && c.xmlMaps {
 		notes["wrapped"] = true
 	}
 	if len(notes) > 0 {

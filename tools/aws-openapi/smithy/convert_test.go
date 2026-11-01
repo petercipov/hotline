@@ -231,7 +231,7 @@ var _ = Describe("Converting an AWS JSON service from Smithy to OpenAPI", func()
 	})
 
 	It("refuses a model on a protocol it doesn't know", func() {
-		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#awsQuery")), smithy.Options{})
+		_, err := smithy.Convert([]byte(strings.ReplaceAll(model, "aws.protocols#awsJson1_0", "aws.protocols#ec2Query")), smithy.Options{})
 		Expect(err).To(MatchError(smithy.ErrUnsupported))
 	})
 

@@ -49,12 +49,15 @@ func (c *call) checkRequest(start time.Time) {
 		return
 	}
 	c.reqCheck.begin(start, c.h.clock.Now, func() spec.Checked {
+		body := c.reqBody.copied()
+		c.action = c.api.Spec.BodyAction(c.in.Header.Get("Content-Type"), body)
 		found := c.api.Spec.CheckRequest(spec.Exchange{
 			Method:      c.in.Method,
 			EscapedPath: c.target.EscapedPath(),
 			RawQuery:    c.target.RawQuery,
 			Header:      c.in.Header,
-			Body:        c.reqBody.copied(),
+			Body:        body,
+			Action:      c.action,
 		})
 		c.reqBody.drop()
 		return found
@@ -67,11 +70,17 @@ func (c *call) checkReply(start time.Time, resp *http.Response) {
 		return
 	}
 	c.replyCheck.begin(start, c.h.clock.Now, func() spec.Checked {
+		if c.api.Spec.NamesActionInBody() {
+			// The route is known only once the request body is whole;
+			// finish starts the request check for every call.
+			<-c.reqCheck.done
+		}
 		found := c.api.Spec.CheckReply(spec.Exchange{
 			Method:      c.in.Method,
 			EscapedPath: c.target.EscapedPath(),
 			RawQuery:    c.target.RawQuery,
 			Header:      c.in.Header,
+			Action:      c.action,
 			Status:      resp.StatusCode,
 			ReplyHeader: resp.Header,
 			ReplyBody:   c.respBody.copied(),

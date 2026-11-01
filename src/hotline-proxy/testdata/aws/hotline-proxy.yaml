@@ -17,7 +17,7 @@ telemetry:                         # the proxy's own numbers, to the same collec
     endpoint: *collector
 
 apis:
-  aws-sqs-invoices:                # the invoices queue: checkout sends jobs, the worker takes them
+  aws-sqs-invoices:                # the invoices queue: the order-paid topic puts jobs on it, the worker takes them
     hosts: [sqs.eu-west-1.amazonaws.com]
     spec: ../../../../specs/aws/sqs/2012-11-05.openapi.yaml
     overlays: [./invoices.overlay.yaml]
@@ -79,19 +79,39 @@ apis:
     spec: ../../../../specs/aws/sfn/2016-11-23.openapi.yaml
     overlays: [./credit-note-workflow.overlay.yaml]
 
+  aws-sns-order-paid:              # the order-paid topic: checkout publishes, the invoices queue is subscribed
+    hosts: [sns.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/sns/2010-03-31.openapi.yaml
+    overlays: [./order-paid-topic.overlay.yaml]
+
+  aws-sts-invoice-worker:          # the role the invoices worker takes on when it starts
+    hosts: [sts.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/sts/2011-06-15.openapi.yaml
+    overlays: [./invoice-worker-role.overlay.yaml]
+
+  aws-lambda-payment-qr:           # the function that writes the payment text for the invoice
+    hosts: [lambda.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/lambda/2015-03-31.openapi.yaml
+    overlays: [./payment-qr-function.overlay.yaml]
+
+  aws-ses-invoice-email:           # the invoice email, sent by the mailer
+    hosts: [email.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/sesv2/2019-09-27.openapi.yaml
+    overlays: [./invoice-email.overlay.yaml]
+
 # Each app is one integration: its ID is the user name the app puts in the
 # proxy address, such as http://checkout:x@localhost:8080.
 integrations:
   - id: checkout
-    apis: [aws-secrets-payment, aws-dynamodb-orders, aws-kinesis-shop-events, aws-sqs-invoices, aws-logs-shop]
+    apis: [aws-secrets-payment, aws-dynamodb-orders, aws-kinesis-shop-events, aws-sns-order-paid, aws-logs-shop]
     fingerprintKey: { file: ./shop.key }   # signs this integration's records
 
   - id: invoices
-    apis: [aws-sqs-invoices, aws-ssm-shop, aws-s3-invoices, aws-kms-invoice-signing, aws-dynamodb-invoices, aws-eventbridge-shop, aws-kinesis-shop-events, aws-logs-shop]
+    apis: [aws-sts-invoice-worker, aws-sqs-invoices, aws-ssm-shop, aws-s3-invoices, aws-kms-invoice-signing, aws-dynamodb-invoices, aws-eventbridge-shop, aws-kinesis-shop-events, aws-lambda-payment-qr, aws-logs-shop]
     fingerprintKey: { file: ./shop.key }
 
   - id: mailer
-    apis: [aws-sqs-mail, aws-s3-invoices, aws-logs-shop]
+    apis: [aws-sqs-mail, aws-s3-invoices, aws-ses-invoice-email, aws-logs-shop]
     fingerprintKey: { file: ./shop.key }
 
   - id: refunds

@@ -30,6 +30,8 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 	var (
 		s3          *fakeS3
 		sqs         *fakeSQS
+		apis        *fakeShopAWS
+		mailFrom    string
 		output      string
 		appErr      error
 		fetchedFile string
@@ -53,6 +55,7 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 			"INVOICES_BUCKET=shop-invoices-192325781350",
 			"HOTLINE_PROXY=http://" + w.addr,
 			"HOME=" + w.dir,
+			"MAIL_FROM=" + mailFrom,
 		}
 		out, err := cmd.CombinedOutput()
 		output, appErr = string(out), err
@@ -72,7 +75,7 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 		sqs = &fakeSQS{}
 		w.vendor(sqsHost).setAnswer(sqs.ServeHTTP)
 		w.vendor(bucket + ".s3.eu-west-1.amazonaws.com").setAnswer(s3.ServeHTTP)
-		apis := newFakeShopAWS(sqs)
+		apis = newFakeShopAWS(sqs)
 		for _, host := range shopHosts() {
 			w.vendor(host).setAnswer(apis.ServeHTTP)
 		}
@@ -98,6 +101,32 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 	})
 	sc.Step(`^the mailer works through its queue once$`, func() error {
 		return succeed("mailer", "work", "--once", "--out", filepath.Join(w.dir, "mail"))
+	})
+	sc.Step(`^checkout takes the payment for order (\S+), sending the invoice to (\S+)$`, func(order, to string) error {
+		return succeed("checkout", "pay", "--order", order, "--language", "en", "--template", "invoice-standard-v2", "--send-to", to)
+	})
+	sc.Step(`^checkout publishes the text (.+) to the order-paid topic$`, func(text string) error {
+		return succeed("checkout", "send", "--body", text)
+	})
+	sc.Step(`^the invoices app tries its queue once$`, func() error {
+		return example("invoices", "work", "--once")
+	})
+	sc.Step(`^the mailer sends its queue's emails once with SES, from (\S+)$`, func(from string) error {
+		mailFrom = from
+		return succeed("mailer", "work", "--once")
+	})
+	sc.Step(`^SES got one email for (\S+) with the PDF attached$`, func(order string) error {
+		emails := apis.sent()
+		if len(emails) != 1 || !strings.Contains(emails[0], "application/pdf") || !strings.Contains(emails[0], order) {
+			return failf("SES got %d emails: %q", len(emails), emails)
+		}
+		return nil
+	})
+	sc.Step(`^the invoices queue still holds the job$`, func() error {
+		if n := sqs.waiting(); n != 1 {
+			return failf("the queues hold %d messages, want the one job", n)
+		}
+		return nil
 	})
 	sc.Step(`^refunds starts a credit note of (\S+) for order (\S+)$`, func(amount, order string) error {
 		return succeed("refunds", "start", "--order", order, "--amount", amount, "--reason", "returned")

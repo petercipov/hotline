@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"time"
@@ -36,6 +38,13 @@ var _ = Describe("The aws-shop program", func() {
 		files = fakes3.Start("shop-invoices", aws)
 		aws.Secrets["shop/payment-key"] = "pk_test_123"
 		aws.Parameters["/shop/invoices/default-template"] = "invoice-standard-v2"
+		// The order-paid topic's subscription puts each message on the
+		// invoices queue, unwrapped.
+		aws.OnPublish = func(topic, message string) {
+			if topic == "arn:aws:sns:eu-west-1:192325781350:order-paid" {
+				sqs.Put(invoicesQueue, message)
+			}
+		}
 		stdout, stderr = &bytes.Buffer{}, &bytes.Buffer{}
 		GinkgoT().Setenv("AWS_REGION", "eu-west-1")
 		GinkgoT().Setenv("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE")
@@ -51,7 +60,7 @@ var _ = Describe("The aws-shop program", func() {
 
 	It("runs the whole story: pay, invoice, mail, status and refund", func() {
 		Expect(run("checkout", "pay", "--order", "A-1001", "--language", "sk", "--send-to", "jana@example.com")).To(Equal(0), stderr.String())
-		Expect(stdout.String()).To(ContainSubstring("order A-1001 paid, invoice job m-1"))
+		Expect(stdout.String()).To(ContainSubstring("order A-1001 paid, invoice job p-1"))
 
 		Expect(run("invoices", "work", "--once")).To(Equal(0), stderr.String())
 		Expect(files.File("A-1001.pdf")).To(HavePrefix("%PDF-1.4"))
@@ -93,6 +102,30 @@ var _ = Describe("The aws-shop program", func() {
 		Expect(ids).To(Equal(map[string]bool{"checkout:x": true, "refunds:x": true}))
 	})
 
+	It("sends the email with SES when MAIL_FROM names a sender", func() {
+		GinkgoT().Setenv("MAIL_FROM", "invoices@shop.example")
+		Expect(run("checkout", "pay", "--order", "A-1001", "--language", "en", "--send-to", "success@simulator.amazonses.com")).To(Equal(0), stderr.String())
+		Expect(run("invoices", "work", "--once")).To(Equal(0), stderr.String())
+		var detail map[string]any
+		Expect(json.Unmarshal([]byte(aws.Events()[0]["Detail"].(string)), &detail)).To(Succeed())
+		event, _ := json.Marshal(map[string]any{"detail-type": "InvoiceReady", "source": "shop.invoices", "detail": detail})
+		sqs.Put(mailQueue, string(event))
+		Expect(run("mailer", "work", "--once")).To(Equal(0), stderr.String())
+		Expect(aws.Emails()).To(HaveLen(1))
+		Expect(aws.Emails()[0]).To(HaveKeyWithValue("Destination", map[string]any{"ToAddresses": []any{"success@simulator.amazonses.com"}}))
+	})
+
+	It("takes the new resources' names from their environment variables", func() {
+		GinkgoT().Setenv("ORDER_PAID_TOPIC", "arn:aws:sns:eu-west-1:192325781350:test-topic")
+		GinkgoT().Setenv("INVOICE_WORKER_ROLE", "")
+		GinkgoT().Setenv("PAYMENT_QR_FUNCTION", "")
+		Expect(run("checkout", "pay", "--order", "A-1001", "--language", "en")).To(Equal(0), stderr.String())
+		Expect(aws.Published()[0].TopicArn).To(Equal("arn:aws:sns:eu-west-1:192325781350:test-topic"))
+		sqs.Put(invoicesQueue, aws.Published()[0].Message)
+		Expect(run("invoices", "work", "--once")).To(Equal(0), stderr.String())
+		Expect(aws.Targets()).NotTo(ContainElements("STS.AssumeRole", "Lambda.Invoke"))
+	})
+
 	It("takes each resource's name from its environment variable", func() {
 		GinkgoT().Setenv("ORDERS_TABLE", "orders-test")
 		GinkgoT().Setenv("SHOP_LOG_GROUP", "")
@@ -101,9 +134,9 @@ var _ = Describe("The aws-shop program", func() {
 		Expect(aws.Logs()).To(BeEmpty())
 	})
 
-	It("sends any text unchanged, to try Hotline's checks", func() {
+	It("publishes any text unchanged, to try Hotline's checks", func() {
 		Expect(run("checkout", "send", "--body", `{"schemaVersion":1}`)).To(Equal(0), stderr.String())
-		Expect(sqs.Calls()[0].Body["MessageBody"]).To(Equal(`{"schemaVersion":1}`))
+		Expect(aws.Published()[0].Message).To(Equal(`{"schemaVersion":1}`))
 		Expect(sqs.WaitingIn(invoicesQueue)).To(Equal(1))
 	})
 
@@ -146,10 +179,25 @@ var _ = Describe("The aws-shop program", func() {
 
 		It("can reach a local SQS and S3 without Hotline", func() {
 			GinkgoT().Setenv("HOTLINE_PROXY", "")
+			GinkgoT().Setenv("INVOICE_WORKER_ROLE", "") // the role would come from AWS's own STS
 			Expect(run("invoices", "list", "--s3-endpoint", "http://"+files.Addr)).To(Equal(0))
 			Expect(files.Calls()[0].RequestURI).To(HavePrefix("/shop-invoices?list-type=2"))
-			Expect(run("checkout", "send", "--body", "x", "--endpoint", "http://"+sqs.Addr)).To(Equal(0), stderr.String())
+			Expect(run("mailer", "work", "--once", "--out", GinkgoT().TempDir(), "--endpoint", "http://"+sqs.Addr)).To(Equal(0), stderr.String())
 			Expect(sqs.Calls()[0].RequestURI).To(Equal("/"))
+		})
+
+		It("can reach a local SNS without Hotline", func() {
+			GinkgoT().Setenv("HOTLINE_PROXY", "")
+			local := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				r.Host = "sns.eu-west-1.amazonaws.com" // the fake knows SNS by its host
+				aws.ServeHTTP(w, r)
+			}))
+			defer local.Close()
+			Expect(run("checkout", "send", "--body", "x", "--sns-endpoint", local.URL)).To(Equal(0), stderr.String())
+			Expect(aws.Published()).To(HaveLen(1))
+			GinkgoT().Setenv("SNS_ENDPOINT", local.URL)
+			Expect(run("checkout", "send", "--body", "y")).To(Equal(0), stderr.String())
+			Expect(aws.Published()).To(HaveLen(2))
 		})
 	})
 

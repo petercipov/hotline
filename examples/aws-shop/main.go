@@ -16,19 +16,18 @@ import (
 	"syscall"
 	"time"
 
-	"hotline-example/aws-shop/invoice"
 	"hotline-example/aws-shop/shop"
 )
 
 const usage = `usage:
   aws-shop checkout pay --order A-1001 --language en [--template default] [--send-to EMAIL]
-  aws-shop checkout send --body TEXT          any text to the invoices queue, unchanged: to try Hotline's checks
+  aws-shop checkout send --body TEXT          any text to the order-paid topic, unchanged: to try Hotline's checks
   aws-shop invoices work [--once] [--out FOLDER]
   aws-shop invoices status --order A-1001
   aws-shop invoices fetch --order A-1001 --out FILE
   aws-shop invoices list
   aws-shop invoices cleanup --before 2026-11-01
-  aws-shop mailer work --out FOLDER [--once]
+  aws-shop mailer work [--out FOLDER] [--once]   sends with SES from $MAIL_FROM, or writes to FOLDER
   aws-shop refunds start --order A-1001 --amount 10.00 --reason returned
 
 every command also takes:
@@ -37,11 +36,14 @@ every command also takes:
                      empty: no proxy)
   --endpoint URL     a local SQS instead of AWS (default: $SQS_ENDPOINT)
   --s3-endpoint URL  a local S3 instead of AWS (default: $S3_ENDPOINT)
+  --sns-endpoint URL a local SNS instead of AWS (default: $SNS_ENDPOINT)
 
 AWS resources, each from its environment variable, else Peter's own:
-  INVOICES_QUEUE_URL, MAIL_QUEUE_URL, INVOICES_BUCKET, ORDERS_TABLE, INVOICES_TABLE,
-  SHOP_STREAM, SHOP_BUS, PAYMENT_SECRET, TEMPLATE_PARAMETER, SIGNING_KEY,
-  CREDIT_NOTE_WORKFLOW, SHOP_LOG_GROUP (empty: no CloudWatch Logs)
+  INVOICES_QUEUE_URL, MAIL_QUEUE_URL, ORDER_PAID_TOPIC, INVOICES_BUCKET, ORDERS_TABLE,
+  INVOICES_TABLE, SHOP_STREAM, SHOP_BUS, PAYMENT_SECRET, TEMPLATE_PARAMETER, SIGNING_KEY,
+  CREDIT_NOTE_WORKFLOW, SHOP_LOG_GROUP (empty: no CloudWatch Logs),
+  INVOICE_WORKER_ROLE (empty: no role), PAYMENT_QR_FUNCTION (empty: no payment text),
+  MAIL_FROM (an SES sender; empty: the mailer needs --out)
 `
 
 // commands lists each app's commands.
@@ -62,7 +64,7 @@ func main() {
 }
 
 type options struct {
-	proxy, endpoint, s3Endpoint                          string
+	proxy, endpoint, s3Endpoint, snsEndpoint             string
 	order, language, template, sendTo, body, out, before string
 	amount, reason                                       string
 	once                                                 bool
@@ -82,6 +84,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags.StringVar(&o.proxy, "proxy", os.Getenv("HOTLINE_PROXY"), "")
 	flags.StringVar(&o.endpoint, "endpoint", os.Getenv("SQS_ENDPOINT"), "")
 	flags.StringVar(&o.s3Endpoint, "s3-endpoint", os.Getenv("S3_ENDPOINT"), "")
+	flags.StringVar(&o.snsEndpoint, "sns-endpoint", os.Getenv("SNS_ENDPOINT"), "")
 	flags.StringVar(&o.order, "order", "", "")
 	flags.StringVar(&o.language, "language", "", "")
 	flags.StringVar(&o.template, "template", "default", "")
@@ -105,7 +108,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	a, err := shop.NewApp(ctx, app, shop.Settings{Proxy: o.proxy, SQSEndpoint: o.endpoint, S3Endpoint: o.s3Endpoint}, names())
+	a, err := shop.NewApp(ctx, app, shop.Settings{Proxy: o.proxy, SQSEndpoint: o.endpoint, S3Endpoint: o.s3Endpoint, SNSEndpoint: o.snsEndpoint}, names())
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
@@ -140,8 +143,8 @@ func missingFlags(command string, o options) string {
 		return "--out"
 	case command == "invoices cleanup" && o.before == "":
 		return "--before"
-	case command == "mailer work" && o.out == "":
-		return "--out"
+	case command == "mailer work" && o.out == "" && os.Getenv("MAIL_FROM") == "":
+		return "--out, or MAIL_FROM to send with SES"
 	case command == "refunds start" && (o.order == "" || o.amount == "" || o.reason == ""):
 		return "--order, --amount and --reason"
 	}
@@ -154,6 +157,10 @@ func names() shop.Names {
 	for env, field := range map[string]*string{
 		"INVOICES_QUEUE_URL":   &n.InvoicesQueue,
 		"MAIL_QUEUE_URL":       &n.MailQueue,
+		"ORDER_PAID_TOPIC":     &n.OrderPaidTopic,
+		"INVOICE_WORKER_ROLE":  &n.WorkerRole,
+		"PAYMENT_QR_FUNCTION":  &n.PaymentQRFunction,
+		"MAIL_FROM":            &n.MailFrom,
 		"INVOICES_BUCKET":      &n.Bucket,
 		"ORDERS_TABLE":         &n.OrdersTable,
 		"INVOICES_TABLE":       &n.InvoicesTable,
@@ -182,7 +189,7 @@ func carryOut(ctx context.Context, a shop.App, command string, o options, cutoff
 		}
 		_, _ = fmt.Fprintf(stdout, "order %s paid, invoice job %s\n", o.order, id)
 	case "checkout send":
-		id, err := invoice.Send(ctx, a.SQS, a.Names.InvoicesQueue, o.body)
+		id, err := a.Publish(ctx, o.body)
 		if err != nil {
 			return err
 		}

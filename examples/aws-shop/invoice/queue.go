@@ -98,6 +98,10 @@ type Worker struct {
 	// message is deleted. When it fails, the message stays on the queue to
 	// be tried again.
 	Made func(ctx context.Context, job Job, pdf []byte) error
+	// PaymentText, when set, gives the payment text a bank app reads from
+	// a QR code, printed on the invoice. When it fails, the message stays
+	// on the queue to be tried again.
+	PaymentText func(ctx context.Context, job Job) (string, error)
 
 	seen map[string]bool
 }
@@ -148,7 +152,17 @@ func (w *Worker) handle(ctx context.Context, m types.Message) error {
 	if job.TemplateID == "default" && w.DefaultTemplate != "" {
 		job.TemplateID = w.DefaultTemplate
 	}
-	pdf, err := Render(job)
+	var extra []string
+	if w.PaymentText != nil {
+		text, err := w.PaymentText(ctx, job)
+		if err != nil {
+			return err
+		}
+		if text != "" {
+			extra = append(extra, "", "Pay: "+text)
+		}
+	}
+	pdf, err := Render(job, extra...)
 	if err != nil {
 		w.Log.Warn("message refused", "messageId", aws.ToString(m.MessageId), "eventId", job.EventID, "reason", err.Error())
 		return nil

@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OrderPaidTopicSendsJobs",
+      "Effect": "Allow",
+      "Principal": { "Service": "sns.amazonaws.com" },
+      "Action": "sqs:SendMessage",
+      "Resource": "arn:aws:sqs:eu-west-1:192325781350:invoices",
+      "Condition": { "ArnEquals": { "aws:SourceArn": "arn:aws:sns:eu-west-1:192325781350:order-paid" } }
+    }
+  ]
+}

@@ -19,7 +19,7 @@ All of these take part in the check. The reply is checked the same way: its stat
 - **Both ways.** Requests and replies are checked (spec section 1; capabilities review item 15).
 - **Never in the way.** The call streams through untouched. Each side is checked as soon as it is whole, alongside the call: the request once it is sent, the reply once it has arrived. The app never waits for them, and they never block, change or refuse a call (Peter, 2026-10-31). The proxy only reports; the control plane judges.
 - **Results name the place and the rule, never the value.** They go in `hotline.schema.request.errors` and `hotline.schema.response.errors`, for example `$.amount required missing`.
-- **Skipped checks say why**, in `hotline.schema.skipped`: `body_too_large` (over 1 MiB), `no_spec_route`, `streaming`, `unsupported_content_type`, `overloaded`.
+- **Skipped checks say why**, in `hotline.schema.skipped`: `body_too_large` (over 2 MiB; 1 MiB until 2026-11-01), `no_spec_route`, `streaming`, `unsupported_content_type`, `overloaded`.
 - **Body types.** JSON and form data (`application/x-www-form-urlencoded`, as Stripe uses) are checked. Anything else is skipped with `unsupported_content_type`.
 - **Who gets checked.** Only calls with a known integration and a host in its `apis`. `not-passed` and unknown IDs get a minimal record and no checks.
 - **Spec versions.** Our example specs are OpenAPI 3.1.

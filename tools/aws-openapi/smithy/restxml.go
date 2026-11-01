@@ -46,7 +46,7 @@ func convertRestXML(m model, serviceID string, service shape, options Options) (
 	}
 	c := converter{model: m, schemas: map[string]any{}, options: options, xml: true}
 	var routes []restRoute
-	for _, op := range service.Operations {
+	for _, op := range m.operations(service) {
 		http, _ := m.Shapes[op.Target].Traits["smithy.api#http"].(map[string]any)
 		uri, _ := http["uri"].(string)
 		method, _ := http["method"].(string)
@@ -210,11 +210,11 @@ func (c *converter) ioShape(r *ref) shape {
 }
 
 // parameter is a member sent in the path, the query or a header, nil for
-// one sent elsewhere. The bucket is in the host name, so it is left out.
+// one sent elsewhere. S3's bucket is in the host name, so it is left out.
 func (c *converter) parameter(n string, mb member) map[string]any {
 	var p map[string]any
 	switch {
-	case has(mb.Traits, "smithy.api#httpLabel") && n != "Bucket":
+	case has(mb.Traits, "smithy.api#httpLabel") && (n != "Bucket" || !c.xml):
 		p = map[string]any{"name": n, "in": "path"}
 	case mb.Traits["smithy.api#httpQuery"] != nil:
 		p = map[string]any{"name": mb.Traits["smithy.api#httpQuery"], "in": "query"}

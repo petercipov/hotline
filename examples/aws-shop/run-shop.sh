@@ -3,9 +3,13 @@
 # the AWS resources that already exist (see README.md). It never creates or
 # removes anything.
 #
-#   1. checkout: a customer pays an order; it is saved and announced
-#   2. invoices: the PDF is made, signed, stored, saved and announced
-#   3. mailer:   the invoice is mailed (written to ./mail, for now)
+#   1. checkout: a customer pays an order; it is saved and announced, and
+#                the invoice job is published on the order-paid topic (SNS)
+#   2. invoices: takes on its role (STS), then the PDF is made, with the
+#                payment text from the payment-qr function (Lambda), signed,
+#                stored, saved and announced
+#   3. mailer:   the invoice is sent with SES when MAIL_FROM is set, else
+#                written to ./mail
 #   4. refunds:  a refund starts the credit note workflow
 #   5. two mistakes on purpose, which still reach AWS and which Hotline
 #      reports: a broken invoice job, and a write to a table that is not
@@ -19,7 +23,11 @@
 #
 # Settings:
 #   ORDER        the order to pay (default A-1001)
-#   SEND_TO      where the invoice is mailed (default customer@example.com)
+#   SEND_TO      where the invoice is mailed (default AWS's test inbox,
+#                success@simulator.amazonses.com, which accepts the email
+#                and delivers nothing)
+#   MAIL_FROM    the sender, an address or domain verified in SES (default
+#                empty: the email is written to ./mail, not sent)
 #   WRONG_TABLE  the table for the second mistake (default orders-archive,
 #                a table that doesn't exist, so nothing is written there)
 set -euo pipefail
@@ -27,7 +35,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 export HOTLINE_PROXY="${HOTLINE_PROXY:-http://localhost:8080}"
 order="${ORDER:-A-1001}"
-send_to="${SEND_TO:-customer@example.com}"
+send_to="${SEND_TO:-success@simulator.amazonses.com}"
 wrong_table="${WRONG_TABLE:-orders-archive}"
 
 work="$(mktemp -d)"
@@ -68,12 +76,15 @@ mistake() {
 }
 
 # mailed waits for the shop's EventBridge rule to put InvoiceReady on the
-# mail queue, then mails it.
+# mail queue, then mails it: with SES when MAIL_FROM is set, else to ./mail.
 mailed() {
+  local out=(--out mail)
+  if [[ -n "${MAIL_FROM:-}" ]]; then
+    out=()
+  fi
   for _ in 1 2 3 4 5; do
-    shop mailer work --once --out mail
-    if [[ -f "mail/$order.eml" ]]; then
-      echo "mailed mail/$order.eml"
+    if shop mailer work --once "${out[@]}" 2>&1 | tee "$work/mailer.log" && grep -q "invoice $order mailed" "$work/mailer.log"; then
+      echo "mailed the invoice of $order"
       return 0
     fi
     sleep 2
@@ -101,8 +112,10 @@ cat <<EOF
 Each app is its own integration in Hotline: look for the integration IDs
 checkout, invoices, mailer and refunds in the records. The steps above
 should have no results; the two mistakes should each have one:
-  - the broken job:   body \$.MessageBody.eventId required, and more
+  - the broken job:   body \$.Message.eventId required, and more, on SNS Publish
   - the wrong table:  body \$.TableName const orders
-The broken job stays on the invoices queue, where the worker refuses it
-until SQS moves it to the dead letter queue.
+The topic passes the broken job to the invoices queue. The next time the
+invoices worker runs, its ReceiveMessage is reported too, with
+body \$.Messages[0].Body.eventId required, and the worker leaves the job on
+the queue until SQS moves it to the dead letter queue.
 EOF

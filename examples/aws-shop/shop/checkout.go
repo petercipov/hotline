@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 
 	"hotline-example/aws-shop/invoice"
 )
@@ -28,8 +29,8 @@ var ErrNoPaymentKey = errors.New("the payment key is empty")
 
 // Pay is checkout taking a payment: it reads the payment key (the card
 // charge itself is left out), saves the order, writes order-paid to the
-// stream, and puts the invoice job on the invoices queue. It gives the
-// job's SQS message ID.
+// stream, and publishes the invoice job on the order-paid topic, which
+// hands it to the invoices queue. It gives the job's SNS message ID.
 func (a App) Pay(ctx context.Context, p Payment, now time.Time) (string, error) {
 	secret, err := a.Secrets.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: aws.String(a.Names.PaymentSecret)})
 	if err != nil {
@@ -67,9 +68,19 @@ func (a App) Pay(ctx context.Context, p Payment, now time.Time) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	id, err := invoice.Send(ctx, a.SQS, a.Names.InvoicesQueue, string(body))
+	id, err := a.Publish(ctx, string(body))
 	if err != nil {
 		return "", fmt.Errorf("ask for the invoice: %w", err)
 	}
 	return id, a.note(ctx, "order "+p.OrderID+" paid", "orderId", p.OrderID, "total", total, "currency", currency)
+}
+
+// Publish puts a message on the order-paid topic and gives its SNS
+// message ID.
+func (a App) Publish(ctx context.Context, message string) (string, error) {
+	out, err := a.SNS.Publish(ctx, &sns.PublishInput{TopicArn: aws.String(a.Names.OrderPaidTopic), Message: aws.String(message)})
+	if err != nil {
+		return "", err
+	}
+	return aws.ToString(out.MessageId), nil
 }

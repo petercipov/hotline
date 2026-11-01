@@ -1,0 +1,66 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "TakeJobs",
+      "Effect": "Allow",
+      "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:ChangeMessageVisibility", "sqs:GetQueueAttributes"],
+      "Resource": "arn:aws:sqs:eu-west-1:192325781350:invoices"
+    },
+    {
+      "Sid": "ReadTheDefaultTemplate",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:eu-west-1:192325781350:parameter/shop/invoices/default-template"
+    },
+    {
+      "Sid": "StoreAndFetchInvoices",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::shop-invoices-192325781350/*"
+    },
+    {
+      "Sid": "ListInvoices",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::shop-invoices-192325781350"
+    },
+    {
+      "Sid": "SignInvoices",
+      "Effect": "Allow",
+      "Action": "kms:Sign",
+      "Resource": "arn:aws:kms:eu-west-1:192325781350:key/*",
+      "Condition": { "ForAnyValue:StringEquals": { "kms:ResourceAliases": "alias/invoice-signing" } }
+    },
+    {
+      "Sid": "SaveInvoiceRows",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem"],
+      "Resource": "arn:aws:dynamodb:eu-west-1:192325781350:table/invoices"
+    },
+    {
+      "Sid": "AnnounceInvoices",
+      "Effect": "Allow",
+      "Action": "events:PutEvents",
+      "Resource": "arn:aws:events:eu-west-1:192325781350:event-bus/shop"
+    },
+    {
+      "Sid": "ShopEvents",
+      "Effect": "Allow",
+      "Action": "kinesis:PutRecord",
+      "Resource": "arn:aws:kinesis:eu-west-1:192325781350:stream/shop-events"
+    },
+    {
+      "Sid": "PaymentText",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:eu-west-1:192325781350:function:payment-qr"
+    },
+    {
+      "Sid": "LogLines",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:eu-west-1:192325781350:log-group:/shop/aws-shop:*"
+    }
+  ]
+}
