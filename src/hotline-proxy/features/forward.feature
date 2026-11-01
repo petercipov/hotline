@@ -12,8 +12,8 @@ Feature: Forwarding a call to the vendor
       | an api with TLS origination on, the default         | https://api.talon.one/v2/x  | https  | 443  |
       | an api with TLS origination on, the default         | http://api.talon.one/v2/x   | https  | 443  |
       | an api with tlsOrigination set to false             | http://api.talon.one/v2/x   | http   | 80   |
-      | a not-passed call with the built-in settings        | http://api.x.com/a          | http   | 80   |
-      | a not-passed entry with tlsOrigination set to true  | http://api.x.com/a          | https  | 443  |
+      | a not-passed call with the built-in settings        | http://api.x.com/a          | https  | 443  |
+      | a not-passed entry with tlsOrigination set to false | http://api.x.com/a          | http   | 80   |
 
   Scenario: Upgrading an address with an explicit port
     Given an api with TLS origination on, the default

@@ -182,24 +182,24 @@ func configSteps(sc *godog.ScenarioContext, w *world) {
 	})
 
 	sc.Step(`^a config file with no not-passed entry$`, func() error { return nil })
-	sc.Step(`^not-passed calls use no TLS origination and may go to any host$`, func() error {
-		w.appID = ""
-		if err := w.call("GET", "http://api.x.com/a"); err != nil {
-			return err
-		}
-		return w.calledOver("http", "80")
-	})
-	sc.Step(`^a config file with a not-passed entry that sets tlsOrigination to true$`, func() error {
-		w.addIntegration(integration("talon-shop-a", w.talonAPI("")))
-		w.addIntegration("  - id: not-passed\n    tlsOrigination: true\n")
-		return nil
-	})
-	sc.Step(`^not-passed calls use TLS origination$`, func() error {
+	sc.Step(`^not-passed calls use TLS origination and may go to any host$`, func() error {
 		w.appID = ""
 		if err := w.call("GET", "http://api.x.com/a"); err != nil {
 			return err
 		}
 		return w.calledOver("https", "443")
+	})
+	sc.Step(`^a config file with a not-passed entry that sets tlsOrigination to false$`, func() error {
+		w.addIntegration(integration("talon-shop-a", w.talonAPI("")))
+		w.addIntegration("  - id: not-passed\n    tlsOrigination: false\n")
+		return nil
+	})
+	sc.Step(`^not-passed calls use no TLS origination$`, func() error {
+		w.appID = ""
+		if err := w.call("GET", "http://api.x.com/a"); err != nil {
+			return err
+		}
+		return w.calledOver("http", "80")
 	})
 	sc.Step(`^two integrations that each name an api for api.talon.one, each with its own spec$`, func() error {
 		w.addIntegration(integration("talon-shop-a", w.talonAPI("")))

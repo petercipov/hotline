@@ -65,7 +65,7 @@ None. All nine were answered; see the decisions below.
           - { api: talon-one, vendorTimeout: 5s }   # an integration may change only vendorTimeout
       - id: not-passed                 # calls with no ID or an unknown ID; optional
         # no apis: these settings apply to any host, and these calls are never checked
-        tlsOrigination: true           # built-in default false
+        tlsOrigination: false          # built-in default true since 2026-11-01
         vendorTimeout: 30s             # built-in default 60s
         allowInternalIPs: false        # built-in default false
     ```

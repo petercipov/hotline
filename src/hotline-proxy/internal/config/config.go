@@ -323,7 +323,7 @@ func Load(path string, now time.Time, lookupEnv func(string) (string, bool)) (*C
 		Warnings:     warnings,
 		ProxyAddr:    f.Listen.Proxy,
 		AdminAddr:    f.Listen.Admin,
-		NotPassed:    Settings{VendorTimeout: time.Minute},
+		NotPassed:    Settings{TLSOrigination: true, VendorTimeout: time.Minute},
 		integrations: map[string]map[string]*API{},
 		traces:       map[string]Trace{},
 	}

@@ -82,12 +82,12 @@ Feature: Loading the config file
   Scenario: Built-in not-passed settings
     Given a config file with no not-passed entry
     When the proxy loads it
-    Then not-passed calls use no TLS origination and may go to any host
+    Then not-passed calls use TLS origination and may go to any host
 
   Scenario: A not-passed entry overrides the built-in settings
-    Given a config file with a not-passed entry that sets tlsOrigination to true
+    Given a config file with a not-passed entry that sets tlsOrigination to false
     When the proxy loads it
-    Then not-passed calls use TLS origination
+    Then not-passed calls use no TLS origination
 
   Scenario: The same host in two apis of different integrations
     Given two integrations that each name an api for api.talon.one, each with its own spec

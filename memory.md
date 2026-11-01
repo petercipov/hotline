@@ -62,7 +62,7 @@ Full wording is at the end of [docs/proxy-slice-1.md](docs/proxy-slice-1.md).
 2. A broken `Proxy-Authorization` header counts as no integration ID: `not-passed`.
 3. A path with no route in the spec: `url.full` and `url.template` are left out.
 4. Turning `http` into `https` keeps the app's port.
-5. `not-passed` calls that use `https` stay `https`.
+5. `not-passed` calls that use `https` stay `https`. Since 2026-11-01 calls outside the config (no known ID, or a host outside the integration's apis) also turn `http` into `https`; the `not-passed` entry can set `tlsOrigination: false` (Peter, 2026-11-01, after the shop example called Secrets Manager on port 80).
 6. The proxy adds no forwarding headers.
 7. The config file needs a `version` field. A config without it is refused.
 8. Config checks are lenient: unknown fields are accepted, with a warning log line each.

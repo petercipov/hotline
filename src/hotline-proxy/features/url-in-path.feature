@@ -14,7 +14,7 @@ Feature: The vendor URL in path ingress
     Examples:
       | path                                          | host          | port |
       | /https://api.talon.one/v2/customer_sessions/1 | api.talon.one | 443  |
-      | /http://api.talon.one/v2/customer_sessions/1  | api.talon.one | 80   |
+      | /http://api.talon.one/v2/customer_sessions/1  | api.talon.one | 443  |
       | /https://api.talon.one:8443/v2/x              | api.talon.one | 8443 |
       | /HTTPS://API.TALON.ONE/v2/x                   | api.talon.one | 443  |
 
@@ -47,7 +47,7 @@ Feature: The vendor URL in path ingress
       | an api with TLS origination on, the default  | /http://api.talon.one/v2/x   | https  | 443  |
       | an api with TLS origination on, the default  | /http://api.talon.one:8080/x | https  | 8080 |
       | an api with tlsOrigination set to false      | /http://api.talon.one/v2/x   | http   | 80   |
-      | a not-passed call with the built-in settings | /http://api.x.com/a          | http   | 80   |
+      | a not-passed call with the built-in settings | /http://api.x.com/a          | https  | 443  |
       | a not-passed call with the built-in settings | /https://api.x.com/a         | https  | 443  |
 
   Scenario: The record of a vendor URL in path call

@@ -13,7 +13,7 @@ Feature: Finding the ingress
     Examples:
       | address                                    | host          | port |
       | https://api.talon.one/v2/customer_sessions/1 | api.talon.one | 443  |
-      | http://api.talon.one/v2/customer_sessions/1  | api.talon.one | 80   |
+      | http://api.talon.one/v2/customer_sessions/1  | api.talon.one | 443  |
       | https://api.talon.one:8443/v2/x            | api.talon.one | 8443 |
       | HTTPS://API.TALON.ONE/v2/x                 | api.talon.one | 443  |
 
