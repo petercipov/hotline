@@ -12,7 +12,7 @@ This page lists every mark, what it is for, and an example. Marks live only in o
 | [`x-hotline-record`](#x-hotline-record) | a body field, a call header | copy one safe value into the record |
 | [`x-hotline-body`](#x-hotline-body) | a body's media type | read a vendor's own content type as JSON or XML |
 | [`x-hotline-action-header`](#x-hotline-action-header) | the top of the spec | the header that names the action, when every call has the same path |
-| [`x-hotline-action-field`](#x-hotline-action-field-coming) | the top of the spec | the body field that names the action. Coming with SNS and STS |
+| [`x-hotline-action-field`](#x-hotline-action-field) | the top of the spec | the body field that names the action, when every call has the same path |
 
 ## x-hotline-redact
 
@@ -121,9 +121,7 @@ A call to `/` with `X-Amz-Target: AmazonSQS.SendMessage` matches the first route
 
 Detail: [proxy-aws.md](proxy-aws.md).
 
-## x-hotline-action-field (coming)
-
-*Agreed in the SNS and STS step, 2026-11-01; not built yet.*
+## x-hotline-action-field
 
 **What it's for.** Like `x-hotline-action-header`, but the action is a field of the body, not a header.
 
@@ -138,11 +136,14 @@ paths:
 
 A call whose body is `Action=Publish&TopicArn=...&Message=...` matches `/#Action=Publish`.
 
-**Rules (planned).**
+**Rules.**
 
 1. It goes at the top of the spec. A spec names the action by a header or by a body field, never both.
 2. Only a top-level field of a form or JSON body is read, once the whole body has arrived, and only from bodies up to 2 MiB, the size the proxy keeps for its checks.
 3. With the field missing or unknown, the call has no route (`no_spec_route`). The call is still forwarded unchanged.
+4. A spec with `#Name=value` routes but no mark, or naming another field, is refused.
+
+Detail: [proxy-aws-query.md](proxy-aws-query.md).
 
 ## Other spec words the proxy reads
 

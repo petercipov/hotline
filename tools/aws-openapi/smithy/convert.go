@@ -31,26 +31,26 @@ type model struct {
 }
 
 type shape struct {
-	Type       string            `json:"type"`
-	Version    string            `json:"version"`
-	Operations []ref             `json:"operations"`
+	Type       string `json:"type"`
+	Version    string `json:"version"`
+	Operations []ref  `json:"operations"`
 	// A resource's own operations, and the resources inside a service or
 	// a resource, as Lambda's model groups its actions.
-	Resources            []ref `json:"resources"`
-	CollectionOperations []ref `json:"collectionOperations"`
-	Create               *ref  `json:"create"`
-	Put                  *ref  `json:"put"`
-	Read                 *ref  `json:"read"`
-	Update               *ref  `json:"update"`
-	Delete               *ref  `json:"delete"`
-	List                 *ref  `json:"list"`
-	Input      *ref              `json:"input"`
-	Output     *ref              `json:"output"`
-	Members    map[string]member `json:"members"`
-	Member     *member           `json:"member"`
-	Key        *member           `json:"key"`
-	Value      *member           `json:"value"`
-	Traits     map[string]any    `json:"traits"`
+	Resources            []ref             `json:"resources"`
+	CollectionOperations []ref             `json:"collectionOperations"`
+	Create               *ref              `json:"create"`
+	Put                  *ref              `json:"put"`
+	Read                 *ref              `json:"read"`
+	Update               *ref              `json:"update"`
+	Delete               *ref              `json:"delete"`
+	List                 *ref              `json:"list"`
+	Input                *ref              `json:"input"`
+	Output               *ref              `json:"output"`
+	Members              map[string]member `json:"members"`
+	Member               *member           `json:"member"`
+	Key                  *member           `json:"key"`
+	Value                *member           `json:"value"`
+	Traits               map[string]any    `json:"traits"`
 }
 
 type ref struct {

@@ -24,6 +24,7 @@
 - [Overlays on a spec](proxy-overlays.md)
 - [XML bodies and S3](proxy-xml-bodies.md)
 - [AWS through the proxy](proxy-aws.md)
+- [AWS's query form: routes picked by a body field](proxy-aws-query.md)
 
 ## What the proxy sends
 

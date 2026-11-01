@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PeopleOfThisAccountMayTakeTheRole",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::192325781350:root" },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
