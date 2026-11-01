@@ -68,6 +68,8 @@ export AWS_REGION=eu-west-1 ACCOUNT=192325781350
 
 aws sqs create-queue --queue-name mail
 aws s3 mb s3://shop-invoices-$ACCOUNT
+aws s3api put-public-access-block --bucket shop-invoices-$ACCOUNT \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 for table in orders invoices; do
   aws dynamodb create-table --table-name $table --billing-mode PAY_PER_REQUEST \
     --attribute-definitions AttributeName=orderId,AttributeType=S --key-schema AttributeName=orderId,KeyType=HASH
