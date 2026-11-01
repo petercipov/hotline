@@ -1,0 +1,13 @@
+# The shop's log group on the shared CloudWatch Logs spec (specs/aws/cloudwatch-logs/2014-03-28.openapi.yaml):
+# every app writes its log lines to /shop/aws-shop, one log stream per app.
+overlay: 1.1.0
+info:
+  title: Shop logs
+  version: "1"
+actions:
+  - target: $.components.schemas['PutLogEventsRequest','CreateLogStreamRequest'].properties.logGroupName
+    update:
+      const: /shop/aws-shop
+  - target: $.components.schemas['PutLogEventsRequest','CreateLogStreamRequest'].properties.logStreamName
+    update:
+      enum: [checkout, invoices, mailer, refunds]

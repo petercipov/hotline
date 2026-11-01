@@ -1,11 +1,12 @@
-# Hotline proxy config for the invoices example app (examples/aws-sqs-invoices):
-# its SQS queue and its S3 bucket.
+# Hotline proxy config for the shop example app (examples/aws-shop): four
+# apps, each its own integration, and every AWS resource they use, each an
+# api with the stable shared spec and an overlay naming that resource.
 # The end-to-end test runs the proxy with this file, changing only the
 # addresses, so what you read here is what the test checks.
 
-version: aws-sqs-invoices-1        # carried by every record
+version: aws-shop-1                # carried by every record
 listen:
-  proxy: ":8080"                   # the app sets HOTLINE_PROXY=http://invoices:x@localhost:8080
+  proxy: ":8080"                   # the app sets HOTLINE_PROXY=http://localhost:8080
   admin: ":8081"
 
 exporters:
@@ -17,18 +18,83 @@ telemetry:                         # the proxy's own numbers, to the same collec
     endpoint: *collector
 
 apis:
-  aws-sqs-invoices:                # the invoices queue
+  aws-sqs-invoices:                # the invoices queue: checkout sends jobs, the worker takes them
     hosts: [sqs.eu-west-1.amazonaws.com]
-    spec: ../../../../specs/aws/sqs/2012-11-05.openapi.yaml   # the stable shared SQS spec
-    overlays: [./invoices.overlay.yaml]                     # this queue's URL and job message
+    spec: ../../../../specs/aws/sqs/2012-11-05.openapi.yaml
+    overlays: [./invoices.overlay.yaml]
     vendorTimeout: 25s             # above SQS's 20 second long polling
+
+  aws-sqs-mail:                    # the mail queue, fed by the shop bus
+    hosts: [sqs.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/sqs/2012-11-05.openapi.yaml
+    overlays: [./mail-queue.overlay.yaml]
+    vendorTimeout: 25s
 
   aws-s3-invoices:                 # the invoices bucket
     hosts: [shop-invoices.s3.eu-west-1.amazonaws.com]   # the bucket is in the host name
-    spec: ../../../../specs/aws/s3/2006-03-01.openapi.yaml    # the stable shared S3 spec
-    overlays: [./invoices-bucket.overlay.yaml]              # this bucket's name and file names
+    spec: ../../../../specs/aws/s3/2006-03-01.openapi.yaml
+    overlays: [./invoices-bucket.overlay.yaml]
 
+  aws-dynamodb-orders:             # the orders table
+    hosts: [dynamodb.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/dynamodb/2012-08-10.openapi.yaml
+    overlays: [./orders-table.overlay.yaml]
+
+  aws-dynamodb-invoices:           # the invoices table
+    hosts: [dynamodb.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/dynamodb/2012-08-10.openapi.yaml
+    overlays: [./invoices-table.overlay.yaml]
+
+  aws-kinesis-shop-events:         # the shop-events stream
+    hosts: [kinesis.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/kinesis/2013-12-02.openapi.yaml
+    overlays: [./shop-events-stream.overlay.yaml]
+
+  aws-eventbridge-shop:            # the shop event bus
+    hosts: [events.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/eventbridge/2015-10-07.openapi.yaml
+    overlays: [./shop-bus.overlay.yaml]
+
+  aws-ssm-shop:                    # the shop's settings
+    hosts: [ssm.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/ssm/2014-11-06.openapi.yaml
+    overlays: [./shop-settings.overlay.yaml]
+
+  aws-secrets-payment:             # the payment key
+    hosts: [secretsmanager.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/secrets-manager/2017-10-17.openapi.yaml
+    overlays: [./payment-secret.overlay.yaml]
+
+  aws-kms-invoice-signing:         # the invoice signing key
+    hosts: [kms.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/kms/2014-11-01.openapi.yaml
+    overlays: [./invoice-signing-key.overlay.yaml]
+
+  aws-logs-shop:                   # the shop's log group
+    hosts: [logs.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/cloudwatch-logs/2014-03-28.openapi.yaml
+    overlays: [./shop-logs.overlay.yaml]
+
+  aws-sfn-credit-note:             # the credit note workflow
+    hosts: [states.eu-west-1.amazonaws.com]
+    spec: ../../../../specs/aws/sfn/2016-11-23.openapi.yaml
+    overlays: [./credit-note-workflow.overlay.yaml]
+
+# Each app is one integration: its ID is the user name the app puts in the
+# proxy address, such as http://checkout:x@localhost:8080.
 integrations:
-  - id: invoices                   # the user name in HOTLINE_PROXY
-    apis: [aws-sqs-invoices, aws-s3-invoices]
-    fingerprintKey: { file: ./invoices.key }   # signs this integration's records
+  - id: checkout
+    apis: [aws-secrets-payment, aws-dynamodb-orders, aws-kinesis-shop-events, aws-sqs-invoices, aws-logs-shop]
+    fingerprintKey: { file: ./shop.key }   # signs this integration's records
+
+  - id: invoices
+    apis: [aws-sqs-invoices, aws-ssm-shop, aws-s3-invoices, aws-kms-invoice-signing, aws-dynamodb-invoices, aws-eventbridge-shop, aws-kinesis-shop-events, aws-logs-shop]
+    fingerprintKey: { file: ./shop.key }
+
+  - id: mailer
+    apis: [aws-sqs-mail, aws-s3-invoices, aws-logs-shop]
+    fingerprintKey: { file: ./shop.key }
+
+  - id: refunds
+    apis: [aws-dynamodb-orders, aws-sfn-credit-note, aws-logs-shop]
+    fingerprintKey: { file: ./shop.key }

@@ -1,0 +1,19 @@
+# The invoice signing key on the shared KMS spec (specs/aws/kms/2014-11-01.openapi.yaml):
+# the invoices worker signs each PDF's SHA-256 fingerprint with this key.
+overlay: 1.1.0
+info:
+  title: Invoice signing key
+  version: "1"
+actions:
+  - target: $.components.schemas.SignRequest
+    update:
+      required: [MessageType]           # added to KeyId, Message and SigningAlgorithm
+  - target: $.components.schemas.SignRequest.properties.KeyId
+    update:
+      const: alias/invoice-signing
+  - target: $.components.schemas.SignRequest.properties.MessageType
+    update:
+      const: DIGEST
+  - target: $.components.schemas.SignRequest.properties.SigningAlgorithm
+    update:
+      const: ECDSA_SHA_256

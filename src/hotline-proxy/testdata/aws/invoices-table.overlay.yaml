@@ -1,0 +1,39 @@
+# The invoices table on the shared DynamoDB spec (specs/aws/dynamodb/2012-08-10.openapi.yaml):
+# its name, and the shape of one invoice row, saved by the invoices worker
+# once the PDF is stored. DynamoDB writes every value with its type, such as
+# {"S": "A-1001"} for text and {"N": "1"} for a number, which travels as text.
+overlay: 1.1.0
+info:
+  title: Invoices table
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      InvoiceRow:
+        type: object
+        additionalProperties: false
+        required: [orderId, eventId, templateId, language, file, pages, signature, createdAt]
+        properties:
+          orderId: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, pattern: '^[A-Z]-[0-9]+$' } } }
+          eventId: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, format: uuid } } }
+          templateId: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, pattern: '^[a-z0-9-]+$' } } }
+          language: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, enum: [en, de, sk, cs] } } }
+          file: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, pattern: '^[A-Z]-[0-9]+\.pdf$' } } }
+          pages: { type: object, additionalProperties: false, required: [N], properties: { N: { type: string, pattern: '^[1-9][0-9]*$' } } }
+          signature: { type: object, additionalProperties: false, required: [B], properties: { B: { type: string, contentEncoding: base64 } } }
+          createdAt: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, format: date-time } } }
+      InvoiceKey:
+        type: object
+        additionalProperties: false
+        required: [orderId]
+        properties:
+          orderId: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, pattern: '^[A-Z]-[0-9]+$' } } }
+  - target: $.components.schemas.*.properties.TableName
+    update:
+      const: invoices
+  - target: $.components.schemas['PutItemInput','GetItemOutput'].properties.Item
+    update:
+      allOf: [{ $ref: '#/components/schemas/InvoiceRow' }]
+  - target: $.components.schemas['GetItemInput','DeleteItemInput','UpdateItemInput'].properties.Key
+    update:
+      allOf: [{ $ref: '#/components/schemas/InvoiceKey' }]

@@ -1,0 +1,38 @@
+# The shop event bus on the shared EventBridge spec (specs/aws/eventbridge/2015-10-07.openapi.yaml):
+# every event goes to the bus "shop". The invoices worker announces a ready
+# invoice as the event InvoiceReady from shop.invoices; its Detail is JSON
+# text, checked like an SQS message.
+overlay: 1.1.0
+info:
+  title: Shop event bus
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      InvoiceReady:
+        type: object
+        additionalProperties: false
+        required: [orderId, eventId, file, language, createdAt]
+        properties:
+          orderId: { type: string, pattern: '^[A-Z]-[0-9]+$' }
+          eventId: { type: string, format: uuid }
+          file: { type: string, pattern: '^[A-Z]-[0-9]+\.pdf$' }
+          language: { type: string, enum: [en, de, sk, cs] }
+          sendTo: { type: string, format: email }
+          createdAt: { type: string, format: date-time }
+  - target: $.components.schemas.PutEventsRequestEntry
+    update:
+      required: [EventBusName, Source, DetailType, Detail]
+  - target: $.components.schemas.PutEventsRequestEntry.properties.EventBusName
+    update:
+      const: shop
+  - target: $.components.schemas.PutEventsRequestEntry.properties.Source
+    update:
+      const: shop.invoices
+  - target: $.components.schemas.PutEventsRequestEntry.properties.DetailType
+    update:
+      const: InvoiceReady
+  - target: $.components.schemas.PutEventsRequestEntry.properties.Detail
+    update:
+      contentMediaType: application/json
+      contentSchema: { $ref: '#/components/schemas/InvoiceReady' }

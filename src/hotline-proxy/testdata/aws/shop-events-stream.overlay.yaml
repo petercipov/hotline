@@ -1,0 +1,31 @@
+# The shop-events stream on the shared Kinesis spec (specs/aws/kinesis/2013-12-02.openapi.yaml):
+# its name, and the shop event inside every record. A record's Data is
+# base64 text (bytes written as letters); here those bytes are JSON, so the
+# proxy decodes the text and checks the JSON. Checkout writes "order-paid",
+# the invoices worker writes "invoice-made".
+overlay: 1.1.0
+info:
+  title: Shop events stream
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      ShopEvent:
+        type: object
+        additionalProperties: false
+        required: [type, orderId, at]
+        properties:
+          type: { type: string, enum: [order-paid, invoice-made] }
+          orderId: { type: string, pattern: '^[A-Z]-[0-9]+$' }
+          at: { type: string, format: date-time }
+          total: { type: string, pattern: '^[0-9]+\.[0-9]{2}$' }
+          pages: { type: integer, minimum: 1 }
+          renderMs: { type: integer, minimum: 0 }
+  - target: $.components.schemas.*.properties.StreamName
+    update:
+      const: shop-events
+  - target: $.components.schemas['PutRecordInput','PutRecordsRequestEntry'].properties.Data
+    update:
+      contentEncoding: base64
+      contentMediaType: application/json
+      contentSchema: { $ref: '#/components/schemas/ShopEvent' }

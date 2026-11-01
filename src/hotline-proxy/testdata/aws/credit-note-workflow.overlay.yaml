@@ -1,0 +1,28 @@
+# The credit note workflow on the shared Step Functions spec (specs/aws/sfn/2016-11-23.openapi.yaml):
+# refunds starts it, with the refund as JSON text in input.
+overlay: 1.1.0
+info:
+  title: Credit note workflow
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      Refund:
+        type: object
+        additionalProperties: false
+        required: [orderId, amount, currency, reason]
+        properties:
+          orderId: { type: string, pattern: '^[A-Z]-[0-9]+$' }
+          amount: { type: string, pattern: '^[0-9]+\.[0-9]{2}$' }
+          currency: { type: string, enum: [EUR, CZK, USD] }
+          reason: { type: string, enum: [returned, damaged, late, other] }
+  - target: $.components.schemas.StartExecutionInput
+    update:
+      required: [input]                 # added to stateMachineArn
+  - target: $.components.schemas.StartExecutionInput.properties.stateMachineArn
+    update:
+      const: arn:aws:states:eu-west-1:192325781350:stateMachine:credit-note
+  - target: $.components.schemas.StartExecutionInput.properties.input
+    update:
+      contentMediaType: application/json
+      contentSchema: { $ref: '#/components/schemas/Refund' }

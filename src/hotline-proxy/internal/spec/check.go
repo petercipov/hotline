@@ -594,6 +594,9 @@ func validate(s *jsonschema.Schema, instance any, part, base string) []Result {
 		case *kind.ContentMediaType:
 			// A string that should hold JSON doesn't.
 			results = append(results, Result{Part: part, Place: place, Rule: "json"})
+		case *kind.ContentEncoding:
+			// A string that should be base64 text isn't.
+			results = append(results, Result{Part: part, Place: place, Rule: "base64"})
 		default:
 			results = append(results, Result{Part: part, Place: place, Rule: rule(e.ErrorKind), Expected: expected(e.ErrorKind)})
 		}

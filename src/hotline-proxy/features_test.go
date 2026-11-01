@@ -70,6 +70,7 @@ func initializeScenario(sc *godog.ScenarioContext, app *exampleApp) {
 	connectSteps(sc, w)
 	overlaySteps(sc, w)
 	awsSteps(sc, w)
+	shopSteps(sc, w)
 	xmlSteps(sc, w)
 	routeSteps(sc, w)
 	s3Steps(sc, w, app)
