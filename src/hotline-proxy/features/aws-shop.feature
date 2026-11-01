@@ -120,3 +120,25 @@ Feature: The shop's AWS apis through the proxy
         | aws-ssm-shop            | AmazonSSM.GetParameter         | {"Name":"/shop/other"} | body $.Name const /shop/invoices/default-template |
         | aws-kms-invoice-signing | TrentService.Sign              | {"KeyId":"alias/other","Message":"AAAA","MessageType":"DIGEST","SigningAlgorithm":"ECDSA_SHA_256"} | body $.KeyId const alias/invoice-signing |
         | aws-logs-shop           | Logs_20140328.PutLogEvents     | {"logGroupName":"/shop/aws-shop","logStreamName":"payments","logEvents":[{"timestamp":1793527200000,"message":"hello"}]} | body $.logStreamName enum checkout, invoices, mailer, refunds |
+
+  Rule: The whole story goes through Hotline, each app as its own integration
+
+    The apps run as the real aws-shop program and talk to AWS's real host
+    names; the proxy, with testdata/aws/hotline-proxy.yaml (only its
+    addresses changed), reaches a fake AWS by them. Like the shop's
+    EventBridge rule, the fake puts each InvoiceReady event on the mail
+    queue (Peter, 2026-11-01).
+
+    Background:
+      Given a fake AWS for the shop, with the bucket shop-invoices
+      And the proxy runs with the shop's hotline-proxy.yaml
+
+    Scenario: An order is paid, invoiced, mailed and refunded, with no results
+      When checkout takes the payment for order A-1001
+      And the invoices app works through its queue once, into the bucket
+      And the mailer works through its queue once
+      And refunds starts a credit note of 10.00 for order A-1001
+      Then the mailer wrote A-1001.eml with the PDF attached
+      And both queues are empty
+      And every record has no results
+      And the records come from the integrations checkout, invoices, mailer and refunds

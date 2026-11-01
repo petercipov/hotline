@@ -5,10 +5,8 @@ package proxy_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
-	"slices"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,10 +16,7 @@ import (
 const invoicesQueueURL = "https://sqs.eu-west-1.amazonaws.com/192325781350/invoices"
 
 func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
-	var (
-		sqs *fakeSQS
-		out string
-	)
+	var sqs *fakeSQS
 	sc.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
 		if sqs != nil {
 			sqs.server.Close()
@@ -33,7 +28,7 @@ func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 		sqs = newFakeSQS(p.issuer.leaf("localhost", time.Now().Add(24*time.Hour), false))
 		return nil
 	})
-	sc.Step(`^the hotline-proxy program runs with the invoices hotline-proxy.yaml$`, func() error {
+	sc.Step(`^the hotline-proxy program runs with the shop's hotline-proxy.yaml$`, func() error {
 		p.pickPorts()
 		config, err := exampleConfig(p.proxyAddr, p.receiver.endpoint)
 		if err != nil {
@@ -55,7 +50,7 @@ func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 			"AWS_SECRET_ACCESS_KEY=secret",
 			"AWS_EC2_METADATA_DISABLED=true",
 			"INVOICES_QUEUE_URL=" + invoicesQueueURL,
-			"HOTLINE_PROXY=http://invoices:x@" + p.proxyAddr,
+			"HOTLINE_PROXY=http://" + p.proxyAddr,
 			"SQS_ENDPOINT=https://localhost:" + port(sqs.server),
 			"HOME=" + p.dir,
 		}
@@ -64,31 +59,8 @@ func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 		}
 		return nil
 	}
-	sc.Step(`^the example app requests the invoice for order (\S+)$`, func(order string) error {
-		return example("request", "--order", order, "--template", "invoice-standard-v2", "--language", "en")
-	})
-	sc.Step(`^the example app sends the message (.+)$`, func(body string) error {
-		return example("send", "--body", body)
-	})
-	sc.Step(`^the example app works through the queue once$`, func() error {
-		out = filepath.Join(p.dir, "invoices")
-		if err := os.MkdirAll(out, 0o750); err != nil {
-			return err
-		}
-		return example("work", "--out", out, "--once")
-	})
-	sc.Step(`^the worker wrote (\S+)$`, func(name string) error {
-		data, err := os.ReadFile(filepath.Join(out, name)) //nolint:gosec // the test's own folder
-		if err != nil || !strings.HasPrefix(string(data), "%PDF-") {
-			return failf("the worker wrote no PDF %s: %v", name, err)
-		}
-		return nil
-	})
-	sc.Step(`^the fake SQS has no messages left$`, func() error {
-		if n := sqs.waiting(); n != 0 {
-			return failf("the fake SQS still has %d messages", n)
-		}
-		return nil
+	sc.Step(`^checkout sends the message (.+)$`, func(body string) error {
+		return example("checkout", "send", "--body", body)
 	})
 	sc.Step(`^the fake SQS has (\d+) messages? waiting$`, func(n int) error {
 		if got := sqs.waiting(); got != n {
@@ -110,23 +82,17 @@ func sqsScenario(sc *godog.ScenarioContext, p *program, app *exampleApp) {
 		}
 		return nil
 	})
-	sc.Step(`^the receiver got records for SendMessage, ReceiveMessage and DeleteMessage, each with its url.template and no results$`, func() error {
+	sc.Step(`^the receiver got one SendMessage record from the integration checkout, with no results$`, func() error {
 		records, err := p.records()
 		if err != nil {
 			return err
 		}
-		var templates []string
-		for _, r := range records {
-			templates = append(templates, fmt.Sprint(r["url.template"]))
-			for _, key := range []string{"hotline.schema.request.errors", "hotline.schema.response.errors", "hotline.schema.skipped"} {
-				if v, found := r[key]; found {
-					return failf("the record for %v has %s %v", r["url.template"], key, v)
-				}
-			}
+		if len(records) != 1 || records[0]["url.template"] != "/#X-Amz-Target=AmazonSQS.SendMessage" || records[0]["hotline.integration.id"] != "checkout" {
+			return failf("want one SendMessage record from checkout, got %v", records)
 		}
-		for _, action := range []string{"SendMessage", "ReceiveMessage", "DeleteMessage"} {
-			if !slices.Contains(templates, "/#X-Amz-Target=AmazonSQS."+action) {
-				return failf("no record for %s; the records have the templates %v", action, templates)
+		for _, key := range []string{"hotline.schema.request.errors", "hotline.schema.response.errors", "hotline.schema.skipped"} {
+			if v, found := records[0][key]; found {
+				return failf("the record has %s %v", key, v)
 			}
 		}
 		return nil
@@ -173,12 +139,22 @@ func (p *program) records() ([]map[string]any, error) {
 }
 
 // exampleConfig is testdata/aws/hotline-proxy.yaml with only the
-// addresses changed: the local ports, the fake SQS on localhost (an internal
-// address), and the spec and overlays read from where they are in the repo.
+// addresses changed: the local ports, the invoices queue on the fake SQS on
+// localhost (an internal address), and the specs, overlays and key read
+// from where they are in the repo. The other AWS hosts stay as they are, so
+// only the invoices queue can be reached.
 func exampleConfig(proxyAddr, otlpEndpoint string) (string, error) {
-	return invoicesConfig(
+	config, err := shopConfig(
 		[2]string{`":8080"`, fmt.Sprintf("%q", proxyAddr)},
 		[2]string{"localhost:4317", otlpEndpoint},
-		[2]string{"[sqs.eu-west-1.amazonaws.com]", "[localhost]\n    allowInternalIPs: true"},
 	)
+	if err != nil {
+		return "", err
+	}
+	// The host line of the invoices queue's api; the mail queue has the same host.
+	invoicesQueueHost := regexp.MustCompile(`(?m)^(  aws-sqs-invoices:.*\n    hosts: )\[sqs\.eu-west-1\.amazonaws\.com\]`)
+	if !invoicesQueueHost.MatchString(config) {
+		return "", failf("the example config no longer names the invoices queue's host")
+	}
+	return invoicesQueueHost.ReplaceAllString(config, "${1}[localhost]\n    allowInternalIPs: true"), nil
 }
