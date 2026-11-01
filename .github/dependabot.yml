@@ -1,0 +1,8 @@
+# Keeps the pinned base images in the proxy's Dockerfile up to date, so the
+# image gets Debian's security fixes (Peter, 2026-11-01).
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /src/hotline-proxy
+    schedule:
+      interval: weekly

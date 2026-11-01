@@ -271,7 +271,15 @@ func logProblems(logger *slog.Logger, msg string, err error) {
 }
 
 // version is the module version Go records when it builds the program.
+// buildVersion is the release's git tag, such as v0.1.0, set when the
+// program is built: go build -ldflags "-X main.buildVersion=v0.1.0".
+var buildVersion string //nolint:gochecknoglobals // go build -ldflags -X can only set a package variable
+
+// version is buildVersion, or else the version Go recorded at build time.
 func version() string {
+	if buildVersion != "" {
+		return buildVersion
+	}
 	info, _ := debug.ReadBuildInfo()
 	return info.Main.Version
 }

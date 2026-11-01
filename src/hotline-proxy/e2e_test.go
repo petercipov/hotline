@@ -167,7 +167,28 @@ func programScenario(sc *godog.ScenarioContext, binary string) *program {
 		return nil
 	})
 
+	// Building the program the way the image does.
+	sc.Step(`^hotline-proxy is built with version "([^"]*)"$`, func(v string) error {
+		p.binary = filepath.Join(p.dir, "hotline-proxy")
+		args := []string{"build", "-o", p.binary, "-ldflags", "-X main.buildVersion=" + v}
+		if os.Getenv("GOCOVERDIR") != "" {
+			// make e2e: this program records its coverage like the main one.
+			args = append(args, "-cover", "-covermode=atomic", "-coverpkg=./...")
+		}
+		build := exec.CommandContext(context.Background(), "go", append(args, "hotline-proxy/cmd")...) //nolint:gosec // builds the program under test
+		if out, err := build.CombinedOutput(); err != nil {
+			return failf("building hotline-proxy failed: %v\n%s", err, out)
+		}
+		return nil
+	})
+
 	// Its output.
+	sc.Step(`^standard output is "([^"]*)"$`, func(text string) error {
+		if got := strings.TrimSuffix(p.stdout.String(), "\n"); got != text {
+			return failf("standard output is %q", p.stdout.String())
+		}
+		return nil
+	})
 	sc.Step(`^standard output starts with "([^"]*)"$`, func(text string) error {
 		if !strings.HasPrefix(p.stdout.String(), text) {
 			return failf("standard output is %q", p.stdout.String())

@@ -14,6 +14,15 @@ Feature: The hotline-proxy program
     Then it exits with code 0
     And standard output starts with "hotline-proxy "
 
+  Scenario: The version given when the program is built is printed
+    The image build passes the release's git tag, such as v0.1.0, so the
+    program in the image prints it (Peter, 2026-11-01).
+
+    Given hotline-proxy is built with version "v0.1.0"
+    When hotline-proxy is run with "version"
+    Then it exits with code 0
+    And standard output is "hotline-proxy v0.1.0"
+
   Scenario: Help is printed on request
     When hotline-proxy is run with "run --help"
     Then it exits with code 0

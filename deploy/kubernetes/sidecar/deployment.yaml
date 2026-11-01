@@ -1,0 +1,63 @@
+# An app with the Hotline proxy next to it, in the same pod. The proxy is a
+# native sidecar (an init container that keeps running), so it starts
+# before the app and stops after it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: checkout }
+  template:
+    metadata:
+      labels: { app: checkout }
+    spec:
+      terminationGracePeriodSeconds: 30   # above the proxy's 25 second stop
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: hotline-proxy
+          image: ghcr.io/petercipov/hotline-proxy:0.1.0
+          restartPolicy: Always           # a native sidecar
+          args: ["run", "--config", "/etc/hotline/config/hotline-proxy.yaml"]
+          env:
+            # Go does not see the container's memory limit by itself. Set
+            # this a little under it, so Go cleans up harder before
+            # Kubernetes would kill the proxy (Peter, 2026-11-01).
+            - { name: GOMEMLIMIT, value: 230MiB }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 256Mi }
+          ports:
+            - { name: proxy, containerPort: 8080 }
+          startupProbe:
+            httpGet: { path: /readyz, port: 8081 }
+            periodSeconds: 1
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /livez, port: 8081 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8081 }
+            periodSeconds: 2
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: config, mountPath: /etc/hotline/config, readOnly: true }
+            - { name: keys, mountPath: /etc/hotline/keys, readOnly: true }
+      containers:
+        - name: checkout
+          image: example.com/checkout:1.0.0   # your app
+          env:
+            # The integration ID is the user name in the proxy address.
+            - { name: HTTP_PROXY, value: "http://checkout:x@localhost:8080" }
+            - { name: HTTPS_PROXY, value: "http://checkout:x@localhost:8080" }
+      volumes:
+        - name: config
+          configMap: { name: hotline-proxy-config }
+        - name: keys
+          secret: { secretName: hotline-proxy-keys }
