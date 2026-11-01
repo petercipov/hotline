@@ -86,7 +86,7 @@ Feature: Each record is signed
       Then hotline.response.body.signature is the HMAC of the body the app got, with the key
 
     Scenario: A body larger than the copy kept for the checks is signed whole
-      When the app sends POST /orders with "Idempotency-Key: k1" and a json body of 2 MiB
+      When the app sends POST /orders with "Idempotency-Key: k1" and a json body of 3 MiB
       Then hotline.request.body.signature is the HMAC of the body the vendor got, with the key
 
     Scenario: No body, no body signature

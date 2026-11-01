@@ -38,7 +38,7 @@ Feature: Checking calls against the vendor's spec
         | 201                                                            | POST /orders with "Idempotency-Key: k1" and the json body {"item":"A1","quantity":2} | valid   | ok      | ok    |
         | 400                                                            | GET /orders?limit=abc                                                                | invalid | error   | ok    |
         | 418                                                            | GET /orders                                                                          | invalid | ok      | error |
-        | 201                                                            | POST /orders with "Idempotency-Key: k1" and a json body of 2 MiB                     | skipped | unset   | ok    |
+        | 201                                                            | POST /orders with "Idempotency-Key: k1" and a json body of 3 MiB                     | skipped | unset   | ok    |
         | 200 with "Content-Type: text/event-stream" and the body data: x | GET /orders                                                                          | skipped | ok      | unset |
 
     Scenario: A call that got no reply has no reply check
@@ -128,8 +128,8 @@ Feature: Checking calls against the vendor's spec
       Then the record says hotline.schema.skipped=unsupported_content_type
       And the record has no request results
 
-    Scenario: A body larger than 1 MiB is not checked
-      When the app sends POST /orders with "Idempotency-Key: k1" and a json body of 2 MiB
+    Scenario: A body larger than 2 MiB is not checked
+      When the app sends POST /orders with "Idempotency-Key: k1" and a json body of 3 MiB
       Then the record says hotline.schema.skipped=body_too_large
       And the record has no request results
 

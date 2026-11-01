@@ -73,6 +73,7 @@ func initializeScenario(sc *godog.ScenarioContext, app *exampleApp) {
 	shopSteps(sc, w)
 	xmlSteps(sc, w)
 	routeSteps(sc, w)
+	bodyRouteSteps(sc, w)
 	s3Steps(sc, w, app)
 	traceSteps(sc, w)
 	reloadSteps(sc, w)

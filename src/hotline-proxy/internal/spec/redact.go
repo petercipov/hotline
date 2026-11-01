@@ -17,6 +17,9 @@ type Call struct {
 	RawQuery     string
 	Header       http.Header
 	ReplyHeaders http.Header
+	// Action is what the request body names as the action, from
+	// BodyAction, for a spec that picks routes by a body field.
+	Action string
 }
 
 // Redacted is the part of a record that the spec decides. URLFull and
@@ -35,7 +38,7 @@ const redacted = "REDACTED"
 // values are redacted unless marked x-hotline-redact false. Headers are kept
 // only when on the default list or marked; secrets never are.
 func (s *Spec) Redact(c Call) Redacted {
-	r := s.match(c.Method, c.EscapedPath, c.RawQuery, c.Header)
+	r := s.match(c.Method, c.EscapedPath, c.RawQuery, c.Header, c.Action)
 	redacted := Redacted{
 		Header:       s.headers(c.Header, r.marks["header"]),
 		ReplyHeaders: s.headers(c.ReplyHeaders, r.marks["reply"]),
@@ -59,15 +62,19 @@ func (s *Spec) Redact(c Call) Redacted {
 // match finds the route for a call. A fixed segment wins over a templated
 // one, which wins over one that takes the rest of the path, and a trailing
 // slash makes no difference. A route named by the action header matches
-// only when the header has exactly its value; one named by query words
-// only when the query has each of them, with the value given. Either wins
-// over the same path without them. With no route, it returns a route with
+// only when the header has exactly its value, one named by a body field
+// only when bodyAction, read from the body, is exactly its value, and one
+// named by query words only when the query has each of them, with the
+// value given. Each wins over the same path without them. With no route, it returns a route with
 // no segments and no marks.
-func (s *Spec) match(method, escapedPath, rawQuery string, header http.Header) route {
+func (s *Spec) match(method, escapedPath, rawQuery string, header http.Header, bodyAction string) route {
 	segments := strings.Split(strings.TrimSuffix(escapedPath, "/"), "/")
 	action := ""
-	if s.actionHeader != "" {
+	switch {
+	case s.actionHeader != "":
 		action = header.Get(s.actionHeader)
+	case s.actionField != "":
+		action = bodyAction
 	}
 	query, _ := url.ParseQuery(rawQuery)
 	best := route{marks: map[string]map[string]mark{}}

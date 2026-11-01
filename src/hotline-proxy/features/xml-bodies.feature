@@ -131,7 +131,7 @@ Feature: Checking XML bodies
         | <note>anything</note> | the record has no request results  |
 
     Scenario: A body over the copy limit is skipped
-      Given the files vendor answers 200 with an application/xml list of 2 MiB
+      Given the files vendor answers 200 with an application/xml list of 3 MiB
       When the app sends GET /?list-type=2 to the files vendor
       Then the record says hotline.schema.skipped=body_too_large
       And the record has no reply results

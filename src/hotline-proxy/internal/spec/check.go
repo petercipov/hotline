@@ -43,6 +43,9 @@ type Exchange struct {
 	RawQuery    string
 	Header      http.Header
 	Body        Body
+	// Action is what the request body names as the action, from
+	// BodyAction, for a spec that picks routes by a body field.
+	Action string
 	// Status is 0 when no reply came.
 	Status      int
 	ReplyHeader http.Header
@@ -141,7 +144,7 @@ func (c Checked) With(reply Checked) Checked {
 // and body. It can run as soon as the request has been sent (Peter,
 // 2026-10-31).
 func (s *Spec) CheckRequest(e Exchange) Checked {
-	r := s.match(e.Method, e.EscapedPath, e.RawQuery, e.Header)
+	r := s.match(e.Method, e.EscapedPath, e.RawQuery, e.Header, e.Action)
 	if r.segments == nil {
 		return Checked{Skipped: "no_spec_route"}
 	}
@@ -169,7 +172,7 @@ func (s *Spec) CheckRequest(e Exchange) Checked {
 // CheckReply checks the reply side of a call: its status, headers and
 // body. It can run as soon as the reply has arrived (Peter, 2026-10-31).
 func (s *Spec) CheckReply(e Exchange) Checked {
-	r := s.match(e.Method, e.EscapedPath, e.RawQuery, e.Header)
+	r := s.match(e.Method, e.EscapedPath, e.RawQuery, e.Header, e.Action)
 	if r.segments == nil {
 		return Checked{Skipped: "no_spec_route"}
 	}
