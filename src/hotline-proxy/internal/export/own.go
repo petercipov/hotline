@@ -34,7 +34,7 @@ func NewOwn(t *config.Telemetry, roots *x509.CertPool, service Service, timing T
 	options := []sdkmetric.Option{
 		sdkmetric.WithResource(describe(service, t.Exporter.Resource)),
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricSender(t.Exporter, roots, timing),
-			sdkmetric.WithInterval(timing.Interval),
+			sdkmetric.WithInterval(t.Exporter.MetricInterval),
 			sdkmetric.WithTimeout(timing.Timeout))),
 	}
 	// Four of the runtime's numbers are enough (Peter, 2026-11-01).

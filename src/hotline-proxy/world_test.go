@@ -56,6 +56,13 @@ type world struct {
 	downEndpoints []string
 	// exporterExtra are more lines for the exporter of each receiver.
 	exporterExtra []string
+	// unsetIntervals leaves the intervals out of the exporters, and
+	// unsetOwnInterval out of the telemetry section, so the defaults apply.
+	// Otherwise everything is sent every 20ms, to keep tests quick.
+	unsetIntervals   bool
+	unsetOwnInterval bool
+	// telemetryExtra are more lines for the telemetry section's otlp.
+	telemetryExtra string
 	// env is the proxy's environment.
 	env map[string]string
 	// processEnv are variables set in the test process itself, unset with
@@ -102,8 +109,6 @@ type world struct {
 	problem string
 	// parameter is the spec parameter a scenario is about.
 	parameter string
-	// exportInterval is how often the proxy sends; 20ms unless set.
-	exportInterval time.Duration
 	// freed, when closed, lets the first of two calls end.
 	freed chan struct{}
 	// quiet, when closed, lets a quiet vendor send the rest of its reply.
@@ -368,8 +373,15 @@ func (w *world) config() string {
 			b.WriteString("      protocol: http/protobuf\n")
 		}
 		fmt.Fprintf(&b, "      endpoint: %s\n", r.endpoint)
+		extra := ""
 		if i < len(w.exporterExtra) {
-			b.WriteString(w.exporterExtra[i])
+			extra = w.exporterExtra[i]
+		}
+		b.WriteString(extra)
+		for _, name := range []string{"metricInterval", "logInterval", "traceInterval"} {
+			if !w.unsetIntervals && !strings.Contains(extra, name) {
+				b.WriteString("      " + name + ": 20ms\n")
+			}
 		}
 	}
 	for _, e := range w.downEndpoints {
@@ -377,6 +389,10 @@ func (w *world) config() string {
 	}
 	if w.telemetry != nil {
 		fmt.Fprintf(&b, "telemetry:\n  otlp:\n    endpoint: %s\n", w.telemetry.endpoint)
+		if !w.unsetOwnInterval {
+			b.WriteString("    metricInterval: 20ms\n")
+		}
+		b.WriteString(w.telemetryExtra)
 		for i, name := range w.telemetryDisable {
 			if i == 0 {
 				b.WriteString("  disable:\n")
@@ -412,9 +428,6 @@ func (w *world) start() error {
 		}
 		w.configPath = w.writeFile("hotline-proxy.yaml", content)
 	}
-	if w.exportInterval == 0 {
-		w.exportInterval = 20 * time.Millisecond
-	}
 	if w.exportTimeout == 0 {
 		w.exportTimeout = 2 * time.Second
 	}
@@ -423,16 +436,15 @@ func (w *world) start() error {
 		clock = w.clock
 	}
 	w.proxy, w.startErr = proxy.Start(context.Background(), proxy.Options{
-		ConfigPath:     w.configPath,
-		Resolver:       w.network,
-		Dialer:         w.network,
-		RootCAs:        w.issuer.pool,
-		Clock:          clock,
-		Logger:         slog.New(slog.NewTextHandler(w.logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
-		ExportInterval: w.exportInterval,
-		ExportTimeout:  w.exportTimeout,
-		Version:        "1.0.0-test",
-		InstanceID:     "proxy-test-1",
+		ConfigPath:    w.configPath,
+		Resolver:      w.network,
+		Dialer:        w.network,
+		RootCAs:       w.issuer.pool,
+		Clock:         clock,
+		Logger:        slog.New(slog.NewTextHandler(w.logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
+		ExportTimeout: w.exportTimeout,
+		Version:       "1.0.0-test",
+		InstanceID:    "proxy-test-1",
 		LookupEnv: func(name string) (string, bool) {
 			v, ok := w.env[name]
 			return v, ok

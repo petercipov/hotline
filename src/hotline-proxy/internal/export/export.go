@@ -34,11 +34,10 @@ import (
 	"hotline-proxy/internal/config"
 )
 
-// Timing says how often the proxy sends, and how long one send to a
-// destination may take, retries included.
+// Timing says how long one send to a destination may take, retries
+// included. How often each destination is sent to is in its config.
 type Timing struct {
-	Interval time.Duration
-	Timeout  time.Duration
+	Timeout time.Duration
 }
 
 // Service describes the proxy on every signal it sends.
@@ -97,20 +96,22 @@ func New(exporters []config.Exporter, roots *x509.CertPool, service Service, tim
 		metrics := metricSender(e, roots, timing)
 		up := &atomic.Int64{}
 		up.Store(1)
-		setup := queueSetup{endpoint: e.Endpoint, size: e.QueueSize, interval: timing.Interval, logger: logger, up: up}
+		setup := queueSetup{endpoint: e.Endpoint, size: e.QueueSize, logger: logger, up: up}
 		setup.sent, setup.dropped = stats.sent, stats.dropped
 		logSetup := setup
 		logSetup.labels = signal(e, "record")
+		logSetup.interval = e.LogInterval
 		q := newLogQueue(logs(e, tlsFor(e, roots), timing), logSetup)
 		spanSetup := setup
 		spanSetup.labels = signal(e, "span")
+		spanSetup.interval = e.TraceInterval
 		counted := countedMetrics{Exporter: metrics, sent: stats.sent, dropped: stats.dropped, labels: signal(e, "count"), up: up}
 		res := describe(service, e.Resource)
 		d := destination{
 			logs: sdklog.NewLoggerProvider(sdklog.WithResource(res), sdklog.WithProcessor(q)),
 			metrics: sdkmetric.NewMeterProvider(sdkmetric.WithResource(res),
 				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(counted,
-					sdkmetric.WithInterval(timing.Interval),
+					sdkmetric.WithInterval(e.MetricInterval),
 					sdkmetric.WithTimeout(timing.Timeout)))),
 			queue: q,
 			spans: newSpanQueue(traces(e, tlsFor(e, roots), timing), spanSetup),

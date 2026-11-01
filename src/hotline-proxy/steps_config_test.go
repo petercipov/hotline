@@ -433,6 +433,15 @@ func (w *world) brokenConfig(problem string) error {
 	case "an integration's fingerprintKey file does not exist":
 		w.rawConfig = w.raw(start+exporters, integration("shop", w.apiFor("api.x.com", ""))+"    fingerprintKey: { file: missing-key }\n")
 		w.problem = "integration shop: fingerprintKey: the file missing-key cannot be read"
+	case "an exporter's metricInterval is zero":
+		w.rawConfig = start + exporters + "      metricInterval: 0s\n"
+		w.problem = "metricInterval \"0s\" must be a duration above zero"
+	case "an exporter's logInterval is not a duration":
+		w.rawConfig = start + exporters + "      logInterval: often\n"
+		w.problem = "logInterval \"often\" must be a duration above zero"
+	case "an exporter's traceInterval is negative":
+		w.rawConfig = start + exporters + "      traceInterval: -1s\n"
+		w.problem = "traceInterval \"-1s\" must be a duration above zero"
 	case "an exporter's queueSize is zero":
 		w.rawConfig = start + exporters + "      queueSize: 0\n"
 		w.problem = "queueSize must be at least 1"

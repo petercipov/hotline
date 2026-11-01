@@ -60,8 +60,6 @@ type Options struct {
 	RootCAs *x509.CertPool
 	Clock   Clock
 	Logger  *slog.Logger
-	// ExportInterval is how often queued records and counts are sent.
-	ExportInterval time.Duration
 	// ExportTimeout is how long one send to a destination may take,
 	// retries included.
 	ExportTimeout time.Duration
@@ -119,7 +117,7 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		}
 	}
 	service := export.Service{Version: o.Version, InstanceID: o.InstanceID}
-	timing := export.Timing{Interval: o.ExportInterval, Timeout: o.ExportTimeout}
+	timing := export.Timing{Timeout: o.ExportTimeout}
 	telemetry := export.NewOwn(cfg.Telemetry, o.RootCAs, service, timing)
 	sink := export.New(cfg.Exporters, o.RootCAs, service, timing, o.Logger, telemetry.Meter())
 	h := &handler{

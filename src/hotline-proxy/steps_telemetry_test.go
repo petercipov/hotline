@@ -20,6 +20,30 @@ func telemetrySteps(sc *godog.ScenarioContext, w *world) {
 		w.telemetry = newReceiver()
 		return nil
 	})
+	sc.Step(`^the telemetry destination does not set metricInterval$`, func() error {
+		w.unsetOwnInterval = true
+		return nil
+	})
+	sc.Step(`^the telemetry destination sets (logInterval|traceInterval)$`, func(name string) error {
+		w.telemetryExtra = "    " + name + ": 5s\n"
+		return nil
+	})
+	sc.Step(`^the telemetry receiver gets no metric within a second$`, func() error {
+		time.Sleep(time.Second)
+		if points := w.telemetry.metricPoints(); len(points) > 0 {
+			return failf("got %d data points within a second, the first %s", len(points), points[0].name)
+		}
+		return nil
+	})
+	sc.Step(`^the telemetry receiver gets the metric (\S+) once the proxy stops$`, func(name string) error {
+		w.settle()
+		for _, p := range w.telemetry.metricPoints() {
+			if p.name == name {
+				return nil
+			}
+		}
+		return failf("the telemetry receiver got no %s", name)
+	})
 	sc.Step(`^a config with no telemetry section$`, func() error {
 		w.telemetry.stop()
 		w.telemetry = nil

@@ -109,6 +109,12 @@ type Exporter struct {
 	Delta   bool
 	// QueueSize is how many records wait for the destination at most.
 	QueueSize int
+	// MetricInterval, LogInterval and TraceInterval are how often counts,
+	// records and spans are sent. Records and spans also go sooner once a
+	// batch of them waits.
+	MetricInterval time.Duration
+	LogInterval    time.Duration
+	TraceInterval  time.Duration
 	// Resource are labels that describe where the proxy runs, sent to this
 	// destination only. They may change service.name and
 	// service.instance.id, never service.version.
@@ -194,7 +200,11 @@ type exporterFile struct {
 	Compression string            `yaml:"compression"`
 	Temporality string            `yaml:"temporality"`
 	QueueSize   *int              `yaml:"queueSize"`
-	Resource    map[string]secret `yaml:"resource"`
+	// The intervals are durations, such as 15s.
+	MetricInterval *string           `yaml:"metricInterval"`
+	LogInterval    *string           `yaml:"logInterval"`
+	TraceInterval  *string           `yaml:"traceInterval"`
+	Resource       map[string]secret `yaml:"resource"`
 }
 
 type exporterTLSFile struct {
@@ -463,6 +473,11 @@ func (l *loader) exporter(f exporterFile, now time.Time) Exporter {
 		Delta:     f.Temporality == "delta",
 		QueueSize: 10_000,
 		Headers:   map[string]string{},
+		// A data point a minute is what Grafana Cloud's standard pricing
+		// covers (Peter, 2026-11-01).
+		MetricInterval: l.interval(label, "metricInterval", f.MetricInterval, time.Minute),
+		LogInterval:    l.interval(label, "logInterval", f.LogInterval, 15*time.Second),
+		TraceInterval:  l.interval(label, "traceInterval", f.TraceInterval, 15*time.Second),
 	}
 	switch f.Protocol {
 	case "", "grpc", "http/protobuf":
@@ -592,6 +607,19 @@ func (l *loader) issuers(label, path string) []byte {
 
 func (l *loader) problem(format string, args ...any) {
 	l.problems = append(l.problems, fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...)))
+}
+
+// interval reads one of an exporter's intervals, or gives the default.
+func (l *loader) interval(label, name string, value *string, def time.Duration) time.Duration {
+	if value == nil {
+		return def
+	}
+	d, err := time.ParseDuration(*value)
+	if err != nil || d <= 0 {
+		l.problem("%s: %s %q must be a duration above zero, such as 15s", label, name, *value)
+		return def
+	}
+	return d
 }
 
 func (l *loader) settings(label string, f settingsFile, s Settings) Settings {

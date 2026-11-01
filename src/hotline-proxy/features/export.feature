@@ -53,6 +53,27 @@ Feature: Sending OpenTelemetry data
       | does not set temporality   | cumulative |
       | sets temporality to delta  | delta      |
 
+  Scenario: How often each exporter sends, by default
+    Counts go out once a minute: one data point a minute is what Grafana
+    Cloud's standard pricing covers. Records and spans go out every 15
+    seconds, or sooner once 512 are waiting (Peter, 2026-11-01).
+    Given an exporter that sets no intervals
+    When a call ends
+    Then nothing arrives within a second
+    And the record, its spans and the count arrive when the proxy stops
+
+  Scenario Outline: Each signal has its own interval
+    Given an exporter that sets <setting> to 1h
+    When a call ends
+    Then no <signal> arrives within a second, but the others do
+    And the <signal> arrives when the proxy stops
+
+    Examples:
+      | setting        | signal |
+      | metricInterval | count  |
+      | logInterval    | record |
+      | traceInterval  | span   |
+
   Scenario: No latency histogram
     When calls end
     Then no histogram is sent
