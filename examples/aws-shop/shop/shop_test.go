@@ -128,7 +128,7 @@ var _ = Describe("The shop's four apps", func() {
 		})
 
 		It("refuses an order it doesn't know", func() {
-			_, err := app("checkout").Pay(ctx, shop.Payment{OrderID: "A-9999", Language: "en", Template: "default"}, now)
+			_, err := app("checkout").Pay(ctx, shop.Payment{OrderID: "Z-9999", Language: "en", Template: "default"}, now)
 			Expect(err).To(MatchError(invoice.ErrUnknownOrder))
 		})
 	})

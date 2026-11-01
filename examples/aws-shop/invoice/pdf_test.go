@@ -33,8 +33,18 @@ var _ = Describe("Rendering the invoice PDF", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(total).To(Equal("65.97"))
 		Expect(currency).To(Equal("EUR"))
-		_, _, err = invoice.OrderTotal("A-9999")
+		_, _, err = invoice.OrderTotal("Z-9999")
 		Expect(err).To(MatchError(invoice.ErrUnknownOrder))
+	})
+
+	It("knows any other A order as a sample order, so each run can pay a new one", func() {
+		total, currency, err := invoice.OrderTotal("A-20261101221714")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(total).To(Equal("65.97"))
+		Expect(currency).To(Equal("EUR"))
+		pdf, err := invoice.Render(job("A-20261101221714", "invoice-standard-v2", "en"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(pdf)).To(ContainSubstring("(Invoice A-20261101221714)"))
 	})
 
 	It("uses the job's language", func() {

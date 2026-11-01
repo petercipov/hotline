@@ -15,7 +15,7 @@ Every app also writes its log lines to CloudWatch Logs, in a log stream named af
 
 ## The whole story in one go
 
-[run-shop.sh](run-shop.sh) runs it all against the AWS resources that already exist, through Hotline: checkout pays order A-1001, invoices makes the invoice, the mailer mails it (with SES when `MAIL_FROM` is set, to AWS's test inbox `success@simulator.amazonses.com`, which accepts the email and delivers nothing), refunds starts a credit note, and then two mistakes on purpose (a broken invoice job, and an order written to a table that is not checkout's own). It prints a summary, and stops at the first step that fails. It never creates or removes anything.
+[run-shop.sh](run-shop.sh) runs it all against the AWS resources that already exist, through Hotline: checkout pays a new order each run (such as A-20261101221714, from the date and time; any `A-` number is a sample order with A-1001's lines, and `ORDER` picks one), invoices makes the invoice (trying a few times, as the topic passes the job on a moment later), the mailer mails it (with SES when `MAIL_FROM` is set, to AWS's test inbox `success@simulator.amazonses.com`, which accepts the email and delivers nothing), refunds starts a credit note, and then two mistakes on purpose (a broken invoice job, and an order written to a table that is not checkout's own). It prints a summary, and stops at the first step that fails. It never creates or removes anything.
 
 ```
 go run ../../src/hotline-proxy/cmd run --config ../../src/hotline-proxy/testdata/aws/hotline-proxy.yaml   # Hotline, in its own terminal

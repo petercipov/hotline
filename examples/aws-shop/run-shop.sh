@@ -22,7 +22,8 @@
 #   HOTLINE_PROXY=http://localhost:8080 ./run-shop.sh
 #
 # Settings:
-#   ORDER        the order to pay (default A-1001)
+#   ORDER        the order to pay (default a new one each run, such as
+#                A-20261101221714, from the date and time)
 #   SEND_TO      where the invoice is mailed (default AWS's test inbox,
 #                success@simulator.amazonses.com, which accepts the email
 #                and delivers nothing)
@@ -34,7 +35,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 export HOTLINE_PROXY="${HOTLINE_PROXY:-http://localhost:8080}"
-order="${ORDER:-A-1001}"
+order="${ORDER:-A-$(date +%Y%m%d%H%M%S)}"
 send_to="${SEND_TO:-success@simulator.amazonses.com}"
 wrong_table="${WRONG_TABLE:-orders-archive}"
 
@@ -75,6 +76,21 @@ mistake() {
   fi
 }
 
+# invoiced runs the invoices worker until the invoice of the order is
+# stored. The topic passes the job on to the invoices queue a moment after
+# checkout publishes it, so the first look can find the queue empty.
+invoiced() {
+  for _ in 1 2 3 4 5; do
+    shop invoices work --once || return 1
+    if shop invoices status --order "$order" 2>/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "no invoice job for $order reached the invoices queue"
+  return 1
+}
+
 # mailed waits for the shop's EventBridge rule to put InvoiceReady on the
 # mail queue, then mails it: with SES when MAIL_FROM is set, else to ./mail.
 mailed() {
@@ -99,8 +115,7 @@ mailed() {
 }
 
 step "checkout pays $order" shop checkout pay --order "$order" --language en --send-to "$send_to"
-step "invoices makes the invoice for $order" shop invoices work --once
-step "invoices shows the invoice of $order" shop invoices status --order "$order"
+step "invoices makes the invoice for $order" invoiced
 step "mailer mails the invoice of $order" mailed
 step "refunds starts a credit note for $order" shop refunds start --order "$order" --amount 10.00 --reason returned
 
