@@ -74,18 +74,18 @@ To create the ones that don't exist yet (the queue `invoices` does). The Kinesis
 export AWS_REGION=eu-west-1 ACCOUNT=192325781350
 
 aws sqs create-queue --queue-name mail
-aws s3 mb s3://shop-invoices-$ACCOUNT
-aws s3api put-public-access-block --bucket shop-invoices-$ACCOUNT \
+aws s3 mb s3://shop-invoices-${ACCOUNT}
+aws s3api put-public-access-block --bucket shop-invoices-${ACCOUNT} \
   --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 for table in orders invoices; do
-  aws dynamodb create-table --table-name $table --billing-mode PAY_PER_REQUEST \
+  aws dynamodb create-table --table-name ${table} --billing-mode PAY_PER_REQUEST \
     --attribute-definitions AttributeName=orderId,AttributeType=S --key-schema AttributeName=orderId,KeyType=HASH
 done
 aws kinesis create-stream --stream-name shop-events --stream-mode-details StreamMode=ON_DEMAND
 aws secretsmanager create-secret --name shop/payment-key --secret-string "any value, for the example"
 aws ssm put-parameter --name /shop/invoices/default-template --type String --value invoice-standard-v2
 key=$(aws kms create-key --key-spec ECC_NIST_P256 --key-usage SIGN_VERIFY --query KeyMetadata.KeyId --output text)
-aws kms create-alias --alias-name alias/invoice-signing --target-key-id $key
+aws kms create-alias --alias-name alias/invoice-signing --target-key-id ${key}
 aws logs create-log-group --log-group-name /shop/aws-shop
 
 # The bus, and a rule that puts each InvoiceReady event on the mail queue.
@@ -93,20 +93,20 @@ aws events create-event-bus --name shop
 aws events put-rule --name invoice-ready-to-mail --event-bus-name shop \
   --event-pattern '{"source":["shop.invoices"],"detail-type":["InvoiceReady"]}'
 aws events put-targets --rule invoice-ready-to-mail --event-bus-name shop \
-  --targets Id=mail,Arn=arn:aws:sqs:$AWS_REGION:$ACCOUNT:mail
-aws sqs set-queue-attributes --queue-url https://sqs.$AWS_REGION.amazonaws.com/$ACCOUNT/mail --attributes "{\"Policy\":\"{\\\"Statement\\\":[{\\\"Effect\\\":\\\"Allow\\\",\\\"Principal\\\":{\\\"Service\\\":\\\"events.amazonaws.com\\\"},\\\"Action\\\":\\\"sqs:SendMessage\\\",\\\"Resource\\\":\\\"arn:aws:sqs:$AWS_REGION:$ACCOUNT:mail\\\",\\\"Condition\\\":{\\\"ArnEquals\\\":{\\\"aws:SourceArn\\\":\\\"arn:aws:events:$AWS_REGION:$ACCOUNT:rule/shop/invoice-ready-to-mail\\\"}}}]}\"}"
+  --targets Id=mail,Arn=arn:aws:sqs:${AWS_REGION}:${ACCOUNT}:mail
+aws sqs set-queue-attributes --queue-url https://sqs.${AWS_REGION}.amazonaws.com/${ACCOUNT}/mail --attributes "{\"Policy\":\"{\\\"Statement\\\":[{\\\"Effect\\\":\\\"Allow\\\",\\\"Principal\\\":{\\\"Service\\\":\\\"events.amazonaws.com\\\"},\\\"Action\\\":\\\"sqs:SendMessage\\\",\\\"Resource\\\":\\\"arn:aws:sqs:${AWS_REGION}:${ACCOUNT}:mail\\\",\\\"Condition\\\":{\\\"ArnEquals\\\":{\\\"aws:SourceArn\\\":\\\"arn:aws:events:${AWS_REGION}:${ACCOUNT}:rule/shop/invoice-ready-to-mail\\\"}}}]}\"}"
 
 # The credit note workflow: for now a single step that passes the refund on.
 aws iam create-role --role-name credit-note-workflow \
   --assume-role-policy-document '{"Statement":[{"Effect":"Allow","Principal":{"Service":"states.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
-aws stepfunctions create-state-machine --name credit-note --role-arn arn:aws:iam::$ACCOUNT:role/credit-note-workflow \
+aws stepfunctions create-state-machine --name credit-note --role-arn arn:aws:iam::${ACCOUNT}:role/credit-note-workflow \
   --definition '{"StartAt":"CreditNote","States":{"CreditNote":{"Type":"Pass","End":true}}}'
 
 # The order-paid topic, passing each job as is (raw delivery) to the invoices queue.
 topic=$(aws sns create-topic --name order-paid --query TopicArn --output text)
-aws sqs set-queue-attributes --queue-url https://sqs.$AWS_REGION.amazonaws.com/$ACCOUNT/invoices \
+aws sqs set-queue-attributes --queue-url https://sqs.${AWS_REGION}.amazonaws.com/${ACCOUNT}/invoices \
   --attributes "$(jq -c '{Policy: tostring}' aws/invoices-queue-policy.json)"
-aws sns subscribe --topic-arn $topic --protocol sqs --notification-endpoint arn:aws:sqs:$AWS_REGION:$ACCOUNT:invoices \
+aws sns subscribe --topic-arn ${topic} --protocol sqs --notification-endpoint arn:aws:sqs:${AWS_REGION}:${ACCOUNT}:invoices \
   --attributes RawMessageDelivery=true
 
 # The invoice-worker role, with only the rights the invoices worker needs.
@@ -117,9 +117,9 @@ aws iam put-role-policy --role-name invoice-worker --policy-name invoice-worker 
 aws iam create-role --role-name payment-qr-function \
   --assume-role-policy-document '{"Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
 aws iam attach-role-policy --role-name payment-qr-function --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-(cd aws && zip -q ../payment-qr.zip payment_qr.py)
+(cd aws && zip -q ../payment-qr.zip payment_qr.py) && \
 aws lambda create-function --function-name payment-qr --runtime python3.13 --handler payment_qr.handler \
-  --role arn:aws:iam::$ACCOUNT:role/payment-qr-function --zip-file fileb://payment-qr.zip
+  --role arn:aws:iam::${ACCOUNT}:role/payment-qr-function --zip-file fileb://payment-qr.zip && \
 rm payment-qr.zip
 
 # The SES sender: AWS mails a link to this address, which you click once.
