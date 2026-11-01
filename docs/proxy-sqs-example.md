@@ -137,7 +137,7 @@ This also builds what [proxy-aws.md](proxy-aws.md) agreed but did not build yet:
 
 ## The example app
 
-**Built** (Peter asked for it, 2026-10-30): [examples/aws-sqs-invoices](../examples/aws-sqs-invoices/README.md), its own Go module, so the proxy's module never depends on the AWS SDK. Three commands:
+**Built** (Peter asked for it, 2026-10-30): `examples/aws-sqs-invoices`, renamed [examples/aws-shop](../examples/aws-shop/README.md) on 2026-11-01, where these commands became the shop's `checkout` and `invoices` apps (see [proxy-shop-example.md](proxy-shop-example.md)). It is its own Go module, so the proxy's module never depends on the AWS SDK. Three commands:
 
 - `request --order A-1001 --template invoice-standard-v2 --language en`: sends the invoice job to the queue.
 - `send --body TEXT`: sends any text unchanged, to try Hotline's checks with a broken message.

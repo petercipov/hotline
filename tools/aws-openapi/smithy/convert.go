@@ -427,8 +427,68 @@ func constrain(out map[string]any, traits map[string]any, kind string) {
 		}
 	}
 	if p, ok := traits["smithy.api#pattern"].(string); ok {
-		out["pattern"] = p
+		if goPattern, ok := readablePattern(p); ok {
+			out["pattern"] = goPattern
+		} else {
+			// Go can't read it (a look ahead, a repeat above 1000), so it
+			// can't be checked; it stays in the spec for people to read.
+			out["x-aws-pattern"] = p
+		}
 	}
+}
+
+// readablePattern writes an AWS pattern, written for Java, so Go's regular
+// expressions read it the same way: a character by its number (\u0020)
+// becomes \x{0020}, and Java's printable class \p{Print} becomes the
+// printable ASCII range. It says false when Go still can't read it.
+func readablePattern(p string) (string, bool) {
+	var b strings.Builder
+	inClass := false
+	for i := 0; i < len(p); i++ {
+		c := p[i]
+		switch {
+		case c == '\\' && i+1 < len(p):
+			rest := p[i+1:]
+			switch {
+			case len(rest) >= 5 && rest[0] == 'u' && isHex(rest[1:5]):
+				b.WriteString(`\x{` + rest[1:5] + `}`)
+				i += 5
+			case strings.HasPrefix(rest, "p{Print}"):
+				if inClass {
+					b.WriteString(`\x20-\x7E`)
+				} else {
+					b.WriteString(`[\x20-\x7E]`)
+				}
+				i += len("p{Print}")
+			default:
+				b.WriteByte(c)
+				b.WriteByte(p[i+1])
+				i++
+			}
+		case c == '[' && !inClass:
+			inClass = true
+			b.WriteByte(c)
+		case c == ']' && inClass:
+			inClass = false
+			b.WriteByte(c)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	out := b.String()
+	if _, err := regexp.Compile(out); err != nil {
+		return "", false
+	}
+	return out, true
+}
+
+func isHex(s string) bool {
+	for _, r := range s {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *converter) prelude(target string) map[string]any {

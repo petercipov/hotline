@@ -7,13 +7,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
 )
 
-const invoicesBucketHost = "shop-invoices.s3.eu-west-1.amazonaws.com"
+const invoicesBucketHost = "shop-invoices-192325781350.s3.eu-west-1.amazonaws.com"
 
 // s3Templates are the routes of the S3 actions the example app uses.
 func s3Templates() map[string]string {
@@ -28,12 +29,14 @@ func s3Templates() map[string]string {
 func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 	var (
 		s3          *fakeS3
+		sqs         *fakeSQS
 		output      string
 		appErr      error
 		fetchedFile string
 	)
 	// example runs the example app against AWS's real host names, through
-	// the proxy, which reaches the fakes by those names.
+	// the proxy, which reaches the fakes by those names. Each app adds its
+	// own name to the proxy address, as its integration ID.
 	example := func(args ...string) error {
 		binary, err := app.build()
 		if err != nil {
@@ -47,8 +50,8 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 			"AWS_SECRET_ACCESS_KEY=secret",
 			"AWS_EC2_METADATA_DISABLED=true",
 			"INVOICES_QUEUE_URL=" + invoicesQueue,
-			"INVOICES_BUCKET=shop-invoices",
-			"HOTLINE_PROXY=http://invoices:x@" + w.addr,
+			"INVOICES_BUCKET=shop-invoices-192325781350",
+			"HOTLINE_PROXY=http://" + w.addr,
 			"HOME=" + w.dir,
 		}
 		out, err := cmd.CombinedOutput()
@@ -64,15 +67,20 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 		}
 		return nil
 	}
-	sc.Step(`^a fake SQS and a fake S3 with the bucket (\S+)$`, func(bucket string) error {
+	sc.Step(`^a fake AWS for the shop, with the bucket (\S+)$`, func(bucket string) error {
 		s3 = newFakeS3(bucket)
-		w.vendor(sqsHost).setAnswer((&fakeSQS{}).ServeHTTP)
+		sqs = &fakeSQS{}
+		w.vendor(sqsHost).setAnswer(sqs.ServeHTTP)
 		w.vendor(bucket + ".s3.eu-west-1.amazonaws.com").setAnswer(s3.ServeHTTP)
+		apis := newFakeShopAWS(sqs)
+		for _, host := range shopHosts() {
+			w.vendor(host).setAnswer(apis.ServeHTTP)
+		}
 		return nil
 	})
-	sc.Step(`^the proxy runs with the invoices hotline-proxy.yaml$`, func() error {
+	sc.Step(`^the proxy runs with the shop's hotline-proxy.yaml$`, func() error {
 		w.addr = freePort()
-		config, err := invoicesConfig(
+		config, err := shopConfig(
 			[2]string{`":8080"`, fmt.Sprintf("%q", w.addr)},
 			[2]string{"localhost:4317", w.receivers[0].endpoint},
 		)
@@ -82,21 +90,69 @@ func s3Steps(sc *godog.ScenarioContext, w *world, app *exampleApp) {
 		}
 		return w.start()
 	})
-	sc.Step(`^the example app requests the invoice for order (\S+)$`, func(order string) error {
-		return succeed("request", "--order", order, "--template", "invoice-standard-v2", "--language", "en")
+	sc.Step(`^checkout takes the payment for order (\S+)$`, func(order string) error {
+		return succeed("checkout", "pay", "--order", order, "--language", "en", "--template", "invoice-standard-v2", "--send-to", "customer@example.com")
 	})
-	sc.Step(`^the example app works through the queue once, into the bucket$`, func() error {
-		return succeed("work", "--once")
+	sc.Step(`^the invoices app works through its queue once, into the bucket$`, func() error {
+		return succeed("invoices", "work", "--once")
 	})
-	sc.Step(`^the example app fetches the invoice for (\S+)$`, func(order string) error {
+	sc.Step(`^the mailer works through its queue once$`, func() error {
+		return succeed("mailer", "work", "--once", "--out", filepath.Join(w.dir, "mail"))
+	})
+	sc.Step(`^refunds starts a credit note of (\S+) for order (\S+)$`, func(amount, order string) error {
+		return succeed("refunds", "start", "--order", order, "--amount", amount, "--reason", "returned")
+	})
+	sc.Step(`^the invoices app fetches the invoice for (\S+)$`, func(order string) error {
 		fetchedFile = filepath.Join(w.dir, order+".pdf")
-		return example("fetch", "--order", order, "--out", fetchedFile)
+		return example("invoices", "fetch", "--order", order, "--out", fetchedFile)
 	})
-	sc.Step(`^the example app lists the invoices$`, func() error {
-		return succeed("list")
+	sc.Step(`^the invoices app lists the invoices$`, func() error {
+		return succeed("invoices", "list")
 	})
-	sc.Step(`^the example app cleans up the invoices stored before (\S+)$`, func(day string) error {
-		return succeed("cleanup", "--before", day)
+	sc.Step(`^the invoices app cleans up the invoices stored before (\S+)$`, func(day string) error {
+		return succeed("invoices", "cleanup", "--before", day)
+	})
+	sc.Step(`^the mailer wrote (\S+) with the PDF attached$`, func(name string) error {
+		mail, err := os.ReadFile(filepath.Join(w.dir, "mail", name)) //nolint:gosec // the test's own folder
+		if err != nil {
+			return err
+		}
+		if !strings.Contains(string(mail), "application/pdf") {
+			return failf("the mail has no PDF attached:\n%s", mail)
+		}
+		return nil
+	})
+	sc.Step(`^both queues are empty$`, func() error {
+		if n := sqs.waiting(); n != 0 {
+			return failf("the queues still hold %d messages", n)
+		}
+		return nil
+	})
+	sc.Step(`^every record has no results$`, func() error {
+		for _, r := range w.records() {
+			if err := hasNo(r.attrs, "hotline.schema.request.errors", "hotline.schema.response.errors"); err != nil {
+				return fmt.Errorf("the record for %v %v: %w", r.attrs["server.address"], r.attrs["url.template"], err)
+			}
+		}
+		return nil
+	})
+	sc.Step(`^the records come from the integrations (.+)$`, func(list string) error {
+		seen := map[string]bool{}
+		for _, r := range w.records() {
+			seen[fmt.Sprint(r.attrs["hotline.integration.id"])] = true
+		}
+		got := make([]string, 0, len(seen))
+		for id := range seen {
+			got = append(got, id)
+		}
+		sort.Strings(got)
+		want := strings.FieldsFunc(list, func(r rune) bool { return r == ',' || r == ' ' })
+		want = slices.DeleteFunc(want, func(s string) bool { return s == "and" })
+		sort.Strings(want)
+		if !slices.Equal(got, want) {
+			return failf("the records come from %v, want %v", got, want)
+		}
+		return nil
 	})
 	sc.Step(`^the bucket holds (\S+?)(?: and (\S+?))?(?:, stored on (\S+))?$`, func(first, second, day string) error {
 		when := time.Now().UTC()

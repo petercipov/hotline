@@ -1,0 +1,35 @@
+# The mail queue on the shared SQS spec (specs/aws/sqs/2012-11-05.openapi.yaml):
+# its own queue URL, and the message the mailer receives. An EventBridge rule
+# on the bus "shop" puts every InvoiceReady event on this queue, so each
+# message is EventBridge's event, as JSON text, with the InvoiceReady detail.
+overlay: 1.1.0
+info:
+  title: Mail queue
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      InvoiceReadyEvent:
+        type: object
+        required: [detail-type, source, detail]
+        properties:
+          detail-type: { const: InvoiceReady }
+          source: { const: shop.invoices }
+          detail:
+            type: object
+            additionalProperties: false
+            required: [orderId, eventId, file, language, createdAt]
+            properties:
+              orderId: { type: string, pattern: '^[A-Z]-[0-9]+$' }
+              eventId: { type: string, format: uuid }
+              file: { type: string, pattern: '^[A-Z]-[0-9]+\.pdf$' }
+              language: { type: string, enum: [en, de, sk, cs] }
+              sendTo: { type: string, format: email }
+              createdAt: { type: string, format: date-time }
+  - target: $.components.schemas.*.properties.QueueUrl
+    update:
+      const: https://sqs.eu-west-1.amazonaws.com/192325781350/mail
+  - target: $.components.schemas.Message.properties.Body
+    update:
+      contentMediaType: application/json
+      contentSchema: { $ref: '#/components/schemas/InvoiceReadyEvent' }

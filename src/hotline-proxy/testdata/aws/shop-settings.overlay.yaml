@@ -1,0 +1,10 @@
+# The shop's settings on the shared SSM spec (specs/aws/ssm/2014-11-06.openapi.yaml):
+# the invoices worker reads one parameter, its default invoice template.
+overlay: 1.1.0
+info:
+  title: Shop settings
+  version: "1"
+actions:
+  - target: $.components.schemas.GetParameterRequest.properties.Name
+    update:
+      const: /shop/invoices/default-template

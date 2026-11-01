@@ -23,7 +23,7 @@ jobs:
             src/hotline-proxy/go.sum
             src/otel-hotline/go.sum
             src/otelcol-dev/go.sum
-            examples/aws-sqs-invoices/go.sum
+            examples/aws-shop/go.sum
             tools/aws-openapi/go.sum
             go.work.sum
       - name: run tests

@@ -1,6 +1,6 @@
 # XML bodies and S3: requirements
 
-*Agreed with Peter, 2026-10-31; built the same day. Scenarios: `src/hotline-proxy/features/xml-bodies.feature`, `query-word-routes.feature` and `aws-s3.feature`. The worked example is [examples/aws-sqs-invoices](../examples/aws-sqs-invoices/README.md).*
+*Agreed with Peter, 2026-10-31; built the same day. Scenarios: `src/hotline-proxy/features/xml-bodies.feature`, `query-word-routes.feature` and `aws-s3.feature`. The worked example is [examples/aws-shop](../examples/aws-shop/README.md), named `aws-sqs-invoices` until 2026-11-01.*
 
 One step, driven by S3 in the invoice example (Peter, 2026-10-31). It builds three things together: XML bodies for any vendor, S3 routes, and the S3 part of the invoice story.
 

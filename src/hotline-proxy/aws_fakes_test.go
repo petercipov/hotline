@@ -28,7 +28,8 @@ import (
 )
 
 // fakeSQS answers SendMessage, ReceiveMessage and DeleteMessage the way SQS
-// does over its JSON protocol, over TLS as localhost.
+// does over its JSON protocol, keeping each queue's messages apart. The
+// end-to-end test serves it over TLS as localhost.
 type fakeSQS struct {
 	server   *httptest.Server
 	mu       sync.Mutex
@@ -38,8 +39,8 @@ type fakeSQS struct {
 }
 
 type sqsMessage struct {
-	id, body, receipt string
-	inFlight          bool
+	queue, id, body, receipt string
+	inFlight                 bool
 }
 
 func newFakeSQS(cert tls.Certificate) *fakeSQS {
@@ -59,16 +60,15 @@ func (f *fakeSQS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var out any
 	switch r.Header.Get("X-Amz-Target") {
 	case "AmazonSQS.SendMessage":
-		f.next++
+		queue, _ := in["QueueUrl"].(string)
 		body, _ := in["MessageBody"].(string)
-		m := sqsMessage{id: fmt.Sprintf("m-%d", f.next), body: body, receipt: fmt.Sprintf("r-%d", f.next)}
-		f.messages = append(f.messages, m)
+		m := f.add(queue, body)
 		out = map[string]any{"MessageId": m.id, "MD5OfMessageBody": md5Hex(m.body)}
 	case "AmazonSQS.ReceiveMessage":
 		var got []map[string]any
 		for i := range f.messages {
 			m := &f.messages[i]
-			if !m.inFlight {
+			if !m.inFlight && m.queue == in["QueueUrl"] {
 				m.inFlight = true
 				got = append(got, map[string]any{"MessageId": m.id, "ReceiptHandle": m.receipt, "MD5OfBody": md5Hex(m.body), "Body": m.body})
 			}
@@ -92,6 +92,21 @@ func (f *fakeSQS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// add puts a message on a queue; the caller holds the lock.
+func (f *fakeSQS) add(queue, body string) sqsMessage {
+	f.next++
+	m := sqsMessage{queue: queue, id: fmt.Sprintf("m-%d", f.next), body: body, receipt: fmt.Sprintf("r-%d", f.next)}
+	f.messages = append(f.messages, m)
+	return m
+}
+
+// put puts a message on a queue, as another AWS service would.
+func (f *fakeSQS) put(queue, body string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.add(queue, body)
+}
+
 func (f *fakeSQS) waiting() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -113,8 +128,8 @@ type exampleApp struct {
 
 func (e *exampleApp) build() (string, error) {
 	e.once.Do(func() {
-		e.binary = filepath.Join(e.dir, "aws-sqs-invoices")
-		build := exec.CommandContext(context.Background(), "go", "build", "-o", e.binary, "hotline-example/aws-sqs-invoices") //nolint:gosec // builds the example app
+		e.binary = filepath.Join(e.dir, "aws-shop")
+		build := exec.CommandContext(context.Background(), "go", "build", "-o", e.binary, "hotline-example/aws-shop") //nolint:gosec // builds the example app
 		if out, err := build.CombinedOutput(); err != nil {
 			e.err = fmt.Errorf("%w: building the example app: %s", err, out)
 		}
@@ -283,10 +298,10 @@ func unchunk(data []byte) ([]byte, map[string]string) {
 	return body, trailer
 }
 
-// invoicesConfig is testdata/aws/hotline-proxy.yaml with the given
-// changes, each to text the file holds once, its admin port free, and its
-// specs, overlays and key read from where they are in the repo.
-func invoicesConfig(changes ...[2]string) (string, error) {
+// shopConfig is testdata/aws/hotline-proxy.yaml with the given changes,
+// each to text the file holds once, its admin port free, and its specs,
+// overlays and key read from where they are in the repo.
+func shopConfig(changes ...[2]string) (string, error) {
 	dir, err := filepath.Abs(filepath.Join("testdata", "aws"))
 	if err != nil {
 		return "", err
@@ -298,9 +313,6 @@ func invoicesConfig(changes ...[2]string) (string, error) {
 	config := string(data)
 	changes = append(changes,
 		[2]string{`":8081"`, `"127.0.0.1:0"`},
-		[2]string{"./invoices.overlay.yaml", filepath.Join(dir, "invoices.overlay.yaml")},
-		[2]string{"./invoices-bucket.overlay.yaml", filepath.Join(dir, "invoices-bucket.overlay.yaml")},
-		[2]string{"./invoices.key", filepath.Join(dir, "invoices.key")},
 	)
 	for _, change := range changes {
 		if strings.Count(config, change[0]) != 1 {
@@ -308,5 +320,7 @@ func invoicesConfig(changes ...[2]string) (string, error) {
 		}
 		config = strings.Replace(config, change[0], change[1], 1)
 	}
+	config = strings.ReplaceAll(config, "[./", "["+dir+"/")
+	config = strings.ReplaceAll(config, "file: ./", "file: "+dir+"/")
 	return strings.ReplaceAll(config, "../../../../specs/", filepath.Join(dir, "..", "..", "..", "..", "specs")+"/"), nil
 }

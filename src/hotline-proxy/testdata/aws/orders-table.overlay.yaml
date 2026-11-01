@@ -1,0 +1,39 @@
+# The orders table on the shared DynamoDB spec (specs/aws/dynamodb/2012-08-10.openapi.yaml):
+# its name, and the shape of one order row. DynamoDB writes every value with
+# its type, such as {"S": "A-1001"} for text and {"N": "12.50"} for a number,
+# which travels as text. Used by checkout, which saves the order, and by
+# refunds, which reads it.
+overlay: 1.1.0
+info:
+  title: Orders table
+  version: "1"
+actions:
+  - target: $.components.schemas
+    update:
+      OrderRow:
+        type: object
+        additionalProperties: false
+        required: [orderId, total, currency, language, paidAt]
+        properties:
+          orderId: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, pattern: '^[A-Z]-[0-9]+$' } } }
+          total: { type: object, additionalProperties: false, required: [N], properties: { N: { type: string, pattern: '^[0-9]+\.[0-9]{2}$' } } }
+          currency: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, enum: [EUR, CZK, USD] } } }
+          language: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, enum: [en, de, sk, cs] } } }
+          paidAt: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, format: date-time } } }
+      OrderKey:
+        type: object
+        additionalProperties: false
+        required: [orderId]
+        properties:
+          orderId: { type: object, additionalProperties: false, required: [S], properties: { S: { type: string, pattern: '^[A-Z]-[0-9]+$' } } }
+  # Every action that names a table names this one.
+  - target: $.components.schemas.*.properties.TableName
+    update:
+      const: orders
+  # The row, when saved and when read.
+  - target: $.components.schemas['PutItemInput','GetItemOutput'].properties.Item
+    update:
+      allOf: [{ $ref: '#/components/schemas/OrderRow' }]
+  - target: $.components.schemas['GetItemInput','DeleteItemInput','UpdateItemInput'].properties.Key
+    update:
+      allOf: [{ $ref: '#/components/schemas/OrderKey' }]

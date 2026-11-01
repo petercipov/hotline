@@ -1,6 +1,6 @@
 # The invoices queue on the shared SQS spec (specs/aws/sqs/2012-11-05.openapi.yaml):
 # its own queue URL, and the invoice job inside every message. The job schema is
-# the same as examples/aws-sqs-invoices/invoice/invoice-job.schema.json. The proxy
+# the same as examples/aws-shop/invoice/invoice-job.schema.json. The proxy
 # config that uses it is hotline-proxy.yaml here.
 overlay: 1.1.0
 info:
