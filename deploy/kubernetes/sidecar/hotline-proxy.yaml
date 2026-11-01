@@ -1,0 +1,29 @@
+# A small Hotline proxy config for the image: one app, one SQS queue. The
+# vendor spec ships inside the image, under /usr/share/hotline/specs/; the
+# config and its overlays come from a ConfigMap at /etc/hotline/config/, and the
+# key from a Secret at /etc/hotline/keys/. The image's smoke test in CI
+# validates and runs this file.
+
+version: sidecar-example-1
+listen:
+  proxy: ":8080"                   # the app sets HTTP_PROXY=http://checkout:x@localhost:8080
+  admin: ":8081"                   # health checks only; never in a Service
+
+exporters:
+  - otlp:
+      endpoint: &collector otel-collector.observability:4317   # your OpenTelemetry collector
+
+telemetry:                         # the proxy's own numbers, to the same collector
+  otlp:
+    endpoint: *collector
+
+apis:
+  aws-sqs-invoices:
+    hosts: [sqs.eu-west-1.amazonaws.com]
+    spec: /usr/share/hotline/specs/aws/sqs/2012-11-05.openapi.yaml
+    vendorTimeout: 25s             # above SQS's 20 second long polling
+
+integrations:
+  - id: checkout
+    apis: [aws-sqs-invoices]
+    fingerprintKey: { file: /etc/hotline/keys/fingerprint.key }   # signs this app's records
