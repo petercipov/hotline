@@ -53,6 +53,8 @@ Feature: Routes picked by a body field
         | the form body Action=MadeUp                             |
         | the form body Action=publish                            |
         | the json body {"Request":{"Action":"Publish"}}          |
+        | the json body ["Action","Publish"]                      |
+        | the form body Action=Publish&Message=100%               |
         | the text body Action=Publish                            |
         | a form body of 3 MiB that starts with Action=Publish    |
 
