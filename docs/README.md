@@ -20,6 +20,7 @@
 ## Checking calls against the vendor's spec
 
 - [Checks against the OpenAPI spec](proxy-spec-checks.md)
+- [Hotline's marks in a vendor spec](spec-marks.md): every `x-hotline-` mark, what it's for, with an example.
 - [Overlays on a spec](proxy-overlays.md)
 - [XML bodies and S3](proxy-xml-bodies.md)
 - [AWS through the proxy](proxy-aws.md)
