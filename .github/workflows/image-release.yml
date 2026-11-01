@@ -34,17 +34,22 @@ jobs:
         with:
           name: hotline-proxy-image
 
+      # Docker's login file, read by both skopeo and cosign. A skopeo login
+      # would keep the token where cosign does not look.
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       # --all keeps both platforms, the SBOM and the provenance;
       # --preserve-digests fails rather than change the image.
       - id: push
         name: push to ghcr.io
         env:
           TAGS: ${{ needs.image.outputs.tags }}
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
-          echo "$REGISTRY_TOKEN" | skopeo login ghcr.io --username "$REGISTRY_USER" --password-stdin
           for tag in $TAGS; do
             skopeo copy --all --preserve-digests --digestfile digest \
               oci-archive:hotline-proxy.tar "docker://$tag"
